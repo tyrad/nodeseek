@@ -14,28 +14,30 @@ protocol PostListViewProtocol: AnyObject {
     func showLoadingMore()
     func hideLoadingMore()
     func showError(message: String)
+    func renderCategories(_ categories: [PostListCategory], selected: PostListCategory)
     func render(posts: [PostSummary])
 }
 
 // MARK: - Presenter Protocol (View -> Presenter)
 protocol PostListPresenterProtocol: AnyObject {
     func viewDidLoad()
+    func didSelectCategory(_ category: PostListCategory)
     func didSelectPost(at index: Int)
     func didApproachBottom(currentIndex: Int, totalCount: Int)
 }
 
 // MARK: - Interactor Input (Presenter -> Interactor)
 protocol PostListInteractorInput: AnyObject {
-    func loadPosts()
-    func loadMorePosts(page: Int)
+    func loadPosts(category: PostListCategory)
+    func loadMorePosts(page: Int, category: PostListCategory)
 }
 
 // MARK: - Interactor Output (Interactor -> Presenter)
 protocol PostListInteractorOutput: AnyObject {
-    func didLoadPosts(_ posts: [PostSummary])
-    func didLoadMorePosts(_ posts: [PostSummary], page: Int)
-    func didFailLoadPosts(error: String)
-    func didFailLoadMorePosts(error: String, page: Int)
+    func didLoadPosts(_ posts: [PostSummary], category: PostListCategory)
+    func didLoadMorePosts(_ posts: [PostSummary], page: Int, category: PostListCategory)
+    func didFailLoadPosts(error: String, category: PostListCategory)
+    func didFailLoadMorePosts(error: String, page: Int, category: PostListCategory)
 }
 
 // MARK: - Router Protocol (Presenter -> Router)

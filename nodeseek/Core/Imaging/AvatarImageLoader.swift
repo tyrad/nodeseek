@@ -8,19 +8,8 @@
 import Foundation
 import Kingfisher
 import OSLog
+import SwiftDraw
 import UIKit
-import WebKit
-
-private let avatarRequestModifier = AnyModifier { request in
-    var request = request
-    request.setValue(
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
-        forHTTPHeaderField: "User-Agent"
-    )
-    request.setValue("https://www.nodeseek.com/", forHTTPHeaderField: "Referer")
-    request.setValue("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8", forHTTPHeaderField: "Accept")
-    return request
-}
 
 @MainActor
 final class AvatarImageLoader {
@@ -34,6 +23,10 @@ final class AvatarImageLoader {
 
     static let shared = AvatarImageLoader()
 
+    private enum AvatarRender {
+        static let size = CGSize(width: 56, height: 56)
+    }
+
     private static let placeholderImage: UIImage = {
         let size = CGSize(width: 8, height: 8)
         let renderer = UIGraphicsImageRenderer(size: size)
@@ -45,9 +38,11 @@ final class AvatarImageLoader {
 
     private let logger = Logger(subsystem: "com.nodeseek.app", category: "PostListAvatar")
     private let downloader: ImageDownloader
+    private let directSession: URLSession
     private let cookieBridge: CookieBridge
     private var requestTokens: [ObjectIdentifier: UUID] = [:]
     private let svgImageCache = NSCache<NSString, UIImage>()
+    private var knownSVGURLs = Set<String>()
 
     convenience init() {
         self.init(cookieBridge: CookieBridge())
@@ -55,14 +50,12 @@ final class AvatarImageLoader {
 
     init(cookieBridge: CookieBridge) {
         self.cookieBridge = cookieBridge
-        let configuration = URLSessionConfiguration.default
-        configuration.httpCookieStorage = .shared
-        configuration.httpShouldSetCookies = true
-        configuration.requestCachePolicy = .returnCacheDataElseLoad
-        configuration.timeoutIntervalForRequest = 20
-        configuration.timeoutIntervalForResource = 20
+
+        let downloaderConfiguration = Self.makeSessionConfiguration()
         self.downloader = ImageDownloader(name: "NodeSeekAvatarDownloader")
-        self.downloader.sessionConfiguration = configuration
+        self.downloader.sessionConfiguration = downloaderConfiguration
+
+        self.directSession = URLSession(configuration: Self.makeSessionConfiguration())
     }
 
     func cancel(on imageView: UIImageView) {
@@ -76,15 +69,25 @@ final class AvatarImageLoader {
         avatarURL: URL?,
         completion: Completion? = nil
     ) {
-        let viewID = ObjectIdentifier(imageView)
-        let token = UUID()
-        requestTokens[viewID] = token
-        imageView.kf.cancelDownloadTask()
+        let token = beginRequest(for: imageView)
         imageView.image = Self.placeholderImage
 
         guard let avatarURL else {
             logger.notice("头像URL缺失 id=\(postID, privacy: .public)")
-            requestTokens.removeValue(forKey: viewID)
+            finishIfCurrent(token, for: imageView)
+            return
+        }
+
+        if knownSVGURLs.contains(avatarURL.absoluteString) {
+            logger.debug("命中已知 SVG 快速路径 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)")
+            loadKnownSVGAvatar(
+                into: imageView,
+                token: token,
+                postID: postID,
+                avatarURL: avatarURL,
+                allowCookieRetry: true,
+                completion: completion
+            )
             return
         }
 
@@ -99,6 +102,14 @@ final class AvatarImageLoader {
         )
     }
 
+    private func beginRequest(for imageView: UIImageView) -> UUID {
+        let viewID = ObjectIdentifier(imageView)
+        let token = UUID()
+        requestTokens[viewID] = token
+        imageView.kf.cancelDownloadTask()
+        return token
+    }
+
     private func loadWithKingfisher(
         into imageView: UIImageView,
         token: UUID,
@@ -108,6 +119,7 @@ final class AvatarImageLoader {
         completion: Completion?
     ) {
         guard isCurrent(token, for: imageView) else { return }
+
         imageView.kf.setImage(
             with: avatarURL,
             placeholder: Self.placeholderImage,
@@ -121,97 +133,281 @@ final class AvatarImageLoader {
 
                 switch result {
                 case .success(let retrieveResult):
-                    self.finishIfCurrent(token, for: imageView)
                     self.logger.debug(
                         "头像加载成功 id=\(postID, privacy: .public), cache=\(String(describing: retrieveResult.cacheType), privacy: .public)"
                     )
-                    completion?(.success(url: avatarURL, cacheType: retrieveResult.cacheType))
+                    self.completeSuccess(
+                        token: token,
+                        imageView: imageView,
+                        url: avatarURL,
+                        cacheType: retrieveResult.cacheType,
+                        completion: completion
+                    )
 
                 case .failure(let error):
-                    if let svgData = self.svgDataIfAvailable(from: error) {
-                        self.logger.info(
-                            "检测到 SVG 头像，准备渲染 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)"
-                        )
-                        Task { @MainActor [weak self, weak imageView] in
-                            guard let self, let imageView else { return }
-                            guard self.isCurrent(token, for: imageView) else { return }
-
-                            let cacheKey = avatarURL.absoluteString as NSString
-                            if let cachedImage = self.svgImageCache.object(forKey: cacheKey) {
-                                imageView.image = cachedImage
-                                self.finishIfCurrent(token, for: imageView)
-                                self.logger.debug(
-                                    "SVG 头像缓存命中 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)"
-                                )
-                                completion?(.success(url: avatarURL, cacheType: .memory))
-                                return
-                            }
-
-                            do {
-                                let renderedImage = try await Self.renderSVGImage(
-                                    data: svgData,
-                                    targetSize: CGSize(width: 56, height: 56)
-                                )
-                                guard self.isCurrent(token, for: imageView) else { return }
-                                imageView.image = renderedImage
-                                self.svgImageCache.setObject(renderedImage, forKey: cacheKey)
-                                self.finishIfCurrent(token, for: imageView)
-                                self.logger.info(
-                                    "SVG 头像渲染成功 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)"
-                                )
-                                completion?(.success(url: avatarURL, cacheType: .none))
-                            } catch {
-                                guard self.isCurrent(token, for: imageView) else { return }
-                                self.finishIfCurrent(token, for: imageView)
-                                self.logger.error(
-                                    "SVG 头像渲染失败 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public), error=\(error.localizedDescription, privacy: .public)"
-                                )
-                                completion?(.failure(url: avatarURL, reason: error.localizedDescription))
-                            }
-                        }
-                        return
-                    }
-
-                    if allowCookieRetry, self.shouldRetryAfterCookieSync(error: error) {
-                        self.logger.warning(
-                            "头像疑似 challenge 页面，准备同步 Cookie 后重试 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)"
-                        )
-                        Task { @MainActor [weak self, weak imageView] in
-                            guard let self, let imageView else { return }
-                            guard self.isCurrent(token, for: imageView) else { return }
-                            await self.cookieBridge.syncWebViewCookiesToURLSession()
-                            guard self.isCurrent(token, for: imageView) else { return }
-                            self.logger.info("头像重试前已同步 WebView Cookie 到 URLSession id=\(postID, privacy: .public)")
-                            self.loadWithKingfisher(
-                                into: imageView,
-                                token: token,
-                                postID: postID,
-                                avatarURL: avatarURL,
-                                allowCookieRetry: false,
-                                completion: completion
-                            )
-                        }
-                        return
-                    }
-
-                    self.finishIfCurrent(token, for: imageView)
-                    let details = self.failureDetails(for: error)
-                    self.logger.error(
-                        "头像加载失败 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public), error=\(details, privacy: .public)"
+                    self.handleKingfisherFailure(
+                        error,
+                        imageView: imageView,
+                        token: token,
+                        postID: postID,
+                        avatarURL: avatarURL,
+                        allowCookieRetry: allowCookieRetry,
+                        completion: completion
                     )
-                    completion?(.failure(url: avatarURL, reason: details))
                 }
             }
         )
     }
 
+    private func handleKingfisherFailure(
+        _ error: KingfisherError,
+        imageView: UIImageView,
+        token: UUID,
+        postID: String,
+        avatarURL: URL,
+        allowCookieRetry: Bool,
+        completion: Completion?
+    ) {
+        if let svgData = svgDataIfAvailable(from: error) {
+            knownSVGURLs.insert(avatarURL.absoluteString)
+            logger.info(
+                "检测到 SVG 头像，准备渲染 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)"
+            )
+            Task { @MainActor [weak self, weak imageView] in
+                guard let self, let imageView else { return }
+                guard self.isCurrent(token, for: imageView) else { return }
+                await self.renderAndDisplaySVG(
+                    data: svgData,
+                    into: imageView,
+                    token: token,
+                    postID: postID,
+                    avatarURL: avatarURL,
+                    completion: completion
+                )
+            }
+            return
+        }
+
+        if allowCookieRetry, shouldRetryAfterCookieSync(error: error) {
+            logger.warning(
+                "头像疑似 challenge 页面，准备同步 Cookie 后重试 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)"
+            )
+            Task { @MainActor [weak self, weak imageView] in
+                guard let self, let imageView else { return }
+                guard self.isCurrent(token, for: imageView) else { return }
+                await self.cookieBridge.syncWebViewCookiesToURLSession()
+                guard self.isCurrent(token, for: imageView) else { return }
+                self.logger.info("头像重试前已同步 WebView Cookie 到 URLSession id=\(postID, privacy: .public)")
+                self.loadWithKingfisher(
+                    into: imageView,
+                    token: token,
+                    postID: postID,
+                    avatarURL: avatarURL,
+                    allowCookieRetry: false,
+                    completion: completion
+                )
+            }
+            return
+        }
+
+        let details = failureDetails(for: error)
+        logger.error(
+            "头像加载失败 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public), error=\(details, privacy: .public)"
+        )
+        completeFailure(
+            token: token,
+            imageView: imageView,
+            url: avatarURL,
+            reason: details,
+            completion: completion
+        )
+    }
+
+    private func loadKnownSVGAvatar(
+        into imageView: UIImageView,
+        token: UUID,
+        postID: String,
+        avatarURL: URL,
+        allowCookieRetry: Bool,
+        completion: Completion?
+    ) {
+        let cacheKey = avatarURL.absoluteString as NSString
+        if let cachedImage = svgImageCache.object(forKey: cacheKey) {
+            imageView.image = cachedImage
+            logger.debug("SVG 快速路径缓存命中 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)")
+            completeSuccess(token: token, imageView: imageView, url: avatarURL, cacheType: .memory, completion: completion)
+            return
+        }
+
+        Task { @MainActor [weak self, weak imageView] in
+            guard let self, let imageView else { return }
+            guard self.isCurrent(token, for: imageView) else { return }
+
+            do {
+                let data = try await self.downloadAvatarData(url: avatarURL)
+                guard self.isCurrent(token, for: imageView) else { return }
+
+                if self.dataLooksLikeSVG(data) {
+                    await self.renderAndDisplaySVG(
+                        data: data,
+                        into: imageView,
+                        token: token,
+                        postID: postID,
+                        avatarURL: avatarURL,
+                        completion: completion
+                    )
+                    return
+                }
+
+                if self.dataLooksLikeHTML(data), allowCookieRetry {
+                    self.logger.warning("SVG 快速路径疑似 challenge 页面，准备同步 Cookie 后重试 id=\(postID, privacy: .public)")
+                    await self.cookieBridge.syncWebViewCookiesToURLSession()
+                    guard self.isCurrent(token, for: imageView) else { return }
+                    self.loadKnownSVGAvatar(
+                        into: imageView,
+                        token: token,
+                        postID: postID,
+                        avatarURL: avatarURL,
+                        allowCookieRetry: false,
+                        completion: completion
+                    )
+                    return
+                }
+
+                if let bitmapImage = UIImage(data: data) {
+                    self.knownSVGURLs.remove(avatarURL.absoluteString)
+                    imageView.image = bitmapImage
+                    self.logger.notice(
+                        "已知 SVG URL 返回位图，已回退普通路径 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)"
+                    )
+                    self.completeSuccess(token: token, imageView: imageView, url: avatarURL, cacheType: .none, completion: completion)
+                    return
+                }
+
+                throw SVGRenderError.unsupportedData
+            } catch {
+                guard self.isCurrent(token, for: imageView) else { return }
+                self.logger.error(
+                    "SVG 快速路径失败 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public), error=\(error.localizedDescription, privacy: .public)"
+                )
+                self.completeFailure(
+                    token: token,
+                    imageView: imageView,
+                    url: avatarURL,
+                    reason: error.localizedDescription,
+                    completion: completion
+                )
+            }
+        }
+    }
+
+    private func renderAndDisplaySVG(
+        data: Data,
+        into imageView: UIImageView,
+        token: UUID,
+        postID: String,
+        avatarURL: URL,
+        completion: Completion?
+    ) async {
+        let cacheKey = avatarURL.absoluteString as NSString
+        if let cachedImage = svgImageCache.object(forKey: cacheKey) {
+            imageView.image = cachedImage
+            logger.debug("SVG 头像缓存命中 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)")
+            completeSuccess(token: token, imageView: imageView, url: avatarURL, cacheType: .memory, completion: completion)
+            return
+        }
+
+        do {
+            let renderedImage = try await Self.renderSVGImage(
+                data: data,
+                targetSize: AvatarRender.size,
+                scale: displayScale(for: imageView)
+            )
+            guard isCurrent(token, for: imageView) else { return }
+            imageView.image = renderedImage
+            svgImageCache.setObject(renderedImage, forKey: cacheKey)
+            logger.info("SVG 头像渲染成功 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)")
+            completeSuccess(token: token, imageView: imageView, url: avatarURL, cacheType: .none, completion: completion)
+        } catch {
+            guard isCurrent(token, for: imageView) else { return }
+            logger.error(
+                "SVG 头像渲染失败 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public), error=\(error.localizedDescription, privacy: .public)"
+            )
+            completeFailure(
+                token: token,
+                imageView: imageView,
+                url: avatarURL,
+                reason: error.localizedDescription,
+                completion: completion
+            )
+        }
+    }
+
+    private func completeSuccess(
+        token: UUID,
+        imageView: UIImageView,
+        url: URL,
+        cacheType: CacheType,
+        completion: Completion?
+    ) {
+        finishIfCurrent(token, for: imageView)
+        completion?(.success(url: url, cacheType: cacheType))
+    }
+
+    private func completeFailure(
+        token: UUID,
+        imageView: UIImageView,
+        url: URL,
+        reason: String,
+        completion: Completion?
+    ) {
+        finishIfCurrent(token, for: imageView)
+        completion?(.failure(url: url, reason: reason))
+    }
+
+    private func downloadAvatarData(url: URL) async throws -> Data {
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 20
+        request.cachePolicy = .returnCacheDataElseLoad
+        Self.applyRequestHeaders(to: &request)
+
+        let (data, _) = try await directSession.data(for: request)
+        return data
+    }
+
     private var optionsInfo: KingfisherOptionsInfo {
         [
-            .requestModifier(avatarRequestModifier),
+            .requestModifier(AnyModifier { request in
+                var request = request
+                Self.applyRequestHeaders(to: &request)
+                return request
+            }),
             .downloader(downloader),
             .transition(.fade(0.2)),
             .cacheOriginalImage
         ]
+    }
+
+    nonisolated private static func makeSessionConfiguration() -> URLSessionConfiguration {
+        let configuration = URLSessionConfiguration.default
+        configuration.httpCookieStorage = .shared
+        configuration.httpShouldSetCookies = true
+        configuration.requestCachePolicy = .returnCacheDataElseLoad
+        configuration.timeoutIntervalForRequest = 20
+        configuration.timeoutIntervalForResource = 20
+        return configuration
+    }
+
+    nonisolated private static func applyRequestHeaders(to request: inout URLRequest) {
+        WebRequestFingerprint.applyImageHeaders(to: &request)
+    }
+
+    private func displayScale(for imageView: UIImageView) -> CGFloat {
+        if let screenScale = imageView.window?.windowScene?.screen.scale {
+            return screenScale
+        }
+        return max(imageView.traitCollection.displayScale, 1)
     }
 
     private func isCurrent(_ token: UUID, for imageView: UIImageView) -> Bool {
@@ -291,126 +487,27 @@ final class AvatarImageLoader {
             || (prefix.contains("<?xml") && prefix.contains("svg"))
     }
 
-    private static func renderSVGImage(data: Data, targetSize: CGSize) async throws -> UIImage {
-        guard let svgContent = String(data: data, encoding: .utf8) else {
-            throw SVGRenderError.invalidUTF8
-        }
-
-        let html = """
-        <!doctype html>
-        <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-              html, body {
-                margin: 0;
-                padding: 0;
-                width: \(Int(targetSize.width))px;
-                height: \(Int(targetSize.height))px;
-                overflow: hidden;
-                background: transparent;
-              }
-              svg {
-                width: 100%;
-                height: 100%;
-                display: block;
-              }
-            </style>
-          </head>
-          <body>\(svgContent)</body>
-        </html>
-        """
-
-        let loader = SVGSnapshotLoader(targetSize: targetSize)
-        return try await loader.render(html: html, baseURL: URL(string: "https://www.nodeseek.com/"))
-    }
-}
-
-private enum SVGRenderError: LocalizedError {
-    case invalidUTF8
-    case snapshotFailed
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidUTF8:
-            return "SVG 数据编码无效"
-        case .snapshotFailed:
-            return "SVG 快照失败"
-        }
-    }
-}
-
-@MainActor
-private final class SVGSnapshotLoader: NSObject, WKNavigationDelegate {
-    private let webView: WKWebView
-    private var navigationContinuation: CheckedContinuation<Void, Error>?
-    private var completed = false
-
-    init(targetSize: CGSize) {
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .nonPersistent()
-        webView = WKWebView(frame: CGRect(origin: .zero, size: targetSize), configuration: configuration)
-        webView.isOpaque = false
-        webView.backgroundColor = .clear
-        super.init()
-        webView.navigationDelegate = self
-    }
-
-    deinit {
-        webView.navigationDelegate = nil
-    }
-
-    func render(html: String, baseURL: URL?) async throws -> UIImage {
+    private static func renderSVGImage(data: Data, targetSize: CGSize, scale: CGFloat) async throws -> UIImage {
         try await withCheckedThrowingContinuation { continuation in
-            navigationContinuation = continuation
-            webView.loadHTMLString(html, baseURL: baseURL)
-        }
-
-        try? await Task.sleep(nanoseconds: 40_000_000)
-        let config = WKSnapshotConfiguration()
-        config.rect = CGRect(origin: .zero, size: webView.bounds.size)
-        config.afterScreenUpdates = true
-        return try await withCheckedThrowingContinuation { continuation in
-            webView.takeSnapshot(with: config) { image, error in
-                if let error {
-                    continuation.resume(throwing: error)
+            DispatchQueue.global(qos: .userInitiated).async {
+                guard let svg = SVG(data: data) else {
+                    continuation.resume(throwing: SVGRenderError.unsupportedData)
                     return
                 }
-                guard let image else {
-                    continuation.resume(throwing: SVGRenderError.snapshotFailed)
-                    return
-                }
+                let image = svg.rasterize(size: targetSize, scale: scale)
                 continuation.resume(returning: image)
             }
         }
     }
+}
 
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        resolveNavigation(.success(()))
-    }
+private enum SVGRenderError: LocalizedError {
+    case unsupportedData
 
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        resolveNavigation(.failure(error))
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        didFailProvisionalNavigation navigation: WKNavigation!,
-        withError error: Error
-    ) {
-        resolveNavigation(.failure(error))
-    }
-
-    private func resolveNavigation(_ result: Result<Void, Error>) {
-        guard !completed, let continuation = navigationContinuation else { return }
-        completed = true
-        navigationContinuation = nil
-        switch result {
-        case .success:
-            continuation.resume()
-        case .failure(let error):
-            continuation.resume(throwing: error)
+    var errorDescription: String? {
+        switch self {
+        case .unsupportedData:
+            return "SVG/位图数据均无法解析"
         }
     }
 }

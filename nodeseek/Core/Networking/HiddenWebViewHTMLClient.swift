@@ -12,6 +12,66 @@ import WebKit
 enum HiddenWebViewHTMLClientError: Error {
     case timeout
     case noNavigationStarted
+    case processTerminated
+}
+
+private enum WebViewCachePolicy {
+    static let getRequestPolicy: URLRequest.CachePolicy = .reloadRevalidatingCacheData
+    static let postRequestPolicy: URLRequest.CachePolicy = .reloadIgnoringLocalCacheData
+}
+
+private final class WebViewCacheTuner {
+    private static let lock = NSLock()
+    private static var tuned = false
+    private static let logger = Logger(subsystem: "com.nodeseek.app", category: "HiddenWebViewCache")
+
+    private static let minMemoryCapacity = 64 * 1024 * 1024
+    private static let minDiskCapacity = 512 * 1024 * 1024
+
+    static func tuneIfNeeded() {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !tuned else { return }
+
+        let current = URLCache.shared
+        let memoryCapacity = max(current.memoryCapacity, minMemoryCapacity)
+        let diskCapacity = max(current.diskCapacity, minDiskCapacity)
+        URLCache.shared = URLCache(
+            memoryCapacity: memoryCapacity,
+            diskCapacity: diskCapacity,
+            diskPath: "com.nodeseek.web-cache"
+        )
+        tuned = true
+        logger.info("已调优 URLCache 容量 memory=\(memoryCapacity / 1024 / 1024)MB, disk=\(diskCapacity / 1024 / 1024)MB")
+    }
+}
+
+actor HiddenWebViewRequestLock {
+    static let shared = HiddenWebViewRequestLock()
+
+    private var isLocked = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func acquire() async {
+        if !isLocked {
+            isLocked = true
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func release() {
+        if waiters.isEmpty {
+            isLocked = false
+            return
+        }
+
+        let next = waiters.removeFirst()
+        next.resume()
+    }
 }
 
 struct HiddenWebViewHTMLClient: HTMLClient {
@@ -26,6 +86,8 @@ struct HiddenWebViewHTMLClient: HTMLClient {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.timeoutInterval = timeoutInterval
+        request.cachePolicy = WebViewCachePolicy.getRequestPolicy
+        WebRequestFingerprint.applyHTMLHeaders(to: &request)
         return try await load(request: request)
     }
 
@@ -33,6 +95,8 @@ struct HiddenWebViewHTMLClient: HTMLClient {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = timeoutInterval
+        request.cachePolicy = WebViewCachePolicy.postRequestPolicy
+        WebRequestFingerprint.applyHTMLHeaders(to: &request)
         request.setValue("application/x-www-form-urlencoded; charset=utf-8", forHTTPHeaderField: "Content-Type")
         request.httpBody = formFields
             .map { key, value in "\(Self.urlEncode(key))=\(Self.urlEncode(value))" }
@@ -42,21 +106,32 @@ struct HiddenWebViewHTMLClient: HTMLClient {
     }
 
     private static func urlEncode(_ value: String) -> String {
-        value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value
+        FormURLEncoder.encode(value)
     }
 
     private func load(request: URLRequest) async throws -> HTMLResponse {
+        let requestLock = HiddenWebViewRequestLock.shared
+        await requestLock.acquire()
         logger.info("准备通过隐藏 WebView 抓取 HTML: \(request.url?.absoluteString ?? "nil")")
-        let loader = await MainActor.run {
-            HiddenWebViewLoader(timeoutInterval: timeoutInterval)
+        do {
+            let loader = await MainActor.run {
+                HiddenWebViewLoader.shared
+            }
+            let response = try await loader.load(request: request, timeoutInterval: timeoutInterval)
+            await requestLock.release()
+            return response
+        } catch {
+            await requestLock.release()
+            throw error
         }
-        return try await loader.load(request: request)
     }
 }
 
 @MainActor
 private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
-    private let timeoutInterval: TimeInterval
+    static let shared = HiddenWebViewLoader()
+
+    private var timeoutInterval: TimeInterval = 20
     private let webView: WKWebView
     private let cookieBridge: CookieBridge
     private var continuation: CheckedContinuation<HTMLResponse, Error>?
@@ -71,11 +146,12 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     private let challengePollIntervalNanoseconds: UInt64 = 1_200_000_000
     private let logger = Logger(subsystem: "com.nodeseek.app", category: "HiddenWebViewLoader")
 
-    init(timeoutInterval: TimeInterval) {
-        self.timeoutInterval = timeoutInterval
+    private override init() {
+        WebViewCacheTuner.tuneIfNeeded()
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
         self.webView = WKWebView(frame: .zero, configuration: configuration)
+        self.webView.customUserAgent = WebRequestFingerprint.userAgent
         self.cookieBridge = CookieBridge(
             webCookieStore: WKWebCookieStoreAdapter(
                 store: configuration.websiteDataStore.httpCookieStore
@@ -90,9 +166,10 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         htmlPollingTask?.cancel()
     }
 
-    func load(request: URLRequest) async throws -> HTMLResponse {
+    func load(request: URLRequest, timeoutInterval: TimeInterval) async throws -> HTMLResponse {
+        self.timeoutInterval = timeoutInterval
+        resetForNextRequest()
         initialURL = request.url
-        challengePollCount = 0
         logger.info("开始加载页面: \(request.url?.absoluteString ?? "nil"), timeout: \(Int(self.timeoutInterval))s")
         await cookieBridge.syncURLSessionCookiesToWebView()
         logger.info("已同步 URLSession Cookie 到 WebView")
@@ -177,7 +254,7 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         logger.error("Web 内容进程终止")
-        resolve(.failure(HiddenWebViewHTMLClientError.timeout))
+        resolve(.failure(HiddenWebViewHTMLClientError.processTerminated))
     }
 
     private func scheduleTimeout() {
@@ -204,7 +281,6 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         timeoutTask = nil
         htmlPollingTask = nil
         self.continuation = nil
-        webView.navigationDelegate = nil
 
         switch result {
         case .success(let response):
@@ -222,9 +298,20 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     }
 
     private static func isChallengePage(html: String) -> Bool {
-        html.contains("Just a moment...")
-            || html.contains("window._cf_chl_opt")
-            || html.contains("/cdn-cgi/challenge-platform/")
-            || html.contains("Enable JavaScript and cookies to continue")
+        ChallengeDetector.containsCloudflareChallengeHTML(html)
+    }
+
+    private func resetForNextRequest() {
+        webView.stopLoading()
+        timeoutTask?.cancel()
+        htmlPollingTask?.cancel()
+        timeoutTask = nil
+        htmlPollingTask = nil
+        continuation = nil
+        initialURL = nil
+        statusCode = 200
+        headers = [:]
+        completed = false
+        challengePollCount = 0
     }
 }

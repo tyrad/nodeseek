@@ -27,14 +27,14 @@ struct NodeSeekService: Sendable {
         self.challengeDetector = challengeDetector
     }
 
-    func loadPostList(page: Int = 1) async throws -> NodeSeekResult<[PostSummary]> {
-        let targetURL = postListURL(page: page)
-        logger.info("开始抓取 NodeSeek 列表，page=\(page): \(targetURL.absoluteString)")
+    func loadPostList(page: Int = 1, category: PostListCategory = .all) async throws -> NodeSeekResult<[PostSummary]> {
+        let targetURL = postListURL(page: page, category: category)
+        logger.info("开始抓取 NodeSeek 列表，category=\(category.rawValue, privacy: .public), page=\(page): \(targetURL.absoluteString)")
         let response = try await htmlClient.get(targetURL)
-        logger.info("抓取返回 page=\(page), status=\(response.statusCode), htmlLength=\(response.html.count), finalURL=\(response.finalURL.absoluteString)")
+        logger.info("抓取返回 category=\(category.rawValue, privacy: .public), page=\(page), status=\(response.statusCode), htmlLength=\(response.html.count), finalURL=\(response.finalURL.absoluteString)")
 
         if let challenge = challengeDetector.detect(response: response) {
-            logger.warning("检测到 challenge: \(Self.describeChallenge(challenge))")
+            logger.warning("检测到 challenge: \(challenge.logDescription)")
             return .challenge(challenge)
         }
 
@@ -43,21 +43,21 @@ struct NodeSeekService: Sendable {
         return .value(posts)
     }
 
-    private func postListURL(page: Int) -> URL {
+    private func postListURL(page: Int, category: PostListCategory) -> URL {
         let normalized = max(1, page)
-        return baseURL.appendingPathComponent("page-\(normalized)")
-    }
-
-    private static func describeChallenge(_ challenge: ChallengeKind) -> String {
-        switch challenge {
-        case .loginRequired(let url):
-            return "loginRequired(\(url.absoluteString))"
-        case .cloudflare(let url):
-            return "cloudflare(\(url.absoluteString))"
-        case .blocked(let url):
-            return "blocked(\(url.absoluteString))"
-        case .unsupported(let url):
-            return "unsupported(\(url.absoluteString))"
+        guard let pathComponent = category.pathComponent else {
+            return baseURL.appendingPathComponent("page-\(normalized)")
         }
+
+        if normalized == 1 {
+            return baseURL
+                .appendingPathComponent("categories")
+                .appendingPathComponent(pathComponent)
+        }
+
+        return baseURL
+            .appendingPathComponent("categories")
+            .appendingPathComponent(pathComponent)
+            .appendingPathComponent("page-\(normalized)")
     }
 }

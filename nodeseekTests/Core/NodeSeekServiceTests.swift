@@ -105,6 +105,50 @@ struct NodeSeekServiceTests {
         #expect(requestedURLs.count == 1)
         #expect(requestedURLs.first?.path == "/page-2")
     }
+
+    @Test func loadsCategoryRootURLForFirstPage() async throws {
+        let html = try FixtureLoader.html(named: "post-list-basic")
+        let url = URL(string: "https://www.nodeseek.com/")!
+        let htmlClient = URLCapturingHTMLClient(response: HTMLResponse(
+            statusCode: 200,
+            headers: [:],
+            finalURL: url,
+            html: html
+        ))
+        let service = NodeSeekService(
+            baseURL: url,
+            htmlClient: htmlClient,
+            parser: KannaNodeSeekParser(baseURL: url)
+        )
+
+        _ = try await service.loadPostList(page: 1, category: .tech)
+        let requestedURLs = await htmlClient.requestedURLs()
+
+        #expect(requestedURLs.count == 1)
+        #expect(requestedURLs.first?.path == "/categories/tech")
+    }
+
+    @Test func loadsCategoryPagedURLWhenRequestingPagination() async throws {
+        let html = try FixtureLoader.html(named: "post-list-basic")
+        let url = URL(string: "https://www.nodeseek.com/")!
+        let htmlClient = URLCapturingHTMLClient(response: HTMLResponse(
+            statusCode: 200,
+            headers: [:],
+            finalURL: url,
+            html: html
+        ))
+        let service = NodeSeekService(
+            baseURL: url,
+            htmlClient: htmlClient,
+            parser: KannaNodeSeekParser(baseURL: url)
+        )
+
+        _ = try await service.loadPostList(page: 3, category: .tech)
+        let requestedURLs = await htmlClient.requestedURLs()
+
+        #expect(requestedURLs.count == 1)
+        #expect(requestedURLs.first?.path == "/categories/tech/page-3")
+    }
 }
 
 private struct StaticHTMLClient: HTMLClient {

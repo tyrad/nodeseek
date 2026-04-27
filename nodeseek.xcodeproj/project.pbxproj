@@ -10,6 +10,7 @@
 		7A1000012FA0000000000001 /* Kanna in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000022FA0000000000001 /* Kanna */; };
 		7A1000042FA0000000000001 /* AsyncDisplayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000052FA0000000000001 /* AsyncDisplayKit */; };
 		7A1000092FA0000000000001 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000082FA0000000000001 /* Kingfisher */; };
+		7A10000C2FA0000000000001 /* SwiftDraw in Frameworks */ = {isa = PBXBuildFile; productRef = 7A10000B2FA0000000000001 /* SwiftDraw */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -74,6 +75,7 @@
 				7A1000012FA0000000000001 /* Kanna in Frameworks */,
 				7A1000042FA0000000000001 /* AsyncDisplayKit in Frameworks */,
 				7A1000092FA0000000000001 /* Kingfisher in Frameworks */,
+				7A10000C2FA0000000000001 /* SwiftDraw in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -137,6 +139,7 @@
 				7A1000022FA0000000000001 /* Kanna */,
 				7A1000052FA0000000000001 /* AsyncDisplayKit */,
 				7A1000082FA0000000000001 /* Kingfisher */,
+				7A10000B2FA0000000000001 /* SwiftDraw */,
 			);
 			productName = nodeseek;
 			productReference = 5CD3D9512F9EFACE008DB075 /* nodeseek.app */;
@@ -224,6 +227,7 @@
 				7A1000032FA0000000000001 /* XCRemoteSwiftPackageReference "Kanna" */,
 				7A1000062FA0000000000001 /* XCRemoteSwiftPackageReference "Texture" */,
 				7A1000072FA0000000000001 /* XCRemoteSwiftPackageReference "Kingfisher" */,
+				7A10000D2FA0000000000001 /* XCRemoteSwiftPackageReference "SwiftDraw" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5CD3D9522F9EFACE008DB075 /* Products */;
@@ -630,6 +634,14 @@
 				minimumVersion = 8.0.0;
 			};
 		};
+		7A10000D2FA0000000000001 /* XCRemoteSwiftPackageReference "SwiftDraw" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/swhitty/SwiftDraw.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.27.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -647,6 +659,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7A1000072FA0000000000001 /* XCRemoteSwiftPackageReference "Kingfisher" */;
 			productName = Kingfisher;
+		};
+		7A10000B2FA0000000000001 /* SwiftDraw */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7A10000D2FA0000000000001 /* XCRemoteSwiftPackageReference "SwiftDraw" */;
+			productName = SwiftDraw;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

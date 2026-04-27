@@ -27,7 +27,7 @@ struct PostListPresenterTests {
             lastActivityText: "刚刚"
         )
 
-        presenter.didLoadPosts([post])
+        presenter.didLoadPosts([post], category: .all)
         presenter.didSelectPost(at: 0)
 
         #expect(router.selectedPost?.id == "1")
@@ -49,11 +49,12 @@ struct PostListPresenterTests {
             lastActivityText: "刚刚"
         )
 
-        presenter.didLoadPosts([post])
+        presenter.didLoadPosts([post], category: .all)
         presenter.didApproachBottom(currentIndex: 0, totalCount: 1)
 
         #expect(interactor.loadMorePages == [2])
         #expect(view.showLoadingMoreCount == 1)
+        #expect(interactor.loadMoreCategories == [.all])
     }
 
     @Test func loadMoreAppendsUniquePosts() {
@@ -90,14 +91,55 @@ struct PostListPresenterTests {
             lastActivityText: "1 分钟前"
         )
 
-        presenter.didLoadPosts([first])
+        presenter.didLoadPosts([first], category: .all)
         presenter.didApproachBottom(currentIndex: 0, totalCount: 1)
-        presenter.didLoadMorePosts([duplicate, second], page: 2)
+        presenter.didLoadMorePosts([duplicate, second], page: 2, category: .all)
         presenter.didSelectPost(at: 1)
 
         #expect(view.renderCallCount == 2)
         #expect(view.lastRenderedPostsCount == 2)
         #expect(router.selectedPost?.id == "2")
+    }
+
+    @Test func switchingBackToLoadedCategoryUsesCachedData() {
+        let view = SpyPostListView()
+        let interactor = SpyPostListInteractor()
+        let router = SpyPostListRouter()
+        let presenter = PostListPresenter(interactor: interactor, router: router)
+        presenter.setView(view)
+
+        let allPost = PostSummary(
+            id: "all-1",
+            title: "全部帖子",
+            url: URL(string: "https://www.nodeseek.com/post-all-1")!,
+            authorName: "mist",
+            nodeName: "日常",
+            replyCount: 1,
+            lastActivityText: "刚刚"
+        )
+        let techPost = PostSummary(
+            id: "tech-1",
+            title: "技术帖子",
+            url: URL(string: "https://www.nodeseek.com/post-tech-1")!,
+            authorName: "mist",
+            nodeName: "技术",
+            replyCount: 1,
+            lastActivityText: "刚刚"
+        )
+
+        presenter.viewDidLoad()
+        #expect(interactor.loadPostsCategories == [.all])
+
+        presenter.didLoadPosts([allPost], category: .all)
+        presenter.didSelectCategory(.tech)
+        #expect(interactor.loadPostsCategories == [.all, .tech])
+
+        presenter.didLoadPosts([techPost], category: .tech)
+        presenter.didSelectCategory(.all)
+
+        #expect(interactor.loadPostsCategories == [.all, .tech])
+        #expect(view.lastRenderedPostIDs == ["all-1"])
+        #expect(view.selectedCategory == .all)
     }
 }
 
@@ -109,7 +151,10 @@ private final class SpyPostListView: PostListViewProtocol {
     var hideLoadingMoreCount = 0
     var renderCallCount = 0
     var lastRenderedPostsCount = 0
+    var lastRenderedPostIDs: [String] = []
     var lastErrorMessage: String?
+    var renderedCategories: [PostListCategory] = []
+    var selectedCategory: PostListCategory = .all
 
     func showLoading() {
         showLoadingCount += 1
@@ -131,23 +176,33 @@ private final class SpyPostListView: PostListViewProtocol {
         lastErrorMessage = message
     }
 
+    func renderCategories(_ categories: [PostListCategory], selected: PostListCategory) {
+        renderedCategories = categories
+        selectedCategory = selected
+    }
+
     func render(posts: [PostSummary]) {
         renderCallCount += 1
         lastRenderedPostsCount = posts.count
+        lastRenderedPostIDs = posts.map(\.id)
     }
 }
 
 @MainActor
 private final class SpyPostListInteractor: PostListInteractorInput {
     var loadPostsCallCount = 0
+    var loadPostsCategories: [PostListCategory] = []
     var loadMorePages: [Int] = []
+    var loadMoreCategories: [PostListCategory] = []
 
-    func loadPosts() {
+    func loadPosts(category: PostListCategory) {
         loadPostsCallCount += 1
+        loadPostsCategories.append(category)
     }
 
-    func loadMorePosts(page: Int) {
+    func loadMorePosts(page: Int, category: PostListCategory) {
         loadMorePages.append(page)
+        loadMoreCategories.append(category)
     }
 }
 
