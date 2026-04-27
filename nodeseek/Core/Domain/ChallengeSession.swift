@@ -38,7 +38,7 @@ actor NodeSeekSessionStore {
     private static func message(for challenge: ChallengeKind) -> String {
         switch challenge {
         case .loginRequired:
-            return "站点当前需要登录验证，请稍后重试。"
+            return "本帖需要注册用户才能查看😭"
         case .cloudflare:
             return "站点当前需要 Cloudflare 验证，请稍后重试。"
         case .blocked:

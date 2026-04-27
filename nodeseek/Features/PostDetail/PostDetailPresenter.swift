@@ -42,6 +42,11 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
         view?.hideLoading()
         view?.render(detail: response.detail)
     }
+
+    func didRequireLogin(message: String) {
+        view?.hideLoading()
+        view?.renderLoginRequired(message: message)
+    }
     
     func didFailLoadPostDetail(error: String) {
         view?.hideLoading()

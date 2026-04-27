@@ -57,15 +57,60 @@ struct PostDetailInteractorTests {
             return
         }
     }
+
+    @Test func reportsLoginRequiredInlineInsteadOfFailingDetailLoad() async throws {
+        let html = try FixtureLoader.html(named: "post-login-required")
+        let url = URL(string: "https://www.nodeseek.com/")!
+        let htmlClient = URLCapturingHTMLClient(response: HTMLResponse(
+            statusCode: 404,
+            headers: [:],
+            finalURL: URL(string: "https://www.nodeseek.com/post-704286-1")!,
+            html: html
+        ))
+        let service = NodeSeekService(
+            baseURL: url,
+            htmlClient: htmlClient,
+            parser: KannaNodeSeekParser(baseURL: url)
+        )
+        let sessionStore = NodeSeekSessionStore()
+        let presenter = SpyPostDetailInteractorOutput()
+        let post = PostSummary(
+            id: "704286",
+            title: "受限帖子",
+            url: URL(string: "https://www.nodeseek.com/post-704286-1")!,
+            authorName: "mist",
+            nodeName: "日常",
+            replyCount: 0,
+            lastActivityText: "刚刚"
+        )
+        let interactor = PostDetailInteractor(
+            post: post,
+            service: service,
+            sessionStore: sessionStore
+        )
+        interactor.presenter = presenter
+
+        interactor.loadPostDetail()
+        await waitForInteractorCallbacks()
+
+        #expect(presenter.loadedResponse == nil)
+        #expect(presenter.errorMessage == nil)
+        #expect(presenter.loginRequiredMessage == "本帖需要注册用户才能查看😭")
+    }
 }
 
 @MainActor
 private final class SpyPostDetailInteractorOutput: PostDetailInteractorOutput {
     var loadedResponse: PostDetailResponse?
+    var loginRequiredMessage: String?
     var errorMessage: String?
 
     func didLoadPostDetail(_ response: PostDetailResponse) {
         loadedResponse = response
+    }
+
+    func didRequireLogin(message: String) {
+        loginRequiredMessage = message
     }
 
     func didFailLoadPostDetail(error: String) {

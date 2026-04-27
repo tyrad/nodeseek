@@ -10,6 +10,10 @@ import Foundation
 struct ChallengeDetector: Sendable {
 
     func detect(response: HTMLResponse) -> ChallengeKind? {
+        if Self.containsLoginRequiredHTML(response.html) {
+            return .loginRequired(response.finalURL)
+        }
+
         if Self.containsUsableNodeSeekHTML(response.html) {
             return nil
         }
@@ -46,6 +50,11 @@ struct ChallengeDetector: Sendable {
             || html.contains("window._cf_chl_opt")
             || html.contains("/cdn-cgi/challenge-platform/")
             || html.contains("Enable JavaScript and cookies to continue")
+    }
+
+    static func containsLoginRequiredHTML(_ html: String) -> Bool {
+        html.contains("本帖需要注册用户才能查看")
+            || html.contains("需要注册用户才能查看")
     }
 
     static func containsUsableNodeSeekHTML(_ html: String) -> Bool {

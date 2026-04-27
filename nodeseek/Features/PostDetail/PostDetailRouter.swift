@@ -24,7 +24,10 @@ class PostDetailRouter: PostDetailRouterProtocol {
         
         interactor.presenter = presenter
         
-        let view = PostDetailViewController(presenter: presenter)
+        let view = PostDetailViewController(
+            presenter: presenter,
+            initialHeader: post.map(PostDetailHeaderContent.init(post:))
+        )
         
         presenter.setView(view)
         router.viewController = view

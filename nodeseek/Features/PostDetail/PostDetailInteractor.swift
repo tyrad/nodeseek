@@ -41,7 +41,9 @@ class PostDetailInteractor: PostDetailInteractorInput {
         Task {
             logger.info("开始加载帖子详情，postID=\(post.id, privacy: .public), page=\(self.page)")
             do {
-                let detail = try await loadDetail(postID: post.id)
+                guard let detail = try await loadDetail(postID: post.id) else {
+                    return
+                }
                 logger.info("帖子详情加载成功，postID=\(detail.id, privacy: .public), 评论数量: \(detail.comments.count)")
                 await MainActor.run {
                     presenter?.didLoadPostDetail(PostDetailResponse(detail: detail))
@@ -55,7 +57,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
         }
     }
 
-    private func loadDetail(postID: String) async throws -> PostDetail {
+    private func loadDetail(postID: String) async throws -> PostDetail? {
         logger.info("详情请求开始，postID=\(postID, privacy: .public), page=\(self.page)")
         let result = try await service.loadPostDetail(postID: postID, page: self.page)
         switch result {
@@ -65,6 +67,12 @@ class PostDetailInteractor: PostDetailInteractorInput {
         case .challenge(let challenge):
             logger.warning("详情请求命中验证，postID=\(postID, privacy: .public): \(challenge.logDescription)")
             let message = await sessionStore.recordChallenge(challenge)
+            if case .loginRequired = challenge {
+                await MainActor.run {
+                    presenter?.didRequireLogin(message: message)
+                }
+                return nil
+            }
             throw PostDetailLoadError.challengeRequired(message)
         }
     }

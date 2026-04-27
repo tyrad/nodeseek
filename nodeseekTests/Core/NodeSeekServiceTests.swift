@@ -172,6 +172,29 @@ struct NodeSeekServiceTests {
         #expect(requestedURLs.first?.path == "/post-703863-1")
         #expect(requestedURLs.first?.pathExtension.isEmpty == true)
     }
+
+    @Test func returnsLoginRequiredWhenPostDetailIsRestrictedToRegisteredUsers() async throws {
+        let html = try FixtureLoader.html(named: "post-login-required")
+        let finalURL = URL(string: "https://www.nodeseek.com/post-704286-1")!
+        let service = NodeSeekService(
+            baseURL: URL(string: "https://www.nodeseek.com/")!,
+            htmlClient: StaticHTMLClient(response: HTMLResponse(
+                statusCode: 404,
+                headers: [:],
+                finalURL: finalURL,
+                html: html
+            ))
+        )
+
+        let result = try await service.loadPostDetail(postID: "704286", page: 1)
+
+        switch result {
+        case .challenge(.loginRequired(let url)):
+            #expect(url == finalURL)
+        default:
+            Issue.record("注册用户可见的详情页应返回 loginRequired，而不是进入普通详情解析")
+        }
+    }
 }
 
 private struct StaticHTMLClient: HTMLClient {

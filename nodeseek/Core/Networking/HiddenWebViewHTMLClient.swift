@@ -7,6 +7,7 @@
 
 import Foundation
 import OSLog
+import UIKit
 import WebKit
 
 enum HiddenWebViewHTMLClientError: Error {
@@ -144,6 +145,7 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     private var challengePollCount = 0
     private let maxChallengePollCount = 10
     private let challengePollIntervalNanoseconds: UInt64 = 1_200_000_000
+    private var debugOverlayConstraints: [NSLayoutConstraint] = []
     private let logger = Logger(subsystem: "com.nodeseek.app", category: "HiddenWebViewLoader")
 
     private override init() {
@@ -170,6 +172,7 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         self.timeoutInterval = timeoutInterval
         resetForNextRequest()
         initialURL = request.url
+        updateDebugOverlayIfNeeded()
         logger.info("开始加载页面: \(request.url?.absoluteString ?? "nil"), timeout: \(Int(self.timeoutInterval))s")
         await cookieBridge.syncURLSessionCookiesToWebView()
         logger.info("已同步 URLSession Cookie 到 WebView")
@@ -314,5 +317,53 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         headers = [:]
         completed = false
         challengePollCount = 0
+    }
+
+    private func updateDebugOverlayIfNeeded() {
+        guard NodeSeekDebugConfig.enableWebViewDebugOverlay else {
+            detachDebugOverlayIfNeeded()
+            return
+        }
+
+        guard let keyWindow = Self.currentKeyWindow() else { return }
+        if webView.superview !== keyWindow {
+            detachDebugOverlayIfNeeded()
+
+            webView.translatesAutoresizingMaskIntoConstraints = false
+            webView.layer.cornerRadius = 8
+            webView.layer.masksToBounds = true
+            webView.layer.borderWidth = 1
+            webView.layer.borderColor = UIColor.systemRed.cgColor
+
+            keyWindow.addSubview(webView)
+            debugOverlayConstraints = [
+                webView.bottomAnchor.constraint(
+                    equalTo: keyWindow.safeAreaLayoutGuide.bottomAnchor,
+                    constant: -NodeSeekDebugConfig.webViewDebugOverlayBottomInset
+                ),
+                webView.leadingAnchor.constraint(
+                    equalTo: keyWindow.safeAreaLayoutGuide.leadingAnchor,
+                    constant: NodeSeekDebugConfig.webViewDebugOverlayLeadingInset
+                ),
+                webView.widthAnchor.constraint(equalToConstant: NodeSeekDebugConfig.webViewDebugOverlaySize.width),
+                webView.heightAnchor.constraint(equalToConstant: NodeSeekDebugConfig.webViewDebugOverlaySize.height)
+            ]
+            NSLayoutConstraint.activate(debugOverlayConstraints)
+        }
+
+        keyWindow.bringSubviewToFront(webView)
+    }
+
+    private func detachDebugOverlayIfNeeded() {
+        NSLayoutConstraint.deactivate(debugOverlayConstraints)
+        debugOverlayConstraints = []
+        webView.removeFromSuperview()
+    }
+
+    private static func currentKeyWindow() -> UIWindow? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)
     }
 }

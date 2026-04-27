@@ -14,6 +14,7 @@ protocol PostDetailViewProtocol: AnyObject {
     func hideLoading()
     func showError(message: String)
     func render(detail: PostDetail)
+    func renderLoginRequired(message: String)
 }
 
 // MARK: - Presenter Protocol (View -> Presenter)
@@ -29,6 +30,7 @@ protocol PostDetailInteractorInput: AnyObject {
 // MARK: - Interactor Output (Interactor -> Presenter)
 protocol PostDetailInteractorOutput: AnyObject {
     func didLoadPostDetail(_ response: PostDetailResponse)
+    func didRequireLogin(message: String)
     func didFailLoadPostDetail(error: String)
 }
 
