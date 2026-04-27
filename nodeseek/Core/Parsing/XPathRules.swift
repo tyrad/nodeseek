@@ -19,4 +19,13 @@ enum XPathRules {
     static let fallbackAuthor = ".//a[contains(@href, '/space/') or contains(@href, '/user/')]"
     static let fallbackNode = ".//a[contains(@href, '/go/') or contains(@href, '/categories/')]"
     static let fallbackLastActive = ".//time"
+
+    static let postDetailTitle = "//*[contains(@class, 'post-title')]//a[contains(@class, 'post-title-link')] | //*[contains(@class, 'post-title')]//h1"
+    static let postDetailBodyItem = "//*[contains(@class, 'nsk-post')]//*[contains(@class, 'content-item')][1]"
+    static let postDetailComments = "//ul[contains(@class, 'comments')]/li[contains(@class, 'content-item')]"
+    static let contentAuthor = ".//*[contains(@class, 'author-name')]"
+    static let contentCreatedAt = ".//*[contains(@class, 'date-created')]//time"
+    static let contentCategory = ".//*[contains(@class, 'content-category')]//a"
+    static let contentFloor = ".//*[contains(@class, 'floor-link')]"
+    static let contentArticle = ".//article[contains(@class, 'post-content')]"
 }

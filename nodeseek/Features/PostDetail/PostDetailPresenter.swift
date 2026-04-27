@@ -40,7 +40,7 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
     
     func didLoadPostDetail(_ response: PostDetailResponse) {
         view?.hideLoading()
-        view?.render(title: response.title, subtitle: response.subtitle)
+        view?.render(detail: response.detail)
     }
     
     func didFailLoadPostDetail(error: String) {

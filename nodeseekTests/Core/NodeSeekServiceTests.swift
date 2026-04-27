@@ -149,6 +149,29 @@ struct NodeSeekServiceTests {
         #expect(requestedURLs.count == 1)
         #expect(requestedURLs.first?.path == "/categories/tech/page-3")
     }
+
+    @Test func loadsPostDetailURLWithoutHTMLSuffix() async throws {
+        let html = try FixtureLoader.html(named: "post-703863-1")
+        let url = URL(string: "https://www.nodeseek.com/")!
+        let htmlClient = URLCapturingHTMLClient(response: HTMLResponse(
+            statusCode: 200,
+            headers: [:],
+            finalURL: URL(string: "https://www.nodeseek.com/post-703863-1")!,
+            html: html
+        ))
+        let service = NodeSeekService(
+            baseURL: url,
+            htmlClient: htmlClient,
+            parser: KannaNodeSeekParser(baseURL: url)
+        )
+
+        _ = try await service.loadPostDetail(postID: "703863", page: 1)
+        let requestedURLs = await htmlClient.requestedURLs()
+
+        #expect(requestedURLs.count == 1)
+        #expect(requestedURLs.first?.path == "/post-703863-1")
+        #expect(requestedURLs.first?.pathExtension.isEmpty == true)
+    }
 }
 
 private struct StaticHTMLClient: HTMLClient {

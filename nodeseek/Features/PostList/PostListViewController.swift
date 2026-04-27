@@ -11,7 +11,6 @@ class PostListViewController: UIViewController {
     
     // MARK: - Properties
     private let presenter: PostListPresenterProtocol
-    private var posts: [PostSummary] = []
     private var categories: [PostListCategory] = []
     private var selectedCategory: PostListCategory = .all
     
@@ -20,14 +19,22 @@ class PostListViewController: UIViewController {
     }
     
     // MARK: - UI Components
-    private let tableView = UITableView(frame: .zero, style: .plain)
+    private let pageContainerView = PostTexturePageContainerView()
     private let compactTopButton: UIButton = {
         let button = UIButton(type: .system)
-        let image = UIImage(systemName: "line.3.horizontal")
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+        let image = UIImage(systemName: "line.3.horizontal.circle", withConfiguration: symbolConfig)
+            ?? UIImage(systemName: "line.3.horizontal", withConfiguration: symbolConfig)
         button.setImage(image, for: .normal)
         button.tintColor = .label
-        button.backgroundColor = .secondarySystemBackground
-        button.layer.cornerRadius = 16
+        button.backgroundColor = .tertiarySystemBackground
+        button.layer.cornerRadius = 10
+        button.layer.borderWidth = 0.5
+        button.layer.borderColor = UIColor.separator.cgColor
+        button.adjustsImageWhenHighlighted = false
+        button.configurationUpdateHandler = { updateButton in
+            updateButton.alpha = updateButton.isHighlighted ? 0.72 : 1.0
+        }
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -56,23 +63,6 @@ class PostListViewController: UIViewController {
     }()
 
     private var tabButtons: [PostListCategory: CategoryTabButton] = [:]
-
-    private let loadMoreIndicator: UIActivityIndicatorView = {
-        let indicator = UIActivityIndicatorView(style: .medium)
-        indicator.hidesWhenStopped = true
-        indicator.translatesAutoresizingMaskIntoConstraints = false
-        return indicator
-    }()
-
-    private lazy var loadMoreContainer: UIView = {
-        let container = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 56))
-        container.addSubview(loadMoreIndicator)
-        NSLayoutConstraint.activate([
-            loadMoreIndicator.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-            loadMoreIndicator.centerYAnchor.constraint(equalTo: container.centerYAnchor)
-        ])
-        return container
-    }()
     
     // MARK: - Initialization
     init(presenter: PostListPresenterProtocol) {
@@ -107,44 +97,31 @@ class PostListViewController: UIViewController {
         navigationItem.leftBarButtonItem = nil
         
         view.backgroundColor = .systemBackground
-        tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.dataSource = self
-        tableView.delegate = self
-        tableView.register(PostListTableViewCell.self, forCellReuseIdentifier: PostListTableViewCell.reuseIdentifier)
-        tableView.rowHeight = UITableView.automaticDimension
-        tableView.estimatedRowHeight = 84
-        let swipeLeft = UISwipeGestureRecognizer(target: self, action: #selector(handleHorizontalSwipe(_:)))
-        swipeLeft.direction = .left
-        swipeLeft.cancelsTouchesInView = false
-        tableView.addGestureRecognizer(swipeLeft)
-
-        let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(handleHorizontalSwipe(_:)))
-        swipeRight.direction = .right
-        swipeRight.cancelsTouchesInView = false
-        tableView.addGestureRecognizer(swipeRight)
-
+        pageContainerView.translatesAutoresizingMaskIntoConstraints = false
+        pageContainerView.delegate = self
+        pageContainerView.attach(to: self)
         compactTopButton.addTarget(self, action: #selector(leftButtonTapped), for: .touchUpInside)
-        view.addSubview(tableView)
+        view.addSubview(pageContainerView)
         view.addSubview(compactTopButton)
         view.addSubview(tabScrollView)
         view.addSubview(loadingIndicator)
         tabScrollView.addSubview(tabStackView)
 
         NSLayoutConstraint.activate([
-            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.topAnchor.constraint(equalTo: tabScrollView.bottomAnchor, constant: 6),
-            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            pageContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            pageContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            pageContainerView.topAnchor.constraint(equalTo: tabScrollView.bottomAnchor, constant: 6),
+            pageContainerView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
             compactTopButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
             compactTopButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
-            compactTopButton.widthAnchor.constraint(equalToConstant: 32),
-            compactTopButton.heightAnchor.constraint(equalToConstant: 32),
+            compactTopButton.widthAnchor.constraint(equalToConstant: 36),
+            compactTopButton.heightAnchor.constraint(equalToConstant: 36),
 
             tabScrollView.leadingAnchor.constraint(equalTo: compactTopButton.trailingAnchor, constant: 8),
             tabScrollView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8),
             tabScrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
-            tabScrollView.heightAnchor.constraint(equalToConstant: 32),
+            tabScrollView.heightAnchor.constraint(equalToConstant: 36),
 
             tabStackView.leadingAnchor.constraint(equalTo: tabScrollView.contentLayoutGuide.leadingAnchor),
             tabStackView.trailingAnchor.constraint(equalTo: tabScrollView.contentLayoutGuide.trailingAnchor),
@@ -164,23 +141,10 @@ class PostListViewController: UIViewController {
 
     @objc private func categoryButtonTapped(_ sender: CategoryTabButton) {
         guard let category = sender.category else { return }
+        guard category != selectedCategory else { return }
+        selectedCategory = category
+        applySelectedCategory(category, syncPage: true, pageAnimated: true)
         presenter.didSelectCategory(category)
-    }
-
-    @objc private func handleHorizontalSwipe(_ recognizer: UISwipeGestureRecognizer) {
-        guard let currentIndex = categories.firstIndex(of: selectedCategory) else { return }
-        let targetIndex: Int
-        switch recognizer.direction {
-        case .left:
-            targetIndex = currentIndex + 1
-        case .right:
-            targetIndex = currentIndex - 1
-        default:
-            return
-        }
-
-        guard categories.indices.contains(targetIndex) else { return }
-        presenter.didSelectCategory(categories[targetIndex])
     }
 
     private func rebuildCategoryButtons() {
@@ -200,7 +164,7 @@ class PostListViewController: UIViewController {
         }
     }
 
-    private func applySelectedCategory(_ selected: PostListCategory) {
+    private func applySelectedCategory(_ selected: PostListCategory, syncPage: Bool, pageAnimated: Bool) {
         for (category, button) in tabButtons {
             button.applySelectedStyle(isSelected: category == selected)
         }
@@ -210,7 +174,9 @@ class PostListViewController: UIViewController {
             tabScrollView.scrollRectToVisible(rect.insetBy(dx: -16, dy: 0), animated: true)
         }
 
-        tableView.setContentOffset(.zero, animated: false)
+        if syncPage {
+            pageContainerView.setCurrentCategory(selected, animated: pageAnimated)
+        }
     }
 }
 
@@ -218,21 +184,29 @@ class PostListViewController: UIViewController {
 extension PostListViewController: PostListViewProtocol {
     
     func showLoading() {
-        loadingIndicator.startAnimating()
+        pageContainerView.showLoadingSkeleton(for: selectedCategory)
+        loadingIndicator.stopAnimating()
     }
     
     func hideLoading() {
+        pageContainerView.hideLoadingSkeleton(for: selectedCategory)
         loadingIndicator.stopAnimating()
     }
 
+    func showRefreshing() {
+        pageContainerView.showRefreshing(for: selectedCategory)
+    }
+
+    func hideRefreshing() {
+        pageContainerView.hideRefreshing(for: selectedCategory)
+    }
+
     func showLoadingMore() {
-        tableView.tableFooterView = loadMoreContainer
-        loadMoreIndicator.startAnimating()
+        pageContainerView.showLoadingMore(for: selectedCategory)
     }
 
     func hideLoadingMore() {
-        loadMoreIndicator.stopAnimating()
-        tableView.tableFooterView = UIView(frame: .zero)
+        pageContainerView.hideLoadingMore(for: selectedCategory)
     }
     
     func showError(message: String) {
@@ -242,36 +216,18 @@ extension PostListViewController: PostListViewProtocol {
     }
 
     func renderCategories(_ categories: [PostListCategory], selected: PostListCategory) {
-        if categories != self.categories {
+        let categoriesChanged = categories != self.categories
+        if categoriesChanged {
             self.categories = categories
             rebuildCategoryButtons()
+            pageContainerView.configure(categories: categories)
         }
         selectedCategory = selected
-        applySelectedCategory(selected)
+        applySelectedCategory(selected, syncPage: categoriesChanged, pageAnimated: false)
     }
     
     func render(posts: [PostSummary]) {
-        self.posts = posts
-        tableView.reloadData()
-    }
-}
-
-extension PostListViewController: UITableViewDataSource {
-
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        posts.count
-    }
-
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        guard let cell = tableView.dequeueReusableCell(
-            withIdentifier: PostListTableViewCell.reuseIdentifier,
-            for: indexPath
-        ) as? PostListTableViewCell else {
-            return UITableViewCell(style: .subtitle, reuseIdentifier: nil)
-        }
-        let post = posts[indexPath.row]
-        cell.configure(with: post)
-        return cell
+        pageContainerView.setPosts(posts, for: selectedCategory)
     }
 }
 
@@ -289,12 +245,8 @@ private final class CategoryTabButton: UIButton {
     override init(frame: CGRect) {
         super.init(frame: frame)
         translatesAutoresizingMaskIntoConstraints = false
-        if #available(iOS 15.0, *) {
-            var configuration = UIButton.Configuration.plain()
-            configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 2, bottom: 0, trailing: 2)
-            self.configuration = configuration
-        }
-        titleLabel?.font = .systemFont(ofSize: 15, weight: .regular)
+        contentEdgeInsets = UIEdgeInsets(top: 0, left: 4, bottom: 0, right: 4)
+        titleLabel?.font = .systemFont(ofSize: 16, weight: .regular)
         setTitleColor(.secondaryLabel, for: .normal)
         addSubview(indicatorView)
         NSLayoutConstraint.activate([
@@ -310,20 +262,56 @@ private final class CategoryTabButton: UIButton {
     }
 
     func applySelectedStyle(isSelected: Bool) {
-        titleLabel?.font = isSelected ? .systemFont(ofSize: 15, weight: .semibold) : .systemFont(ofSize: 15, weight: .regular)
+        titleLabel?.font = isSelected ? .systemFont(ofSize: 16, weight: .semibold) : .systemFont(ofSize: 16, weight: .regular)
         setTitleColor(isSelected ? .label : .secondaryLabel, for: .normal)
         indicatorView.isHidden = !isSelected
     }
 }
 
-extension PostListViewController: UITableViewDelegate {
-
-    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
-        presenter.didSelectPost(at: indexPath.row)
+extension PostListViewController: PostTexturePageContainerViewDelegate {
+    func postTexturePageContainerView(
+        _ containerView: PostTexturePageContainerView,
+        didSelectPostAt index: Int,
+        category: PostListCategory
+    ) {
+        if category != selectedCategory {
+            selectedCategory = category
+            applySelectedCategory(category, syncPage: false, pageAnimated: false)
+            presenter.didSelectCategory(category)
+        }
+        presenter.didSelectPost(at: index)
     }
 
-    func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
-        presenter.didApproachBottom(currentIndex: indexPath.row, totalCount: posts.count)
+    func postTexturePageContainerView(
+        _ containerView: PostTexturePageContainerView,
+        didApproachBottomAt index: Int,
+        totalCount: Int,
+        category: PostListCategory
+    ) {
+        if category != selectedCategory {
+            selectedCategory = category
+            applySelectedCategory(category, syncPage: false, pageAnimated: false)
+            presenter.didSelectCategory(category)
+        }
+        presenter.didApproachBottom(currentIndex: index, totalCount: totalCount)
+    }
+
+    func postTexturePageContainerViewDidRequestRefresh(
+        _ containerView: PostTexturePageContainerView,
+        category: PostListCategory
+    ) {
+        if category != selectedCategory {
+            selectedCategory = category
+            applySelectedCategory(category, syncPage: false, pageAnimated: false)
+            presenter.didSelectCategory(category)
+        }
+        presenter.didPullToRefresh()
+    }
+
+    func postTexturePageContainerView(_ containerView: PostTexturePageContainerView, didScrollTo category: PostListCategory) {
+        guard category != selectedCategory else { return }
+        selectedCategory = category
+        applySelectedCategory(category, syncPage: false, pageAnimated: false)
+        presenter.didSelectCategory(category)
     }
 }

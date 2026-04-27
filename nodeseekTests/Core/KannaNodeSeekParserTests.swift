@@ -72,4 +72,29 @@ struct KannaNodeSeekParserTests {
         #expect(first.lastActivityText == "24s ago")
         #expect(first.avatarURL?.path == "/avatar/17843.png")
     }
+
+    @Test func parsesPostDetailFixture() throws {
+        let html = try FixtureLoader.html(named: "post-703863-1")
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(
+            html: html,
+            url: URL(string: "https://www.nodeseek.com/post-703863-1")!
+        )
+
+        #expect(detail.id == "703863")
+        #expect(detail.title == "绿云抢鸡竞赛又要开始了，一波传家宝又要来袭")
+        #expect(detail.authorName == "ipv4")
+        #expect(detail.avatarURL?.path == "/avatar/34378.png")
+        #expect(detail.metadataText == "36min ago · 日常")
+        #expect(detail.contentHTML.contains("cdn.nodeimage.com"))
+        #expect(detail.contentHTML.contains("喊上你的五指小姐姐一起抢吧"))
+        #expect(detail.comments.count == 10)
+        #expect(detail.comments.first?.id == "9727591")
+        #expect(detail.comments.first?.authorName == "ggbeng")
+        #expect(detail.comments.first?.avatarURL?.path == "/avatar/24520.png")
+        #expect(detail.comments.first?.floorText == "#4")
+        #expect(detail.comments.first?.createdAtText == "34min ago")
+        #expect(detail.comments.first?.contentHTML.contains("CPU限制30%") == true)
+    }
 }

@@ -50,23 +50,29 @@ final class WKWebCookieStoreAdapter: WebCookieStore {
 
 @MainActor
 final class CookieBridge {
-    private let webCookieStore: WebCookieStore
+    private var webCookieStore: WebCookieStore?
+    private let makeDefaultWebCookieStore: @MainActor () -> WebCookieStore
     private let urlCookieStorage: HTTPCookieStorage
     private let allowedDomains: [String]
 
     init(
         webCookieStore: WebCookieStore? = nil,
         urlCookieStorage: HTTPCookieStorage = .shared,
-        allowedDomains: [String] = ["nodeseek.com"]
+        allowedDomains: [String] = ["nodeseek.com"],
+        makeDefaultWebCookieStore: @escaping @MainActor () -> WebCookieStore = {
+            WKWebCookieStoreAdapter(
+                store: WKWebsiteDataStore.default().httpCookieStore
+            )
+        }
     ) {
-        self.webCookieStore = webCookieStore ?? WKWebCookieStoreAdapter(
-            store: WKWebsiteDataStore.default().httpCookieStore
-        )
+        self.webCookieStore = webCookieStore
+        self.makeDefaultWebCookieStore = makeDefaultWebCookieStore
         self.urlCookieStorage = urlCookieStorage
         self.allowedDomains = allowedDomains
     }
 
     func syncWebViewCookiesToURLSession() async {
+        let webCookieStore = resolvedWebCookieStore()
         let cookies = await webCookieStore.allCookies()
         for cookie in cookies where isAllowed(cookie) {
             urlCookieStorage.setCookie(cookie)
@@ -74,6 +80,7 @@ final class CookieBridge {
     }
 
     func syncURLSessionCookiesToWebView() async {
+        let webCookieStore = resolvedWebCookieStore()
         let cookies = urlCookieStorage.cookies ?? []
         for cookie in cookies where isAllowed(cookie) {
             await webCookieStore.setCookie(cookie)
@@ -81,6 +88,7 @@ final class CookieBridge {
     }
 
     func clearSession() async {
+        let webCookieStore = resolvedWebCookieStore()
         let urlCookies = urlCookieStorage.cookies ?? []
         for cookie in urlCookies where isAllowed(cookie) {
             urlCookieStorage.deleteCookie(cookie)
@@ -90,6 +98,16 @@ final class CookieBridge {
         for cookie in webCookies where isAllowed(cookie) {
             await webCookieStore.deleteCookie(cookie)
         }
+    }
+
+    private func resolvedWebCookieStore() -> WebCookieStore {
+        if let webCookieStore {
+            return webCookieStore
+        }
+
+        let webCookieStore = makeDefaultWebCookieStore()
+        self.webCookieStore = webCookieStore
+        return webCookieStore
     }
 
     private func isAllowed(_ cookie: HTTPCookie) -> Bool {

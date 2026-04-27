@@ -9,9 +9,9 @@ import Foundation
 
 struct PostDetailRequest {
     let postID: String
+    let page: Int
 }
 
 struct PostDetailResponse {
-    let title: String
-    let subtitle: String
+    let detail: PostDetail
 }

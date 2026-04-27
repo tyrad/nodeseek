@@ -11,6 +11,8 @@ import Foundation
 protocol PostListViewProtocol: AnyObject {
     func showLoading()
     func hideLoading()
+    func showRefreshing()
+    func hideRefreshing()
     func showLoadingMore()
     func hideLoadingMore()
     func showError(message: String)
@@ -22,6 +24,7 @@ protocol PostListViewProtocol: AnyObject {
 protocol PostListPresenterProtocol: AnyObject {
     func viewDidLoad()
     func didSelectCategory(_ category: PostListCategory)
+    func didPullToRefresh()
     func didSelectPost(at index: Int)
     func didApproachBottom(currentIndex: Int, totalCount: Int)
 }

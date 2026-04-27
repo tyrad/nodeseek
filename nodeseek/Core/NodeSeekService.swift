@@ -43,6 +43,22 @@ struct NodeSeekService: Sendable {
         return .value(posts)
     }
 
+    func loadPostDetail(postID: String, page: Int = 1) async throws -> NodeSeekResult<PostDetail> {
+        let targetURL = postDetailURL(postID: postID, page: page)
+        logger.info("开始抓取 NodeSeek 详情，postID=\(postID, privacy: .public), page=\(page): \(targetURL.absoluteString)")
+        let response = try await htmlClient.get(targetURL)
+        logger.info("详情抓取返回 postID=\(postID, privacy: .public), page=\(page), status=\(response.statusCode), htmlLength=\(response.html.count), finalURL=\(response.finalURL.absoluteString)")
+
+        if let challenge = challengeDetector.detect(response: response) {
+            logger.warning("检测到详情 challenge: \(challenge.logDescription)")
+            return .challenge(challenge)
+        }
+
+        let detail = try parser.parsePostDetail(html: response.html, url: targetURL)
+        logger.info("详情解析完成，postID=\(detail.id, privacy: .public), 评论数量: \(detail.comments.count)")
+        return .value(detail)
+    }
+
     private func postListURL(page: Int, category: PostListCategory) -> URL {
         let normalized = max(1, page)
         guard let pathComponent = category.pathComponent else {
@@ -59,5 +75,10 @@ struct NodeSeekService: Sendable {
             .appendingPathComponent("categories")
             .appendingPathComponent(pathComponent)
             .appendingPathComponent("page-\(normalized)")
+    }
+
+    private func postDetailURL(postID: String, page: Int) -> URL {
+        let normalized = max(1, page)
+        return baseURL.appendingPathComponent("post-\(postID)-\(normalized)")
     }
 }

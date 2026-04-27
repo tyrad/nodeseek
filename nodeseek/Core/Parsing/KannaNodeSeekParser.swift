@@ -10,6 +10,7 @@ import Kanna
 
 enum NodeSeekParserError: Error {
     case notImplemented
+    case postDetailNotFound
 }
 
 struct KannaNodeSeekParser: NodeSeekParser {
@@ -104,7 +105,46 @@ struct KannaNodeSeekParser: NodeSeekParser {
     }
 
     func parsePostDetail(html: String, url: URL) throws -> PostDetail {
-        throw NodeSeekParserError.notImplemented
+        let document = try HTML(html: html, encoding: .utf8)
+
+        let title = document.at_xpath(XPathRules.postDetailTitle)?.text?.normalizedNonEmpty
+            ?? document.at_xpath("//meta[@property='og:title']")?["content"]?.trimmedNonEmpty
+            ?? document.at_xpath("//meta[@name='twitter:title']")?["content"]?.trimmedNonEmpty
+            ?? document.at_xpath("//title")?.text?.normalizedNonEmpty
+
+        guard let title else {
+            throw NodeSeekParserError.postDetailNotFound
+        }
+
+        guard let bodyItem = document.at_xpath(XPathRules.postDetailBodyItem) else {
+            throw NodeSeekParserError.postDetailNotFound
+        }
+
+        let authorName = firstText(in: bodyItem, xpaths: [XPathRules.contentAuthor]) ?? "未知用户"
+        let avatarURL = firstAttribute(
+            in: bodyItem,
+            xpaths: [XPathRules.postAvatar, XPathRules.fallbackAvatar],
+            attribute: "src"
+        ).flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
+        let createdAtText = firstText(in: bodyItem, xpaths: [XPathRules.contentCreatedAt])
+        let categoryText = firstText(in: bodyItem, xpaths: [XPathRules.contentCategory])
+        let metadataText = [createdAtText, categoryText].compactMap(\.self).joined(separator: " · ").trimmedNonEmpty
+        let contentHTML = bodyItem.at_xpath(XPathRules.contentArticle)?.innerHTML?.trimmedNonEmpty ?? ""
+
+        let comments = document.xpath(XPathRules.postDetailComments).compactMap { item -> Comment? in
+            parseComment(item)
+        }
+
+        return PostDetail(
+            id: Self.postID(from: url) ?? title,
+            title: title,
+            authorName: authorName,
+            avatarURL: avatarURL,
+            metadataText: metadataText,
+            contentHTML: contentHTML,
+            comments: comments,
+            replyForm: nil
+        )
     }
 
     func parseReplyForm(html: String, pageURL: URL) throws -> ReplyForm {
@@ -153,6 +193,30 @@ struct KannaNodeSeekParser: NodeSeekParser {
         }
 
         return firstInteger(in: text)
+    }
+
+    private func parseComment(_ item: XMLElement) -> Comment? {
+        guard let authorName = firstText(in: item, xpaths: [XPathRules.contentAuthor]) else {
+            return nil
+        }
+
+        let id = item["data-comment-id"]?.trimmedNonEmpty
+            ?? item["id"]?.trimmedNonEmpty
+            ?? UUID().uuidString
+        let avatarURL = firstAttribute(
+            in: item,
+            xpaths: [XPathRules.postAvatar, XPathRules.fallbackAvatar],
+            attribute: "src"
+        ).flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
+
+        return Comment(
+            id: id,
+            authorName: authorName,
+            avatarURL: avatarURL,
+            floorText: firstText(in: item, xpaths: [XPathRules.contentFloor]),
+            createdAtText: firstText(in: item, xpaths: [XPathRules.contentCreatedAt]),
+            contentHTML: item.at_xpath(XPathRules.contentArticle)?.innerHTML?.trimmedNonEmpty ?? ""
+        )
     }
 }
 

@@ -57,6 +57,32 @@ struct CookieBridgeTests {
         #expect(webStore.cookies.isEmpty)
     }
 
+    @Test func defersDefaultWebCookieStoreCreationUntilSync() async throws {
+        let webStore = InMemoryWebCookieStore(cookies: [
+            try makeCookie(name: "cf_clearance", value: "token", domain: ".nodeseek.com")
+        ])
+        let urlStorage = HTTPCookieStorage.shared
+        deleteTestCookies(from: urlStorage)
+        var factoryCallCount = 0
+
+        let bridge = CookieBridge(
+            urlCookieStorage: urlStorage,
+            makeDefaultWebCookieStore: {
+                factoryCallCount += 1
+                return webStore
+            }
+        )
+
+        #expect(factoryCallCount == 0)
+
+        await bridge.syncWebViewCookiesToURLSession()
+
+        #expect(factoryCallCount == 1)
+        let cookies = urlStorage.cookies(for: URL(string: "https://www.nodeseek.com/")!) ?? []
+        #expect(cookies.contains { $0.name == "cf_clearance" && $0.value == "token" })
+        deleteTestCookies(from: urlStorage)
+    }
+
     private func makeCookie(name: String, value: String, domain: String) throws -> HTTPCookie {
         let cookie = HTTPCookie(properties: [
             .domain: domain,

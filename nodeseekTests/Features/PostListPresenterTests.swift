@@ -141,12 +141,55 @@ struct PostListPresenterTests {
         #expect(view.lastRenderedPostIDs == ["all-1"])
         #expect(view.selectedCategory == .all)
     }
+
+    @Test func pullToRefreshReloadsCurrentCategoryWithoutResettingListState() {
+        let view = SpyPostListView()
+        let interactor = SpyPostListInteractor()
+        let router = SpyPostListRouter()
+        let presenter = PostListPresenter(interactor: interactor, router: router)
+        presenter.setView(view)
+
+        let initialPost = PostSummary(
+            id: "all-1",
+            title: "全部帖子",
+            url: URL(string: "https://www.nodeseek.com/post-all-1")!,
+            authorName: "mist",
+            nodeName: "日常",
+            replyCount: 1,
+            lastActivityText: "刚刚"
+        )
+        let refreshedPost = PostSummary(
+            id: "all-2",
+            title: "全部帖子-刷新后",
+            url: URL(string: "https://www.nodeseek.com/post-all-2")!,
+            authorName: "mist",
+            nodeName: "日常",
+            replyCount: 2,
+            lastActivityText: "1 分钟前"
+        )
+
+        presenter.viewDidLoad()
+        presenter.didLoadPosts([initialPost], category: .all)
+
+        let showRefreshingBefore = view.showRefreshingCount
+        let hideRefreshingBefore = view.hideRefreshingCount
+        presenter.didPullToRefresh()
+
+        #expect(interactor.loadPostsCategories == [.all, .all])
+        #expect(view.showRefreshingCount == showRefreshingBefore + 1)
+
+        presenter.didLoadPosts([refreshedPost], category: .all)
+        #expect(view.hideRefreshingCount == hideRefreshingBefore + 1)
+        #expect(view.lastRenderedPostIDs == ["all-2"])
+    }
 }
 
 @MainActor
 private final class SpyPostListView: PostListViewProtocol {
     var showLoadingCount = 0
     var hideLoadingCount = 0
+    var showRefreshingCount = 0
+    var hideRefreshingCount = 0
     var showLoadingMoreCount = 0
     var hideLoadingMoreCount = 0
     var renderCallCount = 0
@@ -162,6 +205,14 @@ private final class SpyPostListView: PostListViewProtocol {
 
     func hideLoading() {
         hideLoadingCount += 1
+    }
+
+    func showRefreshing() {
+        showRefreshingCount += 1
+    }
+
+    func hideRefreshing() {
+        hideRefreshingCount += 1
     }
 
     func showLoadingMore() {

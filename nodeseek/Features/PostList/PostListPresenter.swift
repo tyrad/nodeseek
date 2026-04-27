@@ -15,6 +15,7 @@ class PostListPresenter: PostListPresenterProtocol {
         var hasMorePages: Bool = true
         var hasLoadedFirstPage: Bool = false
         var isLoadingFirstPage: Bool = false
+        var isRefreshing: Bool = false
         var isLoadingMore: Bool = false
     }
     
@@ -67,6 +68,12 @@ class PostListPresenter: PostListPresenterProtocol {
             view?.hideLoading()
         }
 
+        if state.isRefreshing {
+            view?.showRefreshing()
+        } else {
+            view?.hideRefreshing()
+        }
+
         if state.isLoadingMore {
             view?.showLoadingMore()
         } else {
@@ -86,15 +93,30 @@ class PostListPresenter: PostListPresenterProtocol {
         var state = state(for: category)
         guard !state.isLoadingFirstPage else { return }
         state.isLoadingFirstPage = true
+        state.isRefreshing = false
         state.isLoadingMore = false
         categoryStates[category] = state
 
         if category == currentCategory {
             view?.showLoading()
+            view?.hideRefreshing()
             view?.hideLoadingMore()
         }
 
         interactor.loadPosts(category: category)
+    }
+
+    func didPullToRefresh() {
+        var state = state(for: currentCategory)
+        guard state.hasLoadedFirstPage else { return }
+        guard !state.isRefreshing else { return }
+        guard !state.isLoadingFirstPage else { return }
+        guard !state.isLoadingMore else { return }
+
+        state.isRefreshing = true
+        categoryStates[currentCategory] = state
+        view?.showRefreshing()
+        interactor.loadPosts(category: currentCategory)
     }
     
     func didSelectPost(at index: Int) {
@@ -129,11 +151,13 @@ extension PostListPresenter: PostListInteractorOutput {
         state.nextPage = 2
         state.hasLoadedFirstPage = true
         state.isLoadingFirstPage = false
+        state.isRefreshing = false
         state.isLoadingMore = false
         categoryStates[category] = state
 
         guard category == currentCategory else { return }
         view?.hideLoading()
+        view?.hideRefreshing()
         view?.hideLoadingMore()
         view?.render(posts: state.posts)
     }
@@ -169,11 +193,13 @@ extension PostListPresenter: PostListInteractorOutput {
     func didFailLoadPosts(error: String, category: PostListCategory) {
         var state = state(for: category)
         state.isLoadingFirstPage = false
+        state.isRefreshing = false
         state.isLoadingMore = false
         categoryStates[category] = state
 
         guard category == currentCategory else { return }
         view?.hideLoading()
+        view?.hideRefreshing()
         view?.hideLoadingMore()
         view?.showError(message: error)
     }

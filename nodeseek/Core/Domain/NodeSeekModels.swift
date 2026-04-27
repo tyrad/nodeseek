@@ -42,6 +42,7 @@ struct PostDetail: Equatable, Sendable {
     let id: String
     let title: String
     let authorName: String
+    let avatarURL: URL?
     let metadataText: String?
     let contentHTML: String
     let comments: [Comment]
@@ -51,6 +52,7 @@ struct PostDetail: Equatable, Sendable {
 struct Comment: Equatable, Sendable {
     let id: String
     let authorName: String
+    let avatarURL: URL?
     let floorText: String?
     let createdAtText: String?
     let contentHTML: String

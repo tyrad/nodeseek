@@ -13,7 +13,7 @@ protocol PostDetailViewProtocol: AnyObject {
     func showLoading()
     func hideLoading()
     func showError(message: String)
-    func render(title: String, subtitle: String)
+    func render(detail: PostDetail)
 }
 
 // MARK: - Presenter Protocol (View -> Presenter)
