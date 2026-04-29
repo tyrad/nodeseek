@@ -12,9 +12,9 @@ final class PostSummaryCellNode: ASCellNode {
 
     private enum Layout {
         static let horizontalSpacing: CGFloat = 12
-        static let verticalSpacing: CGFloat = 4
-        static let avatarSize: CGFloat = 56
-        static let contentInset = UIEdgeInsets(top: 9, left: 16, bottom: 9, right: 12)
+        static let verticalSpacing: CGFloat = 5
+        static let avatarSize: CGFloat = 58
+        static let contentInset = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 12)
     }
 
     private let post: PostSummary
@@ -25,7 +25,7 @@ final class PostSummaryCellNode: ASCellNode {
         let node = ASDisplayNode(viewBlock: { [weak self] in
             let imageView = UIImageView()
             imageView.contentMode = .scaleAspectFill
-            imageView.layer.cornerRadius = 10
+            imageView.layer.cornerRadius = 12
             imageView.layer.masksToBounds = true
             imageView.backgroundColor = .systemGray5
             self?.avatarImageView = imageView
@@ -80,17 +80,18 @@ final class PostSummaryCellNode: ASCellNode {
 
         let contentStack = ASStackLayoutSpec.horizontal()
         contentStack.spacing = Layout.horizontalSpacing
-        contentStack.alignItems = .center
+        contentStack.alignItems = .start
         contentStack.children = [avatarNode, textStack]
 
         return ASInsetLayoutSpec(insets: Layout.contentInset, child: contentStack)
     }
 
     private func configureText() {
-        titleNode.maximumNumberOfLines = 0
+        titleNode.maximumNumberOfLines = PostSummaryCellStyle.titleMaximumNumberOfLines
+        titleNode.truncationMode = .byTruncatingTail
         titleNode.attributedText = Self.titleAttributedText(for: post)
 
-        metadataNode.maximumNumberOfLines = 1
+        metadataNode.maximumNumberOfLines = PostSummaryCellStyle.metadataMaximumNumberOfLines
         metadataNode.truncationMode = .byTruncatingTail
         metadataNode.attributedText = Self.metadataAttributedText(for: post)
     }
@@ -108,7 +109,7 @@ final class PostSummaryCellNode: ASCellNode {
     }
 
     static func metadataAttributedText(for post: PostSummary) -> NSAttributedString {
-        let font = UIFont.preferredFont(forTextStyle: .footnote)
+        let font = PostSummaryCellStyle.metadataFont
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: UIColor.secondaryLabel
@@ -147,8 +148,8 @@ final class PostSummaryCellNode: ASCellNode {
         return metadata
     }
 
-    private static func titleAttributedText(for post: PostSummary) -> NSAttributedString {
-        let font = UIFont.preferredFont(forTextStyle: .headline)
+    static func titleAttributedText(for post: PostSummary) -> NSAttributedString {
+        let font = PostSummaryCellStyle.titleFont
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: UIColor.label
@@ -202,4 +203,11 @@ final class PostSummaryCellNode: ASCellNode {
         text.append(NSAttributedString(string: "\(value)", attributes: attributes))
         return text
     }
+}
+
+enum PostSummaryCellStyle {
+    static let titleMaximumNumberOfLines: UInt = 2
+    static let metadataMaximumNumberOfLines: UInt = 1
+    static let titleFont = UIFont.systemFont(ofSize: 19, weight: .semibold)
+    static let metadataFont = UIFont.systemFont(ofSize: 14, weight: .regular)
 }

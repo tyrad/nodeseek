@@ -67,14 +67,6 @@ enum PostListSortMode: String, Sendable {
         }
     }
 
-    var buttonTitle: String {
-        switch self {
-        case .postTime:
-            return "发帖优先"
-        case .replyTime:
-            return "回复优先"
-        }
-    }
 }
 
 struct PostListRequest {

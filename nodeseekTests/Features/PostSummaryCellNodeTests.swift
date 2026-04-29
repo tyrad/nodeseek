@@ -9,6 +9,7 @@ import Testing
 import UIKit
 @testable import nodeseek
 
+@MainActor
 struct PostSummaryCellNodeTests {
     @Test func metadataTextOmitsNodeNameAndWideSeparators() {
         let post = PostSummary(
@@ -30,5 +31,31 @@ struct PostSummaryCellNodeTests {
         #expect(text.contains("22s ago"))
         #expect(!text.contains("NodeSeek"))
         #expect(!text.contains(" · "))
+    }
+
+    @Test func postSummaryCellUsesDenseReadingListTypography() throws {
+        let post = PostSummary(
+            id: "2",
+            title: "nodeimage.com 正式版发布！附带论坛内自动上传图片脚本",
+            url: URL(string: "https://www.nodeseek.com/post-2")!,
+            authorName: "shuai",
+            nodeName: "NodeSeek",
+            replyCount: 961,
+            viewCount: 475454,
+            lastActivityText: "6h 30min ago"
+        )
+        let titleText = PostSummaryCellNode.titleAttributedText(for: post)
+        let metadataText = PostSummaryCellNode.metadataAttributedText(for: post)
+
+        #expect(PostSummaryCellStyle.titleMaximumNumberOfLines == 2)
+        #expect(titleText.string == post.title)
+        #expect(titleText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor == .label)
+        #expect((titleText.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize == 19)
+        #expect(PostSummaryCellStyle.metadataMaximumNumberOfLines == 1)
+        #expect((metadataText.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize == 14)
+        #expect(metadataText.string.contains("shuai"))
+        #expect(metadataText.string.contains("475454"))
+        #expect(metadataText.string.contains("961"))
+        #expect(metadataText.string.contains("6h 30min ago"))
     }
 }

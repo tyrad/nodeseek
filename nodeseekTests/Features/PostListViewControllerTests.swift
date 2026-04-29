@@ -23,10 +23,14 @@ struct PostListViewControllerTests {
         let button = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-sort-toggle"))
         #expect(button.title(for: .normal) == nil)
         #expect(button.image(for: .normal) != nil)
-        #expect(button.bounds.height <= 40)
-        #expect(button.bounds.width <= 48)
+        #expect(button.backgroundColor == .label)
+        #expect(button.layer.maskedCorners == [.layerMinXMinYCorner, .layerMinXMaxYCorner])
+        #expect(button.bounds.height >= 42)
+        #expect(button.bounds.width >= 56)
+        #expect(button.bounds.width <= 60)
         #expect(button.frame.maxX > viewController.view.bounds.maxX)
-        #expect(button.titleLabel?.font.pointSize ?? 99 <= 12)
+        #expect(button.frame.maxY < viewController.view.bounds.maxY - 50)
+        #expect(button.titleLabel?.font.pointSize ?? 0 >= 13)
         #expect(button.titleLabel?.numberOfLines == 1)
         #expect(button.titleLabel?.lineBreakMode == .byTruncatingTail)
         #expect(button.configuration?.titleLineBreakMode == .byTruncatingTail)
@@ -38,12 +42,76 @@ struct PostListViewControllerTests {
         UIView.setAnimationsEnabled(animationsWereEnabled)
 
         #expect(presenter.toggleSortCount == 1)
-        #expect(button.title(for: .normal) == "回复优先")
-        #expect(button.bounds.width >= 124)
-        #expect(button.frame.maxX < viewController.view.bounds.maxX)
+        #expect(button.title(for: .normal) == "按回复时间排序")
+        #expect(button.bounds.width >= 140)
+        #expect(abs(button.frame.maxX - viewController.view.bounds.maxX) < 0.5)
 
         viewController.renderSortMode(.postTime)
-        #expect(button.title(for: .normal) == "发帖优先")
+        #expect(button.title(for: .normal) == "按发帖时间排序")
+    }
+
+    @Test func topNavigationUsesDenseReadingTabStyle() throws {
+        let presenter = SpyPostListPresenter()
+        let viewController = PostListViewController(presenter: presenter)
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.renderCategories([.all, .daily, .tech, .info], selected: .all)
+        viewController.view.layoutIfNeeded()
+
+        let menuButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-menu-button"))
+        #expect(menuButton.bounds.width == 40)
+        #expect(menuButton.bounds.height == 40)
+        #expect(menuButton.backgroundColor == .clear)
+        #expect(menuButton.layer.borderWidth == 0)
+        #expect(menuButton.layer.cornerRadius == 0)
+        #expect(menuButton.configuration?.image != nil)
+        #expect(menuButton.configuration?.image?.renderingMode == .alwaysTemplate)
+
+        let selectedTab = try #require(viewController.view.firstButton(title: "全部"))
+        let unselectedTab = try #require(viewController.view.firstButton(title: "日常"))
+        #expect(selectedTab.titleLabel?.font.pointSize == 17)
+        #expect(selectedTab.titleLabel?.font.fontDescriptor.symbolicTraits.contains(.traitBold) == true)
+        #expect(unselectedTab.titleLabel?.font.pointSize == 17)
+        #expect(unselectedTab.titleColor(for: .normal) == .secondaryLabel)
+        let selectedTabFrame = selectedTab.convert(selectedTab.bounds, to: viewController.view)
+        let menuButtonFrame = menuButton.convert(menuButton.bounds, to: viewController.view)
+        #expect(abs(selectedTabFrame.minY - menuButtonFrame.minY) < 1)
+        #expect(abs(selectedTabFrame.height - menuButtonFrame.height) < 1)
+    }
+
+    @Test func menuButtonPresentsSideMenuWithAvatarAndSettingsButton() throws {
+        let presenter = SpyPostListPresenter()
+        let viewController = PostListViewController(presenter: presenter)
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.view.layoutIfNeeded()
+
+        let menuButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-menu-button"))
+        let sideMenu = try #require(viewController.view.firstView(accessibilityIdentifier: "post-list-side-menu"))
+        let backdrop = try #require(viewController.view.firstView(accessibilityIdentifier: "post-list-side-menu-backdrop"))
+        let avatar = try #require(viewController.view.firstImageView(accessibilityIdentifier: "post-list-side-menu-avatar"))
+        let settingsButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-settings-button"))
+        let sideMenuHost = viewController.children.first {
+            $0.view.firstView(accessibilityIdentifier: "post-list-side-menu") != nil
+        }
+
+        #expect(sideMenuHost != nil)
+        #expect(sideMenu.frame.maxX <= 0.5)
+        #expect(backdrop.isHidden == true)
+        #expect(avatar.image != nil)
+        #expect(settingsButton.configuration?.title == "设置")
+        #expect(settingsButton.configuration?.image != nil)
+
+        let animationsWereEnabled = UIView.areAnimationsEnabled
+        UIView.setAnimationsEnabled(false)
+        menuButton.sendActions(for: .touchUpInside)
+        viewController.view.layoutIfNeeded()
+        UIView.setAnimationsEnabled(animationsWereEnabled)
+
+        #expect(abs(sideMenu.frame.minX) < 0.5)
+        #expect(backdrop.isHidden == false)
+        #expect(backdrop.alpha == 1)
+        #expect(settingsButton.frame.maxY < viewController.view.bounds.maxY)
     }
 }
 
@@ -76,6 +144,48 @@ private extension UIView {
 
         for subview in subviews {
             if let matched = subview.firstButton(accessibilityIdentifier: accessibilityIdentifier) {
+                return matched
+            }
+        }
+
+        return nil
+    }
+
+    func firstButton(title: String) -> UIButton? {
+        if let button = self as? UIButton, button.title(for: .normal) == title {
+            return button
+        }
+
+        for subview in subviews {
+            if let matched = subview.firstButton(title: title) {
+                return matched
+            }
+        }
+
+        return nil
+    }
+
+    func firstView(accessibilityIdentifier: String) -> UIView? {
+        if self.accessibilityIdentifier == accessibilityIdentifier {
+            return self
+        }
+
+        for subview in subviews {
+            if let matched = subview.firstView(accessibilityIdentifier: accessibilityIdentifier) {
+                return matched
+            }
+        }
+
+        return nil
+    }
+
+    func firstImageView(accessibilityIdentifier: String) -> UIImageView? {
+        if let imageView = self as? UIImageView, imageView.accessibilityIdentifier == accessibilityIdentifier {
+            return imageView
+        }
+
+        for subview in subviews {
+            if let matched = subview.firstImageView(accessibilityIdentifier: accessibilityIdentifier) {
                 return matched
             }
         }

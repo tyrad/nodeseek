@@ -18,6 +18,7 @@ class PostListViewController: UIViewController {
     private var sortToggleTrailingConstraint: NSLayoutConstraint?
     private var sortToggleCollapseWorkItem: DispatchWorkItem?
     private var isSortToggleExpanded = false
+    private let sideMenuViewController = PostListSideMenuViewController()
     
     var hasCompactTopButton: Bool {
         compactTopButton.superview != nil
@@ -27,16 +28,22 @@ class PostListViewController: UIViewController {
     private let pageContainerView = PostTexturePageContainerView()
     private let compactTopButton: UIButton = {
         let button = UIButton(type: .system)
-        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
-        let image = UIImage(systemName: "line.3.horizontal.circle", withConfiguration: symbolConfig)
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
+        let image = UIImage(systemName: "list.bullet", withConfiguration: symbolConfig)
             ?? UIImage(systemName: "line.3.horizontal", withConfiguration: symbolConfig)
-        button.setImage(image, for: .normal)
+        var configuration = UIButton.Configuration.plain()
+        configuration.baseForegroundColor = .label
+        configuration.image = image?.withRenderingMode(.alwaysTemplate)
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
+        configuration.background.backgroundColor = .clear
+        configuration.background.cornerRadius = 0
+        configuration.cornerStyle = .fixed
+        button.configuration = configuration
         button.tintColor = .label
-        button.backgroundColor = .tertiarySystemBackground
-        button.layer.cornerRadius = 10
-        button.layer.borderWidth = 0.5
-        button.layer.borderColor = UIColor.separator.cgColor
-        button.adjustsImageWhenHighlighted = false
+        button.backgroundColor = .clear
+        button.layer.cornerRadius = 0
+        button.layer.borderWidth = 0
+        button.accessibilityIdentifier = "post-list-menu-button"
         button.configurationUpdateHandler = { updateButton in
             updateButton.alpha = updateButton.isHighlighted ? 0.72 : 1.0
         }
@@ -46,28 +53,29 @@ class PostListViewController: UIViewController {
 
     private let sortToggleButton: UIButton = {
         let button = UIButton(type: .system)
-        var configuration = UIButton.Configuration.tinted()
-        configuration.baseForegroundColor = .secondaryLabel
-        configuration.baseBackgroundColor = .tertiarySystemFill
-        configuration.cornerStyle = .capsule
+        var configuration = UIButton.Configuration.plain()
+        configuration.baseForegroundColor = .systemBackground
         configuration.imagePadding = 0
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10)
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
         configuration.titleLineBreakMode = .byTruncatingTail
         button.configuration = configuration
         button.accessibilityIdentifier = "post-list-sort-toggle"
-        button.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
+        button.tintColor = .systemBackground
+        button.setTitleColor(.systemBackground, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
         button.titleLabel?.numberOfLines = 1
         button.titleLabel?.lineBreakMode = .byTruncatingTail
         button.titleLabel?.adjustsFontSizeToFitWidth = true
         button.titleLabel?.minimumScaleFactor = 0.9
-        button.backgroundColor = .clear
-        button.layer.cornerRadius = 17
+        button.backgroundColor = .label
+        button.layer.cornerRadius = SortToggleLayout.cornerRadius
+        button.layer.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
         button.layer.borderWidth = 0.5
-        button.layer.borderColor = UIColor.separator.withAlphaComponent(0.55).cgColor
+        button.layer.borderColor = UIColor.separator.cgColor
         button.layer.shadowColor = UIColor.black.cgColor
-        button.layer.shadowOpacity = 0.08
-        button.layer.shadowRadius = 8
-        button.layer.shadowOffset = CGSize(width: 0, height: 3)
+        button.layer.shadowOpacity = 0.18
+        button.layer.shadowRadius = 12
+        button.layer.shadowOffset = CGSize(width: 0, height: 5)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -90,7 +98,7 @@ class PostListViewController: UIViewController {
         let stack = UIStackView()
         stack.axis = .horizontal
         stack.alignment = .fill
-        stack.spacing = 10
+        stack.spacing = 18
         stack.translatesAutoresizingMaskIntoConstraints = false
         return stack
     }()
@@ -123,7 +131,7 @@ class PostListViewController: UIViewController {
         super.viewWillDisappear(animated)
         navigationController?.setNavigationBarHidden(false, animated: animated)
     }
-    
+
     // MARK: - Setup UI
     private func setupUI() {
         navigationItem.title = nil
@@ -160,18 +168,18 @@ class PostListViewController: UIViewController {
             
             compactTopButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
             compactTopButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
-            compactTopButton.widthAnchor.constraint(equalToConstant: 36),
-            compactTopButton.heightAnchor.constraint(equalToConstant: 36),
+            compactTopButton.widthAnchor.constraint(equalToConstant: 40),
+            compactTopButton.heightAnchor.constraint(equalToConstant: 40),
 
             sortToggleTrailingConstraint,
-            sortToggleButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -18),
+            sortToggleButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -56),
             sortToggleWidthConstraint,
-            sortToggleButton.heightAnchor.constraint(equalToConstant: 34),
+            sortToggleButton.heightAnchor.constraint(equalToConstant: SortToggleLayout.height),
 
             tabScrollView.leadingAnchor.constraint(equalTo: compactTopButton.trailingAnchor, constant: 8),
             tabScrollView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8),
             tabScrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
-            tabScrollView.heightAnchor.constraint(equalToConstant: 36),
+            tabScrollView.heightAnchor.constraint(equalToConstant: 40),
 
             tabStackView.leadingAnchor.constraint(equalTo: tabScrollView.contentLayoutGuide.leadingAnchor),
             tabStackView.trailingAnchor.constraint(equalTo: tabScrollView.contentLayoutGuide.trailingAnchor),
@@ -183,12 +191,13 @@ class PostListViewController: UIViewController {
             loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
 
+        installSideMenuController()
         applySortTogglePresentation(expanded: false)
     }
     
     // MARK: - Actions
     @objc private func leftButtonTapped() {
-        // 功能后续补齐。
+        sideMenuViewController.show(animated: true)
     }
 
     @objc private func sortToggleButtonTapped() {
@@ -273,26 +282,41 @@ class PostListViewController: UIViewController {
     }
 
     private func applySortTogglePresentation(expanded: Bool) {
-        let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
         let image = UIImage(systemName: currentSortMode.symbolName, withConfiguration: symbolConfiguration)
+        let title = currentSortMode.accessibilityTitle
         sortToggleButton.setImage(image, for: .normal)
-        sortToggleButton.setTitle(expanded ? currentSortMode.buttonTitle : nil, for: .normal)
-        sortToggleButton.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
+        sortToggleButton.setTitle(expanded ? title : nil, for: .normal)
+        sortToggleButton.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
         sortToggleButton.titleLabel?.numberOfLines = 1
         sortToggleButton.titleLabel?.lineBreakMode = .byTruncatingTail
         sortToggleButton.titleLabel?.adjustsFontSizeToFitWidth = true
         sortToggleButton.titleLabel?.minimumScaleFactor = 0.9
 
-        var configuration = sortToggleButton.configuration ?? UIButton.Configuration.tinted()
+        var configuration = sortToggleButton.configuration ?? UIButton.Configuration.plain()
+        configuration.baseForegroundColor = .systemBackground
         configuration.image = image
-        configuration.title = expanded ? currentSortMode.buttonTitle : nil
-        configuration.imagePadding = expanded ? 3 : 0
+        configuration.title = expanded ? title : nil
+        configuration.imagePadding = expanded ? 5 : 0
         configuration.contentInsets = expanded
-            ? NSDirectionalEdgeInsets(top: 6, leading: 9, bottom: 6, trailing: 10)
-            : NSDirectionalEdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10)
+            ? NSDirectionalEdgeInsets(top: 8, leading: 13, bottom: 8, trailing: 14)
+            : NSDirectionalEdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
         configuration.titleLineBreakMode = .byTruncatingTail
         sortToggleButton.configuration = configuration
         sortToggleButton.accessibilityLabel = currentSortMode.accessibilityTitle
+    }
+
+    private func installSideMenuController() {
+        addChild(sideMenuViewController)
+        view.addSubview(sideMenuViewController.view)
+        sideMenuViewController.view.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            sideMenuViewController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            sideMenuViewController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            sideMenuViewController.view.topAnchor.constraint(equalTo: view.topAnchor),
+            sideMenuViewController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        sideMenuViewController.didMove(toParent: self)
     }
 }
 
@@ -353,19 +377,21 @@ extension PostListViewController: PostListViewProtocol {
 }
 
 private enum SortToggleLayout {
-    static let collapsedWidth: CGFloat = 46
-    static let expandedWidth: CGFloat = 126
-    static let collapsedTrailing: CGFloat = 10
-    static let expandedTrailing: CGFloat = -18
+    static let collapsedWidth: CGFloat = 58
+    static let expandedWidth: CGFloat = 144
+    static let height: CGFloat = 42
+    static let cornerRadius: CGFloat = 14
+    static let collapsedTrailing: CGFloat = 12
+    static let expandedTrailing: CGFloat = 0
 }
 
 private extension PostListSortMode {
     var symbolName: String {
         switch self {
         case .postTime:
-            return "clock.fill"
+            return "line.3.horizontal.decrease.circle.fill"
         case .replyTime:
-            return "clock.arrow.trianglehead.counterclockwise.rotate.90"
+            return "arrow.up.arrow.down.circle.fill"
         }
     }
 }
@@ -384,15 +410,15 @@ private final class CategoryTabButton: UIButton {
     override init(frame: CGRect) {
         super.init(frame: frame)
         translatesAutoresizingMaskIntoConstraints = false
-        contentEdgeInsets = UIEdgeInsets(top: 0, left: 4, bottom: 0, right: 4)
-        titleLabel?.font = .systemFont(ofSize: 16, weight: .regular)
+        contentEdgeInsets = UIEdgeInsets(top: 0, left: 3, bottom: 0, right: 3)
+        titleLabel?.font = .systemFont(ofSize: 17, weight: .regular)
         setTitleColor(.secondaryLabel, for: .normal)
         addSubview(indicatorView)
         NSLayoutConstraint.activate([
-            indicatorView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
-            indicatorView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2),
+            indicatorView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 1),
+            indicatorView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -1),
             indicatorView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -1),
-            indicatorView.heightAnchor.constraint(equalToConstant: 2)
+            indicatorView.heightAnchor.constraint(equalToConstant: 3)
         ])
     }
 
@@ -401,7 +427,7 @@ private final class CategoryTabButton: UIButton {
     }
 
     func applySelectedStyle(isSelected: Bool) {
-        titleLabel?.font = isSelected ? .systemFont(ofSize: 16, weight: .semibold) : .systemFont(ofSize: 16, weight: .regular)
+        titleLabel?.font = isSelected ? .systemFont(ofSize: 17, weight: .semibold) : .systemFont(ofSize: 17, weight: .regular)
         setTitleColor(isSelected ? .label : .secondaryLabel, for: .normal)
         indicatorView.isHidden = !isSelected
     }
