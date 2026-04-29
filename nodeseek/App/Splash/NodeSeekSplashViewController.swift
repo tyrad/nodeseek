@@ -10,6 +10,7 @@ final class NodeSeekSplashViewController: UIViewController {
     private let animator: NodeSeekSplashAnimator
     private let prewarmWebView: @MainActor () -> Void
     private let onFinish: () -> Void
+    private var didPrewarmWebView = false
     private var didStartAnimation = false
 
     init(
@@ -32,6 +33,7 @@ final class NodeSeekSplashViewController: UIViewController {
         super.viewDidLoad()
         applyColors()
         animator.install(in: view)
+        startPrewarmIfNeeded()
         registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (controller: NodeSeekSplashViewController, _) in
             controller.applyColors()
             controller.animator.updateColors(for: controller.traitCollection)
@@ -48,10 +50,15 @@ final class NodeSeekSplashViewController: UIViewController {
 
         guard !didStartAnimation else { return }
         didStartAnimation = true
-        prewarmWebView()
         animator.play { [weak self] in
             self?.onFinish()
         }
+    }
+
+    private func startPrewarmIfNeeded() {
+        guard !didPrewarmWebView else { return }
+        didPrewarmWebView = true
+        prewarmWebView()
     }
 
     private func applyColors() {

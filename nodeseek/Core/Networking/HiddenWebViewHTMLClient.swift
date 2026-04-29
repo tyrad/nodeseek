@@ -89,6 +89,7 @@ struct HiddenWebViewHTMLClient: HTMLClient {
         request.timeoutInterval = timeoutInterval
         request.cachePolicy = WebViewCachePolicy.getRequestPolicy
         WebRequestFingerprint.applyHTMLHeaders(to: &request)
+        await NodeSeekWebViewPrewarmer.waitForPreloadIfNeeded(for: url)
         return try await load(request: request)
     }
 
@@ -130,8 +131,160 @@ struct HiddenWebViewHTMLClient: HTMLClient {
 
 @MainActor
 enum NodeSeekWebViewPrewarmer {
+    private static let defaultPostListURL = URL(string: "https://www.nodeseek.com/page-1?sortBy=replyTime")!
+    private static let defaultPostListPreloadWaitInterval: TimeInterval = 0.45
+
     static func prewarm() {
-        HiddenWebViewLoader.shared.prewarm()
+        _ = HiddenWebViewLoader.shared
+        HiddenWebViewPreloadLoader.shared.preload(url: defaultPostListURL)
+    }
+
+    static func waitForPreloadIfNeeded(for url: URL) async {
+        guard isDefaultPostListURL(url) else { return }
+        await HiddenWebViewPreloadLoader.shared.waitForActivePreload(
+            url: url,
+            maxWait: defaultPostListPreloadWaitInterval
+        )
+    }
+
+    private static func isDefaultPostListURL(_ url: URL) -> Bool {
+        url.absoluteString == defaultPostListURL.absoluteString
+    }
+}
+
+@MainActor
+private final class HiddenWebViewPreloadLoader: NSObject, WKNavigationDelegate {
+    static let shared = HiddenWebViewPreloadLoader()
+
+    private var webView: WKWebView?
+    private var navigation: WKNavigation?
+    private var timeoutTask: Task<Void, Never>?
+    private var activeURL: URL?
+    private var preloadWaiters: [UUID: CheckedContinuation<Void, Never>] = [:]
+    private var preloadWaiterTimeoutTasks: [UUID: Task<Void, Never>] = [:]
+    private var didPreload = false
+    private let logger = Logger(subsystem: "com.nodeseek.app", category: "HiddenWebViewPreload")
+
+    private override init() {
+        super.init()
+    }
+
+    deinit {
+        timeoutTask?.cancel()
+        preloadWaiterTimeoutTasks.values.forEach { $0.cancel() }
+    }
+
+    func preload(url: URL, timeoutInterval: TimeInterval = 15) {
+        guard !didPreload, navigation == nil else { return }
+        didPreload = true
+        activeURL = url
+        WebViewCacheTuner.tuneIfNeeded()
+
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .default()
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.customUserAgent = WebRequestFingerprint.userAgent
+        webView.navigationDelegate = self
+        self.webView = webView
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = timeoutInterval
+        request.cachePolicy = WebViewCachePolicy.getRequestPolicy
+        WebRequestFingerprint.applyHTMLHeaders(to: &request)
+
+        logger.info("预加载 NodeSeek 首屏缓存: \(url.absoluteString, privacy: .public)")
+        navigation = webView.load(request)
+        guard navigation != nil else {
+            logger.warning("预加载未开始: \(url.absoluteString, privacy: .public)")
+            finishPreload()
+            return
+        }
+
+        scheduleTimeout(timeoutInterval)
+    }
+
+    func waitForActivePreload(url: URL, maxWait: TimeInterval) async {
+        guard maxWait > 0, isLoading(url) else { return }
+
+        logger.info("等待 NodeSeek 首屏缓存预加载完成，最多 \(Int(maxWait * 1000), privacy: .public)ms")
+        let waiterID = UUID()
+        await withCheckedContinuation { continuation in
+            guard self.isLoading(url) else {
+                continuation.resume()
+                return
+            }
+
+            self.preloadWaiters[waiterID] = continuation
+            self.preloadWaiterTimeoutTasks[waiterID] = Task { @MainActor [weak self] in
+                let nanoseconds = UInt64(maxWait * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: nanoseconds)
+                guard !Task.isCancelled else { return }
+                self?.logger.info("NodeSeek 首屏缓存预加载等待超时，继续业务请求")
+                self?.resumePreloadWaiter(id: waiterID)
+            }
+        }
+        logger.info("NodeSeek 首屏缓存预加载等待结束")
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard navigation === self.navigation else { return }
+        logger.info("NodeSeek 首屏缓存预加载完成: \(webView.url?.absoluteString ?? "nil", privacy: .public)")
+        finishPreload()
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        guard navigation === self.navigation else { return }
+        logger.warning("NodeSeek 首屏缓存预加载失败: \(error.localizedDescription, privacy: .public)")
+        finishPreload()
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        didFailProvisionalNavigation navigation: WKNavigation!,
+        withError error: Error
+    ) {
+        guard navigation === self.navigation else { return }
+        logger.warning("NodeSeek 首屏缓存预加载 provisional 失败: \(error.localizedDescription, privacy: .public)")
+        finishPreload()
+    }
+
+    private func scheduleTimeout(_ timeoutInterval: TimeInterval) {
+        timeoutTask?.cancel()
+        timeoutTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let nanoseconds = UInt64(timeoutInterval * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: nanoseconds)
+            guard !Task.isCancelled else { return }
+            logger.warning("NodeSeek 首屏缓存预加载超时")
+            webView?.stopLoading()
+            finishPreload()
+        }
+    }
+
+    private func finishPreload() {
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        navigation = nil
+        activeURL = nil
+        webView?.navigationDelegate = nil
+        webView = nil
+        resumeAllPreloadWaiters()
+    }
+
+    private func isLoading(_ url: URL) -> Bool {
+        navigation != nil && activeURL?.absoluteString == url.absoluteString
+    }
+
+    private func resumePreloadWaiter(id: UUID) {
+        preloadWaiterTimeoutTasks.removeValue(forKey: id)?.cancel()
+        preloadWaiters.removeValue(forKey: id)?.resume()
+    }
+
+    private func resumeAllPreloadWaiters() {
+        let waiterIDs = Array(preloadWaiters.keys)
+        waiterIDs.forEach { resumePreloadWaiter(id: $0) }
     }
 }
 
@@ -145,12 +298,10 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     private var continuation: CheckedContinuation<HTMLResponse, Error>?
     private var timeoutTask: Task<Void, Never>?
     private var htmlPollingTask: Task<Void, Never>?
-    private var prewarmNavigation: WKNavigation?
     private var statusCode = 200
     private var headers: [String: String] = [:]
     private var initialURL: URL?
     private var completed = false
-    private var didPrewarm = false
     private var challengePollCount = 0
     private let maxChallengePollCount = 10
     private let challengePollIntervalNanoseconds: UInt64 = 1_200_000_000
@@ -177,16 +328,6 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         htmlPollingTask?.cancel()
     }
 
-    func prewarm() {
-        guard !didPrewarm, continuation == nil else { return }
-        didPrewarm = true
-        logger.info("预热隐藏 WebView")
-        prewarmNavigation = webView.loadHTMLString(
-            "<html><head></head><body></body></html>",
-            baseURL: URL(string: "https://www.nodeseek.com")
-        )
-    }
-
     func load(request: URLRequest, timeoutInterval: TimeInterval) async throws -> HTMLResponse {
         self.timeoutInterval = timeoutInterval
         resetForNextRequest()
@@ -209,10 +350,6 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         logger.info("WebView didFinish: \(webView.url?.absoluteString ?? "nil")")
-        if navigation === prewarmNavigation {
-            prewarmNavigation = nil
-            return
-        }
         guard continuation != nil else { return }
         htmlPollingTask?.cancel()
         htmlPollingTask = Task { @MainActor [weak self] in
@@ -267,11 +404,6 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        if navigation === prewarmNavigation {
-            prewarmNavigation = nil
-            logger.warning("预热隐藏 WebView 导航失败: \(error.localizedDescription)")
-            return
-        }
         logger.error("导航失败 didFail: \(error.localizedDescription)")
         resolve(.failure(error))
     }
@@ -281,11 +413,6 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: Error
     ) {
-        if navigation === prewarmNavigation {
-            prewarmNavigation = nil
-            logger.warning("预热隐藏 WebView provisional 导航失败: \(error.localizedDescription)")
-            return
-        }
         logger.error("导航失败 didFailProvisionalNavigation: \(error.localizedDescription)")
         resolve(.failure(error))
     }
