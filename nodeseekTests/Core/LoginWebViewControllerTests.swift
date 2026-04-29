@@ -14,9 +14,15 @@ struct LoginWebViewControllerTests {
         let viewController = LoginWebViewController(cookieSynchronizer: synchronizer)
 
         viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.view.layoutIfNeeded()
 
+        let hintContainer = try #require(viewController.view.firstView(accessibilityIdentifier: "login-hint-container"))
         let hintLabel = try #require(viewController.view.firstLabel(text: "登录成功后关闭当前页面即可"))
+        #expect(hintContainer.layer.cornerRadius == 12)
+        #expect(hintContainer.frame.minX > 0)
         #expect(hintLabel.numberOfLines == 0)
+        #expect(hintLabel.textAlignment == .natural)
         #expect(viewController.navigationItem.rightBarButtonItem?.accessibilityLabel == "关闭登录页")
     }
 
@@ -102,6 +108,20 @@ private final class SpyLoginCookieSynchronizer: LoginCookieSynchronizing {
 }
 
 private extension UIView {
+    func firstView(accessibilityIdentifier: String) -> UIView? {
+        if self.accessibilityIdentifier == accessibilityIdentifier {
+            return self
+        }
+
+        for subview in subviews {
+            if let matched = subview.firstView(accessibilityIdentifier: accessibilityIdentifier) {
+                return matched
+            }
+        }
+
+        return nil
+    }
+
     func firstLabel(text: String) -> UILabel? {
         if let label = self as? UILabel, label.text == text {
             return label

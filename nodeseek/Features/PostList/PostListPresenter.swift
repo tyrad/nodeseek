@@ -63,6 +63,12 @@ class PostListPresenter: PostListPresenterProtocol {
         presentCurrentCategory(useCache: false)
     }
 
+    func didTapLogin() {
+        router.navigateToLogin { [weak self] in
+            self?.presentCurrentCategory(useCache: false)
+        }
+    }
+
     private func presentCurrentCategory(useCache: Bool) {
         var state = state(for: currentCategory)
         if !useCache {

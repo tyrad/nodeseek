@@ -79,7 +79,7 @@ struct PostListViewControllerTests {
         #expect(abs(selectedTabFrame.height - menuButtonFrame.height) < 1)
     }
 
-    @Test func menuButtonPresentsSideMenuWithAvatarAndSettingsButton() throws {
+    @Test func menuButtonPresentsSideMenuWithAvatarLoginAndSettingsButton() throws {
         let presenter = SpyPostListPresenter()
         let viewController = PostListViewController(presenter: presenter)
         viewController.loadViewIfNeeded()
@@ -90,6 +90,7 @@ struct PostListViewControllerTests {
         let sideMenu = try #require(viewController.view.firstView(accessibilityIdentifier: "post-list-side-menu"))
         let backdrop = try #require(viewController.view.firstView(accessibilityIdentifier: "post-list-side-menu-backdrop"))
         let avatar = try #require(viewController.view.firstImageView(accessibilityIdentifier: "post-list-side-menu-avatar"))
+        let loginButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-login-button"))
         let settingsButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-settings-button"))
         let sideMenuHost = viewController.children.first {
             $0.view.firstView(accessibilityIdentifier: "post-list-side-menu") != nil
@@ -99,6 +100,8 @@ struct PostListViewControllerTests {
         #expect(sideMenu.frame.maxX <= 0.5)
         #expect(backdrop.isHidden == true)
         #expect(avatar.image != nil)
+        #expect(loginButton.configuration?.title == "登录")
+        #expect(loginButton.configuration?.image != nil)
         #expect(settingsButton.configuration?.title == "设置")
         #expect(settingsButton.configuration?.image != nil)
 
@@ -111,13 +114,24 @@ struct PostListViewControllerTests {
         #expect(abs(sideMenu.frame.minX) < 0.5)
         #expect(backdrop.isHidden == false)
         #expect(backdrop.alpha == 1)
+        #expect(loginButton.frame.minY > avatar.frame.maxY)
         #expect(settingsButton.frame.maxY < viewController.view.bounds.maxY)
+
+        UIView.setAnimationsEnabled(false)
+        loginButton.sendActions(for: .touchUpInside)
+        viewController.view.layoutIfNeeded()
+        UIView.setAnimationsEnabled(animationsWereEnabled)
+
+        #expect(presenter.didTapLoginCount == 1)
+        #expect(sideMenu.frame.maxX <= 0.5)
+        #expect(backdrop.isHidden == true)
     }
 }
 
 private final class SpyPostListPresenter: PostListPresenterProtocol {
     private(set) var viewDidLoadCount = 0
     private(set) var toggleSortCount = 0
+    private(set) var didTapLoginCount = 0
 
     func viewDidLoad() {
         viewDidLoadCount += 1
@@ -127,6 +141,10 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
 
     func didToggleSortMode() {
         toggleSortCount += 1
+    }
+
+    func didTapLogin() {
+        didTapLoginCount += 1
     }
 
     func didPullToRefresh() {}

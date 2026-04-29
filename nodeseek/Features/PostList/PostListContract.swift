@@ -26,6 +26,7 @@ protocol PostListPresenterProtocol: AnyObject {
     func viewDidLoad()
     func didSelectCategory(_ category: PostListCategory)
     func didToggleSortMode()
+    func didTapLogin()
     func didPullToRefresh()
     func didSelectPost(at index: Int)
     func didApproachBottom(currentIndex: Int, totalCount: Int)
@@ -48,4 +49,5 @@ protocol PostListInteractorOutput: AnyObject {
 // MARK: - Router Protocol (Presenter -> Router)
 protocol PostListRouterProtocol: AnyObject {
     func navigateToPostDetail(post: PostSummary)
+    func navigateToLogin(onClose: @escaping @MainActor () -> Void)
 }

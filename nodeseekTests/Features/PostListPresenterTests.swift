@@ -286,6 +286,36 @@ struct PostListPresenterTests {
         #expect(view.events.first == "render")
         #expect(view.events.contains("hideLoadingMore"))
     }
+
+    @Test func loginCloseReloadsCurrentCategoryFromFirstPage() {
+        let view = SpyPostListView()
+        let interactor = SpyPostListInteractor()
+        let router = SpyPostListRouter()
+        let presenter = PostListPresenter(interactor: interactor, router: router)
+        presenter.setView(view)
+        let post = PostSummary(
+            id: "1",
+            title: "标题",
+            url: URL(string: "https://www.nodeseek.com/post-1")!,
+            authorName: "mist",
+            nodeName: "开发",
+            replyCount: 3,
+            lastActivityText: "刚刚"
+        )
+
+        presenter.viewDidLoad()
+        presenter.didLoadPosts([post], category: .all)
+        presenter.didTapLogin()
+
+        #expect(router.navigateToLoginCount == 1)
+        #expect(interactor.loadPostsCategories == [.all])
+
+        router.onLoginClose?()
+
+        #expect(view.lastRenderedPostIDs.isEmpty)
+        #expect(interactor.loadPostsCategories == [.all, .all])
+        #expect(interactor.loadPostsSortModes == [.replyTime, .replyTime])
+    }
 }
 
 @MainActor
@@ -383,8 +413,15 @@ private final class SpyPostListInteractor: PostListInteractorInput {
 @MainActor
 private final class SpyPostListRouter: PostListRouterProtocol {
     var selectedPost: PostSummary?
+    var navigateToLoginCount = 0
+    var onLoginClose: (@MainActor () -> Void)?
 
     func navigateToPostDetail(post: PostSummary) {
         selectedPost = post
+    }
+
+    func navigateToLogin(onClose: @escaping @MainActor () -> Void) {
+        navigateToLoginCount += 1
+        onLoginClose = onClose
     }
 }

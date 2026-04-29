@@ -10,6 +10,7 @@ import UIKit
 final class PostListSideMenuViewController: UIViewController {
     private var sideMenuLeadingConstraint: NSLayoutConstraint?
     private var isSideMenuVisible = false
+    var onLoginTapped: (() -> Void)?
 
     private let backdropView: UIView = {
         let view = UIView()
@@ -65,6 +66,24 @@ final class PostListSideMenuViewController: UIViewController {
         return button
     }()
 
+    private let loginButton: UIButton = {
+        let button = UIButton(type: .system)
+        let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+        var configuration = UIButton.Configuration.filled()
+        configuration.image = UIImage(systemName: "person.badge.key", withConfiguration: symbolConfiguration)
+        configuration.imagePadding = 10
+        configuration.baseBackgroundColor = .label
+        configuration.baseForegroundColor = .systemBackground
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)
+        configuration.title = "登录"
+        configuration.cornerStyle = .medium
+        button.configuration = configuration
+        button.contentHorizontalAlignment = .leading
+        button.accessibilityIdentifier = "post-list-side-menu-login-button"
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -88,11 +107,13 @@ final class PostListSideMenuViewController: UIViewController {
         view.isHidden = true
         backdropView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(backdropTapped)))
         avatarImageView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(avatarTapped)))
+        loginButton.addTarget(self, action: #selector(loginButtonTapped), for: .touchUpInside)
         settingsButton.addTarget(self, action: #selector(settingsButtonTapped), for: .touchUpInside)
 
         view.addSubview(backdropView)
         view.addSubview(sideMenuView)
         sideMenuView.addSubview(avatarImageView)
+        sideMenuView.addSubview(loginButton)
         sideMenuView.addSubview(settingsButton)
 
         let sideMenuLeadingConstraint = sideMenuView.leadingAnchor.constraint(
@@ -117,6 +138,11 @@ final class PostListSideMenuViewController: UIViewController {
             avatarImageView.widthAnchor.constraint(equalToConstant: SideMenuLayout.avatarSize),
             avatarImageView.heightAnchor.constraint(equalToConstant: SideMenuLayout.avatarSize),
 
+            loginButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
+            loginButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
+            loginButton.topAnchor.constraint(equalTo: avatarImageView.bottomAnchor, constant: 24),
+            loginButton.heightAnchor.constraint(equalToConstant: 48),
+
             settingsButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
             settingsButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
             settingsButton.bottomAnchor.constraint(equalTo: sideMenuView.safeAreaLayoutGuide.bottomAnchor, constant: -18),
@@ -130,6 +156,11 @@ final class PostListSideMenuViewController: UIViewController {
 
     @objc private func avatarTapped() {
         hide(animated: true)
+    }
+
+    @objc private func loginButtonTapped() {
+        hide(animated: true)
+        onLoginTapped?()
     }
 
     @objc private func settingsButtonTapped() {

@@ -307,6 +307,9 @@ class PostListViewController: UIViewController {
     }
 
     private func installSideMenuController() {
+        sideMenuViewController.onLoginTapped = { [weak self] in
+            self?.presenter.didTapLogin()
+        }
         addChild(sideMenuViewController)
         view.addSubview(sideMenuViewController.view)
         sideMenuViewController.view.translatesAutoresizingMaskIntoConstraints = false
