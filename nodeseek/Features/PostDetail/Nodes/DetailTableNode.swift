@@ -44,7 +44,7 @@ enum DetailContentBlockNodeFactory {
             return imageBlock.url
         }
         var imageIndex = 0
-        blocks.compactMap { block in
+        return blocks.compactMap { block -> ASDisplayNode? in
             switch block {
             case .text(let attributedText):
                 guard attributedText.length > 0 else { return nil }
