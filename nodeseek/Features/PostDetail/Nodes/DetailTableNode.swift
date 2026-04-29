@@ -36,6 +36,7 @@ enum DetailContentBlockNodeFactory {
     static func makeNodes(
         from blocks: [RenderedContentBlock],
         onImageTapped: @escaping ([URL], Int) -> Void,
+        onLinkTapped: @escaping (URL) -> Void,
         onTextLayoutInvalidated: @escaping () -> Void
     ) -> [ASDisplayNode] {
         blocks.compactMap { block in
@@ -45,6 +46,7 @@ enum DetailContentBlockNodeFactory {
                 return DetailRichTextNode(
                     attributedText: attributedText,
                     onImageTapped: onImageTapped,
+                    onLinkTapped: onLinkTapped,
                     onLayoutInvalidated: onTextLayoutInvalidated
                 )
             case .table(let table):

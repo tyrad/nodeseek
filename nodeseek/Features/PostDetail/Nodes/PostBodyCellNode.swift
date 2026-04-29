@@ -24,6 +24,7 @@ final class PostBodyCellNode: ASCellNode {
 
     private let content: PostDetailHeaderContent
     private let onImageTapped: ([URL], Int) -> Void
+    private let onLinkTapped: (URL) -> Void
     private let onTextLayoutInvalidated: () -> Void
     private let avatarLoader = AvatarImageLoader.shared
     private weak var avatarImageView: UIImageView?
@@ -54,14 +55,17 @@ final class PostBodyCellNode: ASCellNode {
         content: PostDetailHeaderContent,
         renderedContent: [RenderedContentBlock]?,
         onImageTapped: @escaping ([URL], Int) -> Void,
+        onLinkTapped: @escaping (URL) -> Void = { _ in },
         onTextLayoutInvalidated: @escaping () -> Void
     ) {
         self.content = content
         self.onImageTapped = onImageTapped
+        self.onLinkTapped = onLinkTapped
         self.onTextLayoutInvalidated = onTextLayoutInvalidated
         self.bodyNodes = DetailContentBlockNodeFactory.makeNodes(
             from: renderedContent ?? [],
             onImageTapped: onImageTapped,
+            onLinkTapped: onLinkTapped,
             onTextLayoutInvalidated: onTextLayoutInvalidated
         )
         super.init()
@@ -151,6 +155,7 @@ final class DetailRichTextNode: ASDisplayNode {
     private let attributedText: NSMutableAttributedString
     private let attributedTextLock = NSLock()
     private let onImageTapped: ([URL], Int) -> Void
+    private let onLinkTapped: (URL) -> Void
     private let onLayoutInvalidated: () -> Void
     private let forcedMinimumHeight: CGFloat
     private let diagnosticID = String(UUID().uuidString.prefix(8))
@@ -159,11 +164,13 @@ final class DetailRichTextNode: ASDisplayNode {
         attributedText: NSAttributedString,
         forcedMinimumHeight: CGFloat = 0,
         onImageTapped: @escaping ([URL], Int) -> Void,
+        onLinkTapped: @escaping (URL) -> Void = { _ in },
         onLayoutInvalidated: @escaping () -> Void
     ) {
         self.attributedText = NSMutableAttributedString(attributedString: attributedText)
         self.forcedMinimumHeight = forcedMinimumHeight
         self.onImageTapped = onImageTapped
+        self.onLinkTapped = onLinkTapped
         self.onLayoutInvalidated = onLayoutInvalidated
         super.init()
         setViewBlock {
@@ -180,6 +187,7 @@ final class DetailRichTextNode: ASDisplayNode {
         richTextView.configure(
             attributedText,
             onImageTapped: onImageTapped,
+            onLinkTapped: onLinkTapped,
             onLayoutInvalidated: onLayoutInvalidated,
             onAttachmentLayoutUpdated: { [weak self] url, originalSize, displaySize in
                 self?.updateAttachmentLayout(

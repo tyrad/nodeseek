@@ -33,6 +33,7 @@ final class CommentCellNode: ASCellNode {
 
     private let comment: Comment
     private let onImageTapped: ([URL], Int) -> Void
+    private let onLinkTapped: (URL) -> Void
     private let onTextLayoutInvalidated: () -> Void
     private let avatarLoader = AvatarImageLoader.shared
     private weak var avatarImageView: UIImageView?
@@ -65,14 +66,17 @@ final class CommentCellNode: ASCellNode {
         comment: Comment,
         renderedBody: [RenderedContentBlock]?,
         onImageTapped: @escaping ([URL], Int) -> Void,
+        onLinkTapped: @escaping (URL) -> Void = { _ in },
         onTextLayoutInvalidated: @escaping () -> Void
     ) {
         self.comment = comment
         self.onImageTapped = onImageTapped
+        self.onLinkTapped = onLinkTapped
         self.onTextLayoutInvalidated = onTextLayoutInvalidated
         self.bodyNodes = DetailContentBlockNodeFactory.makeNodes(
             from: renderedBody ?? [],
             onImageTapped: onImageTapped,
+            onLinkTapped: onLinkTapped,
             onTextLayoutInvalidated: onTextLayoutInvalidated
         )
         super.init()

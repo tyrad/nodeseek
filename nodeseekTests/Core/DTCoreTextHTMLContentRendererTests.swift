@@ -127,6 +127,84 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(link?.absoluteString == "https://www.nodeseek.com/post-123")
     }
 
+    @Test func rendersBodyTextWithReadableLineSpacing() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: "<p>第一行<br>第二行<br>第三行</p>",
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributed = try #require(
+            blocks.compactMap { block -> NSAttributedString? in
+                guard case .text(let text) = block else { return nil }
+                return text
+            }.first
+        )
+
+        let range = (attributed.string as NSString).range(of: "第一行")
+        #expect(range.location != NSNotFound)
+        let paragraphStyle = attributed.attribute(
+            .paragraphStyle,
+            at: range.location,
+            effectiveRange: nil
+        ) as? NSParagraphStyle
+        #expect((paragraphStyle?.lineSpacing ?? 0) >= 5)
+    }
+
+    @Test func rendersLinksWithNodeSeekGreen() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: "<p><a href=\"/post-704174-1\">帖子</a></p>",
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributed = try #require(
+            blocks.compactMap { block -> NSAttributedString? in
+                guard case .text(let text) = block else { return nil }
+                return text
+            }.first
+        )
+
+        let range = (attributed.string as NSString).range(of: "帖子")
+        #expect(range.location != NSNotFound)
+        let color = attributed.attribute(
+            .foregroundColor,
+            at: range.location,
+            effectiveRange: nil
+        ) as? UIColor
+        #expect(color?.isClose(to: UIColor(red: 15 / 255, green: 128 / 255, blue: 85 / 255, alpha: 1)) == true)
+    }
+
+    @Test func rendersBlockquoteWithTextBlockBackground() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: """
+            <blockquote><p><a href="/member?t=xiaogang-119">@xiaogang-119</a> <a href="/post-704014-1#2">#2</a><br>
+            <a href="/member?t=linda">@linda</a> <a href="/post-704014-1#1">#1</a> 区别能过cf盾牌了</p></blockquote>
+            """,
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributed = try #require(
+            blocks.compactMap { block -> NSAttributedString? in
+                guard case .text(let text) = block else { return nil }
+                return text
+            }.first
+        )
+
+        let range = (attributed.string as NSString).range(of: "@xiaogang-119")
+        #expect(range.location != NSNotFound)
+        let textBlocks = attributed.attribute(
+            NSAttributedString.Key(DTTextBlocksAttribute),
+            at: range.location,
+            effectiveRange: nil
+        ) as? [DTTextBlock]
+        #expect(textBlocks?.contains { $0.backgroundColor != nil } == true)
+    }
+
     @Test func rendersSemanticHTMLWithDistinctTypography() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
@@ -622,5 +700,27 @@ struct DTCoreTextHTMLContentRendererTests {
         let range = (attributed.string as NSString).range(of: text)
         guard range.location != NSNotFound else { return nil }
         return attributed.attribute(.font, at: range.location, effectiveRange: nil) as? UIFont
+    }
+}
+
+private extension UIColor {
+    func isClose(to other: UIColor) -> Bool {
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        var otherRed: CGFloat = 0
+        var otherGreen: CGFloat = 0
+        var otherBlue: CGFloat = 0
+        var otherAlpha: CGFloat = 0
+        guard getRed(&red, green: &green, blue: &blue, alpha: &alpha),
+              other.getRed(&otherRed, green: &otherGreen, blue: &otherBlue, alpha: &otherAlpha) else {
+            return false
+        }
+        let tolerance: CGFloat = 0.01
+        return abs(red - otherRed) <= tolerance
+            && abs(green - otherGreen) <= tolerance
+            && abs(blue - otherBlue) <= tolerance
+            && abs(alpha - otherAlpha) <= tolerance
     }
 }

@@ -14,7 +14,10 @@ import UIKit
 struct DTCoreTextHTMLContentRenderer {
     private enum Layout {
         static let defaultMaxImageWidth: CGFloat = 320
+        static let bodyLineSpacing: CGFloat = 5
     }
+
+    private static let linkColor = UIColor(red: 15 / 255, green: 128 / 255, blue: 85 / 255, alpha: 1)
 
     private static let imageSourceRegex = try! NSRegularExpression(
         pattern: "(<img\\b[^>]*\\bsrc\\s*=\\s*[\"'])([^\"']+)([\"'])",
@@ -66,7 +69,7 @@ struct DTCoreTextHTMLContentRenderer {
             NSBaseURLDocumentOption: baseURL,
             DTDefaultFontSize: UIFont.preferredFont(forTextStyle: .body).pointSize,
             DTDefaultTextColor: UIColor.label,
-            DTDefaultLinkColor: UIColor.systemBlue,
+            DTDefaultLinkColor: Self.linkColor,
             DTMaxImageSize: NSValue(cgSize: CGSize(width: maxImageWidth, height: DetailImageLayout.maxImageHeight)),
             DTUseiOS6Attributes: true
         ]
@@ -462,14 +465,15 @@ struct DTCoreTextHTMLContentRenderer {
         h6 { font-size: 17px; }
         strong, b { font-weight: 700; }
         em, i { font-style: italic; }
-        a { color: #0A84FF; text-decoration: none; }
+        a { color: #0f8055; text-decoration: none; }
         ul, ol { margin: 0 0 12px 0; padding-left: 22px; }
         li { margin: 0 0 6px 0; }
         img { max-width: 100%; height: auto; margin: 4px 0 12px 0; }
         blockquote {
-            border-left: 3px solid #d0d0d0;
+            background-color: #f6f8fa;
+            border-left: 3px solid #d0d7de;
             margin: 8px 0 12px 0;
-            padding-left: 10px;
+            padding: 8px 10px 8px 12px;
             color: #555555;
         }
         pre {
@@ -500,6 +504,7 @@ struct DTCoreTextHTMLContentRenderer {
         guard mutable.length > 0 else { return mutable }
 
         normalizeBaseTextAttributes(in: mutable)
+        normalizeParagraphStyles(in: mutable)
         normalizeLinks(in: mutable, baseURL: baseURL)
         normalizeVisibleListMarkers(in: mutable)
         normalizeImageAttachments(in: mutable, imageSources: imageSources, maxImageWidth: maxImageWidth)
@@ -523,6 +528,18 @@ struct DTCoreTextHTMLContentRenderer {
         attributed.enumerateAttribute(.foregroundColor, in: fullRange) { value, range, _ in
             let color = (value as? UIColor).map(normalizedTextColor(from:)) ?? bodyColor
             attributed.addAttribute(.foregroundColor, value: color, range: range)
+        }
+    }
+
+    private func normalizeParagraphStyles(in attributed: NSMutableAttributedString) {
+        let fullRange = NSRange(location: 0, length: attributed.length)
+        attributed.enumerateAttribute(.paragraphStyle, in: fullRange) { value, range, _ in
+            let baseStyle = (value as? NSParagraphStyle) ?? .default
+            let style = NSMutableParagraphStyle()
+            style.setParagraphStyle(baseStyle)
+            style.lineSpacing = max(style.lineSpacing, Layout.bodyLineSpacing)
+            style.lineBreakMode = .byWordWrapping
+            attributed.addAttribute(.paragraphStyle, value: style, range: range)
         }
     }
 
@@ -594,7 +611,7 @@ struct DTCoreTextHTMLContentRenderer {
             }
             guard let raw, let resolved = URL(string: raw, relativeTo: baseURL)?.absoluteURL else { return }
             attributed.addAttribute(.link, value: resolved, range: range)
-            attributed.addAttribute(.foregroundColor, value: UIColor.systemBlue, range: range)
+            attributed.addAttribute(.foregroundColor, value: Self.linkColor, range: range)
             if dtLinkKey != .link {
                 attributed.removeAttribute(dtLinkKey, range: range)
             }

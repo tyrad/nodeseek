@@ -13,6 +13,47 @@ import SafariServices
 import WebKit
 import JXPhotoBrowser
 
+enum PostDetailLinkDestination {
+    case nativePost(postID: String, page: Int, url: URL)
+    case web(URL)
+    case safari(URL)
+}
+
+enum PostDetailLinkResolver {
+    private static let postPathRegex = try! NSRegularExpression(
+        pattern: "^/post-([0-9]+)-([0-9]+)/?$",
+        options: []
+    )
+
+    static func destination(for url: URL, baseURL: URL) -> PostDetailLinkDestination? {
+        guard let resolvedURL = URL(string: url.relativeString, relativeTo: baseURL)?.absoluteURL else {
+            return nil
+        }
+
+        guard isNodeSeekHost(resolvedURL) else {
+            return .safari(resolvedURL)
+        }
+
+        let path = resolvedURL.path
+        let range = NSRange(path.startIndex..<path.endIndex, in: path)
+        if let match = postPathRegex.firstMatch(in: path, options: [], range: range),
+           match.numberOfRanges >= 3,
+           let postIDRange = Range(match.range(at: 1), in: path),
+           let pageRange = Range(match.range(at: 2), in: path) {
+            let postID = String(path[postIDRange])
+            let page = Int(path[pageRange]) ?? 1
+            return .nativePost(postID: postID, page: max(page, 1), url: resolvedURL)
+        }
+
+        return .web(resolvedURL)
+    }
+
+    private static func isNodeSeekHost(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        return host == "nodeseek.com" || host.hasSuffix(".nodeseek.com")
+    }
+}
+
 class PostDetailViewController: UIViewController {
     private static let detailRenderLogger = Logger(subsystem: "com.nodeseek.app", category: "DetailRenderPipeline")
 
@@ -283,6 +324,38 @@ class PostDetailViewController: UIViewController {
         present(safariViewController, animated: true)
     }
 
+    private func handleContentLinkTap(_ url: URL) {
+        guard let destination = PostDetailLinkResolver.destination(for: url, baseURL: baseURL) else { return }
+
+        switch destination {
+        case .nativePost(let postID, let page, let url):
+            let post = PostSummary(
+                id: postID,
+                title: "帖子 #\(postID)",
+                url: url,
+                authorName: "",
+                nodeName: nil,
+                replyCount: 0,
+                lastActivityText: nil
+            )
+            let viewController = PostDetailRouter.createModule(post: post, page: page)
+            showDetailDestination(viewController)
+        case .web(let url):
+            let webViewController = CookieSharedWebViewController(url: url)
+            showDetailDestination(webViewController)
+        case .safari(let url):
+            present(SFSafariViewController(url: url), animated: true)
+        }
+    }
+
+    private func showDetailDestination(_ viewController: UIViewController) {
+        if let navigationController {
+            navigationController.pushViewController(viewController, animated: true)
+        } else {
+            present(UINavigationController(rootViewController: viewController), animated: true)
+        }
+    }
+
     private func resolvedDetailURL() -> URL? {
         if let sourcePostURL {
             return sourcePostURL
@@ -545,6 +618,9 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                     onImageTapped: { imageURLs, initialIndex in
                         self?.presentPhotoBrowser(imageURLs: imageURLs, initialIndex: initialIndex)
                     },
+                    onLinkTapped: { url in
+                        self?.handleContentLinkTap(url)
+                    },
                     onTextLayoutInvalidated: {
                         self?.scheduleAttachmentLayoutRefresh()
                     }
@@ -565,6 +641,9 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                 renderedBody: renderedBody,
                 onImageTapped: { imageURLs, initialIndex in
                     self?.presentPhotoBrowser(imageURLs: imageURLs, initialIndex: initialIndex)
+                },
+                onLinkTapped: { url in
+                    self?.handleContentLinkTap(url)
                 },
                 onTextLayoutInvalidated: {
                     self?.scheduleAttachmentLayoutRefresh()
@@ -816,9 +895,15 @@ private final class PostDetailCommentCell: UITableViewCell {
 }
 
 final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextContentViewDelegate {
+    private enum QuoteStyle {
+        static let borderWidth: CGFloat = 3
+        static let borderColor = UIColor(red: 208 / 255, green: 215 / 255, blue: 222 / 255, alpha: 1)
+    }
+
     private static let logger = Logger(subsystem: "com.nodeseek.app", category: "DetailRichTextView")
 
     private var imageTapHandler: (([URL], Int) -> Void)?
+    private var linkTapHandler: ((URL) -> Void)?
     private var layoutInvalidatedHandler: (() -> Void)?
     private var attachmentLayoutUpdatedHandler: ((URL, CGSize, CGSize) -> Void)?
     private var lastLayoutWidth: CGFloat = 0
@@ -843,10 +928,12 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
     func configure(
         _ attributedText: NSAttributedString?,
         onImageTapped: (([URL], Int) -> Void)?,
+        onLinkTapped: ((URL) -> Void)? = nil,
         onLayoutInvalidated: (() -> Void)?,
         onAttachmentLayoutUpdated: ((URL, CGSize, CGSize) -> Void)? = nil
     ) {
         imageTapHandler = onImageTapped
+        linkTapHandler = onLinkTapped
         layoutInvalidatedHandler = onLayoutInvalidated
         attachmentLayoutUpdatedHandler = onAttachmentLayoutUpdated
         attributedString = attributedText ?? NSAttributedString()
@@ -854,6 +941,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
             "configure length=\(attributedString.length) bounds=\(Self.string(from: bounds.size)) attachments=\(attachmentDiagnostics())"
         )
         removeAllCustomViews()
+        removeAllCustomViewsForLinks()
         layouter = nil
         relayoutText()
         invalidateIntrinsicContentSize()
@@ -926,6 +1014,40 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         return imageView
     }
 
+    func attributedTextContentView(
+        _ attributedTextContentView: DTAttributedTextContentView,
+        viewForLink url: URL,
+        identifier: String,
+        frame: CGRect
+    ) -> UIView? {
+        DetailLinkOverlayButton(frame: frame, url: url) { [weak self] tappedURL in
+            self?.linkTapHandler?(tappedURL)
+        }
+    }
+
+    func attributedTextContentView(
+        _ attributedTextContentView: DTAttributedTextContentView,
+        shouldDrawBackgroundFor textBlock: DTTextBlock,
+        frame: CGRect,
+        context: CGContext,
+        for layoutFrame: DTCoreTextLayoutFrame
+    ) -> Bool {
+        guard let backgroundColor = textBlock.backgroundColor else { return true }
+
+        context.saveGState()
+        context.setFillColor(backgroundColor.cgColor)
+        context.fill(frame)
+        context.setFillColor(QuoteStyle.borderColor.cgColor)
+        context.fill(CGRect(
+            x: frame.minX,
+            y: frame.minY,
+            width: QuoteStyle.borderWidth,
+            height: frame.height
+        ))
+        context.restoreGState()
+        return false
+    }
+
     private func handleLoadedImage(_ url: URL, imageSize: CGSize) {
         guard let displaySize = updateImageAttachments(matching: url, originalSize: imageSize) else {
             logDiagnostics(
@@ -941,6 +1063,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.removeAllCustomViews()
+            self.removeAllCustomViewsForLinks()
             self.layouter = nil
             self.relayoutText()
             self.invalidateIntrinsicContentSize()
@@ -1125,6 +1248,28 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         String(format: "%.1f", Double(value))
     }
 
+}
+
+private final class DetailLinkOverlayButton: UIButton {
+    private let url: URL
+    private let onTapped: (URL) -> Void
+
+    init(frame: CGRect, url: URL, onTapped: @escaping (URL) -> Void) {
+        self.url = url
+        self.onTapped = onTapped
+        super.init(frame: frame)
+        backgroundColor = .clear
+        addTarget(self, action: #selector(handleTap), for: .touchUpInside)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    @objc
+    private func handleTap() {
+        onTapped(url)
+    }
 }
 
 final class DetailInlineImageView: UIImageView {

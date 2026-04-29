@@ -200,6 +200,47 @@ struct PostDetailViewControllerTests {
         #expect(multiLineHeight > singleLineHeight)
     }
 
+    @Test func resolvesNodeSeekPostLinksToNativeDetail() throws {
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let url = try #require(URL(string: "/post-704174-2#8", relativeTo: baseURL)?.absoluteURL)
+
+        let destination = try #require(PostDetailLinkResolver.destination(for: url, baseURL: baseURL))
+
+        guard case .nativePost(let postID, let page, let resolvedURL) = destination else {
+            Issue.record("Expected native post destination")
+            return
+        }
+        #expect(postID == "704174")
+        #expect(page == 2)
+        #expect(resolvedURL.absoluteString == "https://www.nodeseek.com/post-704174-2#8")
+    }
+
+    @Test func resolvesOtherNodeSeekLinksToWebView() throws {
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let url = try #require(URL(string: "/member?t=linda", relativeTo: baseURL)?.absoluteURL)
+
+        let destination = try #require(PostDetailLinkResolver.destination(for: url, baseURL: baseURL))
+
+        guard case .web(let resolvedURL) = destination else {
+            Issue.record("Expected web destination")
+            return
+        }
+        #expect(resolvedURL.absoluteString == "https://www.nodeseek.com/member?t=linda")
+    }
+
+    @Test func resolvesExternalLinksToSafari() throws {
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let url = try #require(URL(string: "https://example.com/path"))
+
+        let destination = try #require(PostDetailLinkResolver.destination(for: url, baseURL: baseURL))
+
+        guard case .safari(let resolvedURL) = destination else {
+            Issue.record("Expected safari destination")
+            return
+        }
+        #expect(resolvedURL.absoluteString == "https://example.com/path")
+    }
+
     @Test func richTextNodeKeepsMeasuredHeightStableAfterNormalImageLoads() throws {
         let imageURL = try #require(URL(string: "https://i.111666.best/image/network.webp"))
         let blocks = DTCoreTextHTMLContentRenderer().render(
