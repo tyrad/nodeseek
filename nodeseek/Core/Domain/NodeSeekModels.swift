@@ -57,11 +57,30 @@ struct PostDetail: Equatable, Sendable {
 
 struct Comment: Equatable, Sendable {
     let id: String
+    let anchorID: String?
     let authorName: String
     let avatarURL: URL?
     let floorText: String?
     let createdAtText: String?
     let contentHTML: String
+
+    init(
+        id: String,
+        anchorID: String? = nil,
+        authorName: String,
+        avatarURL: URL?,
+        floorText: String?,
+        createdAtText: String?,
+        contentHTML: String
+    ) {
+        self.id = id
+        self.anchorID = anchorID
+        self.authorName = authorName
+        self.avatarURL = avatarURL
+        self.floorText = floorText
+        self.createdAtText = createdAtText
+        self.contentHTML = contentHTML
+    }
 }
 
 struct ReplyForm: Equatable, Sendable {

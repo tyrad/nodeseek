@@ -21,10 +21,19 @@ final class CommentCellNode: ASCellNode {
     private enum Layout {
         static let headerSpacing: CGFloat = 5
         static let bodySpacing: CGFloat = 10
+
+        static func textColumnWidth(for maxWidth: CGFloat) -> CGFloat? {
+            guard maxWidth.isFinite, maxWidth > 0 else { return nil }
+            let chromeWidth = PostDetailContentLayout.horizontalInset * 2
+                + PostDetailContentLayout.avatarSize
+                + PostDetailContentLayout.avatarSpacing
+            return max(maxWidth - chromeWidth, 1)
+        }
     }
 
     private let comment: Comment
     private let onImageTapped: ([URL], Int) -> Void
+    private let onLinkTapped: (URL) -> Void
     private let onTextLayoutInvalidated: () -> Void
     private let avatarLoader = AvatarImageLoader.shared
     private weak var avatarImageView: UIImageView?
@@ -34,7 +43,7 @@ final class CommentCellNode: ASCellNode {
     private let timeNode = ASTextNode()
     private let floorNode = ASTextNode()
     private let separatorNode = ASDisplayNode()
-    private let bodyNode: DetailRichTextNode?
+    private let bodyNodes: [ASDisplayNode]
 
     private lazy var avatarNode: ASDisplayNode = {
         let node = ASDisplayNode(viewBlock: { [weak self] in
@@ -55,20 +64,21 @@ final class CommentCellNode: ASCellNode {
 
     init(
         comment: Comment,
-        attributedBody: NSAttributedString?,
+        renderedBody: [RenderedContentBlock]?,
         onImageTapped: @escaping ([URL], Int) -> Void,
+        onLinkTapped: @escaping (URL) -> Void = { _ in },
         onTextLayoutInvalidated: @escaping () -> Void
     ) {
         self.comment = comment
         self.onImageTapped = onImageTapped
+        self.onLinkTapped = onLinkTapped
         self.onTextLayoutInvalidated = onTextLayoutInvalidated
-        self.bodyNode = attributedBody.map {
-            DetailRichTextNode(
-                attributedText: $0,
-                onImageTapped: onImageTapped,
-                onLayoutInvalidated: onTextLayoutInvalidated
-            )
-        }
+        self.bodyNodes = DetailContentBlockNodeFactory.makeNodes(
+            from: renderedBody ?? [],
+            onImageTapped: onImageTapped,
+            onLinkTapped: onLinkTapped,
+            onTextLayoutInvalidated: onTextLayoutInvalidated
+        )
         super.init()
         automaticallyManagesSubnodes = true
         selectionStyle = .none
@@ -112,15 +122,18 @@ final class CommentCellNode: ASCellNode {
         headerStack.children = [identityStack, floorNode]
 
         var textChildren: [ASLayoutElement] = [headerStack]
-        if let bodyNode {
-            bodyNode.style.spacingBefore = Layout.bodySpacing
+        for bodyNode in bodyNodes {
             textChildren.append(bodyNode)
         }
 
         let textStack = ASStackLayoutSpec.vertical()
+        textStack.spacing = Layout.bodySpacing
         textStack.children = textChildren
         textStack.style.flexGrow = 1
         textStack.style.flexShrink = 1
+        if let textColumnWidth = Layout.textColumnWidth(for: constrainedSize.max.width) {
+            textStack.style.width = ASDimension(unit: .points, value: textColumnWidth)
+        }
 
         let contentStack = ASStackLayoutSpec.horizontal()
         contentStack.spacing = PostDetailContentLayout.avatarSpacing

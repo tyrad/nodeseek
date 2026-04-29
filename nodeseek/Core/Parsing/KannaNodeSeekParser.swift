@@ -217,6 +217,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
 
         return Comment(
             id: id,
+            anchorID: item["id"]?.trimmedNonEmpty,
             authorName: authorName,
             avatarURL: avatarURL,
             floorText: firstText(in: item, xpaths: [XPathRules.contentFloor]),

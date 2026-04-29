@@ -14,9 +14,9 @@ class PostDetailRouter: PostDetailRouterProtocol {
     weak var viewController: UIViewController?
     
     // MARK: - Static Methods
-    static func createModule(post: PostSummary? = nil) -> UIViewController {
+    static func createModule(post: PostSummary? = nil, page: Int = 1) -> UIViewController {
         let router = PostDetailRouter()
-        let interactor = PostDetailInteractor(post: post)
+        let interactor = PostDetailInteractor(post: post, page: page)
         let presenter = PostDetailPresenter(
             interactor: interactor,
             router: router
@@ -27,7 +27,8 @@ class PostDetailRouter: PostDetailRouterProtocol {
         let view = PostDetailViewController(
             presenter: presenter,
             initialHeader: post.map(PostDetailHeaderContent.init(post:)),
-            sourcePostURL: post?.url
+            sourcePostURL: post?.url,
+            currentPage: page
         )
         
         presenter.setView(view)

@@ -13,6 +13,73 @@ import SafariServices
 import WebKit
 import JXPhotoBrowser
 
+enum PostDetailLinkDestination {
+    case currentPageAnchor(String)
+    case nativePost(postID: String, page: Int, url: URL)
+    case web(URL)
+    case safari(URL)
+}
+
+enum PostDetailLinkResolver {
+    private static let postPathRegex = try! NSRegularExpression(
+        pattern: "^/post-([0-9]+)-([0-9]+)/?$",
+        options: []
+    )
+
+    static func destination(
+        for url: URL,
+        baseURL: URL,
+        currentPostID: String? = nil,
+        currentPage: Int = 1
+    ) -> PostDetailLinkDestination? {
+        guard let resolvedURL = URL(string: url.relativeString, relativeTo: baseURL)?.absoluteURL else {
+            return nil
+        }
+
+        guard isNodeSeekHost(resolvedURL) else {
+            return .safari(resolvedURL)
+        }
+
+        if let anchorID = normalizedAnchorID(from: resolvedURL),
+           resolvedURL.path.isEmpty || resolvedURL.path == "/" {
+            return .currentPageAnchor(anchorID)
+        }
+
+        let path = resolvedURL.path
+        let range = NSRange(path.startIndex..<path.endIndex, in: path)
+        if let match = postPathRegex.firstMatch(in: path, options: [], range: range),
+           match.numberOfRanges >= 3,
+           let postIDRange = Range(match.range(at: 1), in: path),
+           let pageRange = Range(match.range(at: 2), in: path) {
+            let postID = String(path[postIDRange])
+            let page = Int(path[pageRange]) ?? 1
+            let normalizedPage = max(page, 1)
+            if let anchorID = normalizedAnchorID(from: resolvedURL),
+               postID == currentPostID,
+               normalizedPage == max(currentPage, 1) {
+                return .currentPageAnchor(anchorID)
+            }
+            // TODO: 支持当前帖子跨页锚点在目标页加载完成后自动定位。
+            return .nativePost(postID: postID, page: normalizedPage, url: resolvedURL)
+        }
+
+        return .web(resolvedURL)
+    }
+
+    private static func normalizedAnchorID(from url: URL) -> String? {
+        guard let fragment = url.fragment?.removingPercentEncoding?.trimmingCharacters(in: .whitespacesAndNewlines),
+              fragment.isEmpty == false else {
+            return nil
+        }
+        return fragment.hasPrefix("#") ? String(fragment.dropFirst()) : fragment
+    }
+
+    private static func isNodeSeekHost(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        return host == "nodeseek.com" || host.hasSuffix(".nodeseek.com")
+    }
+}
+
 class PostDetailViewController: UIViewController {
     private static let detailRenderLogger = Logger(subsystem: "com.nodeseek.app", category: "DetailRenderPipeline")
 
@@ -27,10 +94,11 @@ class PostDetailViewController: UIViewController {
 
     private let presenter: PostDetailPresenterProtocol
     private let baseURL = URL(string: "https://www.nodeseek.com")!
+    private let currentPage: Int
     private var currentHeaderContent: PostDetailHeaderContent?
-    private var headerAttributedContent: NSAttributedString?
+    private var headerRenderedContent: [RenderedContentBlock]?
     private var comments: [Comment] = []
-    private var commentAttributedCache: [String: NSAttributedString] = [:]
+    private var commentRenderedCache: [String: [RenderedContentBlock]] = [:]
     private var renderedCommentIDs: Set<String> = []
     private var commentRenderInFlight: Set<String> = []
     private var renderGeneration: Int = 0
@@ -59,15 +127,17 @@ class PostDetailViewController: UIViewController {
     init(
         presenter: PostDetailPresenterProtocol,
         initialHeader: PostDetailHeaderContent? = nil,
-        sourcePostURL: URL? = nil
+        sourcePostURL: URL? = nil,
+        currentPage: Int = 1
     ) {
         self.presenter = presenter
         self.sourcePostURL = sourcePostURL
+        self.currentPage = max(currentPage, 1)
         super.init(nibName: nil, bundle: nil)
 
         if let initialHeader {
             currentHeaderContent = initialHeader
-            headerAttributedContent = nil
+            headerRenderedContent = nil
             scheduleHeaderRender(for: initialHeader)
         }
     }
@@ -133,9 +203,9 @@ class PostDetailViewController: UIViewController {
         reloadTableData()
     }
 
-    private func configureHeader(_ content: PostDetailHeaderContent, attributedContent: NSAttributedString?) {
+    private func configureHeader(_ content: PostDetailHeaderContent, renderedContent: [RenderedContentBlock]?) {
         currentHeaderContent = content
-        headerAttributedContent = attributedContent
+        headerRenderedContent = renderedContent
     }
 
     private func reloadTableData() {
@@ -198,7 +268,7 @@ class PostDetailViewController: UIViewController {
         let width = availableHeaderContentWidth
         let baseURL = baseURL
         renderQueue.async { [weak self] in
-            let attributed = Self.makeAttributedText(
+            let renderedContent = Self.makeRenderedContent(
                 html: html,
                 baseURL: baseURL,
                 maxImageWidth: width
@@ -207,33 +277,19 @@ class PostDetailViewController: UIViewController {
                 guard let self else { return }
                 guard self.renderGeneration == generation else { return }
                 guard self.currentHeaderContent?.postID == content.postID else { return }
-                self.configureHeader(content, attributedContent: attributed)
+                self.configureHeader(content, renderedContent: renderedContent)
                 self.scheduleHeaderReload()
             }
         }
     }
 
-    private static func makeAttributedText(
+    private static func makeRenderedContent(
         html: String,
         baseURL: URL,
         maxImageWidth: CGFloat
-    ) -> NSAttributedString? {
+    ) -> [RenderedContentBlock]? {
         let blocks = DTCoreTextHTMLContentRenderer().render(fragment: html, baseURL: baseURL, maxImageWidth: maxImageWidth)
-        guard blocks.isEmpty == false else { return nil }
-
-        let result = NSMutableAttributedString()
-        for block in blocks {
-            switch block {
-            case .text(let attributedText):
-                result.append(attributedText)
-            case .imagePlaceholder(let url):
-                result.append(NSAttributedString(string: url?.absoluteString ?? "[图片]"))
-            case .unsupported(let reason):
-                result.append(NSAttributedString(string: reason))
-            }
-        }
-
-        return result.length > 0 ? result : nil
+        return blocks.isEmpty ? nil : blocks
     }
 
     private var availableHeaderContentWidth: CGFloat {
@@ -297,6 +353,74 @@ class PostDetailViewController: UIViewController {
         present(safariViewController, animated: true)
     }
 
+    private func handleContentLinkTap(_ url: URL) {
+        guard let destination = PostDetailLinkResolver.destination(
+            for: url,
+            baseURL: baseURL,
+            currentPostID: currentHeaderContent?.postID,
+            currentPage: currentPage
+        ) else { return }
+
+        switch destination {
+        case .currentPageAnchor(let anchorID):
+            scrollToCurrentPageAnchor(anchorID)
+        case .nativePost(let postID, let page, let url):
+            let post = PostSummary(
+                id: postID,
+                title: "帖子 #\(postID)",
+                url: url,
+                authorName: "",
+                nodeName: nil,
+                replyCount: 0,
+                lastActivityText: nil
+            )
+            let viewController = PostDetailRouter.createModule(post: post, page: page)
+            showDetailDestination(viewController)
+        case .web(let url):
+            let webViewController = CookieSharedWebViewController(url: url)
+            showDetailDestination(webViewController)
+        case .safari(let url):
+            present(SFSafariViewController(url: url), animated: true)
+        }
+    }
+
+    private func scrollToCurrentPageAnchor(_ anchorID: String) {
+        guard displayMode == .content else { return }
+
+        let headerRowCount = currentHeaderContent == nil ? 0 : 1
+        let indexPath: IndexPath
+        if (anchorID == "0" || anchorID == "1"), currentHeaderContent != nil {
+            indexPath = IndexPath(row: 0, section: 0)
+        } else if let commentIndex = comments.firstIndex(where: { comment in
+            comment.anchorID == anchorID || comment.floorText == "#\(anchorID)"
+        }) {
+            indexPath = IndexPath(row: headerRowCount + commentIndex, section: 0)
+        } else {
+            return
+        }
+
+        tableNode.scrollToRow(at: indexPath, at: .middle, animated: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            guard let self else { return }
+            switch self.tableNode.nodeForRow(at: indexPath) {
+            case let node as PostBodyCellNode:
+                node.flashAnchorHighlight()
+            case let node as CommentCellNode:
+                node.flashAnchorHighlight()
+            default:
+                break
+            }
+        }
+    }
+
+    private func showDetailDestination(_ viewController: UIViewController) {
+        if let navigationController {
+            navigationController.pushViewController(viewController, animated: true)
+        } else {
+            present(UINavigationController(rootViewController: viewController), animated: true)
+        }
+    }
+
     private func resolvedDetailURL() -> URL? {
         if let sourcePostURL {
             return sourcePostURL
@@ -334,7 +458,7 @@ class PostDetailViewController: UIViewController {
         let width = availableCommentContentWidth
         let baseURL = baseURL
         renderQueue.async { [weak self] in
-            let attributed = Self.makeAttributedText(
+            let renderedContent = Self.makeRenderedContent(
                 html: html,
                 baseURL: baseURL,
                 maxImageWidth: width
@@ -344,10 +468,10 @@ class PostDetailViewController: UIViewController {
                 guard self.renderGeneration == generation else { return }
                 self.commentRenderInFlight.remove(commentID)
                 self.renderedCommentIDs.insert(commentID)
-                if let attributed {
-                    self.commentAttributedCache[commentID] = attributed
+                if let renderedContent {
+                    self.commentRenderedCache[commentID] = renderedContent
                 } else {
-                    self.commentAttributedCache.removeValue(forKey: commentID)
+                    self.commentRenderedCache.removeValue(forKey: commentID)
                 }
                 self.scheduleCommentReload(commentID: commentID)
             }
@@ -382,9 +506,9 @@ extension PostDetailViewController: PostDetailViewProtocol {
         hasRenderedDetailContent = true
         displayMode = .content
         let headerContent = PostDetailHeaderContent(detail: detail)
-        configureHeader(headerContent, attributedContent: nil)
+        configureHeader(headerContent, renderedContent: nil)
         comments = detail.comments
-        commentAttributedCache.removeAll(keepingCapacity: true)
+        commentRenderedCache.removeAll(keepingCapacity: true)
         renderedCommentIDs.removeAll(keepingCapacity: true)
         commentRenderInFlight.removeAll(keepingCapacity: true)
         reloadTableData()
@@ -398,7 +522,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
         hasRenderedDetailContent = true
         displayMode = .content
         let existing = currentHeaderContent
-        headerAttributedContent = nil
+        headerRenderedContent = nil
         let headerContent = PostDetailHeaderContent(
             postID: existing?.postID ?? "login-required",
             title: existing?.title ?? "需要登录",
@@ -407,9 +531,9 @@ extension PostDetailViewController: PostDetailViewProtocol {
             metadataText: existing?.metadataText,
             contentHTML: message
         )
-        configureHeader(headerContent, attributedContent: nil)
+        configureHeader(headerContent, renderedContent: nil)
         comments = []
-        commentAttributedCache.removeAll(keepingCapacity: true)
+        commentRenderedCache.removeAll(keepingCapacity: true)
         renderedCommentIDs.removeAll(keepingCapacity: true)
         commentRenderInFlight.removeAll(keepingCapacity: true)
         reloadTableData()
@@ -551,13 +675,16 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
 
         let headerRowCount = currentHeaderContent == nil ? 0 : 1
         if indexPath.row == 0, let header = currentHeaderContent {
-            let attributedContent = headerAttributedContent
+            let renderedContent = headerRenderedContent
             return { [weak self] in
                 PostBodyCellNode(
                     content: header,
-                    attributedContent: attributedContent,
+                    renderedContent: renderedContent,
                     onImageTapped: { imageURLs, initialIndex in
                         self?.presentPhotoBrowser(imageURLs: imageURLs, initialIndex: initialIndex)
+                    },
+                    onLinkTapped: { url in
+                        self?.handleContentLinkTap(url)
                     },
                     onTextLayoutInvalidated: {
                         self?.scheduleAttachmentLayoutRefresh()
@@ -572,13 +699,16 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
         }
 
         let comment = comments[commentIndex]
-        let attributedBody = commentAttributedCache[comment.id]
+        let renderedBody = commentRenderedCache[comment.id]
         return { [weak self] in
             CommentCellNode(
                 comment: comment,
-                attributedBody: attributedBody,
+                renderedBody: renderedBody,
                 onImageTapped: { imageURLs, initialIndex in
                     self?.presentPhotoBrowser(imageURLs: imageURLs, initialIndex: initialIndex)
+                },
+                onLinkTapped: { url in
+                    self?.handleContentLinkTap(url)
                 },
                 onTextLayoutInvalidated: {
                     self?.scheduleAttachmentLayoutRefresh()
@@ -830,9 +960,16 @@ private final class PostDetailCommentCell: UITableViewCell {
 }
 
 final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextContentViewDelegate {
+    private enum QuoteStyle {
+        static let borderWidth: CGFloat = 3
+        static let borderColor = UIColor(red: 208 / 255, green: 215 / 255, blue: 222 / 255, alpha: 1)
+        static let cornerRadius: CGFloat = 4
+    }
+
     private static let logger = Logger(subsystem: "com.nodeseek.app", category: "DetailRichTextView")
 
     private var imageTapHandler: (([URL], Int) -> Void)?
+    private var linkTapHandler: ((URL) -> Void)?
     private var layoutInvalidatedHandler: (() -> Void)?
     private var attachmentLayoutUpdatedHandler: ((URL, CGSize, CGSize) -> Void)?
     private var lastLayoutWidth: CGFloat = 0
@@ -857,10 +994,12 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
     func configure(
         _ attributedText: NSAttributedString?,
         onImageTapped: (([URL], Int) -> Void)?,
+        onLinkTapped: ((URL) -> Void)? = nil,
         onLayoutInvalidated: (() -> Void)?,
         onAttachmentLayoutUpdated: ((URL, CGSize, CGSize) -> Void)? = nil
     ) {
         imageTapHandler = onImageTapped
+        linkTapHandler = onLinkTapped
         layoutInvalidatedHandler = onLayoutInvalidated
         attachmentLayoutUpdatedHandler = onAttachmentLayoutUpdated
         attributedString = attributedText ?? NSAttributedString()
@@ -868,6 +1007,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
             "configure length=\(attributedString.length) bounds=\(Self.string(from: bounds.size)) attachments=\(attachmentDiagnostics())"
         )
         removeAllCustomViews()
+        removeAllCustomViewsForLinks()
         layouter = nil
         relayoutText()
         invalidateIntrinsicContentSize()
@@ -940,6 +1080,44 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         return imageView
     }
 
+    func attributedTextContentView(
+        _ attributedTextContentView: DTAttributedTextContentView,
+        viewForLink url: URL,
+        identifier: String,
+        frame: CGRect
+    ) -> UIView? {
+        DetailLinkOverlayButton(frame: frame, url: url) { [weak self] tappedURL in
+            self?.linkTapHandler?(tappedURL)
+        }
+    }
+
+    func attributedTextContentView(
+        _ attributedTextContentView: DTAttributedTextContentView,
+        shouldDrawBackgroundFor textBlock: DTTextBlock,
+        frame: CGRect,
+        context: CGContext,
+        for layoutFrame: DTCoreTextLayoutFrame
+    ) -> Bool {
+        guard let backgroundColor = textBlock.backgroundColor else { return true }
+
+        let quoteFrame = frame
+        let backgroundPath = UIBezierPath(roundedRect: quoteFrame, cornerRadius: QuoteStyle.cornerRadius)
+
+        context.saveGState()
+        context.setFillColor(backgroundColor.cgColor)
+        context.addPath(backgroundPath.cgPath)
+        context.fillPath()
+        context.setFillColor(QuoteStyle.borderColor.cgColor)
+        context.fill(CGRect(
+            x: quoteFrame.minX,
+            y: quoteFrame.minY,
+            width: QuoteStyle.borderWidth,
+            height: quoteFrame.height
+        ))
+        context.restoreGState()
+        return false
+    }
+
     private func handleLoadedImage(_ url: URL, imageSize: CGSize) {
         guard let displaySize = updateImageAttachments(matching: url, originalSize: imageSize) else {
             logDiagnostics(
@@ -955,6 +1133,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.removeAllCustomViews()
+            self.removeAllCustomViewsForLinks()
             self.layouter = nil
             self.relayoutText()
             self.invalidateIntrinsicContentSize()
@@ -1139,6 +1318,28 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         String(format: "%.1f", Double(value))
     }
 
+}
+
+private final class DetailLinkOverlayButton: UIButton {
+    private let url: URL
+    private let onTapped: (URL) -> Void
+
+    init(frame: CGRect, url: URL, onTapped: @escaping (URL) -> Void) {
+        self.url = url
+        self.onTapped = onTapped
+        super.init(frame: frame)
+        backgroundColor = .clear
+        addTarget(self, action: #selector(handleTap), for: .touchUpInside)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    @objc
+    private func handleTap() {
+        onTapped(url)
+    }
 }
 
 final class DetailInlineImageView: UIImageView {

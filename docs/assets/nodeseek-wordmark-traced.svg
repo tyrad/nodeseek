@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>NodeSeek NS wordmark traced from AppIcon.png</title>
+  <desc>Smoothed vector trace extracted from nodeseek/Assets.xcassets/AppIcon.appiconset/AppIcon.png. Use these grouped paths for splash animation masks, then crossfade to the original PNG for a pixel-perfect final frame.</desc>
+  <rect id="background" width="1024" height="1024" fill="#FFFFFF"/>
+  <g id="wordmark" fill="#1A1F24" fill-rule="evenodd">
+    <path id="ns" d="M 417.0 274.0 L 416.0 459.0 L 506.0 600.0 L 508.0 463.0 L 507.0 273.0 Z M 176.0 274.0 L 177.0 723.0 L 271.0 722.0 L 274.0 452.0 L 442.0 723.0 L 742.0 722.0 L 772.0 714.0 L 797.0 700.0 L 818.0 680.0 L 833.0 658.0 L 842.0 638.0 L 848.0 616.0 L 850.0 566.0 L 841.0 525.0 L 832.0 506.0 L 820.0 489.0 L 793.0 466.0 L 764.0 453.0 L 737.0 448.0 L 662.0 448.0 L 650.0 445.0 L 638.0 438.0 L 628.0 426.0 L 624.0 415.0 L 623.0 401.0 L 627.0 387.0 L 633.0 378.0 L 642.0 370.0 L 657.0 364.0 L 790.0 364.0 L 847.0 274.0 L 652.0 273.0 L 625.0 277.0 L 596.0 288.0 L 576.0 302.0 L 558.0 322.0 L 543.0 349.0 L 536.0 372.0 L 533.0 393.0 L 535.0 435.0 L 541.0 457.0 L 550.0 476.0 L 562.0 493.0 L 576.0 507.0 L 604.0 525.0 L 631.0 534.0 L 653.0 537.0 L 729.0 538.0 L 746.0 547.0 L 756.0 559.0 L 761.0 570.0 L 763.0 582.0 L 760.0 604.0 L 753.0 617.0 L 744.0 626.0 L 726.0 634.0 L 503.0 634.0 L 271.0 273.0 Z"/>
+  </g>
+  <g id="accent" fill="#18B3B0" fill-rule="evenodd">
+    <path id="dot" d="M 904.0 665.0 L 860.0 664.0 L 822.0 723.0 L 865.0 723.0 Z"/>
+  </g>
+</svg>
