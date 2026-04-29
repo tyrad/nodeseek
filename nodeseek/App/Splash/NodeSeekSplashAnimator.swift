@@ -6,19 +6,19 @@
 import UIKit
 
 enum NodeSeekSplashTimeline {
-    static let animationDuration: CFTimeInterval = 1.35
+    static let animationDuration: CFTimeInterval = 1.65
     static let reduceMotionDuration: CFTimeInterval = 0.18
 
-    static let nDuration: CFTimeInterval = 0.58
+    static let nDuration: CFTimeInterval = 0.72
     static let nLeftDuration: CFTimeInterval = nDuration * 0.31
     static let nDiagonalDuration: CFTimeInterval = nDuration * 0.39
     static let nFinalDuration: CFTimeInterval = nDuration - nLeftDuration - nDiagonalDuration
 
-    static let sDuration: CFTimeInterval = 0.47
-    static let lightSweepBegin: CFTimeInterval = 0.28
-    static let lightSweepDuration: CFTimeInterval = 0.57
-    static let dotBegin: CFTimeInterval = 1.02
-    static let dotDuration: CFTimeInterval = 0.26
+    static let sDuration: CFTimeInterval = 0.58
+    static let lightSweepBegin: CFTimeInterval = 0.35
+    static let lightSweepDuration: CFTimeInterval = 0.72
+    static let dotBegin: CFTimeInterval = 1.30
+    static let dotDuration: CFTimeInterval = 0.30
 }
 
 @MainActor
@@ -34,14 +34,13 @@ final class NodeSeekSplashAnimator: NSObject {
     private let sLayer = CAShapeLayer()
     private let dotLayer = CAShapeLayer()
     private let lightSweepLayer = CAGradientLayer()
-    private let finalLogoLayer = CALayer()
     private var completion: (() -> Void)?
 
     init(
-        reduceMotion: Bool = UIAccessibility.isReduceMotionEnabled,
+        reduceMotion: Bool? = nil,
         animationDuration: CFTimeInterval = NodeSeekSplashTimeline.animationDuration
     ) {
-        self.reduceMotion = reduceMotion
+        self.reduceMotion = reduceMotion ?? UIAccessibility.isReduceMotionEnabled
         self.animationDuration = animationDuration
         super.init()
     }
@@ -57,20 +56,13 @@ final class NodeSeekSplashAnimator: NSObject {
         view.layer.addSublayer(sLayer)
         view.layer.addSublayer(dotLayer)
         view.layer.addSublayer(lightSweepLayer)
-        view.layer.addSublayer(finalLogoLayer)
     }
 
     func play(completion: @escaping () -> Void) {
         self.completion = completion
 
         guard !reduceMotion else {
-            finalLogoLayer.opacity = 1
-            nLeftStrokeLayer.opacity = 0
-            nDiagonalStrokeLayer.opacity = 0
-            nFinalStrokeLayer.opacity = 0
-            sLayer.opacity = 0
-            dotLayer.opacity = 0
-            lightSweepLayer.opacity = 0
+            pinModelLayersToFinalFrame()
             DispatchQueue.main.asyncAfter(deadline: .now() + NodeSeekSplashTimeline.reduceMotionDuration) { [weak self] in
                 self?.complete()
             }
@@ -84,6 +76,13 @@ final class NodeSeekSplashAnimator: NSObject {
         guard let containerView else { return }
         layoutLayers(in: containerView.bounds)
     }
+
+    func updateColors(for traitCollection: UITraitCollection) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        applyColors(for: traitCollection)
+        CATransaction.commit()
+    }
 }
 
 private extension NodeSeekSplashAnimator {
@@ -95,18 +94,16 @@ private extension NodeSeekSplashAnimator {
         sLayer.name = "splash.s"
         dotLayer.name = "splash.dot"
         lightSweepLayer.name = "splash.lightSweep"
-        finalLogoLayer.name = "splash.finalLogo"
     }
 
     func layoutLayers(in bounds: CGRect) {
         backgroundLayer.frame = bounds
-        backgroundLayer.backgroundColor = UIColor.white.cgColor
 
         let logoFrame = aspectFitFrame(for: NodeSeekSplashVector.canvasSize, in: bounds)
-        configureShapeLayer(nLeftStrokeLayer, frame: logoFrame, path: NodeSeekSplashVector.nBodyPath(), color: NodeSeekSplashVector.wordmarkColor)
-        configureShapeLayer(nDiagonalStrokeLayer, frame: logoFrame, path: NodeSeekSplashVector.nBodyPath(), color: NodeSeekSplashVector.wordmarkColor)
-        configureShapeLayer(nFinalStrokeLayer, frame: logoFrame, path: NodeSeekSplashVector.nFinalStrokePath(), color: NodeSeekSplashVector.wordmarkColor)
-        configureShapeLayer(sLayer, frame: logoFrame, path: NodeSeekSplashVector.sBodyPath(), color: NodeSeekSplashVector.wordmarkColor)
+        configureShapeLayer(nLeftStrokeLayer, frame: logoFrame, path: NodeSeekSplashVector.nBodyPath())
+        configureShapeLayer(nDiagonalStrokeLayer, frame: logoFrame, path: NodeSeekSplashVector.nBodyPath())
+        configureShapeLayer(nFinalStrokeLayer, frame: logoFrame, path: NodeSeekSplashVector.nFinalStrokePath())
+        configureShapeLayer(sLayer, frame: logoFrame, path: NodeSeekSplashVector.sBodyPath())
         configureDotLayer(in: logoFrame)
 
         nLeftStrokeLayer.mask = strokeRevealMask(
@@ -137,20 +134,16 @@ private extension NodeSeekSplashAnimator {
         )
 
         configureLightSweep(in: logoFrame)
-
-        finalLogoLayer.frame = logoFrame
-        finalLogoLayer.contentsGravity = .resizeAspect
-        finalLogoLayer.contentsScale = UIScreen.main.scale
-        finalLogoLayer.opacity = 0
-        finalLogoLayer.contents = UIImage(named: "SplashFinalLogo")?.cgImage
+        if let containerView {
+            applyColors(for: containerView.traitCollection)
+        }
     }
 
-    func configureShapeLayer(_ layer: CAShapeLayer, frame: CGRect, path: CGPath, color: UIColor) {
+    func configureShapeLayer(_ layer: CAShapeLayer, frame: CGRect, path: CGPath) {
         layer.frame = frame
         let scale = frame.width / NodeSeekSplashVector.canvasSize.width
         var transform = CGAffineTransform(scaleX: scale, y: scale)
         layer.path = path.copy(using: &transform)
-        layer.fillColor = color.cgColor
         layer.fillRule = .evenOdd
         layer.contentsScale = UIScreen.main.scale
     }
@@ -169,7 +162,6 @@ private extension NodeSeekSplashAnimator {
         var transform = CGAffineTransform(scaleX: scale, y: scale)
             .translatedBy(x: -bounds.minX, y: -bounds.minY)
         dotLayer.path = NodeSeekSplashVector.accentPath().copy(using: &transform)
-        dotLayer.fillColor = NodeSeekSplashVector.accentColor.cgColor
         dotLayer.fillRule = .evenOdd
         dotLayer.contentsScale = UIScreen.main.scale
     }
@@ -183,15 +175,28 @@ private extension NodeSeekSplashAnimator {
             width: bounds.width * scale,
             height: bounds.height * scale
         )
-        lightSweepLayer.colors = [
-            UIColor.white.withAlphaComponent(0).cgColor,
-            UIColor.white.withAlphaComponent(0.62).cgColor,
-            UIColor.white.withAlphaComponent(0).cgColor
-        ]
         lightSweepLayer.locations = [0, 0.5, 1]
         lightSweepLayer.startPoint = CGPoint(x: 0, y: 0.5)
         lightSweepLayer.endPoint = CGPoint(x: 1, y: 0.5)
         lightSweepLayer.opacity = 0
+    }
+
+    func applyColors(for traitCollection: UITraitCollection) {
+        backgroundLayer.backgroundColor = NodeSeekSplashVector.backgroundColor(for: traitCollection).cgColor
+
+        let wordmarkColor = NodeSeekSplashVector.wordmarkColor(for: traitCollection).cgColor
+        nLeftStrokeLayer.fillColor = wordmarkColor
+        nDiagonalStrokeLayer.fillColor = wordmarkColor
+        nFinalStrokeLayer.fillColor = wordmarkColor
+        sLayer.fillColor = wordmarkColor
+        dotLayer.fillColor = NodeSeekSplashVector.accentColor.cgColor
+
+        let sweepColor = NodeSeekSplashVector.lightSweepColor(for: traitCollection)
+        lightSweepLayer.colors = [
+            sweepColor.withAlphaComponent(0).cgColor,
+            sweepColor.cgColor,
+            sweepColor.withAlphaComponent(0).cgColor
+        ]
     }
 
     func strokeRevealMask(
@@ -233,7 +238,6 @@ private extension NodeSeekSplashAnimator {
     func startAnimationTimeline() {
         dotLayer.opacity = 0
         lightSweepLayer.opacity = 1
-        finalLogoLayer.opacity = 0
 
         let timelineBegin = CACurrentMediaTime()
         animateStrokeReveal(
@@ -279,7 +283,6 @@ private extension NodeSeekSplashAnimator {
         sLayer.opacity = 1
         dotLayer.opacity = 1
         lightSweepLayer.opacity = 0
-        finalLogoLayer.opacity = 0
         revealStrokeMask(nLeftStrokeLayer.mask)
         revealStrokeMask(nDiagonalStrokeLayer.mask)
         revealStrokeMask(nFinalStrokeLayer.mask)

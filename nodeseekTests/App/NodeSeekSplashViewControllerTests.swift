@@ -11,7 +11,7 @@ import UIKit
 struct NodeSeekSplashViewControllerTests {
     @Test func splashCallsCompletionWhenReduceMotionIsEnabled() async {
         var didFinish = false
-        let controller = NodeSeekSplashViewController(reduceMotion: true) {
+        let controller = NodeSeekSplashViewController(reduceMotion: true, prewarmWebView: {}) {
             didFinish = true
         }
 
@@ -20,5 +20,22 @@ struct NodeSeekSplashViewControllerTests {
 
         try? await Task.sleep(nanoseconds: 300_000_000)
         #expect(didFinish)
+    }
+
+    @Test func splashPrewarmsWebViewWhenAnimationStarts() {
+        var prewarmCount = 0
+        let controller = NodeSeekSplashViewController(
+            reduceMotion: true,
+            prewarmWebView: {
+                prewarmCount += 1
+            },
+            onFinish: {}
+        )
+
+        controller.loadViewIfNeeded()
+        controller.viewDidAppear(false)
+        controller.viewDidAppear(false)
+
+        #expect(prewarmCount == 1)
     }
 }

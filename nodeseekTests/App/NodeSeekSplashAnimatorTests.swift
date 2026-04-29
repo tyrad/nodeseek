@@ -23,7 +23,7 @@ struct NodeSeekSplashAnimatorTests {
         #expect(layerNames.contains("splash.s"))
         #expect(layerNames.contains("splash.dot"))
         #expect(layerNames.contains("splash.lightSweep"))
-        #expect(layerNames.contains("splash.finalLogo"))
+        #expect(!layerNames.contains("splash.finalLogo"))
     }
 
     @Test func animatorUsesStrokeMasksForHandwrittenReveal() {
@@ -170,7 +170,6 @@ struct NodeSeekSplashAnimatorTests {
         #expect(layers.first { $0.name == "splash.s" }?.opacity == 1)
         #expect(layers.first { $0.name == "splash.dot" }?.opacity == 1)
         #expect(layers.first { $0.name == "splash.lightSweep" }?.opacity == 0)
-        #expect(layers.first { $0.name == "splash.finalLogo" }?.opacity == 0)
 
         let masks = [
             layers.first { $0.name == "splash.n.leftStroke" }?.mask as? CAShapeLayer,

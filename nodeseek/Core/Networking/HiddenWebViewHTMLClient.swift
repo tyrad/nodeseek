@@ -129,6 +129,13 @@ struct HiddenWebViewHTMLClient: HTMLClient {
 }
 
 @MainActor
+enum NodeSeekWebViewPrewarmer {
+    static func prewarm() {
+        HiddenWebViewLoader.shared.prewarm()
+    }
+}
+
+@MainActor
 private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     static let shared = HiddenWebViewLoader()
 
@@ -138,10 +145,12 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     private var continuation: CheckedContinuation<HTMLResponse, Error>?
     private var timeoutTask: Task<Void, Never>?
     private var htmlPollingTask: Task<Void, Never>?
+    private var prewarmNavigation: WKNavigation?
     private var statusCode = 200
     private var headers: [String: String] = [:]
     private var initialURL: URL?
     private var completed = false
+    private var didPrewarm = false
     private var challengePollCount = 0
     private let maxChallengePollCount = 10
     private let challengePollIntervalNanoseconds: UInt64 = 1_200_000_000
@@ -168,6 +177,16 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         htmlPollingTask?.cancel()
     }
 
+    func prewarm() {
+        guard !didPrewarm, continuation == nil else { return }
+        didPrewarm = true
+        logger.info("预热隐藏 WebView")
+        prewarmNavigation = webView.loadHTMLString(
+            "<html><head></head><body></body></html>",
+            baseURL: URL(string: "https://www.nodeseek.com")
+        )
+    }
+
     func load(request: URLRequest, timeoutInterval: TimeInterval) async throws -> HTMLResponse {
         self.timeoutInterval = timeoutInterval
         resetForNextRequest()
@@ -190,6 +209,11 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         logger.info("WebView didFinish: \(webView.url?.absoluteString ?? "nil")")
+        if navigation === prewarmNavigation {
+            prewarmNavigation = nil
+            return
+        }
+        guard continuation != nil else { return }
         htmlPollingTask?.cancel()
         htmlPollingTask = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -243,6 +267,11 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        if navigation === prewarmNavigation {
+            prewarmNavigation = nil
+            logger.warning("预热隐藏 WebView 导航失败: \(error.localizedDescription)")
+            return
+        }
         logger.error("导航失败 didFail: \(error.localizedDescription)")
         resolve(.failure(error))
     }
@@ -252,6 +281,11 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: Error
     ) {
+        if navigation === prewarmNavigation {
+            prewarmNavigation = nil
+            logger.warning("预热隐藏 WebView provisional 导航失败: \(error.localizedDescription)")
+            return
+        }
         logger.error("导航失败 didFailProvisionalNavigation: \(error.localizedDescription)")
         resolve(.failure(error))
     }

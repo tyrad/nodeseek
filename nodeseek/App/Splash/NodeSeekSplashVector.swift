@@ -7,10 +7,26 @@ import UIKit
 
 enum NodeSeekSplashVector {
     static let canvasSize = CGSize(width: 1024, height: 1024)
-    static let wordmarkColor = UIColor(red: 0x1A / 255.0, green: 0x1F / 255.0, blue: 0x24 / 255.0, alpha: 1)
     static let accentColor = UIColor(red: 0x18 / 255.0, green: 0xB3 / 255.0, blue: 0xB0 / 255.0, alpha: 1)
     static let logoBounds = CGRect(x: 176, y: 273, width: 729, height: 451)
     static let dotBounds = CGRect(x: 822, y: 664, width: 83, height: 60)
+
+    static func backgroundColor(for traitCollection: UITraitCollection) -> UIColor {
+        traitCollection.userInterfaceStyle == .dark ? .black : .white
+    }
+
+    static func wordmarkColor(for traitCollection: UITraitCollection) -> UIColor {
+        if traitCollection.userInterfaceStyle == .dark {
+            return .white
+        }
+        return UIColor(red: 0x1A / 255.0, green: 0x1F / 255.0, blue: 0x24 / 255.0, alpha: 1)
+    }
+
+    static func lightSweepColor(for traitCollection: UITraitCollection) -> UIColor {
+        traitCollection.userInterfaceStyle == .dark
+            ? UIColor.black.withAlphaComponent(0.45)
+            : UIColor.white.withAlphaComponent(0.62)
+    }
 
     static func accentPath() -> CGPath {
         let path = CGMutablePath()
