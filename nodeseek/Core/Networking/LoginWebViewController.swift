@@ -21,6 +21,7 @@ final class LoginWebViewController: UIViewController, WKNavigationDelegate {
     private let onClose: @MainActor () -> Void
     private let webView: WKWebView
     private let loadingIndicator = UIActivityIndicatorView(style: .medium)
+    private var loadTask: Task<Void, Never>?
 
     private let hintLabel: UILabel = {
         let label = UILabel()
@@ -52,6 +53,10 @@ final class LoginWebViewController: UIViewController, WKNavigationDelegate {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        cancelLoginLoad()
     }
 
     override func viewDidLoad() {
@@ -102,9 +107,11 @@ final class LoginWebViewController: UIViewController, WKNavigationDelegate {
 
     private func loadLoginPage() {
         loadingIndicator.startAnimating()
-        Task { @MainActor [weak self] in
+        loadTask = Task { @MainActor [weak self] in
             guard let self else { return }
             await cookieSynchronizer.syncURLSessionCookiesToWebView()
+            guard !Task.isCancelled else { return }
+
             var request = URLRequest(url: Self.loginURL)
             request.timeoutInterval = 20
             request.cachePolicy = .reloadRevalidatingCacheData
@@ -115,12 +122,21 @@ final class LoginWebViewController: UIViewController, WKNavigationDelegate {
 
     @objc private func closeTapped() {
         navigationItem.rightBarButtonItem?.isEnabled = false
+        cancelLoginLoad()
+        webView.stopLoading()
+        webView.navigationDelegate = nil
+
         Task { @MainActor [weak self] in
             guard let self else { return }
             await cookieSynchronizer.syncWebViewCookiesToURLSession()
             onClose()
             closeSelf()
         }
+    }
+
+    private func cancelLoginLoad() {
+        loadTask?.cancel()
+        loadTask = nil
     }
 
     private func closeSelf() {

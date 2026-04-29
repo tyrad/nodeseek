@@ -36,19 +36,68 @@ struct LoginWebViewControllerTests {
         #expect(synchronizer.syncWebToURLSessionCount == 1)
         #expect(closeCount == 1)
     }
+
+    @Test func closeCancelsPendingInitialCookieSync() async throws {
+        let synchronizer = SpyLoginCookieSynchronizer()
+        synchronizer.suspendURLSessionSync = true
+        var closeCount = 0
+        let viewController = LoginWebViewController(cookieSynchronizer: synchronizer) {
+            closeCount += 1
+        }
+        viewController.loadViewIfNeeded()
+        await synchronizer.waitForURLSessionSyncStart()
+
+        let closeButton = try #require(viewController.navigationItem.rightBarButtonItem)
+        let action = try #require(closeButton.action)
+        _ = (closeButton.target as AnyObject).perform(action)
+        try await Task.sleep(nanoseconds: 30_000_000)
+
+        synchronizer.resumeURLSessionSync()
+        try await Task.sleep(nanoseconds: 120_000_000)
+
+        #expect(synchronizer.syncURLSessionObservedCancellation)
+        #expect(synchronizer.syncWebToURLSessionCount == 1)
+        #expect(closeCount == 1)
+    }
 }
 
 @MainActor
 private final class SpyLoginCookieSynchronizer: LoginCookieSynchronizing {
     private(set) var syncURLSessionToWebCount = 0
     private(set) var syncWebToURLSessionCount = 0
+    var suspendURLSessionSync = false
+    private(set) var syncURLSessionObservedCancellation = false
+    private var urlSessionSyncStartContinuation: CheckedContinuation<Void, Never>?
+    private var urlSessionSyncResumeContinuation: CheckedContinuation<Void, Never>?
 
     func syncURLSessionCookiesToWebView() async {
         syncURLSessionToWebCount += 1
+        urlSessionSyncStartContinuation?.resume()
+        urlSessionSyncStartContinuation = nil
+
+        guard suspendURLSessionSync else { return }
+
+        await withCheckedContinuation { continuation in
+            urlSessionSyncResumeContinuation = continuation
+        }
+        syncURLSessionObservedCancellation = Task.isCancelled
     }
 
     func syncWebViewCookiesToURLSession() async {
         syncWebToURLSessionCount += 1
+    }
+
+    func waitForURLSessionSyncStart() async {
+        guard syncURLSessionToWebCount == 0 else { return }
+
+        await withCheckedContinuation { continuation in
+            urlSessionSyncStartContinuation = continuation
+        }
+    }
+
+    func resumeURLSessionSync() {
+        urlSessionSyncResumeContinuation?.resume()
+        urlSessionSyncResumeContinuation = nil
     }
 }
 
