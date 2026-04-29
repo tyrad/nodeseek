@@ -11,7 +11,6 @@
 		7A1000042FA0000000000001 /* AsyncDisplayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000052FA0000000000001 /* AsyncDisplayKit */; };
 		7A1000092FA0000000000001 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000082FA0000000000001 /* Kingfisher */; };
 		7A10000C2FA0000000000001 /* SwiftDraw in Frameworks */ = {isa = PBXBuildFile; productRef = 7A10000B2FA0000000000001 /* SwiftDraw */; };
-		7A1000112FA0000000000001 /* ZMarkupParser in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000122FA0000000000001 /* ZMarkupParser */; };
 		7A1000152FA0000000000001 /* JXPhotoBrowser in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000172FA0000000000001 /* JXPhotoBrowser */; };
 		7A1000182FA0000000000001 /* DTCoreText in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000192FA0000000000001 /* DTCoreText */; };
 /* End PBXBuildFile section */
@@ -79,7 +78,6 @@
 				7A1000042FA0000000000001 /* AsyncDisplayKit in Frameworks */,
 				7A1000092FA0000000000001 /* Kingfisher in Frameworks */,
 				7A10000C2FA0000000000001 /* SwiftDraw in Frameworks */,
-				7A1000112FA0000000000001 /* ZMarkupParser in Frameworks */,
 				7A1000152FA0000000000001 /* JXPhotoBrowser in Frameworks */,
 				7A1000182FA0000000000001 /* DTCoreText in Frameworks */,
 			);
@@ -146,7 +144,6 @@
 				7A1000052FA0000000000001 /* AsyncDisplayKit */,
 				7A1000082FA0000000000001 /* Kingfisher */,
 				7A10000B2FA0000000000001 /* SwiftDraw */,
-				7A1000122FA0000000000001 /* ZMarkupParser */,
 				7A1000172FA0000000000001 /* JXPhotoBrowser */,
 				7A1000192FA0000000000001 /* DTCoreText */,
 			);
@@ -237,7 +234,6 @@
 				7A1000062FA0000000000001 /* XCRemoteSwiftPackageReference "Texture" */,
 				7A1000072FA0000000000001 /* XCRemoteSwiftPackageReference "Kingfisher" */,
 				7A10000D2FA0000000000001 /* XCRemoteSwiftPackageReference "SwiftDraw" */,
-				7A1000132FA0000000000001 /* XCRemoteSwiftPackageReference "ZMarkupParser" */,
 				7A1000162FA0000000000001 /* XCRemoteSwiftPackageReference "PhotoBrowser" */,
 				7A10001A2FA0000000000001 /* XCRemoteSwiftPackageReference "DTCoreText" */,
 			);
@@ -654,14 +650,6 @@
 				minimumVersion = 0.27.0;
 			};
 		};
-		7A1000132FA0000000000001 /* XCRemoteSwiftPackageReference "ZMarkupParser" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ZhgChgLi/ZMarkupParser.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.12.0;
-			};
-		};
 		7A1000162FA0000000000001 /* XCRemoteSwiftPackageReference "PhotoBrowser" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/JiongXing/PhotoBrowser.git";
@@ -700,11 +688,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7A10000D2FA0000000000001 /* XCRemoteSwiftPackageReference "SwiftDraw" */;
 			productName = SwiftDraw;
-		};
-		7A1000122FA0000000000001 /* ZMarkupParser */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 7A1000132FA0000000000001 /* XCRemoteSwiftPackageReference "ZMarkupParser" */;
-			productName = ZMarkupParser;
 		};
 		7A1000172FA0000000000001 /* JXPhotoBrowser */ = {
 			isa = XCSwiftPackageProductDependency;
