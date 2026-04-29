@@ -48,6 +48,22 @@ struct NodeSeekSplashAnimatorTests {
         #expect(sLayer?.mask?.name == "splash.s.strokeMask")
     }
 
+    @Test func nJoinRevealsDoNotUseRoundCaps() {
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let animator = NodeSeekSplashAnimator(reduceMotion: false)
+
+        animator.install(in: container)
+
+        let layers = container.layer.sublayers ?? []
+        let nLeftMask = layers.first { $0.name == "splash.n.leftStroke" }?.mask as? CAShapeLayer
+        let nDiagonalMask = layers.first { $0.name == "splash.n.diagonalStroke" }?.mask as? CAShapeLayer
+        let nFinalMask = layers.first { $0.name == "splash.n.finalStroke" }?.mask as? CAShapeLayer
+
+        #expect(nLeftMask?.lineCap == .round)
+        #expect(nDiagonalMask?.lineCap == .butt)
+        #expect(nFinalMask?.lineCap == .butt)
+    }
+
     @Test func nRevealsInSequentialSegmentsBeforeSStarts() {
         let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         let animator = NodeSeekSplashAnimator(reduceMotion: false)
@@ -70,9 +86,34 @@ struct NodeSeekSplashAnimatorTests {
         #expect(nDiagonalAnimation != nil)
         #expect(nFinalAnimation != nil)
         #expect(sAnimation != nil)
-        #expect((nDiagonalAnimation?.beginTime ?? 0) >= (nLeftAnimation?.beginTime ?? 0) + (nLeftAnimation?.duration ?? 0))
-        #expect((nFinalAnimation?.beginTime ?? 0) >= (nDiagonalAnimation?.beginTime ?? 0) + (nDiagonalAnimation?.duration ?? 0))
-        #expect((sAnimation?.beginTime ?? 0) >= (nFinalAnimation?.beginTime ?? 0) + (nFinalAnimation?.duration ?? 0))
+        assertAnimationBeginsAfterPrevious(nDiagonalAnimation, previous: nLeftAnimation)
+        assertAnimationBeginsAfterPrevious(nFinalAnimation, previous: nDiagonalAnimation)
+        assertAnimationBeginsAfterPrevious(sAnimation, previous: nFinalAnimation)
+    }
+
+    @Test func animatorUsesProductionTimelineDurations() {
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let animator = NodeSeekSplashAnimator(reduceMotion: false)
+
+        animator.install(in: container)
+        animator.play {}
+
+        let layers = container.layer.sublayers ?? []
+        let nLeftMask = layers.first { $0.name == "splash.n.leftStroke" }?.mask as? CAShapeLayer
+        let nDiagonalMask = layers.first { $0.name == "splash.n.diagonalStroke" }?.mask as? CAShapeLayer
+        let nFinalMask = layers.first { $0.name == "splash.n.finalStroke" }?.mask as? CAShapeLayer
+        let sMask = layers.first { $0.name == "splash.s" }?.mask as? CAShapeLayer
+
+        let nLeftAnimation = nLeftMask?.animation(forKey: "strokeReveal") as? CABasicAnimation
+        let nDiagonalAnimation = nDiagonalMask?.animation(forKey: "strokeReveal") as? CABasicAnimation
+        let nFinalAnimation = nFinalMask?.animation(forKey: "strokeReveal") as? CABasicAnimation
+        let sAnimation = sMask?.animation(forKey: "strokeReveal") as? CABasicAnimation
+        let nDuration = (nLeftAnimation?.duration ?? 0)
+            + (nDiagonalAnimation?.duration ?? 0)
+            + (nFinalAnimation?.duration ?? 0)
+
+        #expect(abs(nDuration - NodeSeekSplashTimeline.nDuration) < 0.001)
+        #expect(abs((sAnimation?.duration ?? 0) - NodeSeekSplashTimeline.sDuration) < 0.001)
     }
 
     @Test func strokeMasksStayHiddenInModelLayerWhenTimelineStarts() {
@@ -141,5 +182,13 @@ struct NodeSeekSplashAnimatorTests {
         for mask in masks {
             #expect(mask?.strokeEnd == 1)
         }
+    }
+
+    private func assertAnimationBeginsAfterPrevious(
+        _ animation: CABasicAnimation?,
+        previous: CABasicAnimation?,
+        tolerance: CFTimeInterval = 0.001
+    ) {
+        #expect((animation?.beginTime ?? 0) >= (previous?.beginTime ?? 0) + (previous?.duration ?? 0) - tolerance)
     }
 }

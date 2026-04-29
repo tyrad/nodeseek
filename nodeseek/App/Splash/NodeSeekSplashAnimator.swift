@@ -5,10 +5,24 @@
 
 import UIKit
 
+enum NodeSeekSplashTimeline {
+    static let animationDuration: CFTimeInterval = 1.35
+    static let reduceMotionDuration: CFTimeInterval = 0.18
+
+    static let nDuration: CFTimeInterval = 0.58
+    static let nLeftDuration: CFTimeInterval = nDuration * 0.31
+    static let nDiagonalDuration: CFTimeInterval = nDuration * 0.39
+    static let nFinalDuration: CFTimeInterval = nDuration - nLeftDuration - nDiagonalDuration
+
+    static let sDuration: CFTimeInterval = 0.47
+    static let lightSweepBegin: CFTimeInterval = 0.28
+    static let lightSweepDuration: CFTimeInterval = 0.57
+    static let dotBegin: CFTimeInterval = 1.02
+    static let dotDuration: CFTimeInterval = 0.26
+}
+
 @MainActor
 final class NodeSeekSplashAnimator: NSObject {
-    private static let debugAnimationTimeScale: CFTimeInterval = 2.4
-
     private weak var containerView: UIView?
     private let reduceMotion: Bool
     private let animationDuration: CFTimeInterval
@@ -25,7 +39,7 @@ final class NodeSeekSplashAnimator: NSObject {
 
     init(
         reduceMotion: Bool = UIAccessibility.isReduceMotionEnabled,
-        animationDuration: CFTimeInterval = 1.35
+        animationDuration: CFTimeInterval = NodeSeekSplashTimeline.animationDuration
     ) {
         self.reduceMotion = reduceMotion
         self.animationDuration = animationDuration
@@ -57,8 +71,8 @@ final class NodeSeekSplashAnimator: NSObject {
             sLayer.opacity = 0
             dotLayer.opacity = 0
             lightSweepLayer.opacity = 0
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                completion()
+            DispatchQueue.main.asyncAfter(deadline: .now() + NodeSeekSplashTimeline.reduceMotionDuration) { [weak self] in
+                self?.complete()
             }
             return
         }
@@ -89,10 +103,10 @@ private extension NodeSeekSplashAnimator {
         backgroundLayer.backgroundColor = UIColor.white.cgColor
 
         let logoFrame = aspectFitFrame(for: NodeSeekSplashVector.canvasSize, in: bounds)
-        configureShapeLayer(nLeftStrokeLayer, frame: logoFrame, path: NodeSeekSplashVector.wordmarkPath(), color: NodeSeekSplashVector.wordmarkColor)
-        configureShapeLayer(nDiagonalStrokeLayer, frame: logoFrame, path: NodeSeekSplashVector.wordmarkPath(), color: NodeSeekSplashVector.wordmarkColor)
-        configureShapeLayer(nFinalStrokeLayer, frame: logoFrame, path: NodeSeekSplashVector.wordmarkPath(), color: NodeSeekSplashVector.wordmarkColor)
-        configureShapeLayer(sLayer, frame: logoFrame, path: NodeSeekSplashVector.wordmarkPath(), color: NodeSeekSplashVector.wordmarkColor)
+        configureShapeLayer(nLeftStrokeLayer, frame: logoFrame, path: NodeSeekSplashVector.nBodyPath(), color: NodeSeekSplashVector.wordmarkColor)
+        configureShapeLayer(nDiagonalStrokeLayer, frame: logoFrame, path: NodeSeekSplashVector.nBodyPath(), color: NodeSeekSplashVector.wordmarkColor)
+        configureShapeLayer(nFinalStrokeLayer, frame: logoFrame, path: NodeSeekSplashVector.nFinalStrokePath(), color: NodeSeekSplashVector.wordmarkColor)
+        configureShapeLayer(sLayer, frame: logoFrame, path: NodeSeekSplashVector.sBodyPath(), color: NodeSeekSplashVector.wordmarkColor)
         configureDotLayer(in: logoFrame)
 
         nLeftStrokeLayer.mask = strokeRevealMask(
@@ -105,18 +119,20 @@ private extension NodeSeekSplashAnimator {
             name: "splash.n.diagonalStrokeMask",
             path: NodeSeekSplashVector.nDiagonalStrokeRevealPath(),
             lineWidth: 128,
+            lineCap: .butt,
             in: logoFrame
         )
         nFinalStrokeLayer.mask = strokeRevealMask(
             name: "splash.n.finalStrokeMask",
             path: NodeSeekSplashVector.nFinalStrokeRevealPath(),
             lineWidth: 104,
+            lineCap: .butt,
             in: logoFrame
         )
         sLayer.mask = strokeRevealMask(
             name: "splash.s.strokeMask",
             path: NodeSeekSplashVector.sStrokeRevealPath(),
-            lineWidth: 128,
+            lineWidth: 146,
             in: logoFrame
         )
 
@@ -178,7 +194,13 @@ private extension NodeSeekSplashAnimator {
         lightSweepLayer.opacity = 0
     }
 
-    func strokeRevealMask(name: String, path: CGPath, lineWidth: CGFloat, in logoFrame: CGRect) -> CAShapeLayer {
+    func strokeRevealMask(
+        name: String,
+        path: CGPath,
+        lineWidth: CGFloat,
+        lineCap: CAShapeLayerLineCap = .round,
+        in logoFrame: CGRect
+    ) -> CAShapeLayer {
         let scale = logoFrame.width / NodeSeekSplashVector.canvasSize.width
         let mask = CAShapeLayer()
         mask.name = name
@@ -188,7 +210,7 @@ private extension NodeSeekSplashAnimator {
         mask.fillColor = UIColor.clear.cgColor
         mask.strokeColor = UIColor.black.cgColor
         mask.lineWidth = lineWidth * scale
-        mask.lineCap = .round
+        mask.lineCap = lineCap
         mask.lineJoin = .round
         mask.strokeStart = 0
         mask.strokeEnd = 0
@@ -213,28 +235,41 @@ private extension NodeSeekSplashAnimator {
         lightSweepLayer.opacity = 1
         finalLogoLayer.opacity = 0
 
-        let nDuration = scaledTime(0.58)
-        let nLeftDuration = nDuration * 0.31
-        let nDiagonalDuration = nDuration * 0.39
-        let nFinalDuration = nDuration - nLeftDuration - nDiagonalDuration
+        let timelineBegin = CACurrentMediaTime()
+        animateStrokeReveal(
+            mask: nLeftStrokeLayer.mask,
+            beginTime: timelineBegin,
+            duration: NodeSeekSplashTimeline.nLeftDuration
+        )
+        animateStrokeReveal(
+            mask: nDiagonalStrokeLayer.mask,
+            beginTime: timelineBegin + NodeSeekSplashTimeline.nLeftDuration,
+            duration: NodeSeekSplashTimeline.nDiagonalDuration
+        )
+        animateStrokeReveal(
+            mask: nFinalStrokeLayer.mask,
+            beginTime: timelineBegin + NodeSeekSplashTimeline.nLeftDuration + NodeSeekSplashTimeline.nDiagonalDuration,
+            duration: NodeSeekSplashTimeline.nFinalDuration
+        )
+        animateStrokeReveal(
+            mask: sLayer.mask,
+            beginTime: timelineBegin + NodeSeekSplashTimeline.nDuration,
+            duration: NodeSeekSplashTimeline.sDuration
+        )
+        animateLightSweep(
+            beginTime: timelineBegin + NodeSeekSplashTimeline.lightSweepBegin,
+            duration: NodeSeekSplashTimeline.lightSweepDuration
+        )
+        animateDotPop(
+            beginTime: timelineBegin + NodeSeekSplashTimeline.dotBegin,
+            duration: NodeSeekSplashTimeline.dotDuration
+        )
 
-        animateStrokeReveal(mask: nLeftStrokeLayer.mask, beginTime: scaledTime(0.00), duration: nLeftDuration)
-        animateStrokeReveal(mask: nDiagonalStrokeLayer.mask, beginTime: nLeftDuration, duration: nDiagonalDuration)
-        animateStrokeReveal(mask: nFinalStrokeLayer.mask, beginTime: nLeftDuration + nDiagonalDuration, duration: nFinalDuration)
-        animateStrokeReveal(mask: sLayer.mask, beginTime: nDuration, duration: scaledTime(0.47))
-        animateLightSweep(beginTime: scaledTime(0.28), duration: scaledTime(0.57))
-        animateDotPop(beginTime: scaledTime(1.02), duration: scaledTime(0.26))
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + scaledTime(animationDuration)) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + animationDuration) { [weak self] in
             guard let self else { return }
             self.pinModelLayersToFinalFrame()
-            self.completion?()
-            self.completion = nil
+            self.complete()
         }
-    }
-
-    func scaledTime(_ time: CFTimeInterval) -> CFTimeInterval {
-        time * Self.debugAnimationTimeScale
     }
 
     func pinModelLayersToFinalFrame() {
@@ -251,6 +286,11 @@ private extension NodeSeekSplashAnimator {
         revealStrokeMask(sLayer.mask)
     }
 
+    func complete() {
+        completion?()
+        completion = nil
+    }
+
     func animateStrokeReveal(mask: CALayer?, beginTime: CFTimeInterval, duration: CFTimeInterval) {
         guard let mask = mask as? CAShapeLayer else { return }
         mask.strokeEnd = 0
@@ -258,7 +298,7 @@ private extension NodeSeekSplashAnimator {
         let animation = CABasicAnimation(keyPath: "strokeEnd")
         animation.fromValue = 0
         animation.toValue = 1
-        animation.beginTime = CACurrentMediaTime() + beginTime
+        animation.beginTime = beginTime
         animation.duration = duration
         animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
         animation.fillMode = .both
@@ -280,7 +320,7 @@ private extension NodeSeekSplashAnimator {
         let animation = CABasicAnimation(keyPath: "transform.translation.x")
         animation.fromValue = -travel
         animation.toValue = travel
-        animation.beginTime = CACurrentMediaTime() + beginTime
+        animation.beginTime = beginTime
         animation.duration = duration
         animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         animation.fillMode = .backwards
@@ -290,7 +330,7 @@ private extension NodeSeekSplashAnimator {
         let opacity = CAKeyframeAnimation(keyPath: "opacity")
         opacity.values = [0, 1, 0]
         opacity.keyTimes = [0, 0.45, 1]
-        opacity.beginTime = CACurrentMediaTime() + beginTime
+        opacity.beginTime = beginTime
         opacity.duration = duration
         opacity.fillMode = .forwards
         opacity.isRemovedOnCompletion = false
@@ -303,7 +343,7 @@ private extension NodeSeekSplashAnimator {
         let opacity = CAKeyframeAnimation(keyPath: "opacity")
         opacity.values = [0, 1, 1]
         opacity.keyTimes = [0, 0.25, 1]
-        opacity.beginTime = CACurrentMediaTime() + beginTime
+        opacity.beginTime = beginTime
         opacity.duration = duration
         opacity.fillMode = .backwards
         opacity.isRemovedOnCompletion = true
@@ -312,7 +352,7 @@ private extension NodeSeekSplashAnimator {
         let scale = CAKeyframeAnimation(keyPath: "transform.scale")
         scale.values = [0.72, 1.12, 1.0]
         scale.keyTimes = [0, 0.62, 1]
-        scale.beginTime = CACurrentMediaTime() + beginTime
+        scale.beginTime = beginTime
         scale.duration = duration
         scale.timingFunctions = [
             CAMediaTimingFunction(name: .easeOut),

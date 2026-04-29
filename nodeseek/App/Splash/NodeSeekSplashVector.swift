@@ -10,11 +10,32 @@ enum NodeSeekSplashVector {
     static let wordmarkColor = UIColor(red: 0x1A / 255.0, green: 0x1F / 255.0, blue: 0x24 / 255.0, alpha: 1)
     static let accentColor = UIColor(red: 0x18 / 255.0, green: 0xB3 / 255.0, blue: 0xB0 / 255.0, alpha: 1)
     static let logoBounds = CGRect(x: 176, y: 273, width: 729, height: 451)
-    static let nRevealBounds = CGRect(x: 176, y: 273, width: 334, height: 451)
-    static let sRevealBounds = CGRect(x: 505, y: 273, width: 346, height: 451)
     static let dotBounds = CGRect(x: 822, y: 664, width: 83, height: 60)
 
-    static func wordmarkPath() -> CGPath {
+    static func accentPath() -> CGPath {
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: 904, y: 665))
+        path.addLine(to: CGPoint(x: 860, y: 664))
+        path.addLine(to: CGPoint(x: 822, y: 723))
+        path.addLine(to: CGPoint(x: 865, y: 723))
+        path.closeSubpath()
+        return path
+    }
+
+    static func nBodyPath() -> CGPath {
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: 176, y: 274))
+        path.addLine(to: CGPoint(x: 177, y: 723))
+        path.addLine(to: CGPoint(x: 271, y: 722))
+        path.addLine(to: CGPoint(x: 274, y: 452))
+        path.addLine(to: CGPoint(x: 442, y: 723))
+        path.addLine(to: CGPoint(x: 503, y: 634))
+        path.addLine(to: CGPoint(x: 271, y: 273))
+        path.closeSubpath()
+        return path
+    }
+
+    static func nFinalStrokePath() -> CGPath {
         let path = CGMutablePath()
         path.move(to: CGPoint(x: 417, y: 274))
         path.addLine(to: CGPoint(x: 416, y: 459))
@@ -22,11 +43,12 @@ enum NodeSeekSplashVector {
         path.addLine(to: CGPoint(x: 508, y: 463))
         path.addLine(to: CGPoint(x: 507, y: 273))
         path.closeSubpath()
-        path.move(to: CGPoint(x: 176, y: 274))
-        path.addLine(to: CGPoint(x: 177, y: 723))
-        path.addLine(to: CGPoint(x: 271, y: 722))
-        path.addLine(to: CGPoint(x: 274, y: 452))
-        path.addLine(to: CGPoint(x: 442, y: 723))
+        return path
+    }
+
+    static func sBodyPath() -> CGPath {
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: 442, y: 723))
         path.addLine(to: CGPoint(x: 742, y: 722))
         path.addLine(to: CGPoint(x: 772, y: 714))
         path.addLine(to: CGPoint(x: 797, y: 700))
@@ -79,17 +101,6 @@ enum NodeSeekSplashVector {
         path.addLine(to: CGPoint(x: 744, y: 626))
         path.addLine(to: CGPoint(x: 726, y: 634))
         path.addLine(to: CGPoint(x: 503, y: 634))
-        path.addLine(to: CGPoint(x: 271, y: 273))
-        path.closeSubpath()
-        return path
-    }
-
-    static func accentPath() -> CGPath {
-        let path = CGMutablePath()
-        path.move(to: CGPoint(x: 904, y: 665))
-        path.addLine(to: CGPoint(x: 860, y: 664))
-        path.addLine(to: CGPoint(x: 822, y: 723))
-        path.addLine(to: CGPoint(x: 865, y: 723))
         path.closeSubpath()
         return path
     }
@@ -141,6 +152,7 @@ enum NodeSeekSplashVector {
             control2: CGPoint(x: 774, y: 679)
         )
         path.addLine(to: CGPoint(x: 504, y: 679))
+        path.addLine(to: CGPoint(x: 430, y: 679))
         return path
     }
 }
