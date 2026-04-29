@@ -33,6 +33,71 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(link?.absoluteString == "https://www.nodeseek.com/post-123")
     }
 
+    @Test func rendersSemanticHTMLWithDistinctTypography() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: """
+            <article class="post-content">
+            <h4>一级小标题</h4>
+            <p><strong>重点内容</strong> 普通正文<br>第二行 <a href="/jump?to=https%3A%2F%2Fexample.com%2Fkeys">链接</a></p>
+            <ul><li>列表项</li></ul>
+            <h5>二级小标题</h5>
+            <blockquote><p>引用内容</p></blockquote>
+            <pre><code>let value = 1</code></pre>
+            <p><img src="https://cdn.example.com/photo.png" width="1200" height="800"></p>
+            </article>
+            """,
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributed = try #require(
+            blocks.compactMap { block -> NSAttributedString? in
+                guard case .text(let text) = block else { return nil }
+                return text
+            }.first
+        )
+
+        let h4Font = try #require(font(in: attributed, matching: "一级小标题"))
+        let h5Font = try #require(font(in: attributed, matching: "二级小标题"))
+        let strongFont = try #require(font(in: attributed, matching: "重点内容"))
+        let bodyFont = try #require(font(in: attributed, matching: "普通正文"))
+        let codeFont = try #require(font(in: attributed, matching: "let value = 1"))
+
+        #expect(h4Font.pointSize > bodyFont.pointSize)
+        #expect(h5Font.pointSize > bodyFont.pointSize)
+        #expect(strongFont.fontDescriptor.symbolicTraits.contains(.traitBold))
+        #expect(codeFont.pointSize < bodyFont.pointSize)
+        #expect(codeFont.fontDescriptor.symbolicTraits.contains(.traitMonoSpace))
+        #expect(attributed.string.contains("普通正文\n第二行") || attributed.string.contains("普通正文\u{2028}第二行"))
+        #expect(attributed.string.contains("• 列表项"))
+
+        let quoteRange = (attributed.string as NSString).range(of: "引用内容")
+        #expect(quoteRange.location != NSNotFound)
+        let quoteColor = attributed.attribute(
+            .foregroundColor,
+            at: quoteRange.location,
+            effectiveRange: nil
+        ) as? UIColor
+        #expect(quoteColor == .secondaryLabel)
+
+        let linkRange = (attributed.string as NSString).range(of: "链接")
+        #expect(linkRange.location != NSNotFound)
+        let link = attributed.attribute(.link, at: linkRange.location, effectiveRange: nil) as? URL
+        #expect(link?.absoluteString == "https://www.nodeseek.com/jump?to=https%3A%2F%2Fexample.com%2Fkeys")
+
+        var attachmentCount = 0
+        attributed.enumerateAttribute(
+            .attachment,
+            in: NSRange(location: 0, length: attributed.length)
+        ) { value, _, _ in
+            if value is DTTextAttachment {
+                attachmentCount += 1
+            }
+        }
+        #expect(attachmentCount == 1)
+    }
+
     @Test func rendersRelativeImageAsAttachmentWithResolvedURL() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
@@ -457,5 +522,11 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(attributed.string.contains("• second"))
         #expect(attributed.string.contains("1. alpha"))
         #expect(attributed.string.contains("2. beta"))
+    }
+
+    private func font(in attributed: NSAttributedString, matching text: String) -> UIFont? {
+        let range = (attributed.string as NSString).range(of: text)
+        guard range.location != NSNotFound else { return nil }
+        return attributed.attribute(.font, at: range.location, effectiveRange: nil) as? UIFont
     }
 }

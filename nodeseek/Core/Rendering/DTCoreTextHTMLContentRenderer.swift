@@ -218,9 +218,49 @@ struct DTCoreTextHTMLContentRenderer {
         <head>
         <base href="\(baseURL.absoluteString)">
         <style>
-        body { font: -apple-system-body; color: #111; }
-        img { max-width: 100%; height: auto; }
-        blockquote { border-left: 3px solid #d0d0d0; margin-left: 0; padding-left: 10px; color: #555; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-size: 17px;
+            line-height: 1.42;
+            color: #111111;
+        }
+        article, section, div { margin: 0; padding: 0; }
+        p { margin: 0 0 12px 0; }
+        h1, h2, h3, h4, h5, h6 {
+            margin: 18px 0 8px 0;
+            line-height: 1.28;
+            font-weight: 700;
+            color: #111111;
+        }
+        h1 { font-size: 24px; }
+        h2 { font-size: 22px; }
+        h3 { font-size: 20px; }
+        h4 { font-size: 19px; }
+        h5 { font-size: 18px; }
+        h6 { font-size: 17px; }
+        strong, b { font-weight: 700; }
+        em, i { font-style: italic; }
+        a { color: #0A84FF; text-decoration: none; }
+        ul, ol { margin: 0 0 12px 0; padding-left: 22px; }
+        li { margin: 0 0 6px 0; }
+        img { max-width: 100%; height: auto; margin: 4px 0 12px 0; }
+        blockquote {
+            border-left: 3px solid #d0d0d0;
+            margin: 8px 0 12px 0;
+            padding-left: 10px;
+            color: #555555;
+        }
+        pre {
+            font-family: Menlo, Monaco, monospace;
+            font-size: 13px;
+            line-height: 1.35;
+            white-space: pre-wrap;
+            margin: 8px 0 12px 0;
+        }
+        code {
+            font-family: Menlo, Monaco, monospace;
+            font-size: 13px;
+        }
         </style>
         </head>
         <body>\(fragment)</body>
@@ -237,17 +277,82 @@ struct DTCoreTextHTMLContentRenderer {
         let mutable = NSMutableAttributedString(attributedString: attributed)
         guard mutable.length > 0 else { return mutable }
 
-        mutable.addAttributes(
-            [
-                .font: UIFont.preferredFont(forTextStyle: .body),
-                .foregroundColor: UIColor.label
-            ],
-            range: NSRange(location: 0, length: mutable.length)
-        )
+        normalizeBaseTextAttributes(in: mutable)
         normalizeLinks(in: mutable, baseURL: baseURL)
         normalizeVisibleListMarkers(in: mutable)
         normalizeImageAttachments(in: mutable, imageSources: imageSources, maxImageWidth: maxImageWidth)
         return mutable
+    }
+
+    private func normalizeBaseTextAttributes(in attributed: NSMutableAttributedString) {
+        let fullRange = NSRange(location: 0, length: attributed.length)
+        let bodyColor = UIColor.label
+
+        let bodyFont = UIFont.preferredFont(forTextStyle: .body)
+        attributed.enumerateAttribute(.font, in: fullRange) { value, range, _ in
+            guard let font = value as? UIFont else {
+                attributed.addAttribute(.font, value: bodyFont, range: range)
+                return
+            }
+
+            attributed.addAttribute(.font, value: normalizedSystemFont(from: font, fallback: bodyFont), range: range)
+        }
+
+        attributed.enumerateAttribute(.foregroundColor, in: fullRange) { value, range, _ in
+            let color = (value as? UIColor).map(normalizedTextColor(from:)) ?? bodyColor
+            attributed.addAttribute(.foregroundColor, value: color, range: range)
+        }
+    }
+
+    private func normalizedSystemFont(from font: UIFont, fallback: UIFont) -> UIFont {
+        let pointSize = font.pointSize > 0 ? font.pointSize : fallback.pointSize
+        let traits = font.fontDescriptor.symbolicTraits
+        let weight: UIFont.Weight = traits.contains(.traitBold) ? .semibold : .regular
+        let baseFont = isMonospaced(font)
+            ? UIFont.monospacedSystemFont(ofSize: pointSize, weight: weight)
+            : UIFont.systemFont(ofSize: pointSize, weight: weight)
+        guard traits.contains(.traitItalic),
+              let descriptor = baseFont.fontDescriptor.withSymbolicTraits(
+                baseFont.fontDescriptor.symbolicTraits.union(.traitItalic)
+              ) else {
+            return baseFont
+        }
+        return UIFont(descriptor: descriptor, size: pointSize)
+    }
+
+    private func isMonospaced(_ font: UIFont) -> Bool {
+        let traits = font.fontDescriptor.symbolicTraits
+        guard traits.contains(.traitMonoSpace) == false else { return true }
+        let name = "\(font.fontName) \(font.familyName)".lowercased()
+        return name.contains("mono") || name.contains("menlo") || name.contains("courier")
+    }
+
+    private func normalizedTextColor(from color: UIColor) -> UIColor {
+        guard let components = rgbComponents(from: color) else { return color }
+        if isNearGray(components, target: 17) {
+            return .label
+        }
+        if isNearGray(components, target: 85) {
+            return .secondaryLabel
+        }
+        return color
+    }
+
+    private func rgbComponents(from color: UIColor) -> (red: CGFloat, green: CGFloat, blue: CGFloat)? {
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        guard color.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return nil }
+        return (red, green, blue)
+    }
+
+    private func isNearGray(_ components: (red: CGFloat, green: CGFloat, blue: CGFloat), target: CGFloat) -> Bool {
+        let normalizedTarget = target / 255
+        let tolerance: CGFloat = 0.02
+        return abs(components.red - normalizedTarget) <= tolerance
+            && abs(components.green - normalizedTarget) <= tolerance
+            && abs(components.blue - normalizedTarget) <= tolerance
     }
 
     private func normalizeLinks(in attributed: NSMutableAttributedString, baseURL: URL) {
