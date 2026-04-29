@@ -532,7 +532,7 @@ struct DTCoreTextHTMLContentRenderer {
             color: #111111;
         }
         h1 { font-size: 24px; }
-        h2 { font-size: 22px; }
+        h2 { font-size: 22px; color: #2ea44f; }
         h3 { font-size: 20px; }
         h4 { font-size: 19px; }
         h5 { font-size: 18px; }
