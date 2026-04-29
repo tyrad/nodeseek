@@ -926,7 +926,10 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         let imageView = DetailInlineImageView(
             frame: frame,
             imageURL: contentURL,
-            targetPixelWidth: targetImageWidth(for: contentURL) * displayScale,
+            targetPixelWidth: targetImagePointSide(
+                for: contentURL,
+                originalSize: attachment.originalSize
+            ) * displayScale,
             displayScale: displayScale,
             onImageLoaded: { [weak self] loadedURL, imageSize in
                 self?.handleLoadedImage(loadedURL, imageSize: imageSize)
@@ -935,7 +938,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
                 self?.handleImageTap(tappedURL)
             }
         )
-        imageView.contentMode = .scaleAspectFit
+        imageView.contentMode = contentMode(for: contentURL, originalSize: attachment.originalSize)
         imageView.clipsToBounds = true
         imageView.image = (attachment as? DTImageTextAttachment)?.image
 
@@ -985,15 +988,13 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
                 return
             }
 
-            let maxWidth = maxImageWidth(for: url)
             let isSticker = isStickerImageURL(url)
-            let displaySize = isSticker
-                ? DetailImageLayout.scaledSize(
-                    for: originalSize,
-                    maxWidth: maxWidth,
-                    maxHeight: nil
-                )
-                : DetailImageLayout.fixedNormalImageSize(maxWidth: maxWidth)
+            let presentation = DetailImageLayout.presentation(
+                for: originalSize,
+                maxWidth: maxImageWidth(for: url),
+                isSticker: isSticker
+            )
+            let displaySize = presentation.size
             if isSticker == false, attachment.displaySize == displaySize {
                 logDiagnostics(
                     "normal attachment fixed size unchanged url=\(url.absoluteString) imageSize=\(Self.string(from: originalSize)) display=\(Self.string(from: displaySize))"
@@ -1050,11 +1051,32 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         return isStickerImageURL(url) ? min(width, DetailImageLayout.fixedStickerWidth) : width
     }
 
-    private func targetImageWidth(for url: URL) -> CGFloat {
+    private func targetImagePointSide(for url: URL, originalSize: CGSize) -> CGFloat {
         let maxWidth = maxImageWidth(for: url)
-        return isStickerImageURL(url)
-            ? maxWidth
-            : DetailImageLayout.fixedNormalImageSize(maxWidth: maxWidth).width
+        guard originalSize.width > 0, originalSize.height > 0 else {
+            return isStickerImageURL(url) ? maxWidth : max(maxWidth, DetailImageLayout.maxImageHeight)
+        }
+
+        return DetailImageLayout.presentation(
+            for: originalSize,
+            maxWidth: maxWidth,
+            isSticker: isStickerImageURL(url)
+        ).targetPointSide
+    }
+
+    private func contentMode(for url: URL, originalSize: CGSize) -> UIView.ContentMode {
+        let mode = DetailImageLayout.presentation(
+            for: originalSize,
+            maxWidth: maxImageWidth(for: url),
+            isSticker: isStickerImageURL(url)
+        ).mode
+
+        switch mode {
+        case .thumbnailCrop:
+            return .scaleAspectFill
+        case .aspectFit:
+            return .scaleAspectFit
+        }
     }
 
     private func richTextSize(constrainedToWidth width: CGFloat) -> CGSize {

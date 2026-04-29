@@ -38,4 +38,40 @@ struct DetailImageLayoutTests {
         #expect(size.width == 187)
         #expect(size.height == 187)
     }
+
+    @Test func normalPhotoUsesCroppedThumbnailPresentation() {
+        let presentation = DetailImageLayout.presentation(
+            for: CGSize(width: 1200, height: 800),
+            maxWidth: 320,
+            isSticker: false
+        )
+
+        #expect(presentation.size == CGSize(width: 160, height: 160))
+        #expect(presentation.mode == .thumbnailCrop)
+        #expect(presentation.targetPointSide == 160)
+    }
+
+    @Test func tallScreenshotUsesContainedPresentation() {
+        let presentation = DetailImageLayout.presentation(
+            for: CGSize(width: 800, height: 2000),
+            maxWidth: 320,
+            isSticker: false
+        )
+
+        #expect(presentation.size == CGSize(width: 168, height: 420))
+        #expect(presentation.mode == .aspectFit)
+        #expect(presentation.targetPointSide == 420)
+    }
+
+    @Test func veryWideScreenshotUsesContainedPresentation() {
+        let presentation = DetailImageLayout.presentation(
+            for: CGSize(width: 2000, height: 800),
+            maxWidth: 320,
+            isSticker: false
+        )
+
+        #expect(presentation.size == CGSize(width: 320, height: 128))
+        #expect(presentation.mode == .aspectFit)
+        #expect(presentation.targetPointSide == 320)
+    }
 }

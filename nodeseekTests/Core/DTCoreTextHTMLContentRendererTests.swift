@@ -65,7 +65,7 @@ struct DTCoreTextHTMLContentRendererTests {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
         let blocks = renderer.render(
-            fragment: "<p><img src=\"https://cdn.example.com/tall.png\" width=\"800\" height=\"1600\"></p>",
+            fragment: "<p><img src=\"https://cdn.example.com/photo.png\" width=\"1200\" height=\"800\"></p>",
             baseURL: baseURL,
             maxImageWidth: 320
         )
@@ -89,6 +89,36 @@ struct DTCoreTextHTMLContentRendererTests {
         let displaySize = try #require(attachment?.displaySize)
         #expect(displaySize.width == 160)
         #expect(displaySize.height == 160)
+    }
+
+    @Test func usesContainedPresentationForExtremeRatioImageAttachments() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: "<p><img src=\"https://cdn.example.com/tall.png\" width=\"800\" height=\"2000\"></p>",
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributed = try #require(
+            blocks.compactMap { block -> NSAttributedString? in
+                guard case .text(let text) = block else { return nil }
+                return text
+            }.first
+        )
+
+        var attachment: DTTextAttachment?
+        attributed.enumerateAttribute(
+            .attachment,
+            in: NSRange(location: 0, length: attributed.length)
+        ) { value, _, stop in
+            guard let value = value as? DTTextAttachment else { return }
+            attachment = value
+            stop.pointee = true
+        }
+
+        let displaySize = try #require(attachment?.displaySize)
+        #expect(displaySize.width == 168)
+        #expect(displaySize.height == 420)
     }
 
     @Test func keepsStickerImageAttachmentsLimitedByFixedWidthOnly() throws {

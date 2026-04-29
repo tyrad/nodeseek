@@ -159,7 +159,7 @@ struct PostDetailViewControllerTests {
         let initialHeight = node.layoutThatFits(constrainedSize).size.height
         let didUpdate = node.updateAttachmentLayout(
             matching: imageURL,
-            originalSize: CGSize(width: 800, height: 1600),
+            originalSize: CGSize(width: 1200, height: 800),
             displaySize: DetailImageLayout.fixedNormalImageSize(maxWidth: 320)
         )
         let updatedHeight = node.layoutThatFits(constrainedSize).size.height

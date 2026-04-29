@@ -318,10 +318,6 @@ struct DTCoreTextHTMLContentRenderer {
                 attachment.contentURL = imageURL
             }
 
-            let maxWidth = isStickerImageURL(imageURL)
-                ? min(maxImageWidth, DetailImageLayout.fixedStickerWidth)
-                : maxImageWidth
-            let maxHeight = isStickerImageURL(imageURL) ? nil : DetailImageLayout.maxImageHeight
             let isSticker = isStickerImageURL(imageURL)
             if isSticker {
                 stickerFixedCount += 1
@@ -329,30 +325,22 @@ struct DTCoreTextHTMLContentRenderer {
 
             let originalSize = attachment.originalSize
             var usedPlaceholder = false
-            if isSticker == false {
-                attachment.displaySize = DetailImageLayout.fixedNormalImageSize(maxWidth: maxWidth)
-            } else if originalSize.width > 0, originalSize.height > 0 {
-                attachment.displaySize = DetailImageLayout.scaledSize(
-                    for: originalSize,
-                    maxWidth: maxWidth,
-                    maxHeight: maxHeight
-                )
-            } else if attachment.displaySize.width > 0, attachment.displaySize.height > 0 {
-                attachment.displaySize = DetailImageLayout.scaledSize(
-                    for: attachment.displaySize,
-                    maxWidth: maxWidth,
-                    maxHeight: maxHeight
-                )
+            let layoutSourceSize: CGSize
+            if originalSize.width > 0, originalSize.height > 0 {
+                layoutSourceSize = originalSize
+            } else if isSticker, attachment.displaySize.width > 0, attachment.displaySize.height > 0 {
+                layoutSourceSize = attachment.displaySize
             } else {
-                // 避免 attachment 初始尺寸为 0 时无法创建视图，导致图片永远不触发下载回流。
-                attachment.displaySize = DetailImageLayout.placeholderSize(
-                    maxWidth: maxWidth,
-                    maxHeight: maxHeight,
-                    isSticker: isSticker
-                )
+                layoutSourceSize = .zero
                 usedPlaceholder = true
                 placeholderCount += 1
             }
+            // 避免 attachment 初始尺寸为 0 时无法创建视图，导致图片永远不触发下载回流。
+            attachment.displaySize = DetailImageLayout.presentation(
+                for: layoutSourceSize,
+                maxWidth: maxImageWidth,
+                isSticker: isSticker
+            ).size
 
             attachmentSummaries.append(
                 "url=\(imageURL.absoluteString),original=\(string(from: attachment.originalSize)),display=\(string(from: attachment.displaySize)),placeholder=\(usedPlaceholder)"
