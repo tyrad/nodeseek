@@ -16,6 +16,7 @@ struct PostSummary: Equatable, Sendable {
     let replyCount: Int
     let viewCount: Int
     let lastActivityText: String?
+    let isPinned: Bool
     let isLocked: Bool
     let avatarURL: URL?
 
@@ -28,6 +29,7 @@ struct PostSummary: Equatable, Sendable {
         replyCount: Int,
         viewCount: Int = 0,
         lastActivityText: String?,
+        isPinned: Bool = false,
         isLocked: Bool = false,
         avatarURL: URL? = nil
     ) {
@@ -39,6 +41,7 @@ struct PostSummary: Equatable, Sendable {
         self.replyCount = replyCount
         self.viewCount = viewCount
         self.lastActivityText = lastActivityText
+        self.isPinned = isPinned
         self.isLocked = isLocked
         self.avatarURL = avatarURL
     }

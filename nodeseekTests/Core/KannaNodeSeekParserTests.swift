@@ -100,6 +100,49 @@ struct KannaNodeSeekParserTests {
         #expect(post.avatarURL == nil)
     }
 
+    @Test func parsesPinnedPostListItemFromTitleIcon() throws {
+        let html = """
+        <ul class="post-list">
+            <li class="post-list-item">
+                <div class="post-list-content">
+                    <div role="heading" aria-level="3" class="post-title">
+                        <a href="/post-1033-1" target="">[小白入门科普] 服务器行业黑话大全 持续更新中.......</a>
+                        <a href="/award" title="推荐阅读">
+                            <svg class="iconpark-icon award" style="width:15px;height:15px"><use href="#diamonds"></use></svg>
+                        </a>
+                        <span title="置顶">
+                            <svg class="iconpark-icon pined circle-icon" style="width:15px;height:15px"><use href="#pin"></use></svg>
+                        </span>
+                    </div>
+                    <div class="post-info">
+                        <span class="info-item info-author"><a href="/space/1769">斯巴达</a></span>
+                        <span class="info-item info-views"><span title="169842 views">169842</span></span>
+                        <span title="2403 comments" class="info-item info-comments-count"><span title="2404 comments">2403</span></span>
+                        <a href="/post-1033-241#2403" class="info-item info-last-comment-time">
+                            <time title="2026-04-29 08:25:40" datetime="2026-04-29T00:25:40.000Z">7h 32min ago</time>
+                        </a>
+                        <a href="/categories/daily" class="info-item post-category">日常</a>
+                    </div>
+                </div>
+            </li>
+        </ul>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let posts = try parser.parsePostList(html: html)
+
+        let post = try #require(posts.first)
+        #expect(post.id == "1033")
+        #expect(post.isPinned)
+        #expect(!post.isLocked)
+        #expect(post.title.contains("服务器行业黑话大全"))
+        #expect(post.authorName == "斯巴达")
+        #expect(post.nodeName == "日常")
+        #expect(post.replyCount == 2403)
+        #expect(post.viewCount == 169842)
+        #expect(post.lastActivityText == "7h 32min ago")
+    }
+
     @Test func parsesRealPageOneFixture() throws {
         let html = try FixtureLoader.html(named: "page-1")
         let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)

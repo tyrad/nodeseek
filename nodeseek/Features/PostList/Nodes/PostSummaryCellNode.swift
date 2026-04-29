@@ -154,28 +154,86 @@ final class PostSummaryCellNode: ASCellNode {
             .font: font,
             .foregroundColor: UIColor.label
         ]
-        let title = NSMutableAttributedString(string: post.title, attributes: attributes)
+        let title = NSMutableAttributedString()
+        let configuration = UIImage.SymbolConfiguration(font: font, scale: .small)
+
+        if post.isPinned {
+            appendSymbol(
+                "pin.fill",
+                tintColor: .secondaryLabel,
+                font: font,
+                rotationAngle: .pi / 4,
+                to: title
+            )
+            title.append(NSAttributedString(string: " ", attributes: attributes))
+        }
+
+        title.append(NSAttributedString(string: post.title, attributes: attributes))
 
         guard post.isLocked else {
             return title
         }
 
         title.append(NSAttributedString(string: " ", attributes: attributes))
-        let configuration = UIImage.SymbolConfiguration(font: font, scale: .small)
 
-        if let image = UIImage(systemName: "lock.fill", withConfiguration: configuration)?
-            .withTintColor(.systemRed, renderingMode: .alwaysOriginal) {
-            let attachment = NSTextAttachment(image: image)
-            attachment.bounds = CGRect(
-                x: 0,
-                y: (font.capHeight - image.size.height) / 2,
-                width: image.size.width,
-                height: image.size.height
-            )
-            title.append(NSAttributedString(attachment: attachment))
-        }
+        appendSymbol(
+            "lock.fill",
+            tintColor: .systemRed,
+            font: font,
+            configuration: configuration,
+            to: title
+        )
 
         return title
+    }
+
+    private static func appendSymbol(
+        _ systemName: String,
+        tintColor: UIColor,
+        font: UIFont,
+        configuration: UIImage.SymbolConfiguration? = nil,
+        rotationAngle: CGFloat = 0,
+        to text: NSMutableAttributedString
+    ) {
+        let configuration = configuration ?? UIImage.SymbolConfiguration(font: font, scale: .small)
+
+        guard let image = UIImage(systemName: systemName, withConfiguration: configuration)?
+            .withTintColor(tintColor, renderingMode: .alwaysOriginal) else {
+            return
+        }
+
+        let displayImage = rotationAngle == 0 ? image : rotated(image, by: rotationAngle)
+        let attachment = NSTextAttachment(image: displayImage)
+        attachment.bounds = CGRect(
+            x: 0,
+            y: (font.capHeight - displayImage.size.height) / 2,
+            width: displayImage.size.width,
+            height: displayImage.size.height
+        )
+        text.append(NSAttributedString(attachment: attachment))
+    }
+
+    private static func rotated(_ image: UIImage, by angle: CGFloat) -> UIImage {
+        let sourceSize = image.size
+        let rotatedRect = CGRect(origin: .zero, size: sourceSize).applying(CGAffineTransform(rotationAngle: angle))
+        let canvasSize = CGSize(
+            width: ceil(abs(rotatedRect.width)),
+            height: ceil(abs(rotatedRect.height))
+        )
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = image.scale
+
+        return UIGraphicsImageRenderer(size: canvasSize, format: format).image { context in
+            let cgContext = context.cgContext
+            cgContext.translateBy(x: canvasSize.width / 2, y: canvasSize.height / 2)
+            cgContext.rotate(by: angle)
+            image.draw(in: CGRect(
+                x: -sourceSize.width / 2,
+                y: -sourceSize.height / 2,
+                width: sourceSize.width,
+                height: sourceSize.height
+            ))
+        }
     }
 
     private static func metricAttributedText(
@@ -187,16 +245,14 @@ final class PostSummaryCellNode: ASCellNode {
         let text = NSMutableAttributedString()
         let configuration = UIImage.SymbolConfiguration(font: font, scale: .small)
 
-        if let image = UIImage(systemName: systemName, withConfiguration: configuration)?
-            .withTintColor(.secondaryLabel, renderingMode: .alwaysOriginal) {
-            let attachment = NSTextAttachment(image: image)
-            attachment.bounds = CGRect(
-                x: 0,
-                y: (font.capHeight - image.size.height) / 2,
-                width: image.size.width,
-                height: image.size.height
+        if UIImage(systemName: systemName, withConfiguration: configuration) != nil {
+            appendSymbol(
+                systemName,
+                tintColor: .secondaryLabel,
+                font: font,
+                configuration: configuration,
+                to: text
             )
-            text.append(NSAttributedString(attachment: attachment))
             text.append(NSAttributedString(string: " ", attributes: attributes))
         }
 

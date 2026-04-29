@@ -110,6 +110,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
         let replyText = item.at_xpath(XPathRules.replyCount)?.text ?? item.text ?? ""
         let replyCount = Self.replyCount(in: replyText) ?? 0
         let lastActivityText = firstText(in: item, xpaths: [XPathRules.lastActive, XPathRules.fallbackLastActive])
+        let isPinned = item.at_xpath(XPathRules.postPinned) != nil
         let isLocked = item.at_xpath(XPathRules.postLocked) != nil
 
         return PostSummary(
@@ -121,6 +122,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
             replyCount: replyCount,
             viewCount: viewCount,
             lastActivityText: lastActivityText,
+            isPinned: isPinned,
             isLocked: isLocked,
             avatarURL: avatarURL
         )

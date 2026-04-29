@@ -58,4 +58,29 @@ struct PostSummaryCellNodeTests {
         #expect(metadataText.string.contains("961"))
         #expect(metadataText.string.contains("6h 30min ago"))
     }
+
+    @Test func pinnedPostTitleShowsPinSymbolBeforeTitle() throws {
+        let post = PostSummary(
+            id: "1033",
+            title: "[小白入门科普] 服务器行业黑话大全",
+            url: URL(string: "https://www.nodeseek.com/post-1033")!,
+            authorName: "斯巴达",
+            nodeName: "日常",
+            replyCount: 2403,
+            viewCount: 169842,
+            lastActivityText: "7h 32min ago",
+            isPinned: true
+        )
+
+        let titleText = PostSummaryCellNode.titleAttributedText(for: post)
+        let firstAttachment = titleText.attribute(
+            NSAttributedString.Key.attachment,
+            at: 0,
+            effectiveRange: nil
+        ) as? NSTextAttachment
+
+        #expect(firstAttachment?.image != nil)
+        #expect(titleText.string.dropFirst().hasPrefix(" "))
+        #expect(titleText.string.contains(post.title))
+    }
 }
