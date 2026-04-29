@@ -66,6 +66,9 @@ class PostDetailViewController: UIViewController {
         configuration.title = "登录查看"
         configuration.image = UIImage(systemName: "person.crop.circle.badge.plus")
         configuration.imagePadding = 8
+        configuration.baseBackgroundColor = .label
+        configuration.baseForegroundColor = .systemBackground
+        configuration.cornerStyle = .capsule
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 18, bottom: 12, trailing: 18)
         button.configuration = configuration
         button.accessibilityIdentifier = "post-detail-login-button"

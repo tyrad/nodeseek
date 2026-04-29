@@ -89,13 +89,15 @@ final class LoginWebViewController: UIViewController, WKNavigationDelegate {
     }
 
     private func configureNavigationItems() {
+        let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
         let closeButton = UIBarButtonItem(
-            title: "关闭",
-            style: .done,
+            image: UIImage(systemName: "xmark", withConfiguration: symbolConfiguration),
+            style: .plain,
             target: self,
             action: #selector(closeTapped)
         )
         closeButton.accessibilityLabel = "关闭登录页"
+        closeButton.tintColor = .label
         navigationItem.rightBarButtonItem = closeButton
     }
 

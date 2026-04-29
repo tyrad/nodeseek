@@ -79,7 +79,7 @@ struct PostListViewControllerTests {
         #expect(abs(selectedTabFrame.height - menuButtonFrame.height) < 1)
     }
 
-    @Test func menuButtonPresentsSideMenuWithAvatarLoginAndSettingsButton() throws {
+    @Test func menuButtonPresentsSideMenuWithAccountHeaderAndSettingsButton() throws {
         let presenter = SpyPostListPresenter()
         let viewController = PostListViewController(presenter: presenter)
         viewController.loadViewIfNeeded()
@@ -92,7 +92,7 @@ struct PostListViewControllerTests {
         let avatar = try #require(viewController.view.firstImageView(accessibilityIdentifier: "post-list-side-menu-avatar"))
         let nameLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-name-label"))
         let statsLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-stats-label"))
-        let loginButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-login-button"))
+        let accountHeaderButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-account-header-button"))
         let settingsButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-settings-button"))
         let sideMenuHost = viewController.children.first {
             $0.view.firstView(accessibilityIdentifier: "post-list-side-menu") != nil
@@ -104,8 +104,8 @@ struct PostListViewControllerTests {
         #expect(avatar.image != nil)
         #expect(nameLabel.text == "未登录")
         #expect(statsLabel.text == "登录后同步账号信息")
-        #expect(loginButton.configuration?.title == "登录")
-        #expect(loginButton.configuration?.image != nil)
+        #expect(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-login-button") == nil)
+        #expect(accountHeaderButton.accessibilityLabel == "登录账号")
         #expect(settingsButton.configuration?.title == "设置")
         #expect(settingsButton.configuration?.image != nil)
 
@@ -118,11 +118,11 @@ struct PostListViewControllerTests {
         #expect(abs(sideMenu.frame.minX) < 0.5)
         #expect(backdrop.isHidden == false)
         #expect(backdrop.alpha == 1)
-        #expect(loginButton.frame.minY > avatar.frame.maxY)
+        #expect(accountHeaderButton.frame.contains(avatar.frame))
         #expect(settingsButton.frame.maxY < viewController.view.bounds.maxY)
 
         UIView.setAnimationsEnabled(false)
-        loginButton.sendActions(for: .touchUpInside)
+        accountHeaderButton.sendActions(for: .touchUpInside)
         viewController.view.layoutIfNeeded()
         UIView.setAnimationsEnabled(animationsWereEnabled)
 
@@ -149,11 +149,11 @@ struct PostListViewControllerTests {
 
         let nameLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-name-label"))
         let statsLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-stats-label"))
-        let loginButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-login-button"))
+        let accountHeaderButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-account-header-button"))
 
         #expect(nameLabel.text == "缭雾")
         #expect(statsLabel.text == "等级 Lv 1 · 鸡腿 306")
-        #expect(loginButton.isHidden)
+        #expect(accountHeaderButton.accessibilityLabel == "账号信息")
     }
 }
 

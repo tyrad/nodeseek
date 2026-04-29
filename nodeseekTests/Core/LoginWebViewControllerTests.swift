@@ -23,7 +23,11 @@ struct LoginWebViewControllerTests {
         #expect(hintContainer.frame.minX > 0)
         #expect(hintLabel.numberOfLines == 0)
         #expect(hintLabel.textAlignment == .natural)
-        #expect(viewController.navigationItem.rightBarButtonItem?.accessibilityLabel == "关闭登录页")
+        let closeButton = try #require(viewController.navigationItem.rightBarButtonItem)
+        #expect(closeButton.accessibilityLabel == "关闭登录页")
+        #expect(closeButton.title == nil)
+        #expect(closeButton.image != nil)
+        #expect(closeButton.tintColor == .label)
     }
 
     @Test func closeSyncsCookiesAndCallsCompletion() async throws {

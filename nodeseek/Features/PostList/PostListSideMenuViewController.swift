@@ -10,6 +10,7 @@ import UIKit
 final class PostListSideMenuViewController: UIViewController {
     private var sideMenuLeadingConstraint: NSLayoutConstraint?
     private var isSideMenuVisible = false
+    private var isAccountLoggedIn = false
     var onLoginTapped: (() -> Void)?
     private let avatarLoader = AvatarImageLoader.shared
 
@@ -79,6 +80,15 @@ final class PostListSideMenuViewController: UIViewController {
         return label
     }()
 
+    private let accountHeaderButton: UIButton = {
+        let button = UIButton(type: .custom)
+        button.backgroundColor = .clear
+        button.accessibilityIdentifier = "post-list-side-menu-account-header-button"
+        button.accessibilityLabel = "登录账号"
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     private let settingsButton: UIButton = {
         let button = UIButton(type: .system)
         let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
@@ -91,24 +101,6 @@ final class PostListSideMenuViewController: UIViewController {
         button.configuration = configuration
         button.contentHorizontalAlignment = .leading
         button.accessibilityIdentifier = "post-list-side-menu-settings-button"
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
-    }()
-
-    private let loginButton: UIButton = {
-        let button = UIButton(type: .system)
-        let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
-        var configuration = UIButton.Configuration.filled()
-        configuration.image = UIImage(systemName: "person.badge.key", withConfiguration: symbolConfiguration)
-        configuration.imagePadding = 10
-        configuration.baseBackgroundColor = .label
-        configuration.baseForegroundColor = .systemBackground
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)
-        configuration.title = "登录"
-        configuration.cornerStyle = .medium
-        button.configuration = configuration
-        button.contentHorizontalAlignment = .leading
-        button.accessibilityIdentifier = "post-list-side-menu-login-button"
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -132,11 +124,13 @@ final class PostListSideMenuViewController: UIViewController {
     }
 
     func renderAccount(_ account: AccountResponse) {
+        isAccountLoggedIn = account.isLoggedIn
         nameLabel.text = account.isLoggedIn ? account.displayName : "未登录"
         statsLabel.text = account.isLoggedIn
             ? account.stats.prefix(3).joined(separator: " · ")
             : "登录后同步账号信息"
-        loginButton.isHidden = account.isLoggedIn
+        accountHeaderButton.accessibilityLabel = account.isLoggedIn ? "账号信息" : "登录账号"
+        accountHeaderButton.isEnabled = !account.isLoggedIn
 
         if account.isLoggedIn {
             avatarLoader.loadAvatar(
@@ -155,8 +149,7 @@ final class PostListSideMenuViewController: UIViewController {
         view.backgroundColor = .clear
         view.isHidden = true
         backdropView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(backdropTapped)))
-        avatarImageView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(avatarTapped)))
-        loginButton.addTarget(self, action: #selector(loginButtonTapped), for: .touchUpInside)
+        accountHeaderButton.addTarget(self, action: #selector(accountHeaderTapped), for: .touchUpInside)
         settingsButton.addTarget(self, action: #selector(settingsButtonTapped), for: .touchUpInside)
 
         view.addSubview(backdropView)
@@ -164,7 +157,7 @@ final class PostListSideMenuViewController: UIViewController {
         sideMenuView.addSubview(avatarImageView)
         sideMenuView.addSubview(nameLabel)
         sideMenuView.addSubview(statsLabel)
-        sideMenuView.addSubview(loginButton)
+        sideMenuView.addSubview(accountHeaderButton)
         sideMenuView.addSubview(settingsButton)
 
         let sideMenuLeadingConstraint = sideMenuView.leadingAnchor.constraint(
@@ -197,10 +190,10 @@ final class PostListSideMenuViewController: UIViewController {
             statsLabel.trailingAnchor.constraint(equalTo: nameLabel.trailingAnchor),
             statsLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 6),
 
-            loginButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
-            loginButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
-            loginButton.topAnchor.constraint(equalTo: avatarImageView.bottomAnchor, constant: 24),
-            loginButton.heightAnchor.constraint(equalToConstant: 48),
+            accountHeaderButton.leadingAnchor.constraint(equalTo: avatarImageView.leadingAnchor),
+            accountHeaderButton.trailingAnchor.constraint(equalTo: nameLabel.trailingAnchor),
+            accountHeaderButton.topAnchor.constraint(equalTo: avatarImageView.topAnchor, constant: -8),
+            accountHeaderButton.bottomAnchor.constraint(equalTo: avatarImageView.bottomAnchor, constant: 8),
 
             settingsButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
             settingsButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
@@ -213,11 +206,8 @@ final class PostListSideMenuViewController: UIViewController {
         hide(animated: true)
     }
 
-    @objc private func avatarTapped() {
-        hide(animated: true)
-    }
-
-    @objc private func loginButtonTapped() {
+    @objc private func accountHeaderTapped() {
+        guard !isAccountLoggedIn else { return }
         hide(animated: true)
         onLoginTapped?()
     }
@@ -245,7 +235,8 @@ final class PostListSideMenuViewController: UIViewController {
             self.backdropView.isHidden = !self.isSideMenuVisible
         }
 
-        guard animated else {
+        let shouldAnimate = animated && UIView.areAnimationsEnabled
+        guard shouldAnimate else {
             animations()
             completion(true)
             return

@@ -215,6 +215,9 @@ struct PostDetailLoginViewControllerTests {
 
         let button = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-login-button"))
         #expect(button.configuration?.title == "登录查看")
+        #expect(button.configuration?.baseBackgroundColor == .label)
+        #expect(button.configuration?.baseForegroundColor == .systemBackground)
+        #expect(button.configuration?.cornerStyle == .capsule)
         #expect(button.isHidden == false)
 
         button.sendActions(for: .touchUpInside)
