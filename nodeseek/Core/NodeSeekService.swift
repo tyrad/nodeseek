@@ -47,6 +47,22 @@ struct NodeSeekService: Sendable {
         return .value(posts)
     }
 
+    func loadAccount() async throws -> NodeSeekResult<AccountResponse> {
+        let targetURL = baseURL
+        logger.info("开始抓取 NodeSeek 账号信息: \(targetURL.absoluteString)")
+        let response = try await htmlClient.get(targetURL)
+        logger.info("账号信息抓取返回 status=\(response.statusCode), htmlLength=\(response.html.count), finalURL=\(response.finalURL.absoluteString)")
+
+        if let challenge = challengeDetector.detect(response: response) {
+            logger.warning("检测到账号信息 challenge: \(challenge.logDescription)")
+            return .challenge(challenge)
+        }
+
+        let account = try parser.parseAccount(html: response.html)
+        logger.info("账号信息解析完成，loggedIn=\(account.isLoggedIn, privacy: .public), displayName=\(account.displayName, privacy: .public)")
+        return .value(account)
+    }
+
     func loadPostDetail(postID: String, page: Int = 1) async throws -> NodeSeekResult<PostDetail> {
         let targetURL = postDetailURL(postID: postID, page: page)
         logger.info("开始抓取 NodeSeek 详情，postID=\(postID, privacy: .public), page=\(page): \(targetURL.absoluteString)")

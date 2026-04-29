@@ -6,6 +6,13 @@
 //
 
 enum XPathRules {
+    static let accountUserCard = "//*[@id='nsk-right-panel-container']//*[contains(concat(' ', normalize-space(@class), ' '), ' user-card ')][1]"
+    static let accountUsername = ".//a[contains(concat(' ', normalize-space(@class), ' '), ' Username ')]"
+    static let accountProfileLink = ".//a[contains(@href, '/space/')][1]"
+    static let accountAvatar = ".//img[contains(@class, 'avatar') or contains(@src, '/avatar/')]"
+    static let accountStatLinks = ".//*[contains(concat(' ', normalize-space(@class), ' '), ' user-stat ')]//a[normalize-space()]"
+    static let accountStatSpans = ".//*[contains(concat(' ', normalize-space(@class), ' '), ' user-stat ')]//span[normalize-space()]"
+
     static let postListItems = "//article[contains(@class, 'post-item')] | //li[contains(@class, 'post-list-item')]"
     static let postTitle = ".//*[contains(@class, 'post-title') and self::a] | .//*[contains(@class, 'post-title')]//a[contains(@href, '/post-') or contains(@href, '/post/')]"
     static let postLocked = ".//*[contains(@class, 'post-title')]//*[local-name()='use' and @*[local-name()='href' and .='#lock']]"

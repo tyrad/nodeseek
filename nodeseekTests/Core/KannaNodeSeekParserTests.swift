@@ -20,6 +20,50 @@ enum FixtureLoader {
 }
 
 struct KannaNodeSeekParserTests {
+    @Test func parsesAccountFromRightPanelUserCard() throws {
+        let html = """
+        <div id="nsk-right-panel-container">
+            <div class="user-card">
+                <div class="user-head">
+                    <a title="缭雾" href="/space/31037">
+                        <img src="/avatar/31037.png" alt="缭雾" class="avatar-normal skeleton">
+                    </a>
+                    <div class="menu">
+                        <a href="/space/31037" class="Username">缭雾</a>
+                    </div>
+                </div>
+                <div class="user-stat">
+                    <div class="stat-block">
+                        <div><a href="/progress"><span>等级 Lv 1</span></a></div>
+                        <div><a href="/credit"><span>鸡腿 306</span></a></div>
+                        <div><a href="/stardust/list?member_id=31037"><span>星辰 2</span></a></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let account = try parser.parseAccount(html: html)
+
+        #expect(account.isLoggedIn)
+        #expect(account.displayName == "缭雾")
+        #expect(account.avatarURL?.absoluteString == "https://www.nodeseek.com/avatar/31037.png")
+        #expect(account.profileURL?.absoluteString == "https://www.nodeseek.com/space/31037")
+        #expect(account.stats == ["等级 Lv 1", "鸡腿 306", "星辰 2"])
+    }
+
+    @Test func parsesGuestAccountWhenRightPanelHasNoUserCard() throws {
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let account = try parser.parseAccount(html: "<div id=\"nsk-right-panel-container\"></div>")
+
+        #expect(!account.isLoggedIn)
+        #expect(account.displayName == "游客")
+        #expect(account.avatarURL == nil)
+        #expect(account.stats.isEmpty)
+    }
+
     @Test func parsesPostListFixture() throws {
         let html = try FixtureLoader.html(named: "post-list-basic")
         let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)

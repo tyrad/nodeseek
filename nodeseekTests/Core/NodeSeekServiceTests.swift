@@ -11,6 +11,53 @@ import Testing
 
 @MainActor
 struct NodeSeekServiceTests {
+    @Test func loadAccountParsesCurrentUserFromHomePage() async throws {
+        let html = """
+        <div id="nsk-right-panel-container">
+            <div class="user-card">
+                <div class="user-head">
+                    <a title="缭雾" href="/space/31037">
+                        <img src="/avatar/31037.png" alt="缭雾" class="avatar-normal skeleton">
+                    </a>
+                    <div class="menu">
+                        <a href="/space/31037" class="Username">缭雾</a>
+                    </div>
+                </div>
+                <div class="user-stat">
+                    <span>等级 Lv 1</span>
+                    <span>鸡腿 306</span>
+                </div>
+            </div>
+        </div>
+        """
+        let url = URL(string: "https://www.nodeseek.com/")!
+        let htmlClient = URLCapturingHTMLClient(response: HTMLResponse(
+            statusCode: 200,
+            headers: [:],
+            finalURL: url,
+            html: html
+        ))
+        let service = NodeSeekService(
+            baseURL: url,
+            htmlClient: htmlClient,
+            parser: KannaNodeSeekParser(baseURL: url)
+        )
+
+        let result = try await service.loadAccount()
+        let requestedURLs = await htmlClient.requestedURLs()
+
+        #expect(requestedURLs.count == 1)
+        #expect(requestedURLs.first?.path == "/")
+        switch result {
+        case .value(let account):
+            #expect(account.displayName == "缭雾")
+            #expect(account.avatarURL?.path == "/avatar/31037.png")
+            #expect(account.stats == ["等级 Lv 1", "鸡腿 306"])
+        default:
+            Issue.record("账号页正常 HTML 应解析为当前账号")
+        }
+    }
+
     @Test func returnsChallengeWhenPostListResponseIsCloudflare() async throws {
         let html = try FixtureLoader.html(named: "cloudflare-challenge")
         let url = URL(string: "https://www.nodeseek.com/")!

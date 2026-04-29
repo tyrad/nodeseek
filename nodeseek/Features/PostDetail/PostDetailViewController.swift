@@ -124,6 +124,23 @@ class PostDetailViewController: UIViewController {
         return indicator
     }()
 
+    private let loginButton: UIButton = {
+        let button = UIButton(type: .system)
+        var configuration = UIButton.Configuration.filled()
+        configuration.title = "登录查看"
+        configuration.image = UIImage(systemName: "person.crop.circle.badge.plus")
+        configuration.imagePadding = 8
+        configuration.baseBackgroundColor = .label
+        configuration.baseForegroundColor = .systemBackground
+        configuration.cornerStyle = .capsule
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 18, bottom: 12, trailing: 18)
+        button.configuration = configuration
+        button.accessibilityIdentifier = "post-detail-login-button"
+        button.isHidden = true
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     init(
         presenter: PostDetailPresenterProtocol,
         initialHeader: PostDetailHeaderContent? = nil,
@@ -189,6 +206,8 @@ class PostDetailViewController: UIViewController {
 
         view.addSubview(tableNode.view)
         view.addSubview(loadingIndicator)
+        loginButton.addTarget(self, action: #selector(loginButtonTapped), for: .touchUpInside)
+        view.addSubview(loginButton)
 
         NSLayoutConstraint.activate([
             tableNode.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -197,7 +216,10 @@ class PostDetailViewController: UIViewController {
             tableNode.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
             loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+            loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+
+            loginButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            loginButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -28)
         ])
 
         reloadTableData()
@@ -329,6 +351,11 @@ class PostDetailViewController: UIViewController {
     @objc
     private func refreshTapped() {
         presenter.viewDidLoad()
+    }
+
+    @objc
+    private func loginButtonTapped() {
+        presenter.didTapLogin()
     }
 
     @objc
@@ -481,6 +508,7 @@ class PostDetailViewController: UIViewController {
 
 extension PostDetailViewController: PostDetailViewProtocol {
     func showLoading() {
+        loginButton.isHidden = true
         if hasRenderedDetailContent {
             loadingIndicator.startAnimating()
         } else {
@@ -502,6 +530,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
 
     func render(detail: PostDetail) {
         title = "详情"
+        loginButton.isHidden = true
         renderGeneration += 1
         hasRenderedDetailContent = true
         displayMode = .content
@@ -518,6 +547,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
 
     func renderLoginRequired(message: String) {
         title = "详情"
+        loginButton.isHidden = false
         renderGeneration += 1
         hasRenderedDetailContent = true
         displayMode = .content

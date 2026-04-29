@@ -16,6 +16,42 @@ enum NodeSeekParserError: Error {
 struct KannaNodeSeekParser: NodeSeekParser {
     let baseURL: URL
 
+    func parseAccount(html: String) throws -> AccountResponse {
+        let document = try HTML(html: html, encoding: .utf8)
+        guard let userCard = document.at_xpath(XPathRules.accountUserCard) else {
+            return AccountResponse(displayName: "游客", isLoggedIn: false)
+        }
+
+        let usernameNode = userCard.at_xpath(XPathRules.accountUsername)
+            ?? userCard.at_xpath(XPathRules.accountProfileLink)
+        let displayName = usernameNode?.text?.normalizedNonEmpty
+            ?? usernameNode?["title"]?.trimmedNonEmpty
+            ?? userCard.at_xpath(XPathRules.accountAvatar)?["alt"]?.trimmedNonEmpty
+            ?? "已登录"
+        let profileURL = (usernameNode?["href"] ?? userCard.at_xpath(XPathRules.accountProfileLink)?["href"])
+            .flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
+        let avatarURL = userCard.at_xpath(XPathRules.accountAvatar)?["src"]?
+            .trimmedNonEmpty
+            .flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
+        let linkStats = userCard.xpath(XPathRules.accountStatLinks)
+            .compactMap { $0.text?.normalizedNonEmpty }
+        let fallbackStats = userCard.xpath(XPathRules.accountStatSpans)
+            .compactMap { $0.text?.normalizedNonEmpty }
+        let stats = (linkStats.isEmpty ? fallbackStats : linkStats)
+            .reduce(into: [String]()) { result, value in
+                guard !result.contains(value) else { return }
+                result.append(value)
+            }
+
+        return AccountResponse(
+            displayName: displayName,
+            isLoggedIn: true,
+            avatarURL: avatarURL,
+            profileURL: profileURL,
+            stats: Array(stats.prefix(6))
+        )
+    }
+
     func parsePostList(html: String) throws -> [PostSummary] {
         let document = try HTML(html: html, encoding: .utf8)
 

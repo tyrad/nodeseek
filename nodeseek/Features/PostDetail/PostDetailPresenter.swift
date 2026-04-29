@@ -33,6 +33,13 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         view?.showLoading()
         interactor.loadPostDetail()
     }
+
+    func didTapLogin() {
+        router.navigateToLogin { [weak self] in
+            self?.view?.showLoading()
+            self?.interactor.loadPostDetail()
+        }
+    }
 }
 
 // MARK: - Interactor Output

@@ -20,6 +20,7 @@ protocol PostDetailViewProtocol: AnyObject {
 // MARK: - Presenter Protocol (View -> Presenter)
 protocol PostDetailPresenterProtocol: AnyObject {
     func viewDidLoad()
+    func didTapLogin()
 }
 
 // MARK: - Interactor Input (Presenter -> Interactor)
@@ -36,4 +37,5 @@ protocol PostDetailInteractorOutput: AnyObject {
 
 // MARK: - Router Protocol (Presenter -> Router)
 protocol PostDetailRouterProtocol: AnyObject {
+    func navigateToLogin(onClose: @escaping @MainActor () -> Void)
 }

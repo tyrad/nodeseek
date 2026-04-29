@@ -13,12 +13,13 @@ protocol AccountViewProtocol: AnyObject {
     func showLoading()
     func hideLoading()
     func showError(message: String)
-    func render(displayName: String, isLoggedIn: Bool)
+    func render(_ account: AccountResponse)
 }
 
 // MARK: - Presenter Protocol (View -> Presenter)
 protocol AccountPresenterProtocol: AnyObject {
     func viewDidLoad()
+    func didTapLogin()
 }
 
 // MARK: - Interactor Input (Presenter -> Interactor)
@@ -34,4 +35,5 @@ protocol AccountInteractorOutput: AnyObject {
 
 // MARK: - Router Protocol (Presenter -> Router)
 protocol AccountRouterProtocol: AnyObject {
+    func navigateToLogin(onClose: @escaping @MainActor () -> Void)
 }

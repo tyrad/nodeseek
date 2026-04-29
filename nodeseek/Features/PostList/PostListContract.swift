@@ -18,6 +18,7 @@ protocol PostListViewProtocol: AnyObject {
     func showError(message: String)
     func renderCategories(_ categories: [PostListCategory], selected: PostListCategory)
     func renderSortMode(_ sortMode: PostListSortMode)
+    func renderAccount(_ account: AccountResponse)
     func render(posts: [PostSummary])
 }
 
@@ -26,6 +27,7 @@ protocol PostListPresenterProtocol: AnyObject {
     func viewDidLoad()
     func didSelectCategory(_ category: PostListCategory)
     func didToggleSortMode()
+    func didTapLogin()
     func didPullToRefresh()
     func didSelectPost(at index: Int)
     func didApproachBottom(currentIndex: Int, totalCount: Int)
@@ -33,12 +35,15 @@ protocol PostListPresenterProtocol: AnyObject {
 
 // MARK: - Interactor Input (Presenter -> Interactor)
 protocol PostListInteractorInput: AnyObject {
+    func loadAccount()
     func loadPosts(category: PostListCategory, sortMode: PostListSortMode)
     func loadMorePosts(page: Int, category: PostListCategory, sortMode: PostListSortMode)
 }
 
 // MARK: - Interactor Output (Interactor -> Presenter)
 protocol PostListInteractorOutput: AnyObject {
+    func didLoadAccount(_ account: AccountResponse)
+    func didFailLoadAccount(error: String)
     func didLoadPosts(_ posts: [PostSummary], category: PostListCategory, sortMode: PostListSortMode)
     func didLoadMorePosts(_ posts: [PostSummary], page: Int, category: PostListCategory, sortMode: PostListSortMode)
     func didFailLoadPosts(error: String, category: PostListCategory, sortMode: PostListSortMode)
@@ -48,4 +53,5 @@ protocol PostListInteractorOutput: AnyObject {
 // MARK: - Router Protocol (Presenter -> Router)
 protocol PostListRouterProtocol: AnyObject {
     func navigateToPostDetail(post: PostSummary)
+    func navigateToLogin(onClose: @escaping @MainActor () -> Void)
 }

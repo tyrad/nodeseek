@@ -26,6 +26,22 @@ class PostListInteractor: PostListInteractorInput {
     }
     
     // MARK: - Methods
+    func loadAccount() {
+        Task {
+            do {
+                let account = try await loadAccount()
+                await MainActor.run {
+                    presenter?.didLoadAccount(account)
+                }
+            } catch {
+                logger.error("账号信息加载失败: \(error.localizedDescription)")
+                await MainActor.run {
+                    presenter?.didFailLoadAccount(error: error.localizedDescription)
+                }
+            }
+        }
+    }
+
     func loadPosts(category: PostListCategory, sortMode: PostListSortMode) {
         load(page: 1, category: category, sortMode: sortMode, isLoadMore: false)
     }
@@ -70,6 +86,18 @@ class PostListInteractor: PostListInteractorInput {
             return posts
         case .challenge(let challenge):
             logger.warning("列表请求命中验证，category=\(category.rawValue, privacy: .public), sort=\(sortMode.rawValue, privacy: .public), page=\(page): \(challenge.logDescription)")
+            let message = await sessionStore.recordChallenge(challenge)
+            throw PostListLoadError.challengeRequired(message)
+        }
+    }
+
+    private func loadAccount() async throws -> AccountResponse {
+        let result = try await service.loadAccount()
+        switch result {
+        case .value(let account):
+            await sessionStore.recordSuccess()
+            return account
+        case .challenge(let challenge):
             let message = await sessionStore.recordChallenge(challenge)
             throw PostListLoadError.challengeRequired(message)
         }

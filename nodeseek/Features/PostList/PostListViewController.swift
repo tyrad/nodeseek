@@ -339,6 +339,9 @@ class PostListViewController: UIViewController {
     }
 
     private func installSideMenuController() {
+        sideMenuViewController.onLoginTapped = { [weak self] in
+            self?.presenter.didTapLogin()
+        }
         addChild(sideMenuViewController)
         view.addSubview(sideMenuViewController.view)
         sideMenuViewController.view.translatesAutoresizingMaskIntoConstraints = false
@@ -404,6 +407,10 @@ extension PostListViewController: PostListViewProtocol {
         if isSortToggleExpanded {
             sortToggleWidthConstraint?.constant = SortToggleLayout.expandedWidth(for: sortMode.accessibilityTitle)
         }
+    }
+
+    func renderAccount(_ account: AccountResponse) {
+        sideMenuViewController.renderAccount(account)
     }
     
     func render(posts: [PostSummary]) {
