@@ -108,6 +108,7 @@ final class DetailCodeBlockView: UIView {
     private let scrollView = UIScrollView()
     private let contentView = UIView()
     private let codeLabel = UILabel()
+    private let chromeDotsStack = UIStackView()
     private let copyButton = UIButton(type: .system)
     private var contentWidthConstraint: NSLayoutConstraint?
     private var copyResetWorkItem: DispatchWorkItem?
@@ -116,6 +117,7 @@ final class DetailCodeBlockView: UIView {
         self.codeBlock = codeBlock
         super.init(frame: .zero)
         configureView()
+        configureChromeDots()
         configureCopyButton()
         configureScrollView()
     }
@@ -142,11 +144,41 @@ final class DetailCodeBlockView: UIView {
         layer.masksToBounds = true
     }
 
+    private func configureChromeDots() {
+        chromeDotsStack.axis = .horizontal
+        chromeDotsStack.alignment = .center
+        chromeDotsStack.spacing = 7
+        chromeDotsStack.isUserInteractionEnabled = false
+        chromeDotsStack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(chromeDotsStack)
+
+        [
+            UIColor(red: 1, green: 95 / 255, blue: 101 / 255, alpha: 1),
+            UIColor(red: 1, green: 204 / 255, blue: 41 / 255, alpha: 1),
+            UIColor(red: 46 / 255, green: 204 / 255, blue: 84 / 255, alpha: 1)
+        ].forEach { color in
+            let dot = UIView()
+            dot.backgroundColor = color
+            dot.layer.cornerRadius = DetailCodeBlockLayout.chromeDotSize / 2
+            dot.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                dot.widthAnchor.constraint(equalToConstant: DetailCodeBlockLayout.chromeDotSize),
+                dot.heightAnchor.constraint(equalToConstant: DetailCodeBlockLayout.chromeDotSize)
+            ])
+            chromeDotsStack.addArrangedSubview(dot)
+        }
+
+        NSLayoutConstraint.activate([
+            chromeDotsStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            chromeDotsStack.centerYAnchor.constraint(equalTo: topAnchor, constant: DetailCodeBlockLayout.chromeHeight / 2)
+        ])
+    }
+
     private func configureCopyButton() {
         copyButton.accessibilityIdentifier = "detail-code-copy-button"
         copyButton.accessibilityLabel = "复制代码"
         copyButton.tintColor = .secondaryLabel
-        copyButton.setImage(UIImage(systemName: "doc.on.doc"), for: .normal)
+        copyButton.setImage(copyIcon(named: "doc.on.doc"), for: .normal)
         copyButton.addTarget(self, action: #selector(copyCode), for: .touchUpInside)
         copyButton.translatesAutoresizingMaskIntoConstraints = false
         addSubview(copyButton)
@@ -219,13 +251,20 @@ final class DetailCodeBlockView: UIView {
 
     private func showCopiedState() {
         copyResetWorkItem?.cancel()
-        copyButton.setImage(UIImage(systemName: "checkmark"), for: .normal)
+        copyButton.setImage(copyIcon(named: "checkmark"), for: .normal)
 
         let workItem = DispatchWorkItem { [weak self] in
-            self?.copyButton.setImage(UIImage(systemName: "doc.on.doc"), for: .normal)
+            self?.copyButton.setImage(self?.copyIcon(named: "doc.on.doc"), for: .normal)
         }
         copyResetWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.1, execute: workItem)
+    }
+
+    private func copyIcon(named name: String) -> UIImage? {
+        UIImage(
+            systemName: name,
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .medium)
+        )
     }
 }
 
@@ -234,6 +273,7 @@ enum DetailCodeBlockLayout {
     static let chromeHeight: CGFloat = 38
     static let bottomInset: CGFloat = 12
     static let horizontalInset: CGFloat = 12
+    static let chromeDotSize: CGFloat = 10
     static let fallbackViewportWidth: CGFloat = 320
 
     private enum Layout {
