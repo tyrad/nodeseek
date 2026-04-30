@@ -10,6 +10,12 @@ import Foundation
 import UIKit
 
 extension DTCoreTextHTMLContentRenderer {
+    private var blockquoteTextColor: UIColor {
+        UIColor { traits in
+            traits.userInterfaceStyle == .dark ? UIColor.secondaryLabel : UIColor.label
+        }
+    }
+
     func normalize(
         attributed: NSAttributedString,
         baseURL: URL,
@@ -44,7 +50,7 @@ extension DTCoreTextHTMLContentRenderer {
 
         attributed.enumerateAttribute(.foregroundColor, in: fullRange) { value, range, _ in
             let color = containsBlockquoteTextBlock(in: attributed, range: range)
-                ? UIColor.secondaryLabel
+                ? blockquoteTextColor
                 : ((value as? UIColor).map(normalizedTextColor(from:)) ?? bodyColor)
             attributed.addAttribute(.foregroundColor, value: color, range: range)
         }
@@ -97,6 +103,8 @@ extension DTCoreTextHTMLContentRenderer {
             guard let textBlocks = value as? [DTTextBlock] else { return }
             for textBlock in textBlocks where textBlock.backgroundColor != nil {
                 textBlock.padding = UIEdgeInsets(top: 12, left: 8, bottom: 12, right: 10)
+                // HTML 里 blockquote 的 background-color 是固定色；这里统一替换成动态系统色以适配深色模式。
+                textBlock.backgroundColor = UIColor.secondarySystemBackground
             }
         }
         attributed.enumerateAttribute(
@@ -107,7 +115,7 @@ extension DTCoreTextHTMLContentRenderer {
                   textBlocks.contains(where: { $0.backgroundColor != nil }) else {
                 return
             }
-            attributed.addAttribute(.foregroundColor, value: UIColor.secondaryLabel, range: range)
+            attributed.addAttribute(.foregroundColor, value: blockquoteTextColor, range: range)
         }
     }
 

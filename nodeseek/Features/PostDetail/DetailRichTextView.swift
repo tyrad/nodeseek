@@ -13,7 +13,7 @@ import UIKit
 final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextContentViewDelegate {
     private enum QuoteStyle {
         static let borderWidth: CGFloat = 3
-        static let borderColor = UIColor(red: 208 / 255, green: 215 / 255, blue: 222 / 255, alpha: 1)
+        static let borderColor = UIColor.separator
         static let cornerRadius: CGFloat = 4
     }
 
@@ -273,12 +273,14 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
 
         let quoteFrame = frame
         let backgroundPath = UIBezierPath(roundedRect: quoteFrame, cornerRadius: QuoteStyle.cornerRadius)
+        let resolvedBackgroundColor = backgroundColor.resolvedColor(with: traitCollection)
 
         context.saveGState()
-        context.setFillColor(backgroundColor.cgColor)
+        context.setFillColor(resolvedBackgroundColor.cgColor)
         context.addPath(backgroundPath.cgPath)
         context.fillPath()
-        context.setFillColor(QuoteStyle.borderColor.cgColor)
+        let resolvedBorderColor = QuoteStyle.borderColor.resolvedColor(with: traitCollection)
+        context.setFillColor(resolvedBorderColor.cgColor)
         context.fill(CGRect(
             x: quoteFrame.minX,
             y: quoteFrame.minY,

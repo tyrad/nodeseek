@@ -320,6 +320,32 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(paragraphStyle.headIndent <= 12)
     }
 
+    @Test func rendersBlockquoteWithReadableForegroundColorInLightMode() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: "<blockquote><p>引用内容</p></blockquote>",
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributed = try #require(
+            blocks.compactMap { block -> NSAttributedString? in
+                guard case .text(let text) = block else { return nil }
+                return text
+            }.first
+        )
+
+        let range = (attributed.string as NSString).range(of: "引用内容")
+        #expect(range.location != NSNotFound)
+        let color = try #require(attributed.attribute(
+            .foregroundColor,
+            at: range.location,
+            effectiveRange: nil
+        ) as? UIColor)
+        let resolvedLightColor = color.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+        #expect(resolvedLightColor.isClose(to: .label))
+    }
+
     @Test func rendersSemanticHTMLWithDistinctTypography() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
