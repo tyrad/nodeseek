@@ -29,8 +29,24 @@ struct DTCoreTextHTMLContentRenderer {
         pattern: "<img\\b[^>]*>",
         options: [.caseInsensitive]
     )
+    private static let videoTagRegex = try! NSRegularExpression(
+        pattern: "<video\\b[\\s\\S]*?</video>",
+        options: [.caseInsensitive]
+    )
+    private static let videoStartTagRegex = try! NSRegularExpression(
+        pattern: "<video\\b[^>]*>",
+        options: [.caseInsensitive]
+    )
+    private static let sourceTagRegex = try! NSRegularExpression(
+        pattern: "<source\\b[^>]*>",
+        options: [.caseInsensitive]
+    )
     private static let srcAttributeRegex = try! NSRegularExpression(
         pattern: "\\bsrc\\s*=\\s*([\"'])([^\"']+)\\1",
+        options: [.caseInsensitive]
+    )
+    private static let typeAttributeRegex = try! NSRegularExpression(
+        pattern: "\\btype\\s*=\\s*([\"'])([^\"']+)\\1",
         options: [.caseInsensitive]
     )
     private static let dataSourceAttributeRegex = try! NSRegularExpression(
@@ -66,7 +82,8 @@ struct DTCoreTextHTMLContentRenderer {
             "render start fragmentLength=\(fragment.count) hasMagicTabs=\(fragment.contains("nsk-magic-tabs")) maxImageWidth=\(numberString(maxImageWidth))"
         )
         let expandedFragment = expandNodeSeekMagicTabs(in: fragment)
-        let normalizedFragment = normalizeImageSources(in: expandedFragment, baseURL: baseURL)
+        let normalizedVideoFragment = normalizeVideoStickerSources(in: expandedFragment, baseURL: baseURL)
+        let normalizedFragment = normalizeImageSources(in: normalizedVideoFragment, baseURL: baseURL)
         let normalizedSources = imageDescriptors(in: normalizedFragment, baseURL: baseURL)
         logDiagnostics(
             "render normalized expandedLength=\(expandedFragment.count) normalizedLength=\(normalizedFragment.count) imageSources=\(normalizedSources.count) urls=\(normalizedSources.prefix(6).compactMap { $0.url?.absoluteString }.joined(separator: " | "))"
@@ -888,6 +905,80 @@ struct DTCoreTextHTMLContentRenderer {
         }
 
         return mutable as String
+    }
+
+    private func normalizeVideoStickerSources(in fragment: String, baseURL: URL) -> String {
+        let source = fragment as NSString
+        let fullRange = NSRange(location: 0, length: source.length)
+        let matches = Self.videoTagRegex.matches(in: fragment, options: [], range: fullRange)
+        guard matches.isEmpty == false else { return fragment }
+
+        let mutable = NSMutableString(string: fragment)
+        for match in matches.reversed() {
+            let tag = source.substring(with: match.range)
+            guard let startTagMatch = firstMatch(Self.videoStartTagRegex, in: tag) else { continue }
+            let startTag = (tag as NSString).substring(with: startTagMatch.range)
+            guard hasStickerClass(in: startTag),
+                  let rawSource = preferredVideoSource(in: tag),
+                  let resolved = AvatarImageLoader.resolveImageURL(rawSource, baseURL: baseURL) else { continue }
+
+            let replacementStartTag = replacingOrAddingSource(
+                in: startTag,
+                source: resolved.absoluteString
+            )
+            let startRange = NSRange(
+                location: match.range.location + startTagMatch.range.location,
+                length: startTagMatch.range.length
+            )
+            mutable.replaceCharacters(in: startRange, with: replacementStartTag)
+        }
+
+        return mutable as String
+    }
+
+    private func preferredVideoSource(in tag: String) -> String? {
+        let source = tag as NSString
+        let fullRange = NSRange(location: 0, length: source.length)
+        let matches = Self.sourceTagRegex.matches(in: tag, options: [], range: fullRange)
+        let sources: [(url: String, type: String?)] = matches.compactMap { match in
+            let sourceTag = source.substring(with: match.range)
+            guard let url = attributeValue(Self.srcAttributeRegex, in: sourceTag),
+                  url.isEmpty == false else { return nil }
+            return (url, attributeValue(Self.typeAttributeRegex, in: sourceTag))
+        }
+
+        if let preferred = sources.first(where: { isIOSFriendlyVideoSource(url: $0.url, type: $0.type) }) {
+            return preferred.url
+        }
+        if let first = sources.first {
+            return first.url
+        }
+        return attributeValue(Self.srcAttributeRegex, in: tag)
+    }
+
+    private func isIOSFriendlyVideoSource(url: String, type: String?) -> Bool {
+        let lowerURL = url.lowercased()
+        if lowerURL.hasSuffix(".mp4") || lowerURL.hasSuffix(".mov") || lowerURL.hasSuffix(".m4v") {
+            return true
+        }
+
+        let lowerType = type?.lowercased() ?? ""
+        return lowerType.contains("mp4") || lowerType.contains("quicktime")
+    }
+
+    private func replacingOrAddingSource(in startTag: String, source: String) -> String {
+        if let srcMatch = firstMatch(Self.srcAttributeRegex, in: startTag), srcMatch.numberOfRanges >= 3 {
+            let valueRange = srcMatch.range(at: 2)
+            guard valueRange.location != NSNotFound else { return startTag }
+            let mutable = NSMutableString(string: startTag)
+            mutable.replaceCharacters(in: valueRange, with: source)
+            return mutable as String
+        }
+
+        var mutable = startTag
+        let insertionIndex = mutable.index(before: mutable.endIndex)
+        mutable.insert(contentsOf: " src=\"\(source)\"", at: insertionIndex)
+        return mutable
     }
 
     private func imageDescriptors(in fragment: String, baseURL: URL) -> [ImageDescriptor] {

@@ -412,6 +412,42 @@ struct PostDetailViewControllerTests {
         #expect(layout.size.height > DetailImageLayout.fixedNormalImageSize(maxWidth: 320).height + 40)
     }
 
+    @Test func richTextViewUsesVideoStickerViewForVideoStickerAttachment() throws {
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = DTCoreTextHTMLContentRenderer().render(
+            fragment: """
+            <p><video class="sticker" width="100" height="100">
+                <source src="/static/image/sticker/emoji/00.webm" type="video/webm">
+                <source src="/static/image/sticker/emoji/00.mp4" type="video/mp4">
+            </video></p>
+            """,
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributedText = try #require(blocks.compactMap { block -> NSAttributedString? in
+            guard case .text(let text) = block else { return nil }
+            return text
+        }.first)
+        var attachment: DTTextAttachment?
+        attributedText.enumerateAttribute(
+            .attachment,
+            in: NSRange(location: 0, length: attributedText.length)
+        ) { value, _, stop in
+            guard let value = value as? DTTextAttachment else { return }
+            attachment = value
+            stop.pointee = true
+        }
+
+        let richTextView = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 320, height: 120))
+        let attachmentView = richTextView.attributedTextContentView(
+            richTextView,
+            viewFor: try #require(attachment),
+            frame: CGRect(x: 0, y: 0, width: 65, height: 65)
+        )
+
+        #expect(String(describing: type(of: try #require(attachmentView))).contains("DetailInlineVideoStickerView"))
+    }
+
     @Test func richTextNodeUsesDTCoreTextHeightForFixture() throws {
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
         let html = try FixtureLoader.html(named: "post-705039-1")
