@@ -7,7 +7,11 @@
 
 import CoreGraphics
 import Testing
+#if SWIFT_PACKAGE
+@testable import NodeSeekCore
+#else
 @testable import nodeseek
+#endif
 
 struct DetailImageLayoutTests {
     @Test func placeholderUsesFixedStickerSquare() {

@@ -7,14 +7,23 @@
 
 import Foundation
 import Testing
+#if SWIFT_PACKAGE
+@testable import NodeSeekCore
+#else
 @testable import nodeseek
+#endif
 
 private final class FixtureToken {}
 
 enum FixtureLoader {
     static func html(named name: String) throws -> String {
+        #if SWIFT_PACKAGE
+        let bundle = Bundle.module
+        let url = try #require(bundle.url(forResource: name, withExtension: "html", subdirectory: "Fixtures"))
+        #else
         let bundle = Bundle(for: FixtureToken.self)
         let url = try #require(bundle.url(forResource: name, withExtension: "html"))
+        #endif
         return try String(contentsOf: url, encoding: .utf8)
     }
 }

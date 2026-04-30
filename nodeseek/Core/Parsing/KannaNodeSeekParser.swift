@@ -86,7 +86,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
         posts.append(post)
     }
 
-    private func parsePostListItem(_ item: XMLElement, titleNode explicitTitleNode: XMLElement? = nil) -> PostSummary? {
+    private func parsePostListItem(_ item: Kanna.XMLElement, titleNode explicitTitleNode: Kanna.XMLElement? = nil) -> PostSummary? {
         guard
             let titleNode = explicitTitleNode ?? item.at_xpath(XPathRules.postTitle),
             let title = titleNode.text?.normalizedNonEmpty
@@ -128,7 +128,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
         )
     }
 
-    private func firstText(in item: XMLElement, xpaths: [String]) -> String? {
+    private func firstText(in item: Kanna.XMLElement, xpaths: [String]) -> String? {
         for xpath in xpaths {
             if let value = item.at_xpath(xpath)?.text?.normalizedNonEmpty {
                 return value
@@ -138,7 +138,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
         return nil
     }
 
-    private func firstAttribute(in item: XMLElement, xpaths: [String], attribute: String) -> String? {
+    private func firstAttribute(in item: Kanna.XMLElement, xpaths: [String], attribute: String) -> String? {
         for xpath in xpaths {
             if let value = item.at_xpath(xpath)?[attribute]?.trimmedNonEmpty {
                 return value
@@ -293,7 +293,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
         return pagination.hasMultiplePages ? pagination : nil
     }
 
-    private func parseComment(_ item: XMLElement) -> Comment? {
+    private func parseComment(_ item: Kanna.XMLElement) -> Comment? {
         guard let authorName = firstText(in: item, xpaths: [XPathRules.contentAuthor]) else {
             return nil
         }

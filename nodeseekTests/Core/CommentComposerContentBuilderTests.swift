@@ -5,7 +5,11 @@
 
 import Foundation
 import Testing
+#if SWIFT_PACKAGE
+@testable import NodeSeekCore
+#else
 @testable import nodeseek
+#endif
 
 struct CommentComposerContentBuilderTests {
     private let postURL = URL(string: "https://www.nodeseek.com/post-706576-1")!
