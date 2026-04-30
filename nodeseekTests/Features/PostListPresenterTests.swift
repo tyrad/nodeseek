@@ -495,6 +495,7 @@ private final class SpyPostListRouter: PostListRouterProtocol {
     var selectedPost: PostSummary?
     var selectedPage: Int?
     var navigateToLoginCount = 0
+    var navigateToStrikethroughTestCount = 0
     var onLoginClose: (@MainActor () -> Void)?
 
     func navigateToPostDetail(post: PostSummary) {
@@ -509,5 +510,9 @@ private final class SpyPostListRouter: PostListRouterProtocol {
     func navigateToLogin(onClose: @escaping @MainActor () -> Void) {
         navigateToLoginCount += 1
         onLoginClose = onClose
+    }
+
+    func navigateToStrikethroughTest() {
+        navigateToStrikethroughTestCount += 1
     }
 }
