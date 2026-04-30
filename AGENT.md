@@ -16,6 +16,32 @@
 
 处理任务时应优先理解现有 VIPER/分层结构，不要为了局部改动引入新的架构风格。
 
+## 1.1 目录与模块边界
+
+主 App 仍然由 `nodeseek.xcodeproj` 管理，SwiftPM 只作为纯逻辑快速测试入口，不替代 iOS App 工程。
+
+文件放置规则：
+
+- `nodeseek/Core/Domain/`：纯数据模型、结果类型、跨 feature 共享的业务实体。不得依赖 UIKit、WebKit、Texture、DTCoreText、Kingfisher。
+- `nodeseek/Core/Parsing/`：HTML 解析协议与 Kanna 实现。解析规则优先放在 `XPathRules.swift` 或 parser 内，不要散落到 ViewController。
+- `nodeseek/Core/Networking/`：网络协议、URLSession 客户端、表单编码、challenge 检测、提交逻辑。WebKit 宿主类仍可放这里，但不能加入 SwiftPM target。
+- `nodeseek/Core/Rendering/`：渲染输入/输出模型和布局纯函数。依赖 UIKit/DTCoreText 的渲染实现仍留在 Xcode App 测试路径，不加入 SwiftPM 快速测试路径。
+- `nodeseek/Core/Imaging/`：图片下载、SVG/GIF/Kingfisher/SwiftDraw 相关逻辑。默认不加入 SwiftPM target。
+- `nodeseek/Core/UI/`：UIKit 共享控件。只走 Xcode 构建和测试。
+- `nodeseek/Features/`：VIPER feature 层。Presenter/Interactor 可以用 Xcode 单测；ViewController、Router、Texture node 走 App-hosted tests。
+- `nodeseekTests/Core/`：Core 单测。纯 Foundation/CoreGraphics/Kanna 的测试优先纳入 SwiftPM；UIKit/WebKit/DTCoreText/Texture 测试继续只走 Xcode。
+- `nodeseekTests/Features/`：feature 层测试。默认走 Xcode，除非明确拆出纯逻辑模块。
+
+新增 SwiftPM 覆盖文件时，先确认该文件能在 macOS 测试进程中运行：
+
+```text
+不能依赖 App 启动
+不能依赖模拟器
+不能依赖 UIKit 生命周期
+不能依赖 WebKit 页面加载
+不能依赖 Texture node/view 生命周期
+```
+
 ## 2. 项目改动边界
 
 - 证据优先：先看崩溃点、日志、调用栈、diff、相关代码，再决定修改。
@@ -25,25 +51,37 @@
 
 ## 3. 常用验证命令
 
-不要频繁启动或重启模拟器；这会拖慢本机开发效率。能用编译、单元测试、窄范围测试验证时，不要默认跑完整模拟器流程。
+不要频繁启动或重启模拟器；这会拖慢本机开发效率。能用 SwiftPM 或窄范围单元测试验证时，不要默认跑完整模拟器流程。
 
-优先使用本机已有 simulator：
+测试选择规则：
+
+- 改 `Core/Domain`、`Core/Parsing`、`Core/Networking` 中可独立运行的纯逻辑：先跑 `make spm-test`。
+- 改 presenter/interactor 或仍依赖 App target 的单测：跑 `make xcode-test-class TEST=测试类名`。
+- 改 UIKit、WebKit、Texture、DTCoreText、图片预览、App 生命周期：跑对应 Xcode 窄范围测试。
+- 提交前如果改动跨 Core 和 UI，至少跑一次 `make xcode-build-tests`，必要时再跑 `make xcode-test-full`。
+
+纯 Core 逻辑优先使用 SwiftPM：
 
 ```bash
-xcodebuild test \
-  -project nodeseek.xcodeproj \
-  -scheme nodeseek \
-  -destination 'platform=iOS Simulator,id=F1FA4EFA-0399-438E-AC84-9326D32938E4'
+make spm-test
 ```
 
-针对单个测试文件或测试类：
+App-hosted 单测先复用构建产物：
 
 ```bash
-xcodebuild test \
-  -project nodeseek.xcodeproj \
-  -scheme nodeseek \
-  -destination 'platform=iOS Simulator,id=F1FA4EFA-0399-438E-AC84-9326D32938E4' \
-  -only-testing:nodeseekTests/PostDetailViewControllerTests
+make xcode-test-class TEST=KannaNodeSeekParserTests
+```
+
+需要刷新 Xcode 测试构建产物：
+
+```bash
+make xcode-build-tests
+```
+
+完整 App 单测：
+
+```bash
+make xcode-test-full
 ```
 
 如果 simulator id 失效，先运行：
@@ -52,7 +90,27 @@ xcodebuild test \
 xcodebuild -showdestinations -project nodeseek.xcodeproj -scheme nodeseek
 ```
 
-涉及 Swift 编译、测试、接口或 UI 节点生命周期时，应尽量跑对应的 `xcodebuild test`。
+涉及 Swift 编译、测试、接口或 UI 节点生命周期时，应尽量跑对应的验证命令并记录结果。
+
+## 3.1 SwiftPM 快速测试维护规则
+
+`Package.swift` 是测试加速入口，不是 App 工程迁移入口。维护时遵守以下规则：
+
+- 新增到 `NodeSeekCore` target 的源码必须能脱离 App host 编译。
+- 如果某个文件 import 了 UIKit、WebKit、Texture、DTCoreText、Kingfisher、SwiftDraw，默认不要加入 `NodeSeekCore`。
+- 如果测试因为缺少 UIKit/WebKit 类型失败，优先把该测试留在 Xcode 路径，不要为了让 `swift test` 通过而扩大 SwiftPM target。
+- fixture 放在 `nodeseekTests/Fixtures/`，测试读取要同时兼容 `Bundle.module` 和 Xcode test bundle。
+- Core 测试文件如需同时支持 SwiftPM 和 Xcode，使用：
+
+```swift
+#if SWIFT_PACKAGE
+@testable import NodeSeekCore
+#else
+@testable import nodeseek
+#endif
+```
+
+- SwiftPM 快速测试不替代最终 App 验证。涉及 UI、WebView、Texture node、DTCoreText 布局、图片加载和 App 导航时，仍需跑 Xcode 测试。
 
 ## 4. 详情页相关约定
 
