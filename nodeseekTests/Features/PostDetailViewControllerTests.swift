@@ -441,7 +441,7 @@ struct PostDetailViewControllerTests {
         #expect(viewController.testRowCount(inSection: 0) == 3)
     }
 
-    @Test func addsRefreshButtonAndCanTriggerReload() throws {
+    @Test func addsMoreMenuAndCanTriggerReload() throws {
         let presenter = SpyPostDetailPresenter()
         let viewController = PostDetailViewController(presenter: presenter)
 
@@ -449,9 +449,9 @@ struct PostDetailViewControllerTests {
 
         let items = try #require(viewController.navigationItem.rightBarButtonItems)
         #expect(items.count == 2)
-        let refreshButton = try #require(items.first { $0.accessibilityLabel == "刷新" })
-        let action = try #require(refreshButton.action)
-        _ = (refreshButton.target as AnyObject).perform(action)
+        let moreButton = try #require(items.first { $0.accessibilityLabel == "更多" })
+        _ = try #require(moreButton.menu?.children.first { $0.title == "刷新" } as? UIAction)
+        viewController.refreshTapped()
         #expect(presenter.loadCount == 2)
     }
 

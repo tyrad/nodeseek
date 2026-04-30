@@ -359,14 +359,6 @@ class PostDetailViewController: UIViewController {
     }
 
     func configureNavigationItems() {
-        let refreshButton = UIBarButtonItem(
-            image: UIImage(systemName: "arrow.clockwise"),
-            style: .plain,
-            target: self,
-            action: #selector(refreshTapped)
-        )
-        refreshButton.accessibilityLabel = "刷新"
-
         let browserButton = UIBarButtonItem(
             image: UIImage(systemName: "safari"),
             style: .plain,
@@ -374,7 +366,28 @@ class PostDetailViewController: UIViewController {
             action: #selector(openInBrowserTapped)
         )
         browserButton.accessibilityLabel = "在浏览器打开"
-        navigationItem.rightBarButtonItems = [refreshButton, browserButton]
+
+        var moreButton: UIBarButtonItem?
+        let refreshAction = UIAction(
+            title: "刷新",
+            image: UIImage(systemName: "arrow.clockwise")
+        ) { [weak self] _ in
+            self?.refreshTapped()
+        }
+        let shareAction = UIAction(
+            title: "分享",
+            image: UIImage(systemName: "square.and.arrow.up")
+        ) { [weak self] _ in
+            self?.shareCurrentPost(sourceItem: moreButton)
+        }
+
+        moreButton = UIBarButtonItem(
+            image: UIImage(systemName: "ellipsis.circle"),
+            menu: UIMenu(children: [refreshAction, shareAction])
+        )
+        moreButton?.accessibilityLabel = "更多"
+
+        navigationItem.rightBarButtonItems = [moreButton, browserButton].compactMap { $0 }
     }
 
     func setupUI() {

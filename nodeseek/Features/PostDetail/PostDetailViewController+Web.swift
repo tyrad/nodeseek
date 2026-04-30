@@ -32,6 +32,17 @@ extension PostDetailViewController {
         present(safariViewController, animated: true)
     }
 
+    func shareCurrentPost(sourceItem: UIBarButtonItem?) {
+        guard let targetURL = resolvedDetailURL() else {
+            showError(message: "当前帖子链接无效，暂时无法分享。")
+            return
+        }
+
+        let activityViewController = UIActivityViewController(activityItems: [targetURL], applicationActivities: nil)
+        activityViewController.popoverPresentationController?.barButtonItem = sourceItem
+        present(activityViewController, animated: true)
+    }
+
     func handleContentLinkTap(_ url: URL) {
         guard let destination = PostDetailLinkResolver.destination(
             for: url,
