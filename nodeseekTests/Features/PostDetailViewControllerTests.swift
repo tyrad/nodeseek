@@ -655,6 +655,30 @@ struct PostDetailViewControllerTests {
         #expect(anchorID == "0")
     }
 
+    @Test func currentPageAnchorOneTargetsFirstCommentInsteadOfHeader() throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: "1min ago", contentHTML: "<p>一楼</p>"),
+                Comment(id: "2", authorName: "b", avatarURL: nil, floorText: "#2", createdAtText: "2min ago", contentHTML: "<p>二楼</p>")
+            ],
+            replyForm: nil,
+            page: 1,
+            pagination: nil
+        ))
+
+        #expect(viewController.testCurrentPageAnchorRow(for: "0") == 0)
+        #expect(viewController.testCurrentPageAnchorRow(for: "1") == 2)
+    }
+
     @Test func resolvesCurrentPostSamePageFragmentLinksToCurrentPageAnchor() throws {
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
         let url = try #require(URL(string: "/post-704174-1#4", relativeTo: baseURL)?.absoluteURL)

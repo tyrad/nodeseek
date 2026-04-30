@@ -932,23 +932,7 @@ class PostDetailViewController: UIViewController {
 
     private func scrollToCurrentPageAnchor(_ anchorID: String) {
         guard displayMode == .content else { return }
-
-        let indexPath: IndexPath
-        if (anchorID == "0" || anchorID == "1"), currentHeaderContent != nil,
-           let row = detailRows.firstIndex(where: { if case .header = $0 { return true }; return false }) {
-            indexPath = IndexPath(row: row, section: 0)
-        } else if let commentIndex = comments.firstIndex(where: { comment in
-            comment.anchorID == anchorID || comment.floorText == "#\(anchorID)"
-        }), let row = detailRows.firstIndex(where: {
-            if case .comment(let index) = $0 {
-                return index == commentIndex
-            }
-            return false
-        }) {
-            indexPath = IndexPath(row: row, section: 0)
-        } else {
-            return
-        }
+        guard let indexPath = indexPathForCurrentPageAnchor(anchorID) else { return }
 
         tableNode.scrollToRow(at: indexPath, at: .middle, animated: true)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
@@ -963,6 +947,31 @@ class PostDetailViewController: UIViewController {
             }
         }
     }
+
+    private func indexPathForCurrentPageAnchor(_ anchorID: String) -> IndexPath? {
+        if let commentIndex = comments.firstIndex(where: { comment in
+            comment.anchorID == anchorID || comment.floorText == "#\(anchorID)"
+        }), let row = detailRows.firstIndex(where: {
+            if case .comment(let index) = $0 {
+                return index == commentIndex
+            }
+            return false
+        }) {
+            return IndexPath(row: row, section: 0)
+        }
+
+        guard anchorID == "0", currentHeaderContent != nil,
+              let row = detailRows.firstIndex(where: { if case .header = $0 { return true }; return false }) else {
+            return nil
+        }
+        return IndexPath(row: row, section: 0)
+    }
+
+    #if DEBUG
+    func testCurrentPageAnchorRow(for anchorID: String) -> Int? {
+        indexPathForCurrentPageAnchor(anchorID)?.row
+    }
+    #endif
 
     private func showDetailDestination(_ viewController: UIViewController) {
         if let navigationController {
