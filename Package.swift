@@ -18,32 +18,7 @@ let package = Package(
             dependencies: [
                 "Kanna"
             ],
-            path: "nodeseek/Core",
-            exclude: [
-                "Imaging",
-                "UI",
-                "NodeSeekService.swift",
-                "Networking/CookieBridge.swift",
-                "Networking/HiddenWebViewCommentSubmissionClient.swift",
-                "Networking/HiddenWebViewHTMLClient.swift",
-                "Networking/HTTPHTMLClient.swift",
-                "Networking/LoginWebViewController.swift",
-                "Networking/NodeSeekCommentSubmitter.swift",
-                "Networking/NodeSeekDebugConfig.swift",
-                "Rendering/DTCoreTextHTMLContentRenderer.swift",
-                "Rendering/HTMLContentRenderer.swift",
-                "Rendering/RenderedContentBlock.swift"
-            ],
-            sources: [
-                "Domain",
-                "Parsing",
-                "Networking/HTMLClient.swift",
-                "Networking/FormURLEncoder.swift",
-                "Networking/ChallengeDetector.swift",
-                "Networking/WebRequestFingerprint.swift",
-                "CommentComposerContentBuilder.swift",
-                "Rendering/DetailImageLayout.swift"
-            ]
+            path: "nodeseek/SharedCore"
         ),
         .testTarget(
             name: "NodeSeekCoreTests",
@@ -51,25 +26,8 @@ let package = Package(
                 "NodeSeekCore"
             ],
             path: "nodeseekTests",
-            exclude: [
-                "App",
-                "ArchitectureSkeletonTests.swift",
-                "Core/ChallengeSessionStoreTests.swift",
-                "Core/CookieBridgeTests.swift",
-                "Core/DTCoreTextHTMLContentRendererTests.swift",
-                "Core/HTMLContentRendererTests.swift",
-                "Core/LoginWebViewControllerTests.swift",
-                "Core/NodeSeekCommentSubmitterTests.swift",
-                "Core/NodeSeekServiceTests.swift",
-                "Core/SwiftDrawPerformanceTests.swift",
-                "Features",
-                "nodeseekTests.swift"
-            ],
             sources: [
-                "Core/KannaNodeSeekParserTests.swift",
-                "Core/ChallengeDetectorTests.swift",
-                "Core/DetailImageLayoutTests.swift",
-                "Core/CommentComposerContentBuilderTests.swift"
+                "SharedCore"
             ],
             resources: [
                 .copy("Fixtures")
