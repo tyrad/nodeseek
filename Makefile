@@ -7,6 +7,7 @@ CONFIGURATION ?= Debug
 SIMULATOR_ID ?= F1FA4EFA-0399-438E-AC84-9326D32938E4
 DERIVED_DATA ?= .build/XcodeDerivedData
 SOURCE_PACKAGES ?= .build/SourcePackages
+export TEST
 
 CORE_TEST_CLASSES := \
 	KannaNodeSeekParserTests \
@@ -37,7 +38,11 @@ help:
 		'  make xcode-build-tests' \
 		'  make xcode-test-core' \
 		'  make xcode-test-class TEST=KannaNodeSeekParserTests' \
-		'  make xcode-test-full'
+		'  make xcode-test-class TEST=KannaNodeSeekParserTests SIMULATOR_ID=<simulator-udid>' \
+		'  make xcode-test-full' \
+		'' \
+		'Variables:' \
+		'  SIMULATOR_ID defaults to $(SIMULATOR_ID) and is local/machine-specific; override as needed.'
 
 spm-test:
 	swift test
@@ -48,9 +53,19 @@ xcode-build-tests:
 xcode-test-core: xcode-build-tests
 	xcodebuild -quiet test-without-building $(XCODE_COMMON) $(addprefix -only-testing:nodeseekTests/,$(CORE_TEST_CLASSES))
 
-xcode-test-class: xcode-build-tests
-	@test -n "$(TEST)" || { echo "Usage: make xcode-test-class TEST=KannaNodeSeekParserTests" >&2; exit 2; }
-	TEST="$(TEST)"; xcodebuild -quiet test-without-building $(XCODE_COMMON) -only-testing:nodeseekTests/$$TEST
+xcode-test-class:
+	@if [[ -z "$${TEST:-}" ]]; then \
+		echo "Usage: make xcode-test-class TEST=KannaNodeSeekParserTests" >&2; \
+		exit 2; \
+	fi
+	@if [[ ! "$${TEST}" =~ ^[A-Za-z_][A-Za-z0-9_]*$$ ]]; then \
+		echo "Invalid TEST: $${TEST}" >&2; \
+		echo "TEST must be a simple XCTest class identifier: letters, numbers, underscore." >&2; \
+		echo "Usage: make xcode-test-class TEST=KannaNodeSeekParserTests" >&2; \
+		exit 2; \
+	fi
+	$(MAKE) xcode-build-tests
+	xcodebuild -quiet test-without-building $(XCODE_COMMON) -only-testing:nodeseekTests/$$TEST
 
 xcode-test-full:
 	xcodebuild -quiet test $(XCODE_COMMON)
