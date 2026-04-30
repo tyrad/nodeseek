@@ -86,7 +86,7 @@ struct PostListViewControllerTests {
         #expect(abs(selectedTabFrame.height - menuButtonFrame.height) < 1)
     }
 
-    @Test func menuButtonPresentsSideMenuWithAccountHeaderAndSettingsButton() throws {
+    @Test func menuButtonPresentsSideMenuWithAccountHeaderSettingsAndDetailTestButton() throws {
         let presenter = SpyPostListPresenter()
         let viewController = PostListViewController(presenter: presenter)
         viewController.loadViewIfNeeded()
@@ -100,6 +100,7 @@ struct PostListViewControllerTests {
         let nameLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-name-label"))
         let statsLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-stats-label"))
         let accountHeaderButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-account-header-button"))
+        let detailTestButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-detail-test-button"))
         let settingsButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-settings-button"))
         let sideMenuHost = viewController.children.first {
             $0.view.firstView(accessibilityIdentifier: "post-list-side-menu") != nil
@@ -113,6 +114,8 @@ struct PostListViewControllerTests {
         #expect(statsLabel.text == "登录后同步账号信息")
         #expect(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-login-button") == nil)
         #expect(accountHeaderButton.accessibilityLabel == "登录账号")
+        #expect(detailTestButton.configuration?.title == "详情测试")
+        #expect(detailTestButton.configuration?.image != nil)
         #expect(settingsButton.configuration?.title == "设置")
         #expect(settingsButton.configuration?.image != nil)
 
@@ -126,9 +129,21 @@ struct PostListViewControllerTests {
         #expect(backdrop.isHidden == false)
         #expect(backdrop.alpha == 1)
         #expect(accountHeaderButton.frame.contains(avatar.frame))
+        #expect(detailTestButton.frame.maxY < settingsButton.frame.minY)
         #expect(settingsButton.frame.maxY < viewController.view.bounds.maxY)
 
         UIView.setAnimationsEnabled(false)
+        detailTestButton.sendActions(for: .touchUpInside)
+        viewController.view.layoutIfNeeded()
+        UIView.setAnimationsEnabled(animationsWereEnabled)
+
+        #expect(presenter.didTapDetailTestCount == 1)
+        #expect(sideMenu.frame.maxX <= 0.5)
+        #expect(backdrop.isHidden == true)
+
+        UIView.setAnimationsEnabled(false)
+        menuButton.sendActions(for: .touchUpInside)
+        viewController.view.layoutIfNeeded()
         accountHeaderButton.sendActions(for: .touchUpInside)
         viewController.view.layoutIfNeeded()
         UIView.setAnimationsEnabled(animationsWereEnabled)
@@ -168,6 +183,8 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
     private(set) var viewDidLoadCount = 0
     private(set) var toggleSortCount = 0
     private(set) var didTapLoginCount = 0
+    private(set) var didTapDetailTestCount = 0
+    private(set) var submittedDetailTestURL: String?
 
     func viewDidLoad() {
         viewDidLoadCount += 1
@@ -181,6 +198,14 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
 
     func didTapLogin() {
         didTapLoginCount += 1
+    }
+
+    func didTapDetailTest() {
+        didTapDetailTestCount += 1
+    }
+
+    func didSubmitDetailTestURL(_ rawURL: String) {
+        submittedDetailTestURL = rawURL
     }
 
     func didPullToRefresh() {}

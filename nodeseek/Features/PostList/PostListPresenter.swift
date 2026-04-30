@@ -71,6 +71,19 @@ class PostListPresenter: PostListPresenterProtocol {
         }
     }
 
+    func didTapDetailTest() {
+        view?.showDetailTestInput()
+    }
+
+    func didSubmitDetailTestURL(_ rawURL: String) {
+        guard let target = PostDetailTestTarget(rawValue: rawURL) else {
+            view?.showError(message: "请输入 NodeSeek 帖子详情链接，例如 https://www.nodeseek.com/post-705039-1")
+            return
+        }
+
+        router.navigateToPostDetail(post: target.post, page: target.page)
+    }
+
     private func presentCurrentCategory(useCache: Bool) {
         var state = state(for: currentCategory)
         if !useCache {

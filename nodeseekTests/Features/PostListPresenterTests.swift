@@ -33,6 +33,49 @@ struct PostListPresenterTests {
         #expect(router.selectedPost?.id == "1")
     }
 
+    @Test func submittingDetailTestURLNavigatesToParsedPostPage() throws {
+        let view = SpyPostListView()
+        let interactor = SpyPostListInteractor()
+        let router = SpyPostListRouter()
+        let presenter = PostListPresenter(interactor: interactor, router: router)
+        presenter.setView(view)
+
+        presenter.didSubmitDetailTestURL("https://www.nodeseek.com/post-705039-2")
+
+        #expect(router.selectedPost?.id == "705039")
+        #expect(router.selectedPost?.url.absoluteString == "https://www.nodeseek.com/post-705039-2")
+        #expect(router.selectedPage == 2)
+        #expect(view.lastErrorMessage == nil)
+    }
+
+    @Test func submittingInvalidDetailTestURLShowsError() {
+        let view = SpyPostListView()
+        let interactor = SpyPostListInteractor()
+        let router = SpyPostListRouter()
+        let presenter = PostListPresenter(interactor: interactor, router: router)
+        presenter.setView(view)
+
+        presenter.didSubmitDetailTestURL("https://example.com/post-705039-1")
+
+        #expect(router.selectedPost == nil)
+        #expect(view.lastErrorMessage == "请输入 NodeSeek 帖子详情链接，例如 https://www.nodeseek.com/post-705039-1")
+    }
+
+    @Test func detailTestTargetAcceptsRelativePostURL() throws {
+        let target = try #require(PostDetailTestTarget(rawValue: "/post-705039-3"))
+
+        #expect(target.post.id == "705039")
+        #expect(target.page == 3)
+        #expect(target.post.title == "详情测试 #705039")
+    }
+
+    @Test func detailTestTargetDefaultsMissingPageToFirstPage() throws {
+        let target = try #require(PostDetailTestTarget(rawValue: "https://www.nodeseek.com/post-705039"))
+
+        #expect(target.post.id == "705039")
+        #expect(target.page == 1)
+    }
+
     @Test func approachingBottomTriggersLoadMoreForNextPage() {
         let view = SpyPostListView()
         let interactor = SpyPostListInteractor()
@@ -392,6 +435,10 @@ private final class SpyPostListView: PostListViewProtocol {
         lastErrorMessage = message
     }
 
+    func showDetailTestInput() {
+        events.append("showDetailTestInput")
+    }
+
     func renderCategories(_ categories: [PostListCategory], selected: PostListCategory) {
         renderedCategories = categories
         selectedCategory = selected
@@ -446,11 +493,17 @@ private final class SpyPostListInteractor: PostListInteractorInput {
 @MainActor
 private final class SpyPostListRouter: PostListRouterProtocol {
     var selectedPost: PostSummary?
+    var selectedPage: Int?
     var navigateToLoginCount = 0
     var onLoginClose: (@MainActor () -> Void)?
 
     func navigateToPostDetail(post: PostSummary) {
         selectedPost = post
+    }
+
+    func navigateToPostDetail(post: PostSummary, page: Int) {
+        selectedPost = post
+        selectedPage = page
     }
 
     func navigateToLogin(onClose: @escaping @MainActor () -> Void) {

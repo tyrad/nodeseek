@@ -52,6 +52,50 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(afterText.string.contains("after"))
     }
 
+    @Test func preservesBareTextAroundPreformattedBlock() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: "前置说明<pre><code>let value = 1</code></pre>后置说明",
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+
+        #expect(blocks.count == 3)
+        guard case .text(let before) = blocks[0],
+              case .codeBlock(let codeBlock) = blocks[1],
+              case .text(let after) = blocks[2] else {
+            Issue.record("Expected text/codeBlock/text block order")
+            return
+        }
+        #expect(before.string.contains("前置说明"))
+        #expect(codeBlock.text == "let value = 1")
+        #expect(after.string.contains("后置说明"))
+    }
+
+    @Test func preservesParentTextAroundNestedTable() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: """
+            <div>表格前说明<table><tbody><tr><td>单元格</td></tr></tbody></table>表格后说明</div>
+            """,
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+
+        #expect(blocks.count == 3)
+        guard case .text(let before) = blocks[0],
+              case .table(let table) = blocks[1],
+              case .text(let after) = blocks[2] else {
+            Issue.record("Expected text/table/text block order")
+            return
+        }
+        #expect(before.string.contains("表格前说明"))
+        #expect(table.rows.first?.cells.first?.text == "单元格")
+        #expect(after.string.contains("表格后说明"))
+    }
+
     @Test func rendersImageOnlyTableCells() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
@@ -272,13 +316,15 @@ struct DTCoreTextHTMLContentRendererTests {
         let h5Font = try #require(font(in: attributed, matching: "二级小标题"))
         let strongFont = try #require(font(in: attributed, matching: "重点内容"))
         let bodyFont = try #require(font(in: attributed, matching: "普通正文"))
-        let codeFont = try #require(font(in: attributed, matching: "let value = 1"))
+        let codeBlock = try #require(blocks.compactMap { block -> RenderedCodeBlock? in
+            guard case .codeBlock(let codeBlock) = block else { return nil }
+            return codeBlock
+        }.first)
 
         #expect(h4Font.pointSize > bodyFont.pointSize)
         #expect(h5Font.pointSize > bodyFont.pointSize)
         #expect(strongFont.fontDescriptor.symbolicTraits.contains(.traitBold))
-        #expect(codeFont.pointSize < bodyFont.pointSize)
-        #expect(codeFont.fontDescriptor.symbolicTraits.contains(.traitMonoSpace))
+        #expect(codeBlock.text == "let value = 1")
         #expect(attributed.string.contains("普通正文\n第二行") || attributed.string.contains("普通正文\u{2028}第二行"))
         #expect(attributed.string.contains("• 列表项"))
 
@@ -297,12 +343,17 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(link?.absoluteString == "https://www.nodeseek.com/jump?to=https%3A%2F%2Fexample.com%2Fkeys")
 
         var attachmentCount = 0
-        attributed.enumerateAttribute(
-            .attachment,
-            in: NSRange(location: 0, length: attributed.length)
-        ) { value, _, _ in
-            if value is DTTextAttachment {
-                attachmentCount += 1
+        for textBlock in blocks.compactMap({ block -> NSAttributedString? in
+            guard case .text(let text) = block else { return nil }
+            return text
+        }) {
+            textBlock.enumerateAttribute(
+                .attachment,
+                in: NSRange(location: 0, length: textBlock.length)
+            ) { value, _, _ in
+                if value is DTTextAttachment {
+                    attachmentCount += 1
+                }
             }
         }
         #expect(attachmentCount == 1)
@@ -334,6 +385,125 @@ struct DTCoreTextHTMLContentRendererTests {
         }
 
         #expect(attachmentURL?.absoluteString == "https://www.nodeseek.com/static/image/sticker/xhj/003.png")
+    }
+
+    @Test func rendersTextAfterLeadingStickerImage() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: """
+            <p><img class="sticker" src="/static/image/sticker/xhj/013.gif" loading="lazy" alt="xhj013"> 下载个几十兆的文件，非要下载客户端才给下载，这不纯有猫饼吗</p>
+            """,
+            baseURL: baseURL,
+            maxImageWidth: 240
+        )
+        let attributed = try #require(
+            blocks.compactMap { block -> NSAttributedString? in
+                guard case .text(let text) = block else { return nil }
+                return text
+            }.first
+        )
+
+        #expect(attributed.string.contains("下载个几十兆的文件"))
+
+        var attachmentURL: URL?
+        attributed.enumerateAttribute(
+            .attachment,
+            in: NSRange(location: 0, length: attributed.length)
+        ) { value, _, stop in
+            guard let attachment = value as? DTTextAttachment else { return }
+            attachmentURL = attachment.contentURL
+            stop.pointee = true
+        }
+
+        #expect(attachmentURL?.absoluteString == "https://www.nodeseek.com/static/image/sticker/xhj/013.gif")
+    }
+
+    @Test func rendersLazyImageUsingDataSourceWhenSrcIsMissing() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: "<p>before<img data-src=\"/i/lazy.webp\" alt=\"image\">after</p>",
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributed = try #require(
+            blocks.compactMap { block -> NSAttributedString? in
+                guard case .text(let text) = block else { return nil }
+                return text
+            }.first
+        )
+
+        #expect(attributed.string.contains("before"))
+        #expect(attributed.string.contains("after"))
+
+        var attachmentURL: URL?
+        attributed.enumerateAttribute(
+            .attachment,
+            in: NSRange(location: 0, length: attributed.length)
+        ) { value, _, stop in
+            guard let attachment = value as? DTTextAttachment else { return }
+            attachmentURL = attachment.contentURL
+            stop.pointee = true
+        }
+
+        #expect(attachmentURL?.absoluteString == "https://www.nodeseek.com/i/lazy.webp")
+    }
+
+    @Test func rendersImageUsingSrcsetWhenSrcIsMissing() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: "<p><img srcset=\"/i/small.webp 1x, /i/large.webp 2x\" alt=\"image\"></p>",
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributed = try #require(
+            blocks.compactMap { block -> NSAttributedString? in
+                guard case .text(let text) = block else { return nil }
+                return text
+            }.first
+        )
+
+        var attachmentURL: URL?
+        attributed.enumerateAttribute(
+            .attachment,
+            in: NSRange(location: 0, length: attributed.length)
+        ) { value, _, stop in
+            guard let attachment = value as? DTTextAttachment else { return }
+            attachmentURL = attachment.contentURL
+            stop.pointee = true
+        }
+
+        #expect(attachmentURL?.absoluteString == "https://www.nodeseek.com/i/large.webp")
+    }
+
+    @Test func treatsStickerClassAsStickerEvenWhenURLDoesNotContainSticker() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: "<p><img class=\"sticker\" src=\"/static/image/yct/015.gif\" alt=\"yct015\"></p>",
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributed = try #require(
+            blocks.compactMap { block -> NSAttributedString? in
+                guard case .text(let text) = block else { return nil }
+                return text
+            }.first
+        )
+
+        var displaySize: CGSize?
+        attributed.enumerateAttribute(
+            .attachment,
+            in: NSRange(location: 0, length: attributed.length)
+        ) { value, _, stop in
+            guard let attachment = value as? DTTextAttachment else { return }
+            displaySize = attachment.displaySize
+            stop.pointee = true
+        }
+
+        #expect(displaySize == CGSize(width: 65, height: 65))
     }
 
     @Test func usesHalfWidthSquareForNonStickerImageAttachments() throws {
@@ -579,6 +749,40 @@ struct DTCoreTextHTMLContentRendererTests {
         ])
     }
 
+    @Test func preservesPlainMagicTabBodyTextNextToTerminalDOM() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: """
+            <div class="nsk-magic-tabs enabled">
+            <div class="nsk-magic-tab-title">💻基本信息</div>
+            <div class="nsk-magic-tab-body">
+              <p>这段普通说明也要显示</p>
+              <div class="terminal-container embedMode">
+                <div class="xterm-rows">
+                  <div><span>终端第一行</span></div>
+                </div>
+              </div>
+              <p>终端后的补充说明</p>
+            </div>
+            </div>
+            """,
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributed = try #require(
+            blocks.compactMap { block -> NSAttributedString? in
+                guard case .text(let text) = block else { return nil }
+                return text
+            }.first
+        )
+
+        #expect(attributed.string.contains("💻基本信息"))
+        #expect(attributed.string.contains("这段普通说明也要显示"))
+        #expect(attributed.string.contains("终端第一行"))
+        #expect(attributed.string.contains("终端后的补充说明"))
+    }
+
     @Test func sanitizesMagicTabANSICodeBlocks() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
@@ -682,32 +886,21 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(attachmentDisplaySizes.allSatisfy { $0.width > 0 && $0.height > 0 })
     }
 
-    @MainActor
-    @Test func wrapsLongPreformattedLinesToAvailableWidth() throws {
+    @Test func extractsLongPreformattedLinesAsCodeBlock() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let longLine = String(repeating: "+", count: 120)
         let blocks = renderer.render(
-            fragment: "<pre><code>\(String(repeating: "+", count: 120))</code></pre>",
+            fragment: "<pre><code>\(longLine)</code></pre>",
             baseURL: baseURL,
             maxImageWidth: 160
         )
-        let attributed = try #require(
-            blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
-                return text
-            }.first
-        )
+        let codeBlock = try #require(blocks.compactMap { block -> RenderedCodeBlock? in
+            guard case .codeBlock(let codeBlock) = block else { return nil }
+            return codeBlock
+        }.first)
 
-        let label = UILabel()
-        label.numberOfLines = 0
-        label.attributedText = attributed
-        let fittingSize = label.systemLayoutSizeFitting(
-            CGSize(width: 160, height: CGFloat.greatestFiniteMagnitude),
-            withHorizontalFittingPriority: .required,
-            verticalFittingPriority: .fittingSizeLevel
-        )
-
-        #expect(fittingSize.height > UIFont.preferredFont(forTextStyle: .body).lineHeight * 2)
+        #expect(codeBlock.text == longLine)
     }
 
     @Test func extractsCopyWrappedPreCodeAsCodeBlock() throws {

@@ -35,7 +35,7 @@ struct PostDetailViewControllerTests {
 
         let tableView = try #require(viewController.view.firstSubview(of: UITableView.self))
         #expect(tableView.tableHeaderView == nil)
-        #expect(tableView.numberOfRows(inSection: 0) == 5)
+        #expect(viewController.debugNumberOfRowsForTests() == 5)
 
         viewController.render(detail: PostDetail(
             id: "703863",
@@ -51,7 +51,7 @@ struct PostDetailViewControllerTests {
             replyForm: nil
         ))
 
-        #expect(tableView.numberOfRows(inSection: 0) == 3)
+        #expect(viewController.debugNumberOfRowsForTests() == 3)
     }
 
     @Test func showsSkeletonRowsWhileInitialDetailIsLoading() throws {
@@ -61,8 +61,8 @@ struct PostDetailViewControllerTests {
         viewController.loadViewIfNeeded()
         viewController.showLoading()
 
-        let tableView = try #require(viewController.view.firstSubview(of: UITableView.self))
-        #expect(tableView.numberOfRows(inSection: 0) == 5)
+        _ = try #require(viewController.view.firstSubview(of: UITableView.self))
+        #expect(viewController.debugNumberOfRowsForTests() == 5)
 
         viewController.render(detail: PostDetail(
             id: "703863",
@@ -74,7 +74,7 @@ struct PostDetailViewControllerTests {
             comments: [],
             replyForm: nil
         ))
-        #expect(tableView.numberOfRows(inSection: 0) == 1)
+        #expect(viewController.debugNumberOfRowsForTests() == 1)
     }
 
     @Test func addsRefreshButtonAndCanTriggerReload() throws {
@@ -383,6 +383,35 @@ struct PostDetailViewControllerTests {
         #expect(updatedHeight == initialHeight)
     }
 
+    @Test func richTextNodeMeasuresTextAfterImageAndLineBreak() throws {
+        let imageURL = try #require(URL(string: "https://cdn.nodeimage.com/i/E7rnyCXgl36hsqI97dJqQxtLPjZBruA1.webp"))
+        let blocks = DTCoreTextHTMLContentRenderer().render(
+            fragment: """
+            <p><img src="\(imageURL.absoluteString)" alt="image" class=""><br>
+            上个月啥都没干， ip就被送中，拉回来后，今天发现又被送中了 <img class="sticker" src="/static/image/sticker/yct/015.gif" loading="lazy" alt="yct015"></p>
+            """,
+            baseURL: URL(string: "https://www.nodeseek.com")!,
+            maxImageWidth: 320
+        )
+        let attributedText = try #require(blocks.compactMap { block -> NSAttributedString? in
+            guard case .text(let text) = block else { return nil }
+            return text
+        }.first)
+        #expect(attributedText.string.contains("上个月啥都没干"))
+
+        let node = DetailRichTextNode(
+            attributedText: attributedText,
+            onImageTapped: { _, _ in },
+            onLayoutInvalidated: {}
+        )
+        let layout = node.layoutThatFits(ASSizeRange(
+            min: .zero,
+            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
+        ))
+
+        #expect(layout.size.height > DetailImageLayout.fixedNormalImageSize(maxWidth: 320).height + 40)
+    }
+
     @Test func richTextNodeUsesDTCoreTextHeightForFixture() throws {
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
         let html = try FixtureLoader.html(named: "post-705039-1")
@@ -431,6 +460,19 @@ struct PostDetailViewControllerTests {
         let width = DetailRichTextNode.resolvedMeasureWidth(.infinity)
 
         #expect(width == 320)
+    }
+
+    @Test func richTextAttachmentViewFrameUsesAttachmentDisplaySize() {
+        let proposedFrame = CGRect(x: 0, y: 8, width: 320, height: 70)
+        let frame = DetailRichTextView.attachmentViewFrame(
+            proposedFrame: proposedFrame,
+            displaySize: CGSize(width: 65, height: 65)
+        )
+
+        #expect(frame.width == 65)
+        #expect(frame.height == 65)
+        #expect(frame.minX == proposedFrame.minX)
+        #expect(frame.midY == proposedFrame.midY)
     }
 }
 

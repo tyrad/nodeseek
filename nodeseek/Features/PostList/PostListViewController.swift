@@ -342,6 +342,9 @@ class PostListViewController: UIViewController {
         sideMenuViewController.onLoginTapped = { [weak self] in
             self?.presenter.didTapLogin()
         }
+        sideMenuViewController.onDetailTestTapped = { [weak self] in
+            self?.presenter.didTapDetailTest()
+        }
         addChild(sideMenuViewController)
         view.addSubview(sideMenuViewController.view)
         sideMenuViewController.view.translatesAutoresizingMaskIntoConstraints = false
@@ -387,6 +390,28 @@ extension PostListViewController: PostListViewProtocol {
     func showError(message: String) {
         let alert = UIAlertController(title: "错误", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
+    }
+
+    func showDetailTestInput() {
+        let alert = UIAlertController(
+            title: "详情测试",
+            message: "输入 NodeSeek 帖子详情链接",
+            preferredStyle: .alert
+        )
+        alert.addTextField { textField in
+            textField.placeholder = "https://www.nodeseek.com/post-705039-1"
+            textField.keyboardType = .URL
+            textField.textContentType = .URL
+            textField.autocapitalizationType = .none
+            textField.autocorrectionType = .no
+            textField.clearButtonMode = .whileEditing
+        }
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "打开", style: .default) { [weak self, weak alert] _ in
+            let rawURL = alert?.textFields?.first?.text ?? ""
+            self?.presenter.didSubmitDetailTestURL(rawURL)
+        })
         present(alert, animated: true)
     }
 

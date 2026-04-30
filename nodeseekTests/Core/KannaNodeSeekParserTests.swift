@@ -219,6 +219,63 @@ struct KannaNodeSeekParserTests {
         #expect(detail.comments.first?.contentHTML.contains("CPU限制30%") == true)
     }
 
+    @Test func parsesPostDetailContentFromDivPostContentFallback() throws {
+        let html = """
+        <html>
+        <head><title>测试详情</title></head>
+        <body>
+          <div class="nsk-post">
+            <div class="content-item">
+              <a class="author-name" href="/space/1">mist</a>
+              <div class="post-content">
+                <p>div 容器里的正文也要保留</p>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(
+            html: html,
+            url: URL(string: "https://www.nodeseek.com/post-1-1")!
+        )
+
+        #expect(detail.contentHTML.contains("div 容器里的正文也要保留"))
+    }
+
+    @Test func parsesCommentsFromNonListCommentContainers() throws {
+        let html = """
+        <html>
+        <head><title>测试详情</title></head>
+        <body>
+          <div class="nsk-post">
+            <div class="content-item">
+              <a class="author-name" href="/space/1">mist</a>
+              <article class="post-content"><p>正文</p></article>
+            </div>
+          </div>
+          <div class="comments">
+            <div class="content-item" id="comment-1" data-comment-id="1">
+              <a class="author-name" href="/space/2">alice</a>
+              <article class="post-content"><p>非 ul/li 评论也要解析</p></article>
+            </div>
+          </div>
+        </body>
+        </html>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(
+            html: html,
+            url: URL(string: "https://www.nodeseek.com/post-1-1")!
+        )
+
+        #expect(detail.comments.count == 1)
+        #expect(detail.comments.first?.contentHTML.contains("非 ul/li 评论也要解析") == true)
+    }
+
     @Test func parsesMagicTabsDetailFixtureWithANSIAndImageTabs() throws {
         let html = try FixtureLoader.html(named: "post-705039-1")
         let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)

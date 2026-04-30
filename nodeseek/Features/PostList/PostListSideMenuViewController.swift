@@ -12,6 +12,7 @@ final class PostListSideMenuViewController: UIViewController {
     private var isSideMenuVisible = false
     private var isAccountLoggedIn = false
     var onLoginTapped: (() -> Void)?
+    var onDetailTestTapped: (() -> Void)?
     private let avatarLoader = AvatarImageLoader.shared
 
     private static let defaultAvatarImage: UIImage? = {
@@ -105,6 +106,22 @@ final class PostListSideMenuViewController: UIViewController {
         return button
     }()
 
+    private let detailTestButton: UIButton = {
+        let button = UIButton(type: .system)
+        let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+        var configuration = UIButton.Configuration.plain()
+        configuration.image = UIImage(systemName: "doc.text.magnifyingglass", withConfiguration: symbolConfiguration)
+        configuration.imagePadding = 10
+        configuration.baseForegroundColor = .label
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)
+        configuration.title = "详情测试"
+        button.configuration = configuration
+        button.contentHorizontalAlignment = .leading
+        button.accessibilityIdentifier = "post-list-side-menu-detail-test-button"
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -150,6 +167,7 @@ final class PostListSideMenuViewController: UIViewController {
         view.isHidden = true
         backdropView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(backdropTapped)))
         accountHeaderButton.addTarget(self, action: #selector(accountHeaderTapped), for: .touchUpInside)
+        detailTestButton.addTarget(self, action: #selector(detailTestButtonTapped), for: .touchUpInside)
         settingsButton.addTarget(self, action: #selector(settingsButtonTapped), for: .touchUpInside)
 
         view.addSubview(backdropView)
@@ -158,6 +176,7 @@ final class PostListSideMenuViewController: UIViewController {
         sideMenuView.addSubview(nameLabel)
         sideMenuView.addSubview(statsLabel)
         sideMenuView.addSubview(accountHeaderButton)
+        sideMenuView.addSubview(detailTestButton)
         sideMenuView.addSubview(settingsButton)
 
         let sideMenuLeadingConstraint = sideMenuView.leadingAnchor.constraint(
@@ -195,6 +214,11 @@ final class PostListSideMenuViewController: UIViewController {
             accountHeaderButton.topAnchor.constraint(equalTo: avatarImageView.topAnchor, constant: -8),
             accountHeaderButton.bottomAnchor.constraint(equalTo: avatarImageView.bottomAnchor, constant: 8),
 
+            detailTestButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
+            detailTestButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
+            detailTestButton.bottomAnchor.constraint(equalTo: settingsButton.topAnchor, constant: -8),
+            detailTestButton.heightAnchor.constraint(equalToConstant: 48),
+
             settingsButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
             settingsButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
             settingsButton.bottomAnchor.constraint(equalTo: sideMenuView.safeAreaLayoutGuide.bottomAnchor, constant: -18),
@@ -210,6 +234,11 @@ final class PostListSideMenuViewController: UIViewController {
         guard !isAccountLoggedIn else { return }
         hide(animated: true)
         onLoginTapped?()
+    }
+
+    @objc private func detailTestButtonTapped() {
+        hide(animated: true)
+        onDetailTestTapped?()
     }
 
     @objc private func settingsButtonTapped() {

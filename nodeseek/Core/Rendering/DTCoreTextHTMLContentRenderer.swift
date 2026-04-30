@@ -12,6 +12,11 @@ import OSLog
 import UIKit
 
 struct DTCoreTextHTMLContentRenderer {
+    private struct ImageDescriptor {
+        let url: URL?
+        let isSticker: Bool
+    }
+
     private enum Layout {
         static let defaultMaxImageWidth: CGFloat = 320
         static let bodyLineSpacing: CGFloat = 5
@@ -20,8 +25,24 @@ struct DTCoreTextHTMLContentRenderer {
 
     private static let linkColor = UIColor(red: 15 / 255, green: 128 / 255, blue: 85 / 255, alpha: 1)
 
-    private static let imageSourceRegex = try! NSRegularExpression(
-        pattern: "(<img\\b[^>]*\\bsrc\\s*=\\s*[\"'])([^\"']+)([\"'])",
+    private static let imageTagRegex = try! NSRegularExpression(
+        pattern: "<img\\b[^>]*>",
+        options: [.caseInsensitive]
+    )
+    private static let srcAttributeRegex = try! NSRegularExpression(
+        pattern: "\\bsrc\\s*=\\s*([\"'])([^\"']+)\\1",
+        options: [.caseInsensitive]
+    )
+    private static let dataSourceAttributeRegex = try! NSRegularExpression(
+        pattern: "\\b(?:data-src|data-original)\\s*=\\s*([\"'])([^\"']+)\\1",
+        options: [.caseInsensitive]
+    )
+    private static let srcsetAttributeRegex = try! NSRegularExpression(
+        pattern: "\\bsrcset\\s*=\\s*([\"'])([^\"']+)\\1",
+        options: [.caseInsensitive]
+    )
+    private static let classAttributeRegex = try! NSRegularExpression(
+        pattern: "\\bclass\\s*=\\s*([\"'])([^\"']+)\\1",
         options: [.caseInsensitive]
     )
     private static let listMarkerRegex = try! NSRegularExpression(
@@ -46,9 +67,9 @@ struct DTCoreTextHTMLContentRenderer {
         )
         let expandedFragment = expandNodeSeekMagicTabs(in: fragment)
         let normalizedFragment = normalizeImageSources(in: expandedFragment, baseURL: baseURL)
-        let normalizedSources = imageSources(in: normalizedFragment)
+        let normalizedSources = imageDescriptors(in: normalizedFragment, baseURL: baseURL)
         logDiagnostics(
-            "render normalized expandedLength=\(expandedFragment.count) normalizedLength=\(normalizedFragment.count) imageSources=\(normalizedSources.count) urls=\(normalizedSources.prefix(6).joined(separator: " | "))"
+            "render normalized expandedLength=\(expandedFragment.count) normalizedLength=\(normalizedFragment.count) imageSources=\(normalizedSources.count) urls=\(normalizedSources.prefix(6).compactMap { $0.url?.absoluteString }.joined(separator: " | "))"
         )
 
         let blocks = renderContentBlocks(
@@ -65,7 +86,7 @@ struct DTCoreTextHTMLContentRenderer {
             return fallbackBlocks(from: fragment)
         }
 
-        let imageSources = self.imageSources(in: fragment)
+        let imageSources = imageDescriptors(in: fragment, baseURL: baseURL)
         let options: [String: Any] = [
             NSBaseURLDocumentOption: baseURL,
             DTDefaultFontSize: UIFont.preferredFont(forTextStyle: .body).pointSize,
@@ -110,21 +131,19 @@ struct DTCoreTextHTMLContentRenderer {
             html: "<div id=\"__nodeseek_content_root__\">\(fragment)</div>",
             encoding: .utf8
         ),
-              let root = document.at_css("#__nodeseek_content_root__") else {
+              document.at_css("#__nodeseek_content_root__") != nil else {
             return renderTextBlocks(fragment: fragment, baseURL: baseURL, maxImageWidth: maxImageWidth)
         }
 
         var blocks: [RenderedContentBlock] = []
         var pendingHTML = ""
-        for child in root.children {
-            appendContentBlocks(
-                from: child,
-                pendingHTML: &pendingHTML,
-                blocks: &blocks,
-                baseURL: baseURL,
-                maxImageWidth: maxImageWidth
-            )
-        }
+        appendContentBlocks(
+            fromHTML: fragment,
+            pendingHTML: &pendingHTML,
+            blocks: &blocks,
+            baseURL: baseURL,
+            maxImageWidth: maxImageWidth
+        )
         flushPendingHTML(
             &pendingHTML,
             into: &blocks,
@@ -135,55 +154,63 @@ struct DTCoreTextHTMLContentRenderer {
     }
 
     private func appendContentBlocks(
-        from node: XMLElement,
+        fromHTML html: String,
         pendingHTML: inout String,
         blocks: inout [RenderedContentBlock],
         baseURL: URL,
         maxImageWidth: CGFloat
     ) {
-        if isTableElement(node) {
+        let pattern = "(?is)<(table|pre)\\b[^>]*>.*?</\\1>"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+            pendingHTML.append(html)
+            return
+        }
+
+        let source = html as NSString
+        let fullRange = NSRange(location: 0, length: source.length)
+        var currentLocation = 0
+        for match in regex.matches(in: html, options: [], range: fullRange) {
+            guard match.range.location >= currentLocation else { continue }
+            let beforeRange = NSRange(location: currentLocation, length: match.range.location - currentLocation)
+            appendPendingHTMLFragment(source.substring(with: beforeRange), into: &pendingHTML)
             flushPendingHTML(
                 &pendingHTML,
                 into: &blocks,
                 baseURL: baseURL,
                 maxImageWidth: maxImageWidth
             )
-            if let table = tableBlock(from: node, baseURL: baseURL) {
-                blocks.append(.table(table))
-            }
-            return
-        }
 
-        if isPreElement(node) {
-            flushPendingHTML(
-                &pendingHTML,
-                into: &blocks,
-                baseURL: baseURL,
-                maxImageWidth: maxImageWidth
-            )
-            if let codeBlock = codeBlock(from: node) {
-                blocks.append(.codeBlock(codeBlock))
-            }
-            return
-        }
-
-        if containsStructuredElement(node) {
-            for child in node.children {
-                appendContentBlocks(
-                    from: child,
-                    pendingHTML: &pendingHTML,
+            let structuredHTML = source.substring(with: match.range)
+            if let document = try? HTML(html: structuredHTML, encoding: .utf8),
+               let node = document.at_css("table") ?? document.at_css("pre") {
+                appendStructuredBlock(
+                    from: node,
                     blocks: &blocks,
-                    baseURL: baseURL,
-                    maxImageWidth: maxImageWidth
+                    baseURL: baseURL
                 )
             }
-            return
+            currentLocation = NSMaxRange(match.range)
         }
 
-        if let html = node.toHTML, html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
-            pendingHTML.append(html)
-        } else if let text = node.text, text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
-            pendingHTML.append(escapedHTML(text))
+        let remainingRange = NSRange(location: currentLocation, length: fullRange.length - currentLocation)
+        appendPendingHTMLFragment(source.substring(with: remainingRange), into: &pendingHTML)
+    }
+
+    private func appendPendingHTMLFragment(_ html: String, into pendingHTML: inout String) {
+        let trimmed = html.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else { return }
+        pendingHTML.append(html)
+    }
+
+    private func appendStructuredBlock(
+        from node: XMLElement,
+        blocks: inout [RenderedContentBlock],
+        baseURL: URL
+    ) {
+        if isTableElement(node), let table = tableBlock(from: node, baseURL: baseURL) {
+            blocks.append(.table(table))
+        } else if isPreElement(node), let codeBlock = codeBlock(from: node) {
+            blocks.append(.codeBlock(codeBlock))
         }
     }
 
@@ -350,20 +377,8 @@ struct DTCoreTextHTMLContentRenderer {
         return AvatarImageLoader.resolveImageURL(source, baseURL: baseURL)
     }
 
-    private func containsTableElement(_ node: XMLElement) -> Bool {
-        isTableElement(node) || node.at_css("table") != nil
-    }
-
-    private func containsStructuredElement(_ node: XMLElement) -> Bool {
-        containsTableElement(node) || containsPreElement(node)
-    }
-
     private func isTableElement(_ node: XMLElement) -> Bool {
         tagName(of: node) == "table"
-    }
-
-    private func containsPreElement(_ node: XMLElement) -> Bool {
-        isPreElement(node) || node.at_css("pre") != nil
     }
 
     private func isPreElement(_ node: XMLElement) -> Bool {
@@ -457,7 +472,8 @@ struct DTCoreTextHTMLContentRenderer {
     private func simplifiedMagicTabBodyHTML(_ bodyHTML: String) -> String {
         let containsXtermRows = bodyHTML.contains("xterm-rows")
         let mayContainANSICode = bodyHTML.contains("language-ansi") || bodyHTML.contains("data-ansicode")
-        guard containsXtermRows || mayContainANSICode else { return bodyHTML }
+        let containsPre = bodyHTML.range(of: "<pre", options: [.caseInsensitive]) != nil
+        guard containsXtermRows || mayContainANSICode || containsPre else { return bodyHTML }
         guard let document = try? HTML(
             html: "<div id=\"__nodeseek_magic_tab_body__\">\(bodyHTML)</div>",
             encoding: .utf8
@@ -467,41 +483,59 @@ struct DTCoreTextHTMLContentRenderer {
         }
 
         var blocks: [String] = []
-
-        if containsXtermRows {
-            blocks.append(contentsOf: root.css(".xterm-rows").compactMap { rows -> String? in
-                let lines = rows.children.compactMap { row -> String? in
-                    guard let text = row.text?.trimmingCharacters(in: .whitespacesAndNewlines),
-                          text.isEmpty == false else {
-                        return nil
-                    }
-                    return text
-                }
-                guard lines.isEmpty == false else { return nil }
-                return "<pre><code>\(escapedHTML(lines.joined(separator: "\n")))</code></pre>"
-            })
-        }
-
-        if mayContainANSICode {
-            blocks.append(contentsOf: root.css("pre > code").compactMap { code -> String? in
-                let isANSICode = hasClass("language-ansi", in: code) || (code.toHTML?.contains("data-ansicode") == true)
-                guard isANSICode else { return nil }
-                guard let rawText = code.text, rawText.isEmpty == false else { return nil }
-                let normalizedText = stripANSICodes(from: rawText)
-                guard normalizedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
-                    return nil
-                }
-                return "<pre><code>\(escapedHTML(normalizedText))</code></pre>"
-            })
-        }
-
-        for image in root.css("img") {
-            if let imageHTML = image.toHTML {
-                blocks.append(imageHTML)
+        for child in root.children {
+            if let simplified = simplifiedMagicTabChildHTML(child) {
+                blocks.append(simplified)
             }
         }
 
         return blocks.isEmpty ? bodyHTML : blocks.joined(separator: "\n")
+    }
+
+    private func simplifiedMagicTabChildHTML(_ child: XMLElement) -> String? {
+        if let rows = child.at_css(".xterm-rows") {
+            return magicTabCodeHTML(from: xtermText(from: rows))
+        }
+
+        if isPreElement(child), let code = child.at_css("code") {
+            return simplifiedMagicTabCodeHTML(from: code)
+        }
+
+        if let code = child.at_css("pre > code"),
+           hasClass("language-ansi", in: code) || (code.toHTML?.contains("data-ansicode") == true) {
+            return simplifiedMagicTabCodeHTML(from: code)
+        }
+
+        return child.toHTML
+    }
+
+    private func simplifiedMagicTabCodeHTML(from code: XMLElement) -> String? {
+        let isANSICode = hasClass("language-ansi", in: code) || (code.toHTML?.contains("data-ansicode") == true)
+        let rawText: String
+        if isANSICode {
+            rawText = stripANSICodes(from: code.text ?? "")
+        } else {
+            rawText = codeText(from: code)
+        }
+        return magicTabCodeHTML(from: rawText)
+    }
+
+    private func xtermText(from rows: XMLElement) -> String {
+        rows.children.compactMap { row -> String? in
+            guard let text = row.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  text.isEmpty == false else {
+                return nil
+            }
+            return text
+        }.joined(separator: "\n")
+    }
+
+    private func magicTabCodeHTML(from text: String) -> String? {
+        let normalized = normalizedCodeText(text)
+        guard normalized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+            return nil
+        }
+        return "<p><code>\(escapedHTML(normalized).replacingOccurrences(of: "\n", with: "<br>"))</code></p>"
     }
 
     private func escapedHTML(_ text: String) -> String {
@@ -588,7 +622,7 @@ struct DTCoreTextHTMLContentRenderer {
     private func normalize(
         attributed: NSAttributedString,
         baseURL: URL,
-        imageSources: [String],
+        imageSources: [ImageDescriptor],
         maxImageWidth: CGFloat
     ) -> NSMutableAttributedString {
         let mutable = NSMutableAttributedString(attributedString: attributed)
@@ -596,6 +630,7 @@ struct DTCoreTextHTMLContentRenderer {
 
         normalizeBaseTextAttributes(in: mutable)
         normalizeParagraphStyles(in: mutable)
+        normalizeTextBlocks(in: mutable)
         normalizeLinks(in: mutable, baseURL: baseURL)
         normalizeVisibleListMarkers(in: mutable)
         normalizeImageAttachments(in: mutable, imageSources: imageSources, maxImageWidth: maxImageWidth)
@@ -649,6 +684,25 @@ struct DTCoreTextHTMLContentRenderer {
             effectiveRange: nil
         ) as? [DTTextBlock]
         return textBlocks?.contains { $0.backgroundColor != nil } == true
+    }
+
+    private func normalizeTextBlocks(in attributed: NSMutableAttributedString) {
+        let key = NSAttributedString.Key(DTTextBlocksAttribute)
+        attributed.enumerateAttribute(
+            key,
+            in: NSRange(location: 0, length: attributed.length)
+        ) { value, _, _ in
+            guard let textBlocks = value as? [DTTextBlock] else { return }
+            for block in textBlocks where block.backgroundColor != nil {
+                let padding = block.padding
+                block.padding = UIEdgeInsets(
+                    top: max(padding.top, 12),
+                    left: min(max(padding.left, 0), 8),
+                    bottom: max(padding.bottom, 12),
+                    right: max(padding.right, 10)
+                )
+            }
+        }
     }
 
     private func normalizedSystemFont(from font: UIFont, fallback: UIFont) -> UIFont {
@@ -747,7 +801,7 @@ struct DTCoreTextHTMLContentRenderer {
 
     private func normalizeImageAttachments(
         in attributed: NSMutableAttributedString,
-        imageSources: [String],
+        imageSources: [ImageDescriptor],
         maxImageWidth: CGFloat
     ) {
         guard maxImageWidth > 0 else { return }
@@ -763,14 +817,14 @@ struct DTCoreTextHTMLContentRenderer {
         ) { value, range, _ in
             guard let attachment = value as? DTTextAttachment else { return }
             let contentURL = attachment.contentURL
-            let mappedURL = imageIndex < imageSources.count ? URL(string: imageSources[imageIndex]) : nil
-            guard let imageURL = contentURL ?? mappedURL else { return }
+            let descriptor = imageIndex < imageSources.count ? imageSources[imageIndex] : nil
+            guard let imageURL = contentURL ?? descriptor?.url else { return }
 
             if attachment.contentURL == nil {
                 attachment.contentURL = imageURL
             }
 
-            let isSticker = isStickerImageURL(imageURL)
+            let isSticker = (descriptor?.isSticker == true) || isStickerImageURL(imageURL)
             if isSticker {
                 stickerFixedCount += 1
             }
@@ -809,33 +863,85 @@ struct DTCoreTextHTMLContentRenderer {
     private func normalizeImageSources(in fragment: String, baseURL: URL) -> String {
         let source = fragment as NSString
         let fullRange = NSRange(location: 0, length: source.length)
-        let matches = Self.imageSourceRegex.matches(in: fragment, options: [], range: fullRange)
+        let matches = Self.imageTagRegex.matches(in: fragment, options: [], range: fullRange)
         guard matches.isEmpty == false else { return fragment }
 
         let mutable = NSMutableString(string: fragment)
         for match in matches.reversed() {
-            guard match.numberOfRanges >= 3 else { continue }
-            let srcRange = match.range(at: 2)
-            guard srcRange.location != NSNotFound else { continue }
-            let rawSource = source.substring(with: srcRange)
-            guard let resolved = AvatarImageLoader.resolveImageURL(rawSource, baseURL: baseURL) else { continue }
-            mutable.replaceCharacters(in: srcRange, with: resolved.absoluteString)
+            let tag = source.substring(with: match.range)
+            guard let rawSource = preferredImageSource(in: tag),
+                  let resolved = AvatarImageLoader.resolveImageURL(rawSource, baseURL: baseURL) else { continue }
+
+            if let srcMatch = firstMatch(Self.srcAttributeRegex, in: tag), srcMatch.numberOfRanges >= 3 {
+                let localRange = srcMatch.range(at: 2)
+                guard localRange.location != NSNotFound else { continue }
+                let srcRange = NSRange(location: match.range.location + localRange.location, length: localRange.length)
+                mutable.replaceCharacters(in: srcRange, with: resolved.absoluteString)
+                continue
+            }
+
+            let insertion = " src=\"\(resolved.absoluteString)\""
+            let insertionLocation = tag.hasSuffix("/>")
+                ? match.range.location + max(tag.count - 2, 0)
+                : match.range.location + max(tag.count - 1, 0)
+            mutable.insert(insertion, at: insertionLocation)
         }
 
         return mutable as String
     }
 
-    private func imageSources(in fragment: String) -> [String] {
+    private func imageDescriptors(in fragment: String, baseURL: URL) -> [ImageDescriptor] {
         let source = fragment as NSString
         let fullRange = NSRange(location: 0, length: source.length)
-        let matches = Self.imageSourceRegex.matches(in: fragment, options: [], range: fullRange)
+        let matches = Self.imageTagRegex.matches(in: fragment, options: [], range: fullRange)
         guard matches.isEmpty == false else { return [] }
         return matches.compactMap { match in
-            guard match.numberOfRanges >= 3 else { return nil }
-            let srcRange = match.range(at: 2)
-            guard srcRange.location != NSNotFound else { return nil }
-            return source.substring(with: srcRange)
+            let tag = source.substring(with: match.range)
+            guard let rawSource = preferredImageSource(in: tag),
+                  let resolved = AvatarImageLoader.resolveImageURL(rawSource, baseURL: baseURL) else { return nil }
+            return ImageDescriptor(url: resolved, isSticker: hasStickerClass(in: tag))
         }
+    }
+
+    private func preferredImageSource(in tag: String) -> String? {
+        if let source = attributeValue(Self.srcAttributeRegex, in: tag), source.isEmpty == false {
+            return source
+        }
+        if let source = attributeValue(Self.dataSourceAttributeRegex, in: tag), source.isEmpty == false {
+            return source
+        }
+        if let srcset = attributeValue(Self.srcsetAttributeRegex, in: tag) {
+            return preferredSourceFromSrcset(srcset)
+        }
+        return nil
+    }
+
+    private func preferredSourceFromSrcset(_ srcset: String) -> String? {
+        srcset.split(separator: ",").compactMap { candidate -> String? in
+            let parts = candidate.split(whereSeparator: { $0.isWhitespace })
+            return parts.first.map(String.init)
+        }.last
+    }
+
+    private func attributeValue(_ regex: NSRegularExpression, in tag: String) -> String? {
+        guard let match = firstMatch(regex, in: tag), match.numberOfRanges >= 3 else { return nil }
+        let source = tag as NSString
+        let valueRange = match.range(at: 2)
+        guard valueRange.location != NSNotFound else { return nil }
+        return source.substring(with: valueRange)
+    }
+
+    private func firstMatch(_ regex: NSRegularExpression, in string: String) -> NSTextCheckingResult? {
+        regex.firstMatch(
+            in: string,
+            options: [],
+            range: NSRange(location: 0, length: (string as NSString).length)
+        )
+    }
+
+    private func hasStickerClass(in tag: String) -> Bool {
+        guard let classValue = attributeValue(Self.classAttributeRegex, in: tag) else { return false }
+        return classValue.split(whereSeparator: { $0.isWhitespace }).contains { $0 == "sticker" }
     }
 
     private func isStickerImageURL(_ url: URL?) -> Bool {

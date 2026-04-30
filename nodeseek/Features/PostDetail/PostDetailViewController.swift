@@ -898,6 +898,14 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
     }
 }
 
+#if DEBUG
+extension PostDetailViewController {
+    func debugNumberOfRowsForTests(inSection section: Int = 0) -> Int {
+        tableNode(tableNode, numberOfRowsInSection: section)
+    }
+}
+#endif
+
 private final class PostDetailHeaderView: UIView {
     private enum Layout {
         static let horizontalInset: CGFloat = 20
@@ -1256,8 +1264,12 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         logDiagnostics(
             "viewForAttachment url=\(contentURL.absoluteString) frame=\(Self.string(from: frame)) original=\(Self.string(from: attachment.originalSize)) display=\(Self.string(from: attachment.displaySize)) bounds=\(Self.string(from: bounds.size))"
         )
+        let viewFrame = Self.attachmentViewFrame(
+            proposedFrame: frame,
+            displaySize: attachment.displaySize
+        )
         let imageView = DetailInlineImageView(
-            frame: frame,
+            frame: viewFrame,
             imageURL: contentURL,
             targetPixelWidth: targetImagePointSide(
                 for: contentURL,
@@ -1277,9 +1289,31 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         )
         imageView.contentMode = contentMode(for: contentURL, originalSize: attachment.originalSize)
         imageView.clipsToBounds = true
+        imageView.isOpaque = false
+        imageView.backgroundColor = .clear
         imageView.image = (attachment as? DTImageTextAttachment)?.image
 
         return imageView
+    }
+
+    nonisolated static func attachmentViewFrame(
+        proposedFrame: CGRect,
+        displaySize: CGSize
+    ) -> CGRect {
+        guard displaySize.width > 0,
+              displaySize.height > 0 else {
+            return proposedFrame
+        }
+
+        let yOffset = proposedFrame.height > displaySize.height
+            ? (proposedFrame.height - displaySize.height) / 2
+            : 0
+        return CGRect(
+            x: proposedFrame.minX,
+            y: proposedFrame.minY + yOffset,
+            width: displaySize.width,
+            height: displaySize.height
+        )
     }
 
     func attributedTextContentView(

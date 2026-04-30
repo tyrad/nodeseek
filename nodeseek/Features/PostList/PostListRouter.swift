@@ -33,7 +33,11 @@ class PostListRouter: PostListRouterProtocol {
     
     // MARK: - Navigation
     func navigateToPostDetail(post: PostSummary) {
-        let detailViewController = PostDetailRouter.createModule(post: post)
+        navigateToPostDetail(post: post, page: 1)
+    }
+
+    func navigateToPostDetail(post: PostSummary, page: Int) {
+        let detailViewController = PostDetailRouter.createModule(post: post, page: page)
         viewController?.navigationController?.pushViewController(detailViewController, animated: true)
     }
 
