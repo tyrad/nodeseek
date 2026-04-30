@@ -705,6 +705,7 @@ struct DTCoreTextHTMLContentRenderer {
         h6 { font-size: 17px; }
         strong, b { font-weight: 700; }
         em, i { font-style: italic; }
+        s, del, strike { text-decoration: line-through; }
         a { color: #0f8055; text-decoration: none; }
         ul, ol { margin: 0 0 12px 0; padding-left: 22px; }
         li { margin: 0 0 6px 0; }
@@ -749,6 +750,7 @@ struct DTCoreTextHTMLContentRenderer {
         guard mutable.length > 0 else { return mutable }
 
         normalizeBaseTextAttributes(in: mutable)
+        normalizeStrikethroughAttributes(in: mutable)
         normalizeTextBlocks(in: mutable)
         normalizeParagraphStyles(in: mutable)
         normalizeLinks(in: mutable, baseURL: baseURL)
@@ -776,6 +778,27 @@ struct DTCoreTextHTMLContentRenderer {
                 ? UIColor.secondaryLabel
                 : ((value as? UIColor).map(normalizedTextColor(from:)) ?? bodyColor)
             attributed.addAttribute(.foregroundColor, value: color, range: range)
+        }
+    }
+
+    private func normalizeStrikethroughAttributes(in attributed: NSMutableAttributedString) {
+        let fullRange = NSRange(location: 0, length: attributed.length)
+        attributed.enumerateAttribute(NSAttributedString.Key(DTStrikeOutAttribute), in: fullRange) { value, range, _ in
+            guard isEnabledAttributeValue(value) else { return }
+            attributed.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: range)
+        }
+    }
+
+    private func isEnabledAttributeValue(_ value: Any?) -> Bool {
+        switch value {
+        case let number as NSNumber:
+            return number.intValue != 0
+        case let int as Int:
+            return int != 0
+        case let bool as Bool:
+            return bool
+        default:
+            return false
         }
     }
 

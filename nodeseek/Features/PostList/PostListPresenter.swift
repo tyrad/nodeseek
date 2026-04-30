@@ -75,10 +75,6 @@ class PostListPresenter: PostListPresenterProtocol {
         view?.showDetailTestInput()
     }
 
-    func didTapStrikethroughTest() {
-        router.navigateToStrikethroughTest()
-    }
-
     func didSubmitDetailTestURL(_ rawURL: String) {
         guard let target = PostDetailTestTarget(rawValue: rawURL) else {
             view?.showError(message: "请输入 NodeSeek 帖子详情链接，例如 https://www.nodeseek.com/post-705039-1")

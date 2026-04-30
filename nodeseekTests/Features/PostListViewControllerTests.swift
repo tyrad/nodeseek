@@ -184,7 +184,6 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
     private(set) var toggleSortCount = 0
     private(set) var didTapLoginCount = 0
     private(set) var didTapDetailTestCount = 0
-    private(set) var didTapStrikethroughTestCount = 0
     private(set) var submittedDetailTestURL: String?
 
     func viewDidLoad() {
@@ -203,10 +202,6 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
 
     func didTapDetailTest() {
         didTapDetailTestCount += 1
-    }
-
-    func didTapStrikethroughTest() {
-        didTapStrikethroughTestCount += 1
     }
 
     func didSubmitDetailTestURL(_ rawURL: String) {

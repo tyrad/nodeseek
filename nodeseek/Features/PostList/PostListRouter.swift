@@ -52,8 +52,4 @@ class PostListRouter: PostListRouterProtocol {
         viewController?.present(navigationWrapper, animated: true)
     }
 
-    func navigateToStrikethroughTest() {
-        let testViewController = StrikethroughTestViewController()
-        viewController?.navigationController?.pushViewController(testViewController, animated: true)
-    }
 }

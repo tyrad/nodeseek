@@ -30,7 +30,6 @@ protocol PostListPresenterProtocol: AnyObject {
     func didToggleSortMode()
     func didTapLogin()
     func didTapDetailTest()
-    func didTapStrikethroughTest()
     func didSubmitDetailTestURL(_ rawURL: String)
     func didPullToRefresh()
     func didSelectPost(at index: Int)
@@ -59,5 +58,4 @@ protocol PostListRouterProtocol: AnyObject {
     func navigateToPostDetail(post: PostSummary)
     func navigateToPostDetail(post: PostSummary, page: Int)
     func navigateToLogin(onClose: @escaping @MainActor () -> Void)
-    func navigateToStrikethroughTest()
 }

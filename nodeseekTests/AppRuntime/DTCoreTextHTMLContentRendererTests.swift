@@ -221,6 +221,39 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(color?.isClose(to: UIColor(red: 15 / 255, green: 128 / 255, blue: 85 / 255, alpha: 1)) == true)
     }
 
+    @Test func rendersDeletedTextWithStandardStrikethroughAttribute() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: "<p><s>期待那天</s><br>不用梯子那天</p>",
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributed = try #require(
+            blocks.compactMap { block -> NSAttributedString? in
+                guard case .text(let text) = block else { return nil }
+                return text
+            }.first
+        )
+
+        let deletedRange = (attributed.string as NSString).range(of: "期待那天")
+        let normalRange = (attributed.string as NSString).range(of: "不用梯子那天")
+        #expect(deletedRange.location != NSNotFound)
+        #expect(normalRange.location != NSNotFound)
+        let deletedStyle = attributed.attribute(
+            .strikethroughStyle,
+            at: deletedRange.location,
+            effectiveRange: nil
+        ) as? NSNumber
+        let normalStyle = attributed.attribute(
+            .strikethroughStyle,
+            at: normalRange.location,
+            effectiveRange: nil
+        ) as? NSNumber
+        #expect((deletedStyle?.intValue ?? 0) != 0)
+        #expect((normalStyle?.intValue ?? 0) == 0)
+    }
+
     @Test func rendersBlockquoteWithTextBlockBackground() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))

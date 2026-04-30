@@ -13,7 +13,6 @@ final class PostListSideMenuViewController: UIViewController {
     private var isAccountLoggedIn = false
     var onLoginTapped: (() -> Void)?
     var onDetailTestTapped: (() -> Void)?
-    var onStrikethroughTestTapped: (() -> Void)?
     private let avatarLoader = AvatarImageLoader.shared
 
     private static let defaultAvatarImage: UIImage? = {
@@ -123,23 +122,6 @@ final class PostListSideMenuViewController: UIViewController {
         return button
     }()
 
-    private let strikethroughTestButton: UIButton = {
-        let button = UIButton(type: .system)
-        let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
-        var configuration = UIButton.Configuration.plain()
-        configuration.image = UIImage(systemName: "strikethrough", withConfiguration: symbolConfiguration)
-            ?? UIImage(systemName: "textformat", withConfiguration: symbolConfiguration)
-        configuration.imagePadding = 10
-        configuration.baseForegroundColor = .label
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)
-        configuration.title = "删除线测试"
-        button.configuration = configuration
-        button.contentHorizontalAlignment = .leading
-        button.accessibilityIdentifier = "post-list-side-menu-strikethrough-test-button"
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
-    }()
-
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -186,7 +168,6 @@ final class PostListSideMenuViewController: UIViewController {
         backdropView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(backdropTapped)))
         accountHeaderButton.addTarget(self, action: #selector(accountHeaderTapped), for: .touchUpInside)
         detailTestButton.addTarget(self, action: #selector(detailTestButtonTapped), for: .touchUpInside)
-        strikethroughTestButton.addTarget(self, action: #selector(strikethroughTestButtonTapped), for: .touchUpInside)
         settingsButton.addTarget(self, action: #selector(settingsButtonTapped), for: .touchUpInside)
 
         view.addSubview(backdropView)
@@ -195,7 +176,6 @@ final class PostListSideMenuViewController: UIViewController {
         sideMenuView.addSubview(nameLabel)
         sideMenuView.addSubview(statsLabel)
         sideMenuView.addSubview(accountHeaderButton)
-        sideMenuView.addSubview(strikethroughTestButton)
         sideMenuView.addSubview(detailTestButton)
         sideMenuView.addSubview(settingsButton)
 
@@ -234,11 +214,6 @@ final class PostListSideMenuViewController: UIViewController {
             accountHeaderButton.topAnchor.constraint(equalTo: avatarImageView.topAnchor, constant: -8),
             accountHeaderButton.bottomAnchor.constraint(equalTo: avatarImageView.bottomAnchor, constant: 8),
 
-            strikethroughTestButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
-            strikethroughTestButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
-            strikethroughTestButton.bottomAnchor.constraint(equalTo: detailTestButton.topAnchor, constant: -8),
-            strikethroughTestButton.heightAnchor.constraint(equalToConstant: 48),
-
             detailTestButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
             detailTestButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
             detailTestButton.bottomAnchor.constraint(equalTo: settingsButton.topAnchor, constant: -8),
@@ -264,11 +239,6 @@ final class PostListSideMenuViewController: UIViewController {
     @objc private func detailTestButtonTapped() {
         hide(animated: true)
         onDetailTestTapped?()
-    }
-
-    @objc private func strikethroughTestButtonTapped() {
-        hide(animated: true)
-        onStrikethroughTestTapped?()
     }
 
     @objc private func settingsButtonTapped() {

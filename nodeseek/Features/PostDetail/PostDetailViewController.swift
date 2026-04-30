@@ -1867,13 +1867,13 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
 
     override func draw(_ layer: CALayer, in context: CGContext) {
         super.draw(layer, in: context)
-        drawStrikethroughFallback(in: layoutFrame, context: context)
+        drawStrikethroughDecorations(in: layoutFrame, context: context)
     }
 
     override func draw(_ rect: CGRect) {
         super.draw(rect)
         guard let context = UIGraphicsGetCurrentContext() else { return }
-        drawStrikethroughFallback(in: layoutFrame, context: context)
+        drawStrikethroughDecorations(in: layoutFrame, context: context)
     }
 
     func configure(
@@ -2019,7 +2019,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         }
     }
 
-    private func drawStrikethroughFallback(
+    private func drawStrikethroughDecorations(
         in layoutFrame: DTCoreTextLayoutFrame?,
         context: CGContext
     ) {
@@ -2072,6 +2072,9 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
             return color
         }
         if let color = attributes[kCTForegroundColorAttributeName as NSAttributedString.Key] {
+            if let uiColor = color as? UIColor {
+                return uiColor
+            }
             return UIColor(cgColor: color as! CGColor)
         }
         return nil
