@@ -126,7 +126,7 @@ struct PostDetailPresenterTests {
         #expect(view.hideLoadingCount == 2)
     }
 
-    @Test func cancelledNormalDetailLoadShowsError() {
+    @Test func cancelledNormalDetailLoadDoesNotShowError() {
         let interactor = SpyPostDetailInteractor()
         let router = SpyPostDetailRouter()
         let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
@@ -136,12 +136,12 @@ struct PostDetailPresenterTests {
         presenter.didSelectPage(2)
         presenter.didCancelLoadPostDetail()
 
-        #expect(view.errorMessage == "请求已取消，请重试。")
+        #expect(view.errorMessage == nil)
         #expect(view.pageLoadingCount == 1)
         #expect(interactor.loadedPages == [2])
     }
 
-    @Test func failedRefreshAfterReplySubmissionShowsPublishedButRefreshFailedToast() {
+    @Test func failedRefreshAfterReplySubmissionKeepsPublishedToast() {
         let interactor = SpyPostDetailInteractor()
         let router = SpyPostDetailRouter()
         let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 2)
@@ -164,7 +164,7 @@ struct PostDetailPresenterTests {
         presenter.didFailLoadPostDetail(error: "网络错误")
 
         #expect(view.errorMessage == nil)
-        #expect(view.toastMessage == "评论已发布，刷新失败")
+        #expect(view.toastMessage == "已发布")
     }
 }
 

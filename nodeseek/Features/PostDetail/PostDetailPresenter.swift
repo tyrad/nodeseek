@@ -97,21 +97,15 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
         loadingPage = nil
         isRefreshingAfterReplySubmission = false
         view?.hideLoading()
-        if isReplyRefresh {
-            view?.showToast(message: "评论已发布，刷新失败")
-        } else {
+        if isReplyRefresh == false {
             view?.showError(message: error)
         }
     }
 
     func didCancelLoadPostDetail() {
-        let isReplyRefresh = isRefreshingAfterReplySubmission
         loadingPage = nil
         isRefreshingAfterReplySubmission = false
         view?.hideLoading()
-        if isReplyRefresh == false {
-            view?.showError(message: "请求已取消，请重试。")
-        }
     }
 
     func didSubmitReply(_ response: PostDetailSubmitReplyResponse) {

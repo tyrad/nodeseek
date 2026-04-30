@@ -23,19 +23,11 @@
 			remoteGlobalIDString = 5CD3D9502F9EFACE008DB075;
 			remoteInfo = nodeseek;
 		};
-		5CD3D9722F9EFAD0008DB075 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 5CD3D9492F9EFACE008DB075 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 5CD3D9502F9EFACE008DB075;
-			remoteInfo = nodeseek;
-		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		5CD3D9512F9EFACE008DB075 /* nodeseek.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = nodeseek.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5CD3D9672F9EFAD0008DB075 /* nodeseekTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = nodeseekTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		5CD3D9712F9EFAD0008DB075 /* nodeseekUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = nodeseekUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -62,11 +54,6 @@
 			path = nodeseekTests;
 			sourceTree = "<group>";
 		};
-		5CD3D9742F9EFAD0008DB075 /* nodeseekUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = nodeseekUITests;
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -90,13 +77,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		5CD3D96E2F9EFAD0008DB075 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -105,7 +85,6 @@
 			children = (
 				5CD3D9532F9EFACE008DB075 /* nodeseek */,
 				5CD3D96A2F9EFAD0008DB075 /* nodeseekTests */,
-				5CD3D9742F9EFAD0008DB075 /* nodeseekUITests */,
 				5CD3D9522F9EFACE008DB075 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -115,7 +94,6 @@
 			children = (
 				5CD3D9512F9EFACE008DB075 /* nodeseek.app */,
 				5CD3D9672F9EFAD0008DB075 /* nodeseekTests.xctest */,
-				5CD3D9712F9EFAD0008DB075 /* nodeseekUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -174,29 +152,6 @@
 			productReference = 5CD3D9672F9EFAD0008DB075 /* nodeseekTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		5CD3D9702F9EFAD0008DB075 /* nodeseekUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 5CD3D9822F9EFAD0008DB075 /* Build configuration list for PBXNativeTarget "nodeseekUITests" */;
-			buildPhases = (
-				5CD3D96D2F9EFAD0008DB075 /* Sources */,
-				5CD3D96E2F9EFAD0008DB075 /* Frameworks */,
-				5CD3D96F2F9EFAD0008DB075 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				5CD3D9732F9EFAD0008DB075 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				5CD3D9742F9EFAD0008DB075 /* nodeseekUITests */,
-			);
-			name = nodeseekUITests;
-			packageProductDependencies = (
-			);
-			productName = nodeseekUITests;
-			productReference = 5CD3D9712F9EFAD0008DB075 /* nodeseekUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -211,10 +166,6 @@
 						CreatedOnToolsVersion = 26.3;
 					};
 					5CD3D9662F9EFAD0008DB075 = {
-						CreatedOnToolsVersion = 26.3;
-						TestTargetID = 5CD3D9502F9EFACE008DB075;
-					};
-					5CD3D9702F9EFAD0008DB075 = {
 						CreatedOnToolsVersion = 26.3;
 						TestTargetID = 5CD3D9502F9EFACE008DB075;
 					};
@@ -244,7 +195,6 @@
 			targets = (
 				5CD3D9502F9EFACE008DB075 /* nodeseek */,
 				5CD3D9662F9EFAD0008DB075 /* nodeseekTests */,
-				5CD3D9702F9EFAD0008DB075 /* nodeseekUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -258,13 +208,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5CD3D9652F9EFAD0008DB075 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		5CD3D96F2F9EFAD0008DB075 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -288,13 +231,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		5CD3D96D2F9EFAD0008DB075 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -302,11 +238,6 @@
 			isa = PBXTargetDependency;
 			target = 5CD3D9502F9EFACE008DB075 /* nodeseek */;
 			targetProxy = 5CD3D9682F9EFAD0008DB075 /* PBXContainerItemProxy */;
-		};
-		5CD3D9732F9EFAD0008DB075 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 5CD3D9502F9EFACE008DB075 /* nodeseek */;
-			targetProxy = 5CD3D9722F9EFAD0008DB075 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -536,46 +467,6 @@
 			};
 			name = Release;
 		};
-		5CD3D9832F9EFAD0008DB075 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = Z9K94479DQ;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.mistj.nodeseekUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = nodeseek;
-			};
-			name = Debug;
-		};
-		5CD3D9842F9EFAD0008DB075 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = Z9K94479DQ;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.mistj.nodeseekUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = nodeseek;
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -602,15 +493,6 @@
 			buildConfigurations = (
 				5CD3D9802F9EFAD0008DB075 /* Debug */,
 				5CD3D9812F9EFAD0008DB075 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		5CD3D9822F9EFAD0008DB075 /* Build configuration list for PBXNativeTarget "nodeseekUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				5CD3D9832F9EFAD0008DB075 /* Debug */,
-				5CD3D9842F9EFAD0008DB075 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
