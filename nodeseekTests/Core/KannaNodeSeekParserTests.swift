@@ -216,7 +216,82 @@ struct KannaNodeSeekParserTests {
         #expect(detail.comments.first?.avatarURL?.path == "/avatar/24520.png")
         #expect(detail.comments.first?.floorText == "#4")
         #expect(detail.comments.first?.createdAtText == "34min ago")
+        #expect(detail.comments.first?.createdAtTitleText == "2026-04-27 15:58:51")
         #expect(detail.comments.first?.contentHTML.contains("CPU限制30%") == true)
+        #expect(detail.isLastPage == false)
+    }
+
+    @Test func parsesPostDetailPaginationFromFixture() throws {
+        let html = try FixtureLoader.html(named: "post-703863-1")
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(
+            html: html,
+            url: URL(string: "https://www.nodeseek.com/post-703863-1")!
+        )
+
+        let pagination = try #require(detail.pagination)
+        #expect(detail.page == 1)
+        #expect(pagination.currentPage == 1)
+        #expect(pagination.previousPage == nil)
+        #expect(pagination.nextPage == 2)
+        #expect(pagination.items.map(\.page) == [1, 2, 3, 4])
+        #expect(pagination.items.first?.isCurrent == true)
+        #expect(pagination.items.dropFirst().first?.isCurrent == false)
+        #expect(pagination.items.dropFirst().first?.url?.path == "/post-703863-2")
+    }
+
+    @Test func parsesPostDetailLaterPageWithoutPostBody() throws {
+        let html = """
+        <div class="nsk-post-wrapper">
+            <div class="nsk-post">
+                <div class="post-title">
+                    <h1><a href="/post-706714-1" class="post-title-link">一周内第五个龟壳到手，圣何塞区</a></h1>
+                </div>
+            </div>
+            <div class="comment-container">
+                <div class="nsk-pager post-top-pager">
+                    <div role="navigation" aria-label="pagination">
+                        <a href="/post-706714-1" rel="prev" class="pager-prev"><div class="triangle-left"></div></a>
+                        <a href="/post-706714-1" aria-label="page1" class="pager-pos">1</a>
+                        <span href="/post-706714-2" aria-label="page2" aria-current="page" class="pager-pos pager-cur">2</span>
+                        <a href="/post-706714-3" aria-label="page3" class="pager-pos">3</a>
+                        <a href="/post-706714-3" rel="next" class="pager-next"><div class="triangle-right"></div></a>
+                    </div>
+                </div>
+                <ul class="comments">
+                    <li data-comment-id="9765301" id="11" class="content-item">
+                        <div class="nsk-content-meta-info">
+                            <div class="avatar-wrapper"><a title="liuqin" href="/space/2077"><img src="/avatar/2077.png" alt="liuqin" class="avatar-normal"></a></div>
+                            <div><div class="author-info"><a href="/space/2077" class="author-name">liuqin</a></div>
+                            <div class="content-info"><span class="date-created"><time datetime="2026-04-29T07:36:40.000Z">1h 18min ago</time></span></div></div>
+                            <div class="floor-link-wrapper"><a href="#11" class="floor-link">#11</a></div>
+                        </div>
+                        <article class="post-content"><p>有没搞错，5个龟壳，真离谱啊</p></article>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(
+            html: html,
+            url: URL(string: "https://www.nodeseek.com/post-706714-2")!
+        )
+
+        #expect(detail.id == "706714")
+        #expect(detail.title == "一周内第五个龟壳到手，圣何塞区")
+        #expect(detail.page == 2)
+        #expect(detail.contentHTML.isEmpty)
+        #expect(detail.comments.count == 1)
+        #expect(detail.comments.first?.authorName == "liuqin")
+        let pagination = try #require(detail.pagination)
+        #expect(pagination.currentPage == 2)
+        #expect(pagination.previousPage == 1)
+        #expect(pagination.nextPage == 3)
+        #expect(pagination.items.map(\.page) == [1, 2, 3])
+        #expect(pagination.items[1].isCurrent)
     }
 
     @Test func parsesPostDetailContentFromDivPostContentFallback() throws {
@@ -290,5 +365,43 @@ struct KannaNodeSeekParserTests {
         #expect(detail.contentHTML.contains("language-ansi"))
         #expect(detail.contentHTML.contains("https://i.111666.best/image/G9D5ncG5qndySgQtNwvFq4.webp"))
         #expect(detail.contentHTML.contains("https://i.111666.best/image/noEhdCSyuAeuREqqSWgdY5.webp"))
+        #expect(detail.isLastPage)
+    }
+
+    @Test func parsesLastPageStateFromPagerNextLink() throws {
+        let baseURL = URL(string: "https://www.nodeseek.com")!
+        let parser = KannaNodeSeekParser(baseURL: baseURL)
+        let htmlWithNext = """
+        <div class="nsk-post">
+            <div class="post-title"><h1><a class="post-title-link" href="/post-1-1">标题</a></h1></div>
+            <div class="content-item">
+                <a class="author-name">作者</a>
+                <article class="post-content"><p>正文</p></article>
+            </div>
+        </div>
+        <div class="comment-container">
+            <a href="/post-1-2" rel="next" class="pager-next"></a>
+            <ul class="comments"></ul>
+        </div>
+        """
+        let htmlWithoutNext = """
+        <div class="nsk-post">
+            <div class="post-title"><h1><a class="post-title-link" href="/post-1-2">标题</a></h1></div>
+            <div class="content-item">
+                <a class="author-name">作者</a>
+                <article class="post-content"><p>正文</p></article>
+            </div>
+        </div>
+        <div class="comment-container">
+            <span class="pager-next" aria-disabled="true"></span>
+            <ul class="comments"></ul>
+        </div>
+        """
+
+        let firstPage = try parser.parsePostDetail(html: htmlWithNext, url: URL(string: "https://www.nodeseek.com/post-1-1")!)
+        let lastPage = try parser.parsePostDetail(html: htmlWithoutNext, url: URL(string: "https://www.nodeseek.com/post-1-2")!)
+
+        #expect(firstPage.isLastPage == false)
+        #expect(lastPage.isLastPage)
     }
 }

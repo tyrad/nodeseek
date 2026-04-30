@@ -242,6 +242,28 @@ struct NodeSeekServiceTests {
         #expect(requestedURLs.first?.pathExtension.isEmpty == true)
     }
 
+    @Test func loadsPostDetailRequestedPageURL() async throws {
+        let html = try FixtureLoader.html(named: "post-703863-1")
+        let url = URL(string: "https://www.nodeseek.com/")!
+        let htmlClient = URLCapturingHTMLClient(response: HTMLResponse(
+            statusCode: 200,
+            headers: [:],
+            finalURL: URL(string: "https://www.nodeseek.com/post-703863-3")!,
+            html: html
+        ))
+        let service = NodeSeekService(
+            baseURL: url,
+            htmlClient: htmlClient,
+            parser: KannaNodeSeekParser(baseURL: url)
+        )
+
+        _ = try await service.loadPostDetail(postID: "703863", page: 3)
+        let requestedURLs = await htmlClient.requestedURLs()
+
+        #expect(requestedURLs.count == 1)
+        #expect(requestedURLs.first?.path == "/post-703863-3")
+    }
+
     @Test func returnsLoginRequiredWhenPostDetailIsRestrictedToRegisteredUsers() async throws {
         let html = try FixtureLoader.html(named: "post-login-required")
         let finalURL = URL(string: "https://www.nodeseek.com/post-704286-1")!

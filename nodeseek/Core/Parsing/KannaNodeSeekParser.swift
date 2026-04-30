@@ -160,24 +160,25 @@ struct KannaNodeSeekParser: NodeSeekParser {
             throw NodeSeekParserError.postDetailNotFound
         }
 
-        guard let bodyItem = document.at_xpath(XPathRules.postDetailBodyItem) else {
-            throw NodeSeekParserError.postDetailNotFound
-        }
-
-        let authorName = firstText(in: bodyItem, xpaths: [XPathRules.contentAuthor]) ?? ""
-        let avatarURL = firstAttribute(
-            in: bodyItem,
-            xpaths: [XPathRules.postAvatar, XPathRules.fallbackAvatar],
-            attribute: "src"
-        ).flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
-        let createdAtText = firstText(in: bodyItem, xpaths: [XPathRules.contentCreatedAt])
-        let categoryText = firstText(in: bodyItem, xpaths: [XPathRules.contentCategory])
+        let bodyItem = document.at_xpath(XPathRules.postDetailBodyItem)
+        let authorName = bodyItem.flatMap { firstText(in: $0, xpaths: [XPathRules.contentAuthor]) } ?? ""
+        let avatarURL = bodyItem.flatMap {
+            firstAttribute(
+                in: $0,
+                xpaths: [XPathRules.postAvatar, XPathRules.fallbackAvatar],
+                attribute: "src"
+            )
+        }.flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
+        let createdAtText = bodyItem.flatMap { firstText(in: $0, xpaths: [XPathRules.contentCreatedAt]) }
+        let categoryText = bodyItem.flatMap { firstText(in: $0, xpaths: [XPathRules.contentCategory]) }
         let metadataText = [createdAtText, categoryText].compactMap(\.self).joined(separator: " · ").trimmedNonEmpty
-        let contentHTML = bodyItem.at_xpath(XPathRules.contentArticle)?.innerHTML?.trimmedNonEmpty ?? ""
+        let contentHTML = bodyItem?.at_xpath(XPathRules.contentArticle)?.innerHTML?.trimmedNonEmpty ?? ""
 
         let comments = document.xpath(XPathRules.postDetailComments).compactMap { item -> Comment? in
             parseComment(item)
         }
+        let page = Self.postPage(from: url) ?? 1
+        let pagination = parsePostDetailPagination(in: document, pageURL: url)
 
         return PostDetail(
             id: Self.postID(from: url) ?? title,
@@ -187,7 +188,10 @@ struct KannaNodeSeekParser: NodeSeekParser {
             metadataText: metadataText,
             contentHTML: contentHTML,
             comments: comments,
-            replyForm: nil
+            replyForm: nil,
+            page: page,
+            pagination: pagination,
+            isLastPage: document.at_xpath(XPathRules.postDetailNextPage) == nil
         )
     }
 
@@ -209,6 +213,26 @@ struct KannaNodeSeekParser: NodeSeekParser {
             .components(separatedBy: CharacterSet.decimalDigits.inverted)
             .joined()
             .trimmedNonEmpty
+    }
+
+    private static func postPage(from url: URL) -> Int? {
+        let path = url.path
+        guard let range = path.range(of: #"post[-/]\d+-(\d+)"#, options: .regularExpression) else {
+            return nil
+        }
+
+        return String(path[range])
+            .components(separatedBy: CharacterSet.decimalDigits.inverted)
+            .compactMap(Int.init)
+            .last
+    }
+
+    private static func postPage(from href: String?, relativeTo baseURL: URL) -> Int? {
+        guard let href,
+              let url = URL(string: href, relativeTo: baseURL)?.absoluteURL else {
+            return nil
+        }
+        return postPage(from: url)
     }
     
     private static func firstInteger(in text: String) -> Int? {
@@ -239,6 +263,41 @@ struct KannaNodeSeekParser: NodeSeekParser {
         return firstInteger(in: text)
     }
 
+    private func parsePostDetailPagination(in document: HTMLDocument, pageURL: URL) -> PostDetailPagination? {
+        guard let pager = document.at_xpath(XPathRules.postDetailPagination) else {
+            return nil
+        }
+
+        let currentPageFromURL = Self.postPage(from: pageURL) ?? 1
+        var seenPages: Set<Int> = []
+        var items: [PostDetailPageItem] = []
+
+        for item in pager.xpath(XPathRules.pagerPositionItems) {
+            let page = Self.firstInteger(in: item.text ?? "")
+                ?? Self.postPage(from: item["href"], relativeTo: baseURL)
+            guard let page, page > 0, seenPages.insert(page).inserted else {
+                continue
+            }
+
+            let url = item["href"]
+                .flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
+            let className = item["class"] ?? ""
+            let isCurrent = className.contains("pager-cur") || page == currentPageFromURL && url == nil
+            items.append(PostDetailPageItem(page: page, url: url, isCurrent: isCurrent))
+        }
+
+        let currentPage = items.first(where: \.isCurrent)?.page ?? currentPageFromURL
+        let previousPage = Self.postPage(from: pager.at_xpath(XPathRules.pagerPrevious)?["href"], relativeTo: baseURL)
+        let nextPage = Self.postPage(from: pager.at_xpath(XPathRules.pagerNext)?["href"], relativeTo: baseURL)
+        let pagination = PostDetailPagination(
+            currentPage: currentPage,
+            items: items,
+            previousPage: previousPage,
+            nextPage: nextPage
+        )
+        return pagination.hasMultiplePages ? pagination : nil
+    }
+
     private func parseComment(_ item: XMLElement) -> Comment? {
         guard let authorName = firstText(in: item, xpaths: [XPathRules.contentAuthor]) else {
             return nil
@@ -260,6 +319,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
             avatarURL: avatarURL,
             floorText: firstText(in: item, xpaths: [XPathRules.contentFloor]),
             createdAtText: firstText(in: item, xpaths: [XPathRules.contentCreatedAt]),
+            createdAtTitleText: item.at_xpath(XPathRules.contentCreatedAt)?["title"]?.trimmedNonEmpty,
             contentHTML: item.at_xpath(XPathRules.contentArticle)?.innerHTML?.trimmedNonEmpty ?? ""
         )
     }

@@ -32,10 +32,16 @@ struct RenderedCodeBlock: Equatable {
     let text: String
 }
 
+struct RenderedImageBlock: Equatable {
+    let url: URL
+    let altText: String?
+}
+
 enum RenderedContentBlock {
     case text(NSAttributedString)
     case table(RenderedTableBlock)
     case codeBlock(RenderedCodeBlock)
+    case image(RenderedImageBlock)
     case imagePlaceholder(URL?)
     case unsupported(reason: String)
 }

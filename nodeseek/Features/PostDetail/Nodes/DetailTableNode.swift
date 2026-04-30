@@ -39,7 +39,12 @@ enum DetailContentBlockNodeFactory {
         onLinkTapped: @escaping (URL) -> Void,
         onTextLayoutInvalidated: @escaping () -> Void
     ) -> [ASDisplayNode] {
-        blocks.compactMap { block in
+        let imageURLs = blocks.compactMap { block -> URL? in
+            guard case .image(let imageBlock) = block else { return nil }
+            return imageBlock.url
+        }
+        var imageIndex = 0
+        return blocks.compactMap { block -> ASDisplayNode? in
             switch block {
             case .text(let attributedText):
                 guard attributedText.length > 0 else { return nil }
@@ -60,6 +65,16 @@ enum DetailContentBlockNodeFactory {
                     return nil
                 }
                 return DetailCodeBlockNode(codeBlock: codeBlock)
+            case .image(let imageBlock):
+                let index = imageIndex
+                imageIndex += 1
+                return DetailImageBlockNode(
+                    imageBlock: imageBlock,
+                    imageURLs: imageURLs,
+                    imageIndex: index,
+                    onImageTapped: onImageTapped,
+                    onLayoutInvalidated: onTextLayoutInvalidated
+                )
             case .imagePlaceholder(let url):
                 return plainTextNode(url?.absoluteString ?? "[图片]")
             case .unsupported(let reason):
