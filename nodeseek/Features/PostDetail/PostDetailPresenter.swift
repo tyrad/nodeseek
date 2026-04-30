@@ -17,6 +17,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
     private var loadingPage: Int?
     private var currentDetail: PostDetail?
     private var isSubmittingReply = false
+    private var isRefreshingAfterReplySubmission = false
     
     // MARK: - Initialization
     init(
@@ -77,6 +78,7 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
     
     func didLoadPostDetail(_ response: PostDetailResponse) {
         loadingPage = nil
+        isRefreshingAfterReplySubmission = false
         currentPage = max(1, response.detail.page)
         currentDetail = response.detail
         view?.hideLoading()
@@ -85,14 +87,31 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
 
     func didRequireLogin(message: String) {
         loadingPage = nil
+        isRefreshingAfterReplySubmission = false
         view?.hideLoading()
         view?.renderLoginRequired(message: message)
     }
     
     func didFailLoadPostDetail(error: String) {
+        let isReplyRefresh = isRefreshingAfterReplySubmission
         loadingPage = nil
+        isRefreshingAfterReplySubmission = false
         view?.hideLoading()
-        view?.showError(message: error)
+        if isReplyRefresh {
+            view?.showToast(message: "评论已发布，刷新失败")
+        } else {
+            view?.showError(message: error)
+        }
+    }
+
+    func didCancelLoadPostDetail() {
+        let isReplyRefresh = isRefreshingAfterReplySubmission
+        loadingPage = nil
+        isRefreshingAfterReplySubmission = false
+        view?.hideLoading()
+        if isReplyRefresh == false {
+            view?.showError(message: "请求已取消，请重试。")
+        }
     }
 
     func didSubmitReply(_ response: PostDetailSubmitReplyResponse) {
@@ -109,7 +128,7 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
                 toastMessage = "评论已发布"
             }
             view?.showToast(message: toastMessage)
-            view?.showLoading()
+            isRefreshingAfterReplySubmission = true
             interactor.loadPostDetail(page: currentPage)
         } else {
             view?.showToast(message: "评论已发布，可到最后一页查看")

@@ -57,9 +57,14 @@ class PostDetailInteractor: PostDetailInteractorInput {
                     presenter?.didLoadPostDetail(PostDetailResponse(detail: detail))
                 }
             } catch {
-                logger.error("帖子详情加载失败，postID=\(post.id, privacy: .public): \(error.localizedDescription)")
                 await MainActor.run {
-                    presenter?.didFailLoadPostDetail(error: error.localizedDescription)
+                    if Self.isCancelledLoad(error) {
+                        logger.info("帖子详情加载取消，postID=\(post.id, privacy: .public)")
+                        presenter?.didCancelLoadPostDetail()
+                    } else {
+                        logger.error("帖子详情加载失败，postID=\(post.id, privacy: .public): \(error.localizedDescription)")
+                        presenter?.didFailLoadPostDetail(error: error.localizedDescription)
+                    }
                 }
             }
         }
@@ -116,6 +121,11 @@ class PostDetailInteractor: PostDetailInteractorInput {
             }
             throw PostDetailLoadError.challengeRequired(message)
         }
+    }
+
+    private static func isCancelledLoad(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 }
 

@@ -212,6 +212,10 @@ private final class SpyPostDetailInteractorOutput: PostDetailInteractorOutput {
         errorMessage = error
     }
 
+    func didCancelLoadPostDetail() {
+        errorMessage = "cancelled"
+    }
+
     func didSubmitReply(_ response: PostDetailSubmitReplyResponse) {
         didSubmitReplyCount += 1
         submitReplyResponse = response

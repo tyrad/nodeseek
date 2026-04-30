@@ -96,6 +96,75 @@ struct PostDetailPresenterTests {
         #expect(view.finishReplySubmissionCount == 1)
         #expect(view.toastMessage == "已发布")
         #expect(interactor.loadedPages == [2])
+        #expect(view.loadingCount == 0)
+    }
+
+    @Test func cancelledRefreshAfterReplySubmissionDoesNotShowError() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 2)
+        let view = SpyPostDetailView()
+        presenter.setView(view)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [],
+            page: 2,
+            isLastPage: true
+        )))
+
+        presenter.didTapSendReply(content: "测试回复")
+        presenter.didSubmitReply(PostDetailSubmitReplyResponse(message: "已发布"))
+        presenter.didCancelLoadPostDetail()
+
+        #expect(view.errorMessage == nil)
+        #expect(view.toastMessage == "已发布")
+        #expect(view.hideLoadingCount == 2)
+    }
+
+    @Test func cancelledNormalDetailLoadShowsError() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        let view = SpyPostDetailView()
+        presenter.setView(view)
+
+        presenter.didSelectPage(2)
+        presenter.didCancelLoadPostDetail()
+
+        #expect(view.errorMessage == "请求已取消，请重试。")
+        #expect(view.pageLoadingCount == 1)
+        #expect(interactor.loadedPages == [2])
+    }
+
+    @Test func failedRefreshAfterReplySubmissionShowsPublishedButRefreshFailedToast() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 2)
+        let view = SpyPostDetailView()
+        presenter.setView(view)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [],
+            page: 2,
+            isLastPage: true
+        )))
+
+        presenter.didTapSendReply(content: "测试回复")
+        presenter.didSubmitReply(PostDetailSubmitReplyResponse(message: "已发布"))
+        presenter.didFailLoadPostDetail(error: "网络错误")
+
+        #expect(view.errorMessage == nil)
+        #expect(view.toastMessage == "评论已发布，刷新失败")
     }
 }
 
@@ -135,10 +204,11 @@ private final class SpyPostDetailView: PostDetailViewProtocol {
     var toastMessage: String?
     private(set) var replySubmittingStates: [Bool] = []
     private(set) var finishReplySubmissionCount = 0
+    private(set) var hideLoadingCount = 0
 
     func showLoading() { loadingCount += 1 }
     func showPageLoading() { pageLoadingCount += 1 }
-    func hideLoading() {}
+    func hideLoading() { hideLoadingCount += 1 }
     func showError(message: String) { errorMessage = message }
     func showToast(message: String) { toastMessage = message }
     func setReplySubmitting(_ isSubmitting: Bool) { replySubmittingStates.append(isSubmitting) }
