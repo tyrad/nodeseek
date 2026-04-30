@@ -19,7 +19,7 @@ final class PageScrubberView: UIView {
         static let loadingIndicatorSize: CGFloat = 16
         static let loadingIndicatorSpacing: CGFloat = 8
         static let trailingEdgeCompensation: CGFloat = 16
-        static let globalTriggerWidth: CGFloat = 72
+        static let hitTargetOutset: CGFloat = 8
         static let expandedCornerRadius: CGFloat = 18
         static let snapRatio: CGFloat = 0.08
         static let accelerationPower: CGFloat = 1.35
@@ -100,7 +100,24 @@ final class PageScrubberView: UIView {
 
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
         guard isHidden == false, alpha > 0.01, isUserInteractionEnabled else { return false }
-        return point.x >= bounds.maxX - Layout.globalTriggerWidth
+        return currentHitFrame().contains(point)
+    }
+
+    private func currentHitFrame() -> CGRect {
+        let visibleFrame: CGRect
+        if isScrubbing || barView.alpha > 0.01 {
+            visibleFrame = effectiveTrackFrame()
+        } else if toggleButton.frame.isEmpty == false {
+            visibleFrame = toggleButton.frame
+        } else {
+            visibleFrame = CGRect(
+                x: bounds.minX,
+                y: bounds.midY - Layout.collapsedHeight / 2,
+                width: bounds.width,
+                height: Layout.collapsedHeight
+            )
+        }
+        return visibleFrame.insetBy(dx: -Layout.hitTargetOutset, dy: -Layout.hitTargetOutset)
     }
 
     private func installHUDInSuperviewIfNeeded() {

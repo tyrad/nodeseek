@@ -140,7 +140,7 @@ struct PostDetailViewControllerTests {
         view.configure(currentPage: 2, totalPages: 5, isLoading: false)
         view.frame = CGRect(x: 0, y: 0, width: 58, height: 220)
 
-        #expect(view.alpha == 0.62)
+        #expect(abs(view.alpha - 0.62) < 0.001)
 
         view.beginScrubbingForTesting(at: 110)
 
@@ -206,6 +206,22 @@ struct PostDetailViewControllerTests {
 
         #expect(selectedPages.isEmpty)
         #expect(view.alpha == 1)
+    }
+
+    @Test func pageScrubberOnlyHandlesTouchesNearVisibleControlWhenCollapsed() throws {
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 640))
+        let view = PageScrubberView()
+        container.addSubview(view)
+        NSLayoutConstraint.activate([
+            view.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: 12),
+            view.topAnchor.constraint(equalTo: container.topAnchor),
+            view.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        ])
+        view.configure(currentPage: 50, totalPages: 100, isLoading: false)
+        container.layoutIfNeeded()
+
+        #expect(view.point(inside: CGPoint(x: 57, y: 24), with: nil) == false)
+        #expect(view.point(inside: CGPoint(x: 57, y: 320), with: nil) == true)
     }
 
     @Test func selectingPageThroughDetailScrubberCallsPresenter() throws {
