@@ -22,15 +22,28 @@
 
 文件放置规则：
 
-- `nodeseek/Core/Domain/`：纯数据模型、结果类型、跨 feature 共享的业务实体。不得依赖 UIKit、WebKit、Texture、DTCoreText、Kingfisher。
-- `nodeseek/Core/Parsing/`：HTML 解析协议与 Kanna 实现。解析规则优先放在 `XPathRules.swift` 或 parser 内，不要散落到 ViewController。
-- `nodeseek/Core/Networking/`：网络协议、URLSession 客户端、表单编码、challenge 检测、提交逻辑。WebKit 宿主类仍可放这里，但不能加入 SwiftPM target。
-- `nodeseek/Core/Rendering/`：渲染输入/输出模型和布局纯函数。依赖 UIKit/DTCoreText 的渲染实现仍留在 Xcode App 测试路径，不加入 SwiftPM 快速测试路径。
-- `nodeseek/Core/Imaging/`：图片下载、SVG/GIF/Kingfisher/SwiftDraw 相关逻辑。默认不加入 SwiftPM target。
-- `nodeseek/Core/UI/`：UIKit 共享控件。只走 Xcode 构建和测试。
+- `nodeseek/SharedCore/`：App 与 SwiftPM tests 共享的纯逻辑。允许 Foundation、CoreGraphics、Kanna 等 macOS SwiftPM 可运行依赖；不得依赖 UIKit、WebKit、Texture、DTCoreText、Kingfisher、SwiftDraw、App 生命周期或模拟器。
+- `nodeseek/SharedCore/Domain/`：纯数据模型、结果类型、跨 feature 共享的业务实体。
+- `nodeseek/SharedCore/Parsing/`：HTML 解析协议、Kanna parser 和解析规则。解析规则优先放在 `XPathRules.swift` 或 parser 内，不要散落到 ViewController。
+- `nodeseek/SharedCore/HTTP/`：网络协议、URLSession 客户端、表单编码、challenge 检测等可在 SwiftPM/macOS 测试进程运行的 HTTP 逻辑。
+- `nodeseek/SharedCore/Composer/`：评论、发帖等内容构造和提交前的纯逻辑。
+- `nodeseek/SharedCore/Layout/`：渲染输入/输出模型、尺寸计算和布局纯函数。
+- `nodeseek/AppRuntime/`：需要 iOS App runtime 或第三方 UI/runtime 框架的基础设施。只走 Xcode 构建和 App-hosted 测试。
+- `nodeseek/AppRuntime/Web/`：WebKit、网页登录、页面加载和 Web 宿主相关逻辑。
+- `nodeseek/AppRuntime/Rendering/`：依赖 UIKit、Texture、DTCoreText 等 App runtime 的渲染实现。
+- `nodeseek/AppRuntime/Images/`：图片下载、预览、SVG/GIF、Kingfisher、SwiftDraw 等 runtime 相关图片能力。
+- `nodeseek/AppRuntime/UI/`：UIKit/Texture 共享控件和 UI 基础设施。
+- `nodeseek/AppRuntime/Services/`：依赖 App runtime、WebKit 或 Xcode App target 的服务实现。
 - `nodeseek/Features/`：VIPER feature 层。Presenter/Interactor 可以用 Xcode 单测；ViewController、Router、Texture node 走 App-hosted tests。
-- `nodeseekTests/Core/`：Core 单测。纯 Foundation/CoreGraphics/Kanna 的测试优先纳入 SwiftPM；UIKit/WebKit/DTCoreText/Texture 测试继续只走 Xcode。
+- `nodeseek/App/`：App 生命周期、启动动画、根路由和模板 App 控制器。
+- `nodeseek/Resources/`：Info.plist、Assets.xcassets 等 App 资源。注意 Info.plist 由 Xcode build setting 管理，不是 SwiftPM 资源。
+- `nodeseekTests/SharedCore/`：SharedCore 纯逻辑测试。能脱离 App host 的 Foundation/CoreGraphics/Kanna 测试优先纳入 SwiftPM。
+- `nodeseekTests/AppRuntime/`：AppRuntime 测试。UIKit、WebKit、DTCoreText、Texture、图片预览和 runtime 服务测试只走 Xcode App-hosted tests。
 - `nodeseekTests/Features/`：feature 层测试。默认走 Xcode，除非明确拆出纯逻辑模块。
+- `nodeseekTests/App/`：App 生命周期、启动和根路由相关测试，只走 Xcode App-hosted tests。
+- `nodeseekTests/Fixtures/`：测试 fixture。读取逻辑要同时兼容 `Bundle.module` 和 Xcode test bundle。
+
+新增文件先按“能否脱离 App host 在 SwiftPM/macOS 测试进程运行”判断目录，不要因为名称像 Core 就放进共享路径。
 
 新增 SwiftPM 覆盖文件时，先确认该文件能在 macOS 测试进程中运行：
 
@@ -55,12 +68,12 @@
 
 测试选择规则：
 
-- 改 `Core/Domain`、`Core/Parsing`、`Core/Networking` 中可独立运行的纯逻辑：先跑 `make spm-test`。
-- 改 presenter/interactor 或仍依赖 App target 的单测：跑 `make xcode-test-class TEST=测试类名`。
-- 改 UIKit、WebKit、Texture、DTCoreText、图片预览、App 生命周期：跑对应 Xcode 窄范围测试。
-- 提交前如果改动跨 Core 和 UI，至少跑一次 `make xcode-build-tests`，必要时再跑 `make xcode-test-full`。
+- 改 `SharedCore` 下可独立运行的纯逻辑：先跑 `make spm-test`。
+- 改 `AppRuntime`、UIKit、WebKit、Texture、DTCoreText、图片预览、App 生命周期：跑对应 Xcode 窄范围测试。
+- 改 `Features` presenter/interactor 或仍依赖 App target 的单测：跑 `make xcode-test-class TEST=测试类名`。
+- 提交前如果改动跨 SharedCore 和 UI/runtime，至少跑一次 `make xcode-build-tests`，必要时再跑 `make xcode-test-full`。
 
-纯 Core 逻辑优先使用 SwiftPM：
+纯 SharedCore 逻辑优先使用 SwiftPM：
 
 ```bash
 make spm-test
@@ -69,7 +82,7 @@ make spm-test
 App-hosted 单测先复用构建产物：
 
 ```bash
-make xcode-test-class TEST=KannaNodeSeekParserTests
+make xcode-test-class TEST=NodeSeekServiceTests
 ```
 
 需要刷新 Xcode 测试构建产物：
@@ -100,7 +113,7 @@ xcodebuild -showdestinations -project nodeseek.xcodeproj -scheme nodeseek
 - 如果某个文件 import 了 UIKit、WebKit、Texture、DTCoreText、Kingfisher、SwiftDraw，默认不要加入 `NodeSeekCore`。
 - 如果测试因为缺少 UIKit/WebKit 类型失败，优先把该测试留在 Xcode 路径，不要为了让 `swift test` 通过而扩大 SwiftPM target。
 - fixture 放在 `nodeseekTests/Fixtures/`，测试读取要同时兼容 `Bundle.module` 和 Xcode test bundle。
-- Core 测试文件如需同时支持 SwiftPM 和 Xcode，使用：
+- SharedCore 测试文件如需同时支持 SwiftPM 和 Xcode，使用：
 
 ```swift
 #if SWIFT_PACKAGE
@@ -131,10 +144,11 @@ xcodebuild -showdestinations -project nodeseek.xcodeproj -scheme nodeseek
 
 核心网络与解析文件：
 
-- `nodeseek/Core/NodeSeekService.swift`
-- `nodeseek/Core/Networking/`
-- `nodeseek/Core/Parsing/KannaNodeSeekParser.swift`
-- `nodeseek/Core/Rendering/`
+- `nodeseek/AppRuntime/Services/NodeSeekService.swift`
+- `nodeseek/AppRuntime/Web/`
+- `nodeseek/SharedCore/HTTP/`
+- `nodeseek/SharedCore/Parsing/KannaNodeSeekParser.swift`
+- `nodeseek/AppRuntime/Rendering/`
 
 约定：
 

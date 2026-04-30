@@ -9,13 +9,13 @@ DERIVED_DATA ?= .build/XcodeDerivedData
 SOURCE_PACKAGES ?= .build/SourcePackages
 export TEST
 
-CORE_TEST_CLASSES := \
-	KannaNodeSeekParserTests \
-	ChallengeDetectorTests \
-	DetailImageLayoutTests \
+RUNTIME_TEST_CLASSES := \
 	NodeSeekServiceTests \
 	NodeSeekCommentSubmitterTests \
-	CommentComposerContentBuilderTests
+	CookieBridgeTests \
+	HTMLContentRendererTests \
+	DTCoreTextHTMLContentRendererTests \
+	LoginWebViewControllerTests
 
 XCODE_COMMON = \
 	-project "$(PROJECT)" \
@@ -28,7 +28,7 @@ XCODE_COMMON = \
 	-parallel-testing-enabled NO \
 	-maximum-concurrent-test-simulator-destinations 1
 
-.PHONY: help spm-test xcode-build-tests xcode-test-core xcode-test-class xcode-test-full
+.PHONY: help spm-test xcode-build-tests xcode-test-runtime-core xcode-test-core xcode-test-class xcode-test-full
 
 help:
 	@printf '%s\n' \
@@ -36,9 +36,10 @@ help:
 		'  make help' \
 		'  make spm-test' \
 		'  make xcode-build-tests' \
-		'  make xcode-test-core' \
-		'  make xcode-test-class TEST=KannaNodeSeekParserTests' \
-		'  make xcode-test-class TEST=KannaNodeSeekParserTests SIMULATOR_ID=<simulator-udid>' \
+		'  make xcode-test-runtime-core' \
+		'  make xcode-test-core  # alias' \
+		'  make xcode-test-class TEST=NodeSeekServiceTests' \
+		'  make xcode-test-class TEST=NodeSeekServiceTests SIMULATOR_ID=<simulator-udid>' \
 		'  make xcode-test-full' \
 		'' \
 		'Variables:' \
@@ -50,18 +51,20 @@ spm-test:
 xcode-build-tests:
 	xcodebuild -quiet build-for-testing $(XCODE_COMMON)
 
-xcode-test-core: xcode-build-tests
-	xcodebuild -quiet test-without-building $(XCODE_COMMON) $(addprefix -only-testing:nodeseekTests/,$(CORE_TEST_CLASSES))
+xcode-test-runtime-core: xcode-build-tests
+	xcodebuild -quiet test-without-building $(XCODE_COMMON) $(addprefix -only-testing:nodeseekTests/,$(RUNTIME_TEST_CLASSES))
+
+xcode-test-core: xcode-test-runtime-core
 
 xcode-test-class:
 	@if [[ -z "$${TEST:-}" ]]; then \
-		echo "Usage: make xcode-test-class TEST=KannaNodeSeekParserTests" >&2; \
+		echo "Usage: make xcode-test-class TEST=NodeSeekServiceTests" >&2; \
 		exit 2; \
 	fi
 	@if [[ ! "$${TEST}" =~ ^[A-Za-z_][A-Za-z0-9_]*$$ ]]; then \
 		echo "Invalid TEST: $${TEST}" >&2; \
 		echo "TEST must be a simple XCTest class identifier: letters, numbers, underscore." >&2; \
-		echo "Usage: make xcode-test-class TEST=KannaNodeSeekParserTests" >&2; \
+		echo "Usage: make xcode-test-class TEST=NodeSeekServiceTests" >&2; \
 		exit 2; \
 	fi
 	$(MAKE) xcode-build-tests
