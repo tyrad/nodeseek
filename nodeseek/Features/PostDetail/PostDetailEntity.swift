@@ -25,6 +25,7 @@ struct PostDetailHeaderContent: Equatable {
     let title: String
     let authorName: String
     let avatarURL: URL?
+    let authorProfileURL: URL?
     let metadataText: String?
     let contentHTML: String
 
@@ -33,6 +34,7 @@ struct PostDetailHeaderContent: Equatable {
         title: String,
         authorName: String,
         avatarURL: URL?,
+        authorProfileURL: URL? = nil,
         metadataText: String?,
         contentHTML: String = ""
     ) {
@@ -40,6 +42,7 @@ struct PostDetailHeaderContent: Equatable {
         self.title = title
         self.authorName = authorName
         self.avatarURL = avatarURL
+        self.authorProfileURL = authorProfileURL
         self.metadataText = metadataText
         self.contentHTML = contentHTML
     }
@@ -56,6 +59,7 @@ struct PostDetailHeaderContent: Equatable {
             title: post.title,
             authorName: post.authorName,
             avatarURL: post.avatarURL,
+            authorProfileURL: nil,
             metadataText: metadata.isEmpty ? nil : metadata
         )
     }
@@ -66,6 +70,7 @@ struct PostDetailHeaderContent: Equatable {
             title: detail.title,
             authorName: detail.authorName,
             avatarURL: detail.avatarURL,
+            authorProfileURL: detail.authorProfileURL,
             metadataText: detail.metadataText,
             contentHTML: detail.contentHTML
         )

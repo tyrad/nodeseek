@@ -25,6 +25,7 @@ final class PostBodyCellNode: ASCellNode {
     private let content: PostDetailHeaderContent
     private let onImageTapped: ([URL], Int) -> Void
     private let onLinkTapped: (URL) -> Void
+    private let onAuthorTapped: (URL) -> Void
     private let onTextLayoutInvalidated: () -> Void
     private let avatarLoader = AvatarImageLoader.shared
     private weak var avatarImageView: UIImageView?
@@ -32,9 +33,13 @@ final class PostBodyCellNode: ASCellNode {
     private var hasDisplayableAuthor: Bool {
         AuthorDisplayPolicy.isDisplayable(content.authorName)
     }
+    private var hasAuthorProfileLink: Bool {
+        content.authorProfileURL != nil && hasDisplayableAuthor
+    }
 
     private let titleNode = ASTextNode()
-    private let subtitleNode = ASTextNode()
+    private let authorButtonNode = ASButtonNode()
+    private let metadataNode = ASTextNode()
     private let bodyNodes: [ASDisplayNode]
 
     private lazy var avatarNode: ASDisplayNode = {
@@ -44,6 +49,10 @@ final class PostBodyCellNode: ASCellNode {
             imageView.backgroundColor = .systemGray5
             imageView.layer.cornerRadius = PostDetailContentLayout.avatarCornerRadius
             imageView.layer.masksToBounds = true
+            imageView.isUserInteractionEnabled = self?.hasAuthorProfileLink == true
+            if self?.hasAuthorProfileLink == true {
+                imageView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(PostBodyCellNode.authorTapped)))
+            }
             self?.avatarImageView = imageView
             return imageView
         })
@@ -59,11 +68,13 @@ final class PostBodyCellNode: ASCellNode {
         renderedContent: [RenderedContentBlock]?,
         onImageTapped: @escaping ([URL], Int) -> Void,
         onLinkTapped: @escaping (URL) -> Void = { _ in },
+        onAuthorTapped: @escaping (URL) -> Void = { _ in },
         onTextLayoutInvalidated: @escaping () -> Void
     ) {
         self.content = content
         self.onImageTapped = onImageTapped
         self.onLinkTapped = onLinkTapped
+        self.onAuthorTapped = onAuthorTapped
         self.onTextLayoutInvalidated = onTextLayoutInvalidated
         self.bodyNodes = DetailContentBlockNodeFactory.makeNodes(
             from: renderedContent ?? [],
@@ -76,6 +87,7 @@ final class PostBodyCellNode: ASCellNode {
         selectionStyle = .none
         backgroundColor = .systemBackground
         configureText()
+        configureActions()
     }
 
     override func didLoad() {
@@ -96,16 +108,31 @@ final class PostBodyCellNode: ASCellNode {
 
     override func layoutSpecThatFits(_ constrainedSize: ASSizeRange) -> ASLayoutSpec {
         titleNode.style.flexShrink = 1
-        subtitleNode.style.flexShrink = 1
+        authorButtonNode.style.flexShrink = 0
+        metadataNode.style.flexShrink = 1
+
+        let identityStack = ASStackLayoutSpec.horizontal()
+        identityStack.spacing = 5
+        identityStack.alignItems = .center
+        var identityChildren: [ASLayoutElement] = []
+        if hasDisplayableAuthor {
+            identityChildren.append(authorButtonNode)
+        }
+        if Self.metadataText(for: content).isEmpty == false {
+            identityChildren.append(metadataNode)
+        }
+        identityStack.children = identityChildren
+        identityStack.style.flexShrink = 1
+        identityStack.style.flexGrow = 1
 
         let authorStack = ASStackLayoutSpec.horizontal()
         authorStack.spacing = PostDetailContentLayout.avatarSpacing
         authorStack.alignItems = .center
-        authorStack.children = hasDisplayableAuthor ? [avatarNode, subtitleNode] : [subtitleNode]
+        authorStack.children = hasDisplayableAuthor ? [avatarNode, identityStack] : [identityStack]
 
         let stack = ASStackLayoutSpec.vertical()
         stack.spacing = Layout.verticalSpacing
-        stack.children = Self.subtitleText(for: content).isEmpty ? [titleNode] : [titleNode, authorStack]
+        stack.children = identityChildren.isEmpty ? [titleNode] : [titleNode, authorStack]
 
         if bodyNodes.isEmpty == false {
             let contentStack = ASStackLayoutSpec.vertical()
@@ -128,14 +155,38 @@ final class PostBodyCellNode: ASCellNode {
             ]
         )
 
-        subtitleNode.maximumNumberOfLines = 0
-        subtitleNode.attributedText = NSAttributedString(
-            string: Self.subtitleText(for: content),
+        authorButtonNode.setAttributedTitle(
+            NSAttributedString(
+                string: AuthorDisplayPolicy.displayName(from: content.authorName) ?? "",
+                attributes: [
+                    .font: UIFont.preferredFont(forTextStyle: .subheadline),
+                    .foregroundColor: UIColor.secondaryLabel
+                ]
+            ),
+            for: .normal
+        )
+        authorButtonNode.accessibilityLabel = "查看 \(AuthorDisplayPolicy.displayName(from: content.authorName) ?? "作者") 的主页"
+
+        metadataNode.maximumNumberOfLines = 0
+        metadataNode.attributedText = NSAttributedString(
+            string: Self.metadataText(for: content),
             attributes: [
                 .font: UIFont.preferredFont(forTextStyle: .subheadline),
                 .foregroundColor: UIColor.secondaryLabel
             ]
         )
+    }
+
+    private func configureActions() {
+        authorButtonNode.isUserInteractionEnabled = hasAuthorProfileLink
+        if hasAuthorProfileLink {
+            authorButtonNode.addTarget(self, action: #selector(authorTapped), forControlEvents: .touchUpInside)
+        }
+    }
+
+    @objc private func authorTapped() {
+        guard let authorProfileURL = content.authorProfileURL else { return }
+        onAuthorTapped(authorProfileURL)
     }
 
     private func requestAvatarIfNeeded() {
@@ -151,16 +202,10 @@ final class PostBodyCellNode: ASCellNode {
         avatarLoader.cancel(on: avatarImageView)
     }
 
-    private static func subtitleText(for content: PostDetailHeaderContent) -> String {
-        [
-            AuthorDisplayPolicy.displayName(from: content.authorName),
-            content.metadataText?.trimmingCharacters(in: .whitespacesAndNewlines)
-        ]
-            .compactMap { value in
-                guard let value, !value.isEmpty else { return nil }
-                return value
-            }
-            .joined(separator: " · ")
+    private static func metadataText(for content: PostDetailHeaderContent) -> String {
+        let metadata = content.metadataText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard metadata.isEmpty == false else { return "" }
+        return AuthorDisplayPolicy.isDisplayable(content.authorName) ? "· \(metadata)" : metadata
     }
 }
 

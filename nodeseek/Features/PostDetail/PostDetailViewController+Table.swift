@@ -116,6 +116,9 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                     onLinkTapped: { url in
                         self?.handleContentLinkTap(url)
                     },
+                    onAuthorTapped: { url in
+                        self?.openUserInfo(profileURL: url)
+                    },
                     onTextLayoutInvalidated: {
                         self?.scheduleAttachmentLayoutRefresh()
                     }
@@ -145,6 +148,9 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                     },
                     onLinkTapped: { url in
                         self?.handleContentLinkTap(url)
+                    },
+                    onAuthorTapped: { url in
+                        self?.openUserInfo(profileURL: url)
                     },
                     onReplyTapped: { comment in
                         self?.handleReply(to: comment)

@@ -63,6 +63,11 @@ extension PostDetailViewController {
         }
     }
 
+    func openUserInfo(profileURL: URL) {
+        let viewController = UserInfoWebViewController(profileURL: profileURL)
+        showDetailDestination(viewController)
+    }
+
     func scrollToCurrentPageAnchor(_ anchorID: String) {
         guard displayMode == .content else { return }
         guard let indexPath = indexPathForCurrentPageAnchor(anchorID) else { return }

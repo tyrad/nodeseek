@@ -169,6 +169,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
                 attribute: "src"
             )
         }.flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
+        let authorProfileURL = bodyItem.flatMap { parseUserProfileURL(in: $0) }
         let createdAtText = bodyItem.flatMap { firstText(in: $0, xpaths: [XPathRules.contentCreatedAt]) }
         let categoryText = bodyItem.flatMap { firstText(in: $0, xpaths: [XPathRules.contentCategory]) }
         let metadataText = [createdAtText, categoryText].compactMap(\.self).joined(separator: " · ").trimmedNonEmpty
@@ -185,6 +186,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
             title: title,
             authorName: authorName,
             avatarURL: avatarURL,
+            authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
             comments: comments,
@@ -306,12 +308,14 @@ struct KannaNodeSeekParser: NodeSeekParser {
             xpaths: [XPathRules.postAvatar, XPathRules.fallbackAvatar],
             attribute: "src"
         ).flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
+        let authorProfileURL = parseUserProfileURL(in: item)
 
         return Comment(
             id: id,
             anchorID: item["id"]?.trimmedNonEmpty,
             authorName: authorName,
             avatarURL: avatarURL,
+            authorProfileURL: authorProfileURL,
             floorText: firstText(in: item, xpaths: [XPathRules.contentFloor]),
             createdAtText: firstText(in: item, xpaths: [XPathRules.contentCreatedAt]),
             createdAtTitleText: firstAttribute(
@@ -321,6 +325,24 @@ struct KannaNodeSeekParser: NodeSeekParser {
             ),
             contentHTML: item.at_xpath(XPathRules.contentArticle)?.innerHTML?.trimmedNonEmpty ?? ""
         )
+    }
+
+    private func parseUserProfileURL(in item: Kanna.XMLElement) -> URL? {
+        for xpath in [XPathRules.contentAuthorProfileLink, XPathRules.contentAvatarProfileLink] {
+            guard let href = item.at_xpath(xpath)?["href"]?.trimmedNonEmpty else { continue }
+            guard let url = normalizeUserProfileURL(href) else { continue }
+            return url
+        }
+
+        return nil
+    }
+
+    private func normalizeUserProfileURL(_ href: String) -> URL? {
+        guard let url = URL(string: href, relativeTo: baseURL)?.absoluteURL else { return nil }
+        guard url.path.hasPrefix("/space/") else { return nil }
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: true) else { return url }
+        components.fragment = "/general"
+        return components.url
     }
 
     private func isLastPostPage(in document: HTMLDocument, currentURL: URL) -> Bool {

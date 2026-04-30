@@ -216,6 +216,7 @@ struct KannaNodeSeekParserTests {
         #expect(detail.title == "绿云抢鸡竞赛又要开始了，一波传家宝又要来袭")
         #expect(detail.authorName == "ipv4")
         #expect(detail.avatarURL?.path == "/avatar/34378.png")
+        #expect(detail.authorProfileURL?.absoluteString == "https://www.nodeseek.com/space/34378#/general")
         #expect(detail.metadataText == "36min ago · 日常")
         #expect(detail.contentHTML.contains("cdn.nodeimage.com"))
         #expect(detail.contentHTML.contains("喊上你的五指小姐姐一起抢吧"))
@@ -223,6 +224,7 @@ struct KannaNodeSeekParserTests {
         #expect(detail.comments.first?.id == "9727591")
         #expect(detail.comments.first?.authorName == "ggbeng")
         #expect(detail.comments.first?.avatarURL?.path == "/avatar/24520.png")
+        #expect(detail.comments.first?.authorProfileURL?.absoluteString == "https://www.nodeseek.com/space/24520#/general")
         #expect(detail.comments.first?.floorText == "#4")
         #expect(detail.comments.first?.createdAtText == "34min ago")
         #expect(detail.comments.first?.createdAtTitleText == "2026-04-27 15:58:51")
@@ -358,6 +360,39 @@ struct KannaNodeSeekParserTests {
 
         #expect(detail.comments.count == 1)
         #expect(detail.comments.first?.contentHTML.contains("非 ul/li 评论也要解析") == true)
+    }
+
+    @Test func parsesAuthorProfileURLFromAvatarWrapperFallback() throws {
+        let html = """
+        <html>
+        <head><title>测试详情</title></head>
+        <body>
+          <div class="nsk-post">
+            <div class="content-item">
+              <div class="avatar-wrapper"><a href="/space/1541"><img class="avatar-normal" src="/avatar/1541.png"></a></div>
+              <a class="author-name">mist</a>
+              <article class="post-content"><p>正文</p></article>
+            </div>
+          </div>
+          <div class="comments">
+            <div class="content-item" id="comment-1" data-comment-id="1">
+              <div class="avatar-wrapper"><a href="/space/17851"><img class="avatar-normal" src="/avatar/17851.png"></a></div>
+              <a class="author-name">luren</a>
+              <article class="post-content"><p>评论</p></article>
+            </div>
+          </div>
+        </body>
+        </html>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(
+            html: html,
+            url: URL(string: "https://www.nodeseek.com/post-1-1")!
+        )
+
+        #expect(detail.authorProfileURL?.absoluteString == "https://www.nodeseek.com/space/1541#/general")
+        #expect(detail.comments.first?.authorProfileURL?.absoluteString == "https://www.nodeseek.com/space/17851#/general")
     }
 
     @Test func parsesMagicTabsDetailFixtureWithANSIAndImageTabs() throws {

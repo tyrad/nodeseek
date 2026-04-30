@@ -91,6 +91,7 @@ struct PostDetail: Equatable, Sendable {
     let title: String
     let authorName: String
     let avatarURL: URL?
+    let authorProfileURL: URL?
     let metadataText: String?
     let contentHTML: String
     let comments: [Comment]
@@ -103,6 +104,7 @@ struct PostDetail: Equatable, Sendable {
         title: String,
         authorName: String,
         avatarURL: URL?,
+        authorProfileURL: URL? = nil,
         metadataText: String?,
         contentHTML: String,
         comments: [Comment],
@@ -114,6 +116,7 @@ struct PostDetail: Equatable, Sendable {
         self.title = title
         self.authorName = authorName
         self.avatarURL = avatarURL
+        self.authorProfileURL = authorProfileURL
         self.metadataText = metadataText
         self.contentHTML = contentHTML
         self.comments = comments
@@ -128,6 +131,7 @@ struct Comment: Equatable, Sendable {
     let anchorID: String?
     let authorName: String
     let avatarURL: URL?
+    let authorProfileURL: URL?
     let floorText: String?
     let createdAtText: String?
     let createdAtTitleText: String?
@@ -138,6 +142,7 @@ struct Comment: Equatable, Sendable {
         anchorID: String? = nil,
         authorName: String,
         avatarURL: URL?,
+        authorProfileURL: URL? = nil,
         floorText: String?,
         createdAtText: String?,
         createdAtTitleText: String? = nil,
@@ -147,6 +152,7 @@ struct Comment: Equatable, Sendable {
         self.anchorID = anchorID
         self.authorName = authorName
         self.avatarURL = avatarURL
+        self.authorProfileURL = authorProfileURL
         self.floorText = floorText
         self.createdAtText = createdAtText
         self.createdAtTitleText = createdAtTitleText

@@ -35,6 +35,7 @@ final class CommentCellNode: ASCellNode {
     private let comment: Comment
     private let onImageTapped: ([URL], Int) -> Void
     private let onLinkTapped: (URL) -> Void
+    private let onAuthorTapped: (URL) -> Void
     private let onReplyTapped: (Comment) -> Void
     private let onQuoteTapped: (Comment) -> Void
     private let onTextLayoutInvalidated: () -> Void
@@ -44,8 +45,11 @@ final class CommentCellNode: ASCellNode {
     private var hasDisplayableAuthor: Bool {
         AuthorDisplayPolicy.isDisplayable(comment.authorName)
     }
+    private var hasAuthorProfileLink: Bool {
+        comment.authorProfileURL != nil && hasDisplayableAuthor
+    }
 
-    private let authorNode = ASTextNode()
+    private let authorButtonNode = ASButtonNode()
     private let timeNode = ASTextNode()
     private let floorNode = ASTextNode()
     private let replyButtonNode = ASButtonNode()
@@ -60,6 +64,10 @@ final class CommentCellNode: ASCellNode {
             imageView.backgroundColor = .systemGray5
             imageView.layer.cornerRadius = PostDetailContentLayout.avatarCornerRadius
             imageView.layer.masksToBounds = true
+            imageView.isUserInteractionEnabled = self?.hasAuthorProfileLink == true
+            if self?.hasAuthorProfileLink == true {
+                imageView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(CommentCellNode.authorTapped)))
+            }
             self?.avatarImageView = imageView
             return imageView
         })
@@ -75,6 +83,7 @@ final class CommentCellNode: ASCellNode {
         renderedBody: [RenderedContentBlock]?,
         onImageTapped: @escaping ([URL], Int) -> Void,
         onLinkTapped: @escaping (URL) -> Void = { _ in },
+        onAuthorTapped: @escaping (URL) -> Void = { _ in },
         onReplyTapped: @escaping (Comment) -> Void = { _ in },
         onQuoteTapped: @escaping (Comment) -> Void = { _ in },
         onTextLayoutInvalidated: @escaping () -> Void
@@ -82,6 +91,7 @@ final class CommentCellNode: ASCellNode {
         self.comment = comment
         self.onImageTapped = onImageTapped
         self.onLinkTapped = onLinkTapped
+        self.onAuthorTapped = onAuthorTapped
         self.onReplyTapped = onReplyTapped
         self.onQuoteTapped = onQuoteTapped
         self.onTextLayoutInvalidated = onTextLayoutInvalidated
@@ -117,7 +127,7 @@ final class CommentCellNode: ASCellNode {
     }
 
     override func layoutSpecThatFits(_ constrainedSize: ASSizeRange) -> ASLayoutSpec {
-        authorNode.style.flexShrink = 1
+        authorButtonNode.style.flexShrink = 1
         timeNode.style.flexShrink = 1
         floorNode.style.flexShrink = 0
         replyButtonNode.style.flexShrink = 0
@@ -129,7 +139,7 @@ final class CommentCellNode: ASCellNode {
         identityStack.alignItems = .center
         var identityChildren: [ASLayoutElement] = []
         if hasDisplayableAuthor {
-            identityChildren.append(authorNode)
+            identityChildren.append(authorButtonNode)
         }
         if comment.createdAtText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
             identityChildren.append(timeNode)
@@ -197,15 +207,17 @@ final class CommentCellNode: ASCellNode {
     }
 
     private func configureText() {
-        authorNode.maximumNumberOfLines = 1
-        authorNode.truncationMode = .byTruncatingTail
-        authorNode.attributedText = NSAttributedString(
-            string: AuthorDisplayPolicy.displayName(from: comment.authorName) ?? "",
-            attributes: [
-                .font: UIFont.preferredFont(forTextStyle: .headline),
-                .foregroundColor: UIColor.label
-            ]
+        authorButtonNode.setAttributedTitle(
+            NSAttributedString(
+                string: AuthorDisplayPolicy.displayName(from: comment.authorName) ?? "",
+                attributes: [
+                    .font: UIFont.preferredFont(forTextStyle: .headline),
+                    .foregroundColor: UIColor.label
+                ]
+            ),
+            for: .normal
         )
+        authorButtonNode.accessibilityLabel = "查看 \(AuthorDisplayPolicy.displayName(from: comment.authorName) ?? "作者") 的主页"
 
         timeNode.maximumNumberOfLines = 1
         timeNode.truncationMode = .byTruncatingTail
@@ -230,6 +242,10 @@ final class CommentCellNode: ASCellNode {
     private func configureActions() {
         configureActionButton(replyButtonNode, title: "回复", accessibilityLabel: "回复评论")
         configureActionButton(quoteButtonNode, title: "引用", accessibilityLabel: "引用评论")
+        authorButtonNode.isUserInteractionEnabled = hasAuthorProfileLink
+        if hasAuthorProfileLink {
+            authorButtonNode.addTarget(self, action: #selector(authorTapped), forControlEvents: .touchUpInside)
+        }
         replyButtonNode.addTarget(self, action: #selector(replyTapped), forControlEvents: .touchUpInside)
         quoteButtonNode.addTarget(self, action: #selector(quoteTapped), forControlEvents: .touchUpInside)
     }
@@ -254,6 +270,11 @@ final class CommentCellNode: ASCellNode {
 
     @objc private func quoteTapped() {
         onQuoteTapped(comment)
+    }
+
+    @objc private func authorTapped() {
+        guard let authorProfileURL = comment.authorProfileURL else { return }
+        onAuthorTapped(authorProfileURL)
     }
 
     private func requestAvatarIfNeeded() {
