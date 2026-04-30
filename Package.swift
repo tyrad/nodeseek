@@ -18,19 +18,31 @@ let package = Package(
             dependencies: [
                 "Kanna"
             ],
-            path: ".",
+            path: "nodeseek/Core",
+            exclude: [
+                "Imaging",
+                "UI",
+                "NodeSeekService.swift",
+                "Networking/CookieBridge.swift",
+                "Networking/HiddenWebViewCommentSubmissionClient.swift",
+                "Networking/HiddenWebViewHTMLClient.swift",
+                "Networking/HTTPHTMLClient.swift",
+                "Networking/LoginWebViewController.swift",
+                "Networking/NodeSeekCommentSubmitter.swift",
+                "Networking/NodeSeekDebugConfig.swift",
+                "Rendering/DTCoreTextHTMLContentRenderer.swift",
+                "Rendering/HTMLContentRenderer.swift",
+                "Rendering/RenderedContentBlock.swift"
+            ],
             sources: [
-                "nodeseek/Core/Domain",
-                "nodeseek/Core/Parsing",
-                "nodeseek/Core/Networking/HTMLClient.swift",
-                "nodeseek/Core/Networking/HTTPHTMLClient.swift",
-                "nodeseek/Core/Networking/FormURLEncoder.swift",
-                "nodeseek/Core/Networking/ChallengeDetector.swift",
-                "nodeseek/Core/Networking/NodeSeekCommentSubmitter.swift",
-                "nodeseek/Core/Networking/WebRequestFingerprint.swift",
-                "nodeseek/Core/NodeSeekService.swift",
-                "nodeseek/Core/CommentComposerContentBuilder.swift",
-                "nodeseek/Core/Rendering/DetailImageLayout.swift"
+                "Domain",
+                "Parsing",
+                "Networking/HTMLClient.swift",
+                "Networking/FormURLEncoder.swift",
+                "Networking/ChallengeDetector.swift",
+                "Networking/WebRequestFingerprint.swift",
+                "CommentComposerContentBuilder.swift",
+                "Rendering/DetailImageLayout.swift"
             ]
         ),
         .testTarget(
@@ -38,17 +50,29 @@ let package = Package(
             dependencies: [
                 "NodeSeekCore"
             ],
-            path: ".",
+            path: "nodeseekTests",
+            exclude: [
+                "App",
+                "ArchitectureSkeletonTests.swift",
+                "Core/ChallengeSessionStoreTests.swift",
+                "Core/CookieBridgeTests.swift",
+                "Core/DTCoreTextHTMLContentRendererTests.swift",
+                "Core/HTMLContentRendererTests.swift",
+                "Core/LoginWebViewControllerTests.swift",
+                "Core/NodeSeekCommentSubmitterTests.swift",
+                "Core/NodeSeekServiceTests.swift",
+                "Core/SwiftDrawPerformanceTests.swift",
+                "Features",
+                "nodeseekTests.swift"
+            ],
             sources: [
-                "nodeseekTests/Core/KannaNodeSeekParserTests.swift",
-                "nodeseekTests/Core/ChallengeDetectorTests.swift",
-                "nodeseekTests/Core/DetailImageLayoutTests.swift",
-                "nodeseekTests/Core/NodeSeekServiceTests.swift",
-                "nodeseekTests/Core/NodeSeekCommentSubmitterTests.swift",
-                "nodeseekTests/Core/CommentComposerContentBuilderTests.swift"
+                "Core/KannaNodeSeekParserTests.swift",
+                "Core/ChallengeDetectorTests.swift",
+                "Core/DetailImageLayoutTests.swift",
+                "Core/CommentComposerContentBuilderTests.swift"
             ],
             resources: [
-                .copy("nodeseekTests/Fixtures")
+                .copy("Fixtures")
             ]
         )
     ]
