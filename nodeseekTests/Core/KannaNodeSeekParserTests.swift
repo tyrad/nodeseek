@@ -216,7 +216,9 @@ struct KannaNodeSeekParserTests {
         #expect(detail.comments.first?.avatarURL?.path == "/avatar/24520.png")
         #expect(detail.comments.first?.floorText == "#4")
         #expect(detail.comments.first?.createdAtText == "34min ago")
+        #expect(detail.comments.first?.createdAtTitleText == "2026-04-27 15:58:51")
         #expect(detail.comments.first?.contentHTML.contains("CPU限制30%") == true)
+        #expect(detail.isLastPage == false)
     }
 
     @Test func parsesMagicTabsDetailFixtureWithANSIAndImageTabs() throws {
@@ -233,5 +235,43 @@ struct KannaNodeSeekParserTests {
         #expect(detail.contentHTML.contains("language-ansi"))
         #expect(detail.contentHTML.contains("https://i.111666.best/image/G9D5ncG5qndySgQtNwvFq4.webp"))
         #expect(detail.contentHTML.contains("https://i.111666.best/image/noEhdCSyuAeuREqqSWgdY5.webp"))
+        #expect(detail.isLastPage)
+    }
+
+    @Test func parsesLastPageStateFromPagerNextLink() throws {
+        let baseURL = URL(string: "https://www.nodeseek.com")!
+        let parser = KannaNodeSeekParser(baseURL: baseURL)
+        let htmlWithNext = """
+        <div class="nsk-post">
+            <div class="post-title"><h1><a class="post-title-link" href="/post-1-1">标题</a></h1></div>
+            <div class="content-item">
+                <a class="author-name">作者</a>
+                <article class="post-content"><p>正文</p></article>
+            </div>
+        </div>
+        <div class="comment-container">
+            <a href="/post-1-2" rel="next" class="pager-next"></a>
+            <ul class="comments"></ul>
+        </div>
+        """
+        let htmlWithoutNext = """
+        <div class="nsk-post">
+            <div class="post-title"><h1><a class="post-title-link" href="/post-1-2">标题</a></h1></div>
+            <div class="content-item">
+                <a class="author-name">作者</a>
+                <article class="post-content"><p>正文</p></article>
+            </div>
+        </div>
+        <div class="comment-container">
+            <span class="pager-next" aria-disabled="true"></span>
+            <ul class="comments"></ul>
+        </div>
+        """
+
+        let firstPage = try parser.parsePostDetail(html: htmlWithNext, url: URL(string: "https://www.nodeseek.com/post-1-1")!)
+        let lastPage = try parser.parsePostDetail(html: htmlWithoutNext, url: URL(string: "https://www.nodeseek.com/post-1-2")!)
+
+        #expect(firstPage.isLastPage == false)
+        #expect(lastPage.isLastPage)
     }
 }

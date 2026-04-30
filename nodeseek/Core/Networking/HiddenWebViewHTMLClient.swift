@@ -129,7 +129,7 @@ struct HiddenWebViewHTMLClient: HTMLClient {
 }
 
 @MainActor
-private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
+final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     static let shared = HiddenWebViewLoader()
 
     private var timeoutInterval: TimeInterval = 20
@@ -186,6 +186,28 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
                 resolve(.failure(HiddenWebViewHTMLClientError.noNavigationStarted))
             }
         }
+    }
+
+    func submitComment(pageURL: URL, content: String, timeoutInterval: TimeInterval) async throws -> CommentAutomationResponse {
+        var request = URLRequest(url: pageURL)
+        request.httpMethod = "GET"
+        request.timeoutInterval = timeoutInterval
+        request.cachePolicy = WebViewCachePolicy.getRequestPolicy
+        WebRequestFingerprint.applyHTMLHeaders(to: &request)
+
+        let response = try await load(request: request, timeoutInterval: timeoutInterval)
+        if let challenge = ChallengeDetector().detect(response: response) {
+            return CommentAutomationResponse(
+                ok: false,
+                statusCode: response.statusCode,
+                message: Self.message(for: challenge),
+                reason: "challenge"
+            )
+        }
+
+        let result = try await evaluateCommentSubmissionScript(content: content, timeoutInterval: timeoutInterval)
+        await cookieBridge.syncWebViewCookiesToURLSession()
+        return result
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -299,6 +321,60 @@ private final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     private func readOuterHTML() async throws -> String {
         let htmlAny = try await webView.evaluateJavaScript("document.documentElement.outerHTML")
         return htmlAny as? String ?? ""
+    }
+
+    private func evaluateCommentSubmissionScript(content: String, timeoutInterval: TimeInterval) async throws -> CommentAutomationResponse {
+        let timeoutMilliseconds = max(5_000, Int(timeoutInterval * 1_000))
+        let result: Any?
+        do {
+            result = try await webView.callAsyncJavaScript(
+                CommentSubmissionAutomationScript.source,
+                arguments: [
+                    "commentText": content,
+                    "timeoutMs": timeoutMilliseconds
+                ],
+                in: nil,
+                contentWorld: .page
+            )
+        } catch {
+            let nsError = error as NSError
+            logger.error("评论脚本执行异常: domain=\(nsError.domain, privacy: .public), code=\(nsError.code), info=\(String(describing: nsError.userInfo), privacy: .public)")
+            return CommentAutomationResponse(
+                ok: false,
+                message: error.localizedDescription,
+                reason: "javascript_exception"
+            )
+        }
+
+        guard let object = result as? [String: Any] else {
+            return CommentAutomationResponse(ok: false, message: nil, reason: "invalid_script_result")
+        }
+
+        let ok = object["ok"] as? Bool ?? false
+        let statusCode = (object["statusCode"] as? NSNumber)?.intValue ?? object["statusCode"] as? Int
+        let message = object["message"] as? String
+        let reason = object["reason"] as? String ?? "unknown"
+        let body = object["body"] as? String
+        return CommentAutomationResponse(
+            ok: ok,
+            statusCode: statusCode,
+            message: message,
+            reason: reason,
+            body: body
+        )
+    }
+
+    private static func message(for challenge: ChallengeKind) -> String {
+        switch challenge {
+        case .loginRequired:
+            return "请先登录后再发表评论。"
+        case .cloudflare:
+            return "站点当前需要 Cloudflare 验证，请稍后重试。"
+        case .blocked:
+            return "站点当前返回了拦截页面，请稍后重试。"
+        case .unsupported:
+            return "站点当前返回了无法处理的验证页面，请稍后重试。"
+        }
     }
 
     private static func isChallengePage(html: String) -> Bool {

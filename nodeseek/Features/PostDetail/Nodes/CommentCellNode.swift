@@ -35,6 +35,8 @@ final class CommentCellNode: ASCellNode {
     private let comment: Comment
     private let onImageTapped: ([URL], Int) -> Void
     private let onLinkTapped: (URL) -> Void
+    private let onReplyTapped: (Comment) -> Void
+    private let onQuoteTapped: (Comment) -> Void
     private let onTextLayoutInvalidated: () -> Void
     private let avatarLoader = AvatarImageLoader.shared
     private weak var avatarImageView: UIImageView?
@@ -46,6 +48,8 @@ final class CommentCellNode: ASCellNode {
     private let authorNode = ASTextNode()
     private let timeNode = ASTextNode()
     private let floorNode = ASTextNode()
+    private let replyButtonNode = ASButtonNode()
+    private let quoteButtonNode = ASButtonNode()
     private let separatorNode = ASDisplayNode()
     private let bodyNodes: [ASDisplayNode]
 
@@ -71,11 +75,15 @@ final class CommentCellNode: ASCellNode {
         renderedBody: [RenderedContentBlock]?,
         onImageTapped: @escaping ([URL], Int) -> Void,
         onLinkTapped: @escaping (URL) -> Void = { _ in },
+        onReplyTapped: @escaping (Comment) -> Void = { _ in },
+        onQuoteTapped: @escaping (Comment) -> Void = { _ in },
         onTextLayoutInvalidated: @escaping () -> Void
     ) {
         self.comment = comment
         self.onImageTapped = onImageTapped
         self.onLinkTapped = onLinkTapped
+        self.onReplyTapped = onReplyTapped
+        self.onQuoteTapped = onQuoteTapped
         self.onTextLayoutInvalidated = onTextLayoutInvalidated
         self.bodyNodes = DetailContentBlockNodeFactory.makeNodes(
             from: renderedBody ?? [],
@@ -89,6 +97,7 @@ final class CommentCellNode: ASCellNode {
         backgroundColor = .systemBackground
         separatorNode.backgroundColor = .separator
         configureText()
+        configureActions()
     }
 
     override func didLoad() {
@@ -111,6 +120,8 @@ final class CommentCellNode: ASCellNode {
         authorNode.style.flexShrink = 1
         timeNode.style.flexShrink = 1
         floorNode.style.flexShrink = 0
+        replyButtonNode.style.flexShrink = 0
+        quoteButtonNode.style.flexShrink = 0
         separatorNode.style.height = ASDimension(unit: .points, value: 1 / UIScreen.main.scale)
 
         let identityStack = ASStackLayoutSpec.horizontal()
@@ -134,9 +145,18 @@ final class CommentCellNode: ASCellNode {
         if identityChildren.isEmpty == false {
             headerChildren.append(identityStack)
         }
+        var actionChildren: [ASLayoutElement] = []
         if comment.floorText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
-            headerChildren.append(floorNode)
+            actionChildren.append(floorNode)
         }
+        actionChildren.append(replyButtonNode)
+        actionChildren.append(quoteButtonNode)
+
+        let actionStack = ASStackLayoutSpec.horizontal()
+        actionStack.spacing = 8
+        actionStack.alignItems = .center
+        actionStack.children = actionChildren
+        headerChildren.append(actionStack)
         headerStack.children = headerChildren
 
         var textChildren: [ASLayoutElement] = headerChildren.isEmpty ? [] : [headerStack]
@@ -205,6 +225,35 @@ final class CommentCellNode: ASCellNode {
                 .foregroundColor: UIColor.tertiaryLabel
             ]
         )
+    }
+
+    private func configureActions() {
+        configureActionButton(replyButtonNode, title: "回复", accessibilityLabel: "回复评论")
+        configureActionButton(quoteButtonNode, title: "引用", accessibilityLabel: "引用评论")
+        replyButtonNode.addTarget(self, action: #selector(replyTapped), forControlEvents: .touchUpInside)
+        quoteButtonNode.addTarget(self, action: #selector(quoteTapped), forControlEvents: .touchUpInside)
+    }
+
+    private func configureActionButton(_ button: ASButtonNode, title: String, accessibilityLabel: String) {
+        button.setAttributedTitle(
+            NSAttributedString(
+                string: title,
+                attributes: [
+                    .font: UIFont.preferredFont(forTextStyle: .subheadline),
+                    .foregroundColor: UIColor.secondaryLabel
+                ]
+            ),
+            for: .normal
+        )
+        button.accessibilityLabel = accessibilityLabel
+    }
+
+    @objc private func replyTapped() {
+        onReplyTapped(comment)
+    }
+
+    @objc private func quoteTapped() {
+        onQuoteTapped(comment)
     }
 
     private func requestAvatarIfNeeded() {

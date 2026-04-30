@@ -56,6 +56,29 @@ struct PostDetail: Equatable, Sendable {
     let contentHTML: String
     let comments: [Comment]
     let replyForm: ReplyForm?
+    let isLastPage: Bool
+
+    init(
+        id: String,
+        title: String,
+        authorName: String,
+        avatarURL: URL?,
+        metadataText: String?,
+        contentHTML: String,
+        comments: [Comment],
+        replyForm: ReplyForm?,
+        isLastPage: Bool = true
+    ) {
+        self.id = id
+        self.title = title
+        self.authorName = authorName
+        self.avatarURL = avatarURL
+        self.metadataText = metadataText
+        self.contentHTML = contentHTML
+        self.comments = comments
+        self.replyForm = replyForm
+        self.isLastPage = isLastPage
+    }
 }
 
 struct Comment: Equatable, Sendable {
@@ -65,6 +88,7 @@ struct Comment: Equatable, Sendable {
     let avatarURL: URL?
     let floorText: String?
     let createdAtText: String?
+    let createdAtTitleText: String?
     let contentHTML: String
 
     init(
@@ -74,6 +98,7 @@ struct Comment: Equatable, Sendable {
         avatarURL: URL?,
         floorText: String?,
         createdAtText: String?,
+        createdAtTitleText: String? = nil,
         contentHTML: String
     ) {
         self.id = id
@@ -82,6 +107,7 @@ struct Comment: Equatable, Sendable {
         self.avatarURL = avatarURL
         self.floorText = floorText
         self.createdAtText = createdAtText
+        self.createdAtTitleText = createdAtTitleText
         self.contentHTML = contentHTML
     }
 }

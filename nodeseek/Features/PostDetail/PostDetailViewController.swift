@@ -113,6 +113,16 @@ class PostDetailViewController: UIViewController {
 
     private enum Layout {
         static let horizontalInset: CGFloat = PostDetailContentLayout.horizontalInset
+        static let composerHorizontalInset: CGFloat = 12
+        static let composerVerticalInset: CGFloat = 6
+        static let composerTargetSpacing: CGFloat = 6
+        static let composerTextHorizontalInset: CGFloat = 10
+        static let composerTextVerticalInset: CGFloat = 12
+        static let composerMinLines: CGFloat = 1
+        static let composerMaxLines: CGFloat = 6
+        static let composerDeferredHeightRefreshDelay: TimeInterval = 0.08
+        static let sendButtonWidth: CGFloat = 40
+        static let sendButtonHeight: CGFloat = 34
     }
 
     private let presenter: PostDetailPresenterProtocol
@@ -132,6 +142,9 @@ class PostDetailViewController: UIViewController {
     private var pendingReloadIndexPaths: Set<IndexPath> = []
     private var displayMode: DisplayMode = .skeleton
     private var hasRenderedDetailContent = false
+    private var composerMode: CommentComposerMode = .plain
+    private var isCommentSubmitting = false
+    private var isKeyboardVisible = false
     private let skeletonCommentRowCount = 4
     private let renderQueue = DispatchQueue(
         label: "com.nodeseek.app.postdetail.render",
@@ -139,6 +152,14 @@ class PostDetailViewController: UIViewController {
     )
 
     private let tableNode = ASTableNode(style: .plain)
+    private var composerBottomConstraint: NSLayoutConstraint?
+    private var commentTextViewHeightConstraint: NSLayoutConstraint?
+    private var commentTextViewTopToComposerConstraint: NSLayoutConstraint?
+    private var commentTextViewTopToTargetConstraint: NSLayoutConstraint?
+    private var sendCommentButtonSpacingConstraint: NSLayoutConstraint?
+    private var sendCommentButtonWidthConstraint: NSLayoutConstraint?
+    private var toastHideWorkItem: DispatchWorkItem?
+    private var commentTextViewHeightRefreshWorkItem: DispatchWorkItem?
 
     private let loadingIndicator: UIActivityIndicatorView = {
         let indicator = UIActivityIndicatorView(style: .medium)
@@ -162,6 +183,121 @@ class PostDetailViewController: UIViewController {
         button.isHidden = true
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
+    }()
+
+    private let composerContainerView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .systemBackground
+        view.layer.borderWidth = 0.5
+        view.layer.borderColor = UIColor.separator.cgColor
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let targetContainerView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .secondarySystemBackground
+        view.layer.cornerRadius = 8
+        view.isHidden = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let targetLabel: UILabel = {
+        let label = UILabel()
+        label.font = .preferredFont(forTextStyle: .footnote)
+        label.textColor = .secondaryLabel
+        label.accessibilityIdentifier = "post-detail-comment-target-label"
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    private let targetCancelButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
+        button.tintColor = .tertiaryLabel
+        button.accessibilityIdentifier = "post-detail-comment-target-cancel-button"
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
+    private let commentTextView: UITextView = {
+        let textView = UITextView()
+        textView.font = .preferredFont(forTextStyle: .body)
+        textView.backgroundColor = .secondarySystemBackground
+        textView.layer.cornerRadius = 12
+        textView.layer.cornerCurve = .continuous
+        textView.isScrollEnabled = false
+        textView.textContainerInset = UIEdgeInsets(
+            top: Layout.composerTextVerticalInset,
+            left: Layout.composerTextHorizontalInset,
+            bottom: Layout.composerTextVerticalInset,
+            right: Layout.composerTextHorizontalInset
+        )
+        textView.textContainer.lineFragmentPadding = 0
+        textView.accessibilityIdentifier = "post-detail-comment-input"
+        textView.translatesAutoresizingMaskIntoConstraints = false
+        return textView
+    }()
+
+    private let commentPlaceholderLabel: UILabel = {
+        let label = UILabel()
+        label.text = "写下你的评论..."
+        label.font = .preferredFont(forTextStyle: .body)
+        label.textColor = .tertiaryLabel
+        label.accessibilityIdentifier = "post-detail-comment-placeholder-label"
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    private let sendCommentButton: UIButton = {
+        let button = UIButton(type: .system)
+        var configuration = UIButton.Configuration.filled()
+        configuration.image = UIImage(systemName: "paperplane.fill")
+        configuration.cornerStyle = .capsule
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12)
+        button.configuration = configuration
+        button.accessibilityIdentifier = "post-detail-comment-send-button"
+        button.accessibilityLabel = "发送评论"
+        button.isHidden = true
+        button.isEnabled = false
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
+    private let toastContainerView: UIView = {
+        let view = UIView()
+        view.backgroundColor = UIColor.label.withAlphaComponent(0.92)
+        view.layer.cornerRadius = 14
+        view.layer.cornerCurve = .continuous
+        view.layer.shadowColor = UIColor.black.cgColor
+        view.layer.shadowOpacity = 0.18
+        view.layer.shadowRadius = 14
+        view.layer.shadowOffset = CGSize(width: 0, height: 8)
+        view.isHidden = true
+        view.alpha = 0
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let toastIconView: UIImageView = {
+        let imageView = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
+        imageView.tintColor = .systemGreen
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+
+    private let toastLabel: UILabel = {
+        let label = UILabel()
+        label.font = .preferredFont(forTextStyle: .footnote)
+        label.textColor = .systemBackground
+        label.backgroundColor = .clear
+        label.textAlignment = .natural
+        label.numberOfLines = 0
+        label.accessibilityIdentifier = "post-detail-toast-label"
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
     }()
 
     init(
@@ -189,6 +325,8 @@ class PostDetailViewController: UIViewController {
     deinit {
         attachmentLayoutRefreshWorkItem?.cancel()
         tableReloadWorkItem?.cancel()
+        toastHideWorkItem?.cancel()
+        commentTextViewHeightRefreshWorkItem?.cancel()
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -197,6 +335,11 @@ class PostDetailViewController: UIViewController {
         configureNavigationItems()
         setupUI()
         presenter.viewDidLoad()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        updateCommentTextViewHeight(animated: false)
     }
 
     private func configureNavigationItems() {
@@ -228,24 +371,199 @@ class PostDetailViewController: UIViewController {
         tableNode.view.translatesAutoresizingMaskIntoConstraints = false
 
         view.addSubview(tableNode.view)
+        view.addSubview(composerContainerView)
         view.addSubview(loadingIndicator)
         loginButton.addTarget(self, action: #selector(loginButtonTapped), for: .touchUpInside)
         view.addSubview(loginButton)
+        toastContainerView.addSubview(toastIconView)
+        toastContainerView.addSubview(toastLabel)
+        view.addSubview(toastContainerView)
+        configureComposer()
+        configureDismissKeyboardGesture()
 
+        composerBottomConstraint = composerContainerView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
         NSLayoutConstraint.activate([
             tableNode.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableNode.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tableNode.view.topAnchor.constraint(equalTo: view.topAnchor),
-            tableNode.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            tableNode.view.bottomAnchor.constraint(equalTo: composerContainerView.topAnchor),
+
+            composerContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            composerContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            composerBottomConstraint!,
 
             loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
 
             loginButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            loginButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -28)
+            loginButton.bottomAnchor.constraint(equalTo: composerContainerView.topAnchor, constant: -18),
+
+            toastContainerView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 24),
+            toastContainerView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -24),
+            toastContainerView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            toastContainerView.bottomAnchor.constraint(equalTo: composerContainerView.topAnchor, constant: -12),
+
+            toastIconView.leadingAnchor.constraint(equalTo: toastContainerView.leadingAnchor, constant: 12),
+            toastIconView.centerYAnchor.constraint(equalTo: toastContainerView.centerYAnchor),
+            toastIconView.widthAnchor.constraint(equalToConstant: 18),
+            toastIconView.heightAnchor.constraint(equalToConstant: 18),
+
+            toastLabel.leadingAnchor.constraint(equalTo: toastIconView.trailingAnchor, constant: 8),
+            toastLabel.trailingAnchor.constraint(equalTo: toastContainerView.trailingAnchor, constant: -14),
+            toastLabel.topAnchor.constraint(equalTo: toastContainerView.topAnchor, constant: 10),
+            toastLabel.bottomAnchor.constraint(equalTo: toastContainerView.bottomAnchor, constant: -10)
         ])
 
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillChangeFrame(_:)),
+            name: UIResponder.keyboardWillChangeFrameNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillHide(_:)),
+            name: UIResponder.keyboardWillHideNotification,
+            object: nil
+        )
+
         reloadTableData()
+    }
+
+    private func configureComposer() {
+        commentTextView.delegate = self
+        sendCommentButton.addTarget(self, action: #selector(sendCommentTapped), for: .touchUpInside)
+        targetCancelButton.addTarget(self, action: #selector(cancelReplyTargetTapped), for: .touchUpInside)
+
+        commentTextView.addSubview(commentPlaceholderLabel)
+        targetContainerView.addSubview(targetLabel)
+        targetContainerView.addSubview(targetCancelButton)
+        composerContainerView.addSubview(targetContainerView)
+        composerContainerView.addSubview(commentTextView)
+        composerContainerView.addSubview(sendCommentButton)
+
+        commentTextViewHeightConstraint = commentTextView.heightAnchor.constraint(equalToConstant: preferredCommentTextViewHeight())
+        commentTextViewHeightConstraint?.priority = .required
+        commentTextViewTopToComposerConstraint = commentTextView.topAnchor.constraint(
+            equalTo: composerContainerView.topAnchor,
+            constant: Layout.composerVerticalInset
+        )
+        commentTextViewTopToTargetConstraint = commentTextView.topAnchor.constraint(
+            equalTo: targetContainerView.bottomAnchor,
+            constant: Layout.composerTargetSpacing
+        )
+        sendCommentButtonSpacingConstraint = sendCommentButton.leadingAnchor.constraint(
+            equalTo: commentTextView.trailingAnchor,
+            constant: 0
+        )
+        sendCommentButtonWidthConstraint = sendCommentButton.widthAnchor.constraint(equalToConstant: 0)
+
+        NSLayoutConstraint.activate([
+            targetContainerView.leadingAnchor.constraint(equalTo: composerContainerView.leadingAnchor, constant: Layout.composerHorizontalInset),
+            targetContainerView.trailingAnchor.constraint(equalTo: composerContainerView.trailingAnchor, constant: -Layout.composerHorizontalInset),
+            targetContainerView.topAnchor.constraint(equalTo: composerContainerView.topAnchor, constant: Layout.composerVerticalInset),
+
+            targetLabel.leadingAnchor.constraint(equalTo: targetContainerView.leadingAnchor, constant: 10),
+            targetLabel.topAnchor.constraint(equalTo: targetContainerView.topAnchor, constant: 7),
+            targetLabel.bottomAnchor.constraint(equalTo: targetContainerView.bottomAnchor, constant: -7),
+
+            targetCancelButton.leadingAnchor.constraint(equalTo: targetLabel.trailingAnchor, constant: 8),
+            targetCancelButton.trailingAnchor.constraint(equalTo: targetContainerView.trailingAnchor, constant: -8),
+            targetCancelButton.centerYAnchor.constraint(equalTo: targetContainerView.centerYAnchor),
+            targetCancelButton.widthAnchor.constraint(equalToConstant: 24),
+            targetCancelButton.heightAnchor.constraint(equalToConstant: 24),
+
+            commentTextView.leadingAnchor.constraint(equalTo: composerContainerView.leadingAnchor, constant: Layout.composerHorizontalInset),
+            commentTextViewTopToComposerConstraint!,
+            commentTextView.bottomAnchor.constraint(equalTo: composerContainerView.bottomAnchor, constant: -Layout.composerVerticalInset),
+            commentTextViewHeightConstraint!,
+
+            commentPlaceholderLabel.leadingAnchor.constraint(
+                equalTo: commentTextView.leadingAnchor,
+                constant: commentTextView.textContainerInset.left
+            ),
+            commentPlaceholderLabel.trailingAnchor.constraint(
+                lessThanOrEqualTo: commentTextView.trailingAnchor,
+                constant: -commentTextView.textContainerInset.right
+            ),
+            commentPlaceholderLabel.topAnchor.constraint(
+                equalTo: commentTextView.topAnchor,
+                constant: commentTextView.textContainerInset.top
+            ),
+
+            sendCommentButtonSpacingConstraint!,
+            sendCommentButton.trailingAnchor.constraint(equalTo: composerContainerView.trailingAnchor, constant: -Layout.composerHorizontalInset),
+            sendCommentButton.centerYAnchor.constraint(equalTo: commentTextView.centerYAnchor),
+            sendCommentButtonWidthConstraint!,
+            sendCommentButton.heightAnchor.constraint(equalToConstant: Layout.sendButtonHeight)
+        ])
+
+        updateCommentPlaceholderVisibility()
+    }
+
+    private func configureDismissKeyboardGesture() {
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboardFromBackgroundTap(_:)))
+        tapGesture.cancelsTouchesInView = false
+        tapGesture.delegate = self
+        view.addGestureRecognizer(tapGesture)
+        tableNode.view.keyboardDismissMode = .onDrag
+    }
+
+    private func preferredCommentTextViewHeight() -> CGFloat {
+        let minimumHeight = commentTextViewHeight(forLineCount: Layout.composerMinLines)
+        let maximumHeight = commentTextViewHeight(forLineCount: Layout.composerMaxLines)
+
+        guard commentTextView.text.isEmpty == false else {
+            return minimumHeight
+        }
+
+        let width = commentTextView.bounds.width > 0
+            ? commentTextView.bounds.width
+            : view.bounds.width - Layout.composerHorizontalInset * 2 - 44 - 8
+        let fittingSize = CGSize(width: max(width, 1), height: .greatestFiniteMagnitude)
+        let measuredHeight = commentTextView.sizeThatFits(fittingSize).height
+        return min(max(measuredHeight, minimumHeight), maximumHeight)
+    }
+
+    private func commentTextViewHeight(forLineCount lineCount: CGFloat) -> CGFloat {
+        let lineHeight = commentTextView.font?.lineHeight ?? UIFont.preferredFont(forTextStyle: .body).lineHeight
+        let insetHeight = commentTextView.textContainerInset.top + commentTextView.textContainerInset.bottom
+        return lineHeight * lineCount + insetHeight
+    }
+
+    private func updateCommentTextViewHeight(animated: Bool = true) {
+        guard let commentTextViewHeightConstraint else { return }
+        let newHeight = preferredCommentTextViewHeight()
+        let maximumHeight = commentTextViewHeight(forLineCount: Layout.composerMaxLines)
+        commentTextView.isScrollEnabled = newHeight >= maximumHeight - 0.5
+        guard abs(commentTextViewHeightConstraint.constant - newHeight) > 0.5 else { return }
+
+        commentTextViewHeightConstraint.constant = newHeight
+
+        guard animated, view.window != nil else {
+            view.layoutIfNeeded()
+            return
+        }
+
+        UIView.animate(withDuration: 0.18, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
+            self.view.layoutIfNeeded()
+        }
+    }
+
+    private func scheduleDeferredCommentTextViewHeightRefresh(animated: Bool = true) {
+        commentTextViewHeightRefreshWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.commentTextView.setNeedsLayout()
+            self.commentTextView.layoutIfNeeded()
+            self.updateCommentTextViewHeight(animated: animated)
+        }
+        commentTextViewHeightRefreshWorkItem = workItem
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + Layout.composerDeferredHeightRefreshDelay,
+            execute: workItem
+        )
     }
 
     private func configureHeader(_ content: PostDetailHeaderContent, renderedContent: [RenderedContentBlock]?) {
@@ -259,6 +577,12 @@ class PostDetailViewController: UIViewController {
         guard isViewLoaded else { return }
         tableNode.reloadData()
     }
+
+    #if DEBUG
+    func testRowCount() -> Int {
+        tableNode(tableNode, numberOfRowsInSection: 0)
+    }
+    #endif
 
     private func scheduleHeaderReload() {
         guard currentHeaderContent != nil else { return }
@@ -380,6 +704,144 @@ class PostDetailViewController: UIViewController {
     private func loginButtonTapped() {
         presenter.didTapLogin()
     }
+
+    @objc
+    private func sendCommentTapped() {
+        let content = resolvedCommentContent()
+        presenter.didSubmitComment(content: content)
+    }
+
+    @objc
+    private func cancelReplyTargetTapped() {
+        composerMode = .plain
+        updateComposerTarget()
+    }
+
+    @objc
+    private func dismissKeyboardFromBackgroundTap(_ recognizer: UITapGestureRecognizer) {
+        view.endEditing(true)
+    }
+
+    @objc
+    private func keyboardWillChangeFrame(_ notification: Notification) {
+        guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+        let convertedFrame = view.convert(frame, from: nil)
+        let overlap = max(view.bounds.maxY - convertedFrame.minY - view.safeAreaInsets.bottom, 0)
+        isKeyboardVisible = overlap > 0
+        composerBottomConstraint?.constant = -overlap
+        updateSendButtonVisibility()
+        animateComposer(with: notification)
+    }
+
+    @objc
+    private func keyboardWillHide(_ notification: Notification) {
+        isKeyboardVisible = false
+        composerBottomConstraint?.constant = 0
+        updateSendButtonVisibility()
+        animateComposer(with: notification)
+    }
+
+    private func animateComposer(with notification: Notification) {
+        let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? TimeInterval ?? 0.25
+        UIView.animate(withDuration: duration) {
+            self.view.layoutIfNeeded()
+        }
+    }
+
+    private func resolvedCommentContent() -> String {
+        CommentComposerContentBuilder.content(
+            text: commentTextView.text,
+            mode: composerMode,
+            postURL: resolvedDetailURL() ?? baseURL
+        )
+    }
+
+    private func updateComposerTarget() {
+        switch composerMode {
+        case .plain:
+            targetContainerView.isHidden = true
+            targetLabel.isHidden = true
+            targetLabel.text = nil
+            commentTextViewTopToTargetConstraint?.isActive = false
+            commentTextViewTopToComposerConstraint?.isActive = true
+        case .reply(let comment), .quote(let comment):
+            targetContainerView.isHidden = false
+            targetLabel.isHidden = false
+            targetLabel.text = "回复 @\(comment.authorName) \(comment.floorText ?? "#\(comment.anchorID ?? comment.id)")"
+            commentTextViewTopToComposerConstraint?.isActive = false
+            commentTextViewTopToTargetConstraint?.isActive = true
+        }
+        updateCommentTextViewHeight(animated: true)
+    }
+
+    private func setCommentComposerText(_ text: String, animated: Bool) {
+        commentTextView.text = text
+        updateCommentPlaceholderVisibility()
+        updateSendButtonState()
+        updateCommentTextViewHeight(animated: animated)
+        scheduleDeferredCommentTextViewHeightRefresh(animated: animated)
+    }
+
+    func handleReply(to comment: Comment) {
+        composerMode = .reply(comment)
+        updateComposerTarget()
+        commentTextView.becomeFirstResponder()
+    }
+
+    func handleQuote(_ comment: Comment) {
+        composerMode = .plain
+        updateComposerTarget()
+        let quoteText = CommentComposerContentBuilder.content(
+            text: "",
+            mode: .quote(comment),
+            postURL: resolvedDetailURL() ?? baseURL
+        )
+        setCommentComposerText(quoteText, animated: false)
+        commentTextView.becomeFirstResponder()
+    }
+
+    private func updateSendButtonVisibility() {
+        sendCommentButton.isHidden = isKeyboardVisible == false
+        sendCommentButtonSpacingConstraint?.constant = isKeyboardVisible ? 8 : 0
+        sendCommentButtonWidthConstraint?.constant = isKeyboardVisible ? Layout.sendButtonWidth : 0
+        updateSendButtonState()
+    }
+
+    private func updateCommentPlaceholderVisibility() {
+        commentPlaceholderLabel.isHidden = commentTextView.text.isEmpty == false
+    }
+
+    #if DEBUG
+    func simulateKeyboardVisibleForTesting() {
+        if view.bounds.height <= 0 || view.bounds.width <= 0 {
+            view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+            view.layoutIfNeeded()
+        }
+        let keyboardHeight: CGFloat = 300
+        let frame = CGRect(
+            x: 0,
+            y: view.bounds.maxY - keyboardHeight,
+            width: max(view.bounds.width, 390),
+            height: keyboardHeight
+        )
+        keyboardWillChangeFrame(Notification(
+            name: UIResponder.keyboardWillChangeFrameNotification,
+            object: nil,
+            userInfo: [
+                UIResponder.keyboardFrameEndUserInfoKey: frame,
+                UIResponder.keyboardAnimationDurationUserInfoKey: 0
+            ]
+        ))
+    }
+
+    func simulateKeyboardHiddenForTesting() {
+        keyboardWillHide(Notification(
+            name: UIResponder.keyboardWillHideNotification,
+            object: nil,
+            userInfo: [UIResponder.keyboardAnimationDurationUserInfoKey: 0]
+        ))
+    }
+    #endif
 
     @objc
     private func openInBrowserTapped() {
@@ -551,6 +1013,36 @@ extension PostDetailViewController: PostDetailViewProtocol {
         present(alert, animated: true)
     }
 
+    func showToast(message: String) {
+        toastHideWorkItem?.cancel()
+        toastLabel.text = message
+        toastContainerView.isHidden = false
+        toastContainerView.alpha = 0
+        toastContainerView.transform = CGAffineTransform(translationX: 0, y: 8)
+
+        UIView.animate(withDuration: 0.22, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
+            self.toastContainerView.alpha = 1
+            self.toastContainerView.transform = .identity
+        }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            UIView.animate(
+                withDuration: 0.2,
+                delay: 0,
+                options: [.curveEaseIn, .allowUserInteraction]
+            ) {
+                self.toastContainerView.alpha = 0
+                self.toastContainerView.transform = CGAffineTransform(translationX: 0, y: 8)
+            } completion: { _ in
+                self.toastContainerView.isHidden = true
+                self.toastContainerView.transform = .identity
+            }
+        }
+        toastHideWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: workItem)
+    }
+
     func render(detail: PostDetail) {
         title = "详情"
         loginButton.isHidden = true
@@ -566,6 +1058,18 @@ extension PostDetailViewController: PostDetailViewProtocol {
         reloadTableData()
         scheduleHeaderRender(for: headerContent)
         preheatCommentRender(for: comments)
+    }
+
+    func setCommentComposerSubmitting(_ isSubmitting: Bool) {
+        isCommentSubmitting = isSubmitting
+
+        var configuration = sendCommentButton.configuration ?? UIButton.Configuration.filled()
+        configuration.showsActivityIndicator = isSubmitting
+        configuration.image = isSubmitting ? nil : UIImage(systemName: "paperplane.fill")
+        sendCommentButton.configuration = configuration
+        sendCommentButton.accessibilityLabel = isSubmitting ? "正在发送评论" : "发送评论"
+
+        updateSendButtonState()
     }
 
     func renderLoginRequired(message: String) {
@@ -591,6 +1095,35 @@ extension PostDetailViewController: PostDetailViewProtocol {
         commentRenderInFlight.removeAll(keepingCapacity: true)
         reloadTableData()
         scheduleHeaderRender(for: headerContent)
+    }
+
+    func clearCommentComposer() {
+        setCommentComposerText("", animated: true)
+        composerMode = .plain
+        updateComposerTarget()
+    }
+}
+
+extension PostDetailViewController: UITextViewDelegate {
+    func textViewDidChange(_ textView: UITextView) {
+        updateCommentPlaceholderVisibility()
+        updateSendButtonState()
+        updateCommentTextViewHeight()
+        scheduleDeferredCommentTextViewHeightRefresh()
+    }
+
+    private func updateSendButtonState() {
+        sendCommentButton.isEnabled = isKeyboardVisible
+            && isCommentSubmitting == false
+            && !commentTextView.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+extension PostDetailViewController: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard gestureRecognizer is UITapGestureRecognizer else { return true }
+        guard let touchedView = touch.view else { return true }
+        return touchedView.isDescendant(of: composerContainerView) == false
     }
 }
 
@@ -880,6 +1413,12 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                 },
                 onLinkTapped: { url in
                     self?.handleContentLinkTap(url)
+                },
+                onReplyTapped: { comment in
+                    self?.handleReply(to: comment)
+                },
+                onQuoteTapped: { comment in
+                    self?.handleQuote(comment)
                 },
                 onTextLayoutInvalidated: {
                     self?.scheduleAttachmentLayoutRefresh()
