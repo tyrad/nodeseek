@@ -16,7 +16,9 @@ protocol PostListViewProtocol: AnyObject {
     func showLoadingMore()
     func hideLoadingMore()
     func showError(message: String)
+    #if DEBUG
     func showDetailTestInput()
+    #endif
     func renderCategories(_ categories: [PostListCategory], selected: PostListCategory)
     func renderSortMode(_ sortMode: PostListSortMode)
     func renderAccount(_ account: AccountResponse)
@@ -29,8 +31,10 @@ protocol PostListPresenterProtocol: AnyObject {
     func didSelectCategory(_ category: PostListCategory)
     func didToggleSortMode()
     func didTapLogin()
+    #if DEBUG
     func didTapDetailTest()
     func didSubmitDetailTestURL(_ rawURL: String)
+    #endif
     func didPullToRefresh()
     func didSelectPost(at index: Int)
     func didApproachBottom(currentIndex: Int, totalCount: Int)

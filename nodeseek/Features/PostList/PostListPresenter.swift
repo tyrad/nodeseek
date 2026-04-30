@@ -71,11 +71,14 @@ class PostListPresenter: PostListPresenterProtocol {
         }
     }
 
+    #if DEBUG
     func didTapDetailTest() {
+        guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }
         view?.showDetailTestInput()
     }
 
     func didSubmitDetailTestURL(_ rawURL: String) {
+        guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }
         guard let target = PostDetailTestTarget(rawValue: rawURL) else {
             view?.showError(message: "请输入 NodeSeek 帖子详情链接，例如 https://www.nodeseek.com/post-705039-1")
             return
@@ -83,6 +86,7 @@ class PostListPresenter: PostListPresenterProtocol {
 
         router.navigateToPostDetail(post: target.post, page: target.page)
     }
+    #endif
 
     private func presentCurrentCategory(useCache: Bool) {
         var state = state(for: currentCategory)

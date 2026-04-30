@@ -12,7 +12,9 @@ final class PostListSideMenuViewController: UIViewController {
     private var isSideMenuVisible = false
     private var isAccountLoggedIn = false
     var onLoginTapped: (() -> Void)?
+    #if DEBUG
     var onDetailTestTapped: (() -> Void)?
+    #endif
     private let avatarLoader = AvatarImageLoader.shared
 
     private static let defaultAvatarImage: UIImage? = {
@@ -106,6 +108,7 @@ final class PostListSideMenuViewController: UIViewController {
         return button
     }()
 
+    #if DEBUG
     private let detailTestButton: UIButton = {
         let button = UIButton(type: .system)
         let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
@@ -119,8 +122,10 @@ final class PostListSideMenuViewController: UIViewController {
         button.contentHorizontalAlignment = .leading
         button.accessibilityIdentifier = "post-list-side-menu-detail-test-button"
         button.translatesAutoresizingMaskIntoConstraints = false
+        button.isHidden = !NodeSeekDebugConfig.enablePostDetailTestEntry
         return button
     }()
+    #endif
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -167,7 +172,11 @@ final class PostListSideMenuViewController: UIViewController {
         view.isHidden = true
         backdropView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(backdropTapped)))
         accountHeaderButton.addTarget(self, action: #selector(accountHeaderTapped), for: .touchUpInside)
-        detailTestButton.addTarget(self, action: #selector(detailTestButtonTapped), for: .touchUpInside)
+        #if DEBUG
+        if NodeSeekDebugConfig.enablePostDetailTestEntry {
+            detailTestButton.addTarget(self, action: #selector(detailTestButtonTapped), for: .touchUpInside)
+        }
+        #endif
         settingsButton.addTarget(self, action: #selector(settingsButtonTapped), for: .touchUpInside)
 
         view.addSubview(backdropView)
@@ -176,7 +185,11 @@ final class PostListSideMenuViewController: UIViewController {
         sideMenuView.addSubview(nameLabel)
         sideMenuView.addSubview(statsLabel)
         sideMenuView.addSubview(accountHeaderButton)
-        sideMenuView.addSubview(detailTestButton)
+        #if DEBUG
+        if NodeSeekDebugConfig.enablePostDetailTestEntry {
+            sideMenuView.addSubview(detailTestButton)
+        }
+        #endif
         sideMenuView.addSubview(settingsButton)
 
         let sideMenuLeadingConstraint = sideMenuView.leadingAnchor.constraint(
@@ -214,16 +227,22 @@ final class PostListSideMenuViewController: UIViewController {
             accountHeaderButton.topAnchor.constraint(equalTo: avatarImageView.topAnchor, constant: -8),
             accountHeaderButton.bottomAnchor.constraint(equalTo: avatarImageView.bottomAnchor, constant: 8),
 
-            detailTestButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
-            detailTestButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
-            detailTestButton.bottomAnchor.constraint(equalTo: settingsButton.topAnchor, constant: -8),
-            detailTestButton.heightAnchor.constraint(equalToConstant: 48),
-
             settingsButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
             settingsButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
             settingsButton.bottomAnchor.constraint(equalTo: sideMenuView.safeAreaLayoutGuide.bottomAnchor, constant: -18),
             settingsButton.heightAnchor.constraint(equalToConstant: 48)
         ])
+
+        #if DEBUG
+        if NodeSeekDebugConfig.enablePostDetailTestEntry {
+            NSLayoutConstraint.activate([
+                detailTestButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
+                detailTestButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
+                detailTestButton.bottomAnchor.constraint(equalTo: settingsButton.topAnchor, constant: -8),
+                detailTestButton.heightAnchor.constraint(equalToConstant: 48)
+            ])
+        }
+        #endif
     }
 
     @objc private func backdropTapped() {
@@ -236,10 +255,12 @@ final class PostListSideMenuViewController: UIViewController {
         onLoginTapped?()
     }
 
+    #if DEBUG
     @objc private func detailTestButtonTapped() {
         hide(animated: true)
         onDetailTestTapped?()
     }
+    #endif
 
     @objc private func settingsButtonTapped() {
         hide(animated: true)

@@ -342,9 +342,11 @@ class PostListViewController: UIViewController {
         sideMenuViewController.onLoginTapped = { [weak self] in
             self?.presenter.didTapLogin()
         }
+        #if DEBUG
         sideMenuViewController.onDetailTestTapped = { [weak self] in
             self?.presenter.didTapDetailTest()
         }
+        #endif
         addChild(sideMenuViewController)
         view.addSubview(sideMenuViewController.view)
         sideMenuViewController.view.translatesAutoresizingMaskIntoConstraints = false
@@ -393,7 +395,9 @@ extension PostListViewController: PostListViewProtocol {
         present(alert, animated: true)
     }
 
+    #if DEBUG
     func showDetailTestInput() {
+        guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }
         let alert = UIAlertController(
             title: "详情测试",
             message: "输入 NodeSeek 帖子详情链接",
@@ -414,6 +418,7 @@ extension PostListViewController: PostListViewProtocol {
         })
         present(alert, animated: true)
     }
+    #endif
 
     func renderCategories(_ categories: [PostListCategory], selected: PostListCategory) {
         let categoriesChanged = categories != self.categories

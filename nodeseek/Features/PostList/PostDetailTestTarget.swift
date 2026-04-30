@@ -7,6 +7,7 @@
 
 import Foundation
 
+#if DEBUG
 struct PostDetailTestTarget: Equatable {
     private static let baseURL = URL(string: "https://www.nodeseek.com")!
     private static let postPathRegex = try! NSRegularExpression(
@@ -66,3 +67,4 @@ struct PostDetailTestTarget: Equatable {
         return host == "nodeseek.com" || host.hasSuffix(".nodeseek.com")
     }
 }
+#endif
