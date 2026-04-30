@@ -881,8 +881,32 @@ struct PostDetailViewControllerTests {
         let playerLayer = try #require(view.layer.sublayers?.compactMap { $0 as? AVPlayerLayer }.first)
         let playButton = try #require(view.firstSubview(of: UIButton.self))
 
+        #expect(view.backgroundColor == .clear)
+        #expect(view.isOpaque == false)
         #expect(playerLayer.isHidden)
         #expect(playButton.isUserInteractionEnabled == false)
+    }
+
+    @Test func videoAssetRequestCarriesBrowserContextForNodeSeekAssets() throws {
+        let url = try #require(URL(string: "https://www.nodeseek.com/static/image/sticker/emoji/00.mp4"))
+        let storage = HTTPCookieStorage.shared
+        deleteVideoAssetTestCookies(from: storage)
+        defer { deleteVideoAssetTestCookies(from: storage) }
+        let cookie = try #require(HTTPCookie(properties: [
+            .domain: ".nodeseek.com",
+            .path: "/",
+            .name: "video_asset_test_cookie",
+            .value: "token",
+            .secure: "TRUE",
+            .expires: Date(timeIntervalSinceNow: 3600)
+        ]))
+        storage.setCookie(cookie)
+
+        let options = DetailVideoAssetRequest.assetOptions(for: url, cookieStorage: storage)
+        let cookies = try #require(options[AVURLAssetHTTPCookiesKey] as? [HTTPCookie])
+
+        #expect(cookies.contains { $0.name == "video_asset_test_cookie" && $0.value == "token" })
+        #expect(options[AVURLAssetHTTPUserAgentKey] as? String == WebRequestFingerprint.userAgent)
     }
 
     @Test func imageBlockUsesStablePlaceholderHeightForNormalImages() {
@@ -1125,6 +1149,12 @@ private final class SpyPostDetailPresenter: PostDetailPresenterProtocol {
 
     func didTapSendReply(content: String) {
         sentReplyContent = content
+    }
+}
+
+private func deleteVideoAssetTestCookies(from storage: HTTPCookieStorage) {
+    for cookie in storage.cookies ?? [] where cookie.name == "video_asset_test_cookie" {
+        storage.deleteCookie(cookie)
     }
 }
 

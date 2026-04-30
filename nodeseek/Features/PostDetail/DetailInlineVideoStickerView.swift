@@ -14,14 +14,18 @@ final class DetailInlineVideoStickerView: UIView {
     private let playButton = UIButton(type: .system)
     private let playerLayer = AVPlayerLayer()
     private var thumbnailToken: UUID?
+    private var thumbnailTask: Task<Void, Never>?
     private var thumbnailGenerator: AVAssetImageGenerator?
+    private var playbackToken: UUID?
+    private var playbackTask: Task<Void, Never>?
     private var isPlaying = false
 
     init(frame: CGRect, videoURL: URL) {
         self.videoURL = videoURL
         super.init(frame: frame)
 
-        backgroundColor = .secondarySystemFill
+        backgroundColor = .clear
+        isOpaque = false
         clipsToBounds = true
         isUserInteractionEnabled = true
 
@@ -67,9 +71,14 @@ final class DetailInlineVideoStickerView: UIView {
 
         guard superview != nil else {
             StickerVideoPlaybackCoordinator.shared.stop(owner: self)
+            thumbnailTask?.cancel()
+            thumbnailTask = nil
             thumbnailToken = nil
             thumbnailGenerator?.cancelAllCGImageGeneration()
             thumbnailGenerator = nil
+            playbackTask?.cancel()
+            playbackTask = nil
+            playbackToken = nil
             return
         }
 
@@ -77,6 +86,9 @@ final class DetailInlineVideoStickerView: UIView {
     }
 
     func playbackCoordinatorDidStop() {
+        playbackTask?.cancel()
+        playbackTask = nil
+        playbackToken = nil
         isPlaying = false
         playerLayer.player = nil
         playerLayer.isHidden = true
@@ -85,22 +97,31 @@ final class DetailInlineVideoStickerView: UIView {
     }
 
     private func loadThumbnailIfNeeded() {
-        guard thumbnailToken == nil,
+        guard thumbnailTask == nil,
+              thumbnailToken == nil,
               thumbnailView.image == nil,
               let resolvedURL = AvatarImageLoader.resolveImageURL(videoURL) else { return }
 
         let token = UUID()
         thumbnailToken = token
-        let asset = AVURLAsset(url: resolvedURL)
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(width: 180, height: 180)
-        thumbnailGenerator = generator
-        generator.generateCGImageAsynchronously(for: .zero) { [weak self] cgImage, _, _ in
-            DispatchQueue.main.async {
-                guard let self, self.thumbnailToken == token else { return }
-                self.thumbnailGenerator = nil
-                self.thumbnailView.image = cgImage.map(UIImage.init(cgImage:))
+        thumbnailTask = Task { @MainActor [weak self] in
+            let asset = await DetailVideoAssetProvider.shared.makeAsset(for: resolvedURL)
+            guard let self,
+                  Task.isCancelled == false,
+                  self.thumbnailToken == token,
+                  self.superview != nil else { return }
+
+            let generator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
+            generator.maximumSize = CGSize(width: 180, height: 180)
+            self.thumbnailGenerator = generator
+            generator.generateCGImageAsynchronously(for: .zero) { [weak self] cgImage, _, _ in
+                DispatchQueue.main.async {
+                    guard let self, self.thumbnailToken == token else { return }
+                    self.thumbnailTask = nil
+                    self.thumbnailGenerator = nil
+                    self.thumbnailView.image = cgImage.map(UIImage.init(cgImage:))
+                }
             }
         }
     }
@@ -112,12 +133,29 @@ final class DetailInlineVideoStickerView: UIView {
             return
         }
 
-        guard let resolvedURL = AvatarImageLoader.resolveImageURL(videoURL) else { return }
-        isPlaying = true
-        playerLayer.isHidden = false
-        thumbnailView.isHidden = true
-        playButton.isHidden = true
-        StickerVideoPlaybackCoordinator.shared.play(resolvedURL, in: playerLayer, owner: self)
+        guard playbackTask == nil,
+              let resolvedURL = AvatarImageLoader.resolveImageURL(videoURL) else { return }
+
+        let token = UUID()
+        playbackToken = token
+        playbackTask = Task { @MainActor [weak self] in
+            let asset = await DetailVideoAssetProvider.shared.makeAsset(for: resolvedURL)
+            guard let self else { return }
+            defer {
+                if self.playbackToken == token {
+                    self.playbackTask = nil
+                }
+            }
+            guard Task.isCancelled == false,
+                  self.playbackToken == token,
+                  self.superview != nil else { return }
+
+            self.isPlaying = true
+            self.playerLayer.isHidden = false
+            self.thumbnailView.isHidden = true
+            self.playButton.isHidden = true
+            StickerVideoPlaybackCoordinator.shared.play(asset, in: self.playerLayer, owner: self)
+        }
     }
 }
 
@@ -133,14 +171,14 @@ private final class StickerVideoPlaybackCoordinator {
         player.isMuted = true
     }
 
-    func play(_ url: URL, in layer: AVPlayerLayer, owner: DetailInlineVideoStickerView) {
+    func play(_ asset: AVURLAsset, in layer: AVPlayerLayer, owner: DetailInlineVideoStickerView) {
         if activeView !== owner {
             activeView?.playbackCoordinatorDidStop()
             activeLayer?.player = nil
         }
 
         removeEndObserver()
-        let item = AVPlayerItem(url: url)
+        let item = AVPlayerItem(asset: asset)
         activeView = owner
         activeLayer = layer
         layer.player = player
