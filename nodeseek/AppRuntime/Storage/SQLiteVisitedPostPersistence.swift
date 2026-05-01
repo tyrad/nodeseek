@@ -176,3 +176,26 @@ final class SQLiteVisitedPostPersistence: VisitedPostPersistence {
         return String(cString: message)
     }
 }
+
+extension VisitedPostStore {
+    static let shared: VisitedPostStore = {
+        do {
+            let persistence = try SQLiteVisitedPostPersistence(databaseURL: SQLiteVisitedPostPersistence.defaultDatabaseURL())
+            return VisitedPostStore(persistence: persistence)
+        } catch {
+            return VisitedPostStore(persistence: NoopVisitedPostPersistence())
+        }
+    }()
+}
+
+private final class NoopVisitedPostPersistence: VisitedPostPersistence {
+    func loadRecent(limit: Int) throws -> [VisitedPostRecord] {
+        []
+    }
+
+    func upsert(_ record: VisitedPostRecord) throws {
+    }
+
+    func trim(keepingLatest limit: Int) throws {
+    }
+}
