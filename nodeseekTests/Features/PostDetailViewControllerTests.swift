@@ -638,6 +638,19 @@ struct PostDetailViewControllerTests {
         #expect(UIPasteboard.general.string == codeBlock.text)
     }
 
+    @Test func unsupportedContentNodeUsesSafariIcon() throws {
+        let nodes = DetailContentBlockNodeFactory.makeNodes(
+            from: [.unsupported(reason: DTCoreTextHTMLContentRenderer.unsupportedXtermContentNotice)],
+            onImageTapped: { _, _ in },
+            onLinkTapped: { _ in },
+            onTextLayoutInvalidated: {}
+        )
+
+        let node = try #require(nodes.first as? DetailUnsupportedContentNode)
+        #expect(node.reason == DTCoreTextHTMLContentRenderer.unsupportedXtermContentNotice)
+        #expect(node.iconSymbolName == "safari")
+    }
+
     @Test func resolvesNodeSeekPostLinksToNativeDetail() throws {
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
         let url = try #require(URL(string: "/post-704174-2#8", relativeTo: baseURL)?.absoluteURL)
