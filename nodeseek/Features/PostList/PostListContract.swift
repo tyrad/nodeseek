@@ -21,8 +21,7 @@ protocol PostListViewProtocol: AnyObject {
     #endif
     func renderCategories(_ categories: [PostListCategory], selected: PostListCategory)
     func renderSortMode(_ sortMode: PostListSortMode)
-    func render(items: [PostListItem])
-    func renderVisitedState(at index: Int, isVisited: Bool)
+    func render(posts: [PostSummary])
 }
 
 // MARK: - Presenter Protocol (View -> Presenter)

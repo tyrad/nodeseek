@@ -33,59 +33,6 @@ struct PostListPresenterTests {
         #expect(router.selectedPost?.id == "1")
     }
 
-    @Test func loadingPostsComposesVisitedStateBeforeRendering() {
-        let view = SpyPostListView()
-        let interactor = SpyPostListInteractor()
-        let router = SpyPostListRouter()
-        let visitedStore = FakeVisitedPostStore()
-        visitedStore.visitedIDs = ["2"]
-        let presenter = PostListPresenter(interactor: interactor, router: router, visitedStore: visitedStore)
-        presenter.setView(view)
-        let first = makePost(id: "1", title: "未访问")
-        let second = makePost(id: "2", title: "已访问")
-
-        presenter.didLoadPosts([first, second], category: .all)
-
-        #expect(view.lastRenderedPostIDs == ["1", "2"])
-        #expect(view.lastRenderedVisitedFlags == [false, true])
-    }
-
-    @Test func selectingUnvisitedPostMarksVisitedAndReloadsOnlySelectedRowBeforeNavigation() {
-        let view = SpyPostListView()
-        let interactor = SpyPostListInteractor()
-        let router = SpyPostListRouter()
-        let visitedStore = FakeVisitedPostStore()
-        let presenter = PostListPresenter(interactor: interactor, router: router, visitedStore: visitedStore)
-        presenter.setView(view)
-        let post = makePost(id: "1", title: "标题")
-
-        presenter.didLoadPosts([post], category: .all)
-        presenter.didSelectPost(at: 0)
-
-        #expect(visitedStore.markedPosts.map(\.id) == ["1"])
-        #expect(view.updatedVisitedRows == [0])
-        #expect(view.updatedVisitedFlags == [true])
-        #expect(router.selectedPost?.id == "1")
-    }
-
-    @Test func selectingAlreadyVisitedPostDoesNotReloadRowAgain() {
-        let view = SpyPostListView()
-        let interactor = SpyPostListInteractor()
-        let router = SpyPostListRouter()
-        let visitedStore = FakeVisitedPostStore()
-        visitedStore.visitedIDs = ["1"]
-        let presenter = PostListPresenter(interactor: interactor, router: router, visitedStore: visitedStore)
-        presenter.setView(view)
-        let post = makePost(id: "1", title: "标题")
-
-        presenter.didLoadPosts([post], category: .all)
-        presenter.didSelectPost(at: 0)
-
-        #expect(visitedStore.markedPosts.map(\.id) == ["1"])
-        #expect(view.updatedVisitedRows.isEmpty)
-        #expect(router.selectedPost?.id == "1")
-    }
-
     @Test func submittingDetailTestURLNavigatesToParsedPostPage() throws {
         let view = SpyPostListView()
         let interactor = SpyPostListInteractor()
@@ -414,18 +361,6 @@ struct PostListPresenterTests {
     }
 }
 
-private func makePost(id: String, title: String) -> PostSummary {
-    PostSummary(
-        id: id,
-        title: title,
-        url: URL(string: "https://www.nodeseek.com/post-\(id)")!,
-        authorName: "mist",
-        nodeName: "开发",
-        replyCount: 1,
-        lastActivityText: "刚刚"
-    )
-}
-
 @MainActor
 private final class SpyPostListView: PostListViewProtocol {
     var showLoadingCount = 0
@@ -437,9 +372,6 @@ private final class SpyPostListView: PostListViewProtocol {
     var renderCallCount = 0
     var lastRenderedPostsCount = 0
     var lastRenderedPostIDs: [String] = []
-    var lastRenderedVisitedFlags: [Bool] = []
-    var updatedVisitedRows: [Int] = []
-    var updatedVisitedFlags: [Bool] = []
     var lastErrorMessage: String?
     var renderedCategories: [PostListCategory] = []
     var selectedCategory: PostListCategory = .all
@@ -495,37 +427,11 @@ private final class SpyPostListView: PostListViewProtocol {
         events.append("renderSortMode")
     }
 
-    func render(items: [PostListItem]) {
+    func render(posts: [PostSummary]) {
         renderCallCount += 1
-        lastRenderedPostsCount = items.count
-        lastRenderedPostIDs = items.map(\.post.id)
-        lastRenderedVisitedFlags = items.map(\.isVisited)
+        lastRenderedPostsCount = posts.count
+        lastRenderedPostIDs = posts.map(\.id)
         events.append("render")
-    }
-
-    func renderVisitedState(at index: Int, isVisited: Bool) {
-        updatedVisitedRows.append(index)
-        updatedVisitedFlags.append(isVisited)
-        events.append("renderVisitedState")
-    }
-}
-
-@MainActor
-private final class FakeVisitedPostStore: VisitedPostStoreProtocol {
-    var visitedIDs: Set<String> = []
-    var markedPosts: [PostSummary] = []
-
-    func isVisited(postID: String) -> Bool {
-        visitedIDs.contains(postID)
-    }
-
-    func markVisited(post: PostSummary, visitedAt: Date) {
-        visitedIDs.insert(post.id)
-        markedPosts.append(post)
-    }
-
-    func recentRecords(limit: Int) -> [VisitedPostRecord] {
-        []
     }
 }
 

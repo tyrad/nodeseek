@@ -18,8 +18,7 @@ class PostListRouter: PostListRouterProtocol {
         let interactor = PostListInteractor()
         let presenter = PostListPresenter(
             interactor: interactor,
-            router: router,
-            visitedStore: VisitedPostStore.shared
+            router: router
         )
         
         interactor.presenter = presenter

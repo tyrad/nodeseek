@@ -9,7 +9,7 @@ import Foundation
 
 class PostListPresenter: PostListPresenterProtocol {
     private struct CategoryState {
-        var items: [PostListItem] = []
+        var posts: [PostSummary] = []
         var loadedIDs: Set<String> = []
         var nextPage: Int = 2
         var hasMorePages: Bool = true
@@ -23,7 +23,6 @@ class PostListPresenter: PostListPresenterProtocol {
     private weak var view: PostListViewProtocol?
     private let interactor: PostListInteractorInput
     private let router: PostListRouterProtocol
-    private let visitedStore: VisitedPostStoreProtocol
     private var categoryStates: [PostListCategory: CategoryState] = [:]
     private let categories = PostListCategory.allCases
     private var currentCategory: PostListCategory = .all
@@ -32,12 +31,10 @@ class PostListPresenter: PostListPresenterProtocol {
     // MARK: - Initialization
     init(
         interactor: PostListInteractorInput,
-        router: PostListRouterProtocol,
-        visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore()
+        router: PostListRouterProtocol
     ) {
         self.interactor = interactor
         self.router = router
-        self.visitedStore = visitedStore
     }
     
     // MARK: - Setup
@@ -96,7 +93,7 @@ class PostListPresenter: PostListPresenterProtocol {
             categoryStates[currentCategory] = state
         }
 
-        view?.render(items: state.items)
+        view?.render(posts: state.posts)
         if state.isLoadingFirstPage {
             view?.showLoading()
         } else {
@@ -155,18 +152,9 @@ class PostListPresenter: PostListPresenterProtocol {
     }
     
     func didSelectPost(at index: Int) {
-        var state = state(for: currentCategory)
-        guard state.items.indices.contains(index) else { return }
-        let item = state.items[index]
-        visitedStore.markVisited(post: item.post, visitedAt: Date())
-
-        if !item.isVisited {
-            state.items[index] = PostListItem(post: item.post, isVisited: true)
-            categoryStates[currentCategory] = state
-            view?.renderVisitedState(at: index, isVisited: true)
-        }
-
-        router.navigateToPostDetail(post: item.post)
+        let posts = state(for: currentCategory).posts
+        guard posts.indices.contains(index) else { return }
+        router.navigateToPostDetail(post: posts[index])
     }
 
     func didApproachBottom(currentIndex: Int, totalCount: Int) {
@@ -193,7 +181,7 @@ extension PostListPresenter: PostListInteractorOutput {
     ) {
         guard sortMode == currentSortMode else { return }
         var state = state(for: category)
-        state.items = items(for: posts)
+        state.posts = posts
         state.loadedIDs = Set(posts.map(\.id))
         state.hasMorePages = !posts.isEmpty
         state.nextPage = 2
@@ -204,7 +192,7 @@ extension PostListPresenter: PostListInteractorOutput {
         categoryStates[category] = state
 
         guard category == currentCategory else { return }
-        view?.render(items: state.items)
+        view?.render(posts: state.posts)
         view?.hideLoading()
         view?.hideRefreshing()
         view?.hideLoadingMore()
@@ -232,7 +220,7 @@ extension PostListPresenter: PostListInteractorOutput {
         state.nextPage = page + 1
         var appended = false
         for post in posts where state.loadedIDs.insert(post.id).inserted {
-            state.items.append(item(for: post))
+            state.posts.append(post)
             appended = true
         }
         categoryStates[category] = state
@@ -240,7 +228,7 @@ extension PostListPresenter: PostListInteractorOutput {
         guard category == currentCategory else { return }
         if appended {
             // 先接上新数据，再收起底部 loading，避免 footer 高度变化带动可见列表跳动。
-            view?.render(items: state.items)
+            view?.render(posts: state.posts)
         }
         view?.hideLoadingMore()
     }
@@ -278,15 +266,5 @@ extension PostListPresenter: PostListInteractorOutput {
         guard category == currentCategory else { return }
         view?.hideLoadingMore()
         view?.showError(message: "第 \(page) 页加载失败：\(error)")
-    }
-}
-
-private extension PostListPresenter {
-    func items(for posts: [PostSummary]) -> [PostListItem] {
-        posts.map(item(for:))
-    }
-
-    func item(for post: PostSummary) -> PostListItem {
-        PostListItem(post: post, isVisited: visitedStore.isVisited(postID: post.id))
     }
 }
