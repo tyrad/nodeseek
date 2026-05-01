@@ -25,7 +25,7 @@ final class PostTextureListView: UIView {
     private let tableNode = ASTableNode(style: .plain)
     private let refreshControl = UIRefreshControl()
     private var displayMode: DisplayMode = .content
-    private var posts: [PostSummary] = []
+    private var items: [PostListItem] = []
     private let minimumSkeletonRowCount = 8
     private let estimatedSkeletonRowHeight: CGFloat = 84
     private var skeletonRowCount: Int = 8
@@ -56,19 +56,19 @@ final class PostTextureListView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func setPosts(_ posts: [PostSummary]) {
-        if displayMode == .content, self.posts == posts {
+    func setItems(_ items: [PostListItem]) {
+        if displayMode == .content, self.items == items {
             return
         }
         if displayMode != .content {
-            self.posts = posts
+            self.items = items
             displayMode = .content
             tableNode.reloadData()
             return
         }
 
-        if let appendIndexPaths = makeAppendIndexPaths(from: self.posts, to: posts) {
-            self.posts = posts
+        if let appendIndexPaths = makeAppendIndexPaths(from: self.items, to: items) {
+            self.items = items
             // 分页追加发生在滚动底部，关闭 row 插入动画可以避免 Texture 调整 contentOffset 时牵动上方内容。
             tableNode.performBatch(animated: false, updates: { [weak self] in
                 self?.tableNode.insertRows(at: appendIndexPaths, with: .none)
@@ -76,8 +76,17 @@ final class PostTextureListView: UIView {
             return
         }
 
-        self.posts = posts
+        self.items = items
         tableNode.reloadData()
+    }
+
+    func updateVisitedState(at index: Int, isVisited: Bool) {
+        guard displayMode == .content else { return }
+        guard items.indices.contains(index) else { return }
+        let existing = items[index]
+        guard existing.isVisited != isVisited else { return }
+        items[index] = PostListItem(post: existing.post, isVisited: isVisited)
+        tableNode.reloadRows(at: [IndexPath(row: index, section: 0)], with: .none)
     }
 
     func showLoadingSkeleton() {
@@ -135,15 +144,15 @@ final class PostTextureListView: UIView {
         ])
     }
 
-    private func makeAppendIndexPaths(from oldPosts: [PostSummary], to newPosts: [PostSummary]) -> [IndexPath]? {
-        guard newPosts.count > oldPosts.count else { return nil }
-        guard !oldPosts.isEmpty else { return nil }
+    private func makeAppendIndexPaths(from oldItems: [PostListItem], to newItems: [PostListItem]) -> [IndexPath]? {
+        guard newItems.count > oldItems.count else { return nil }
+        guard !oldItems.isEmpty else { return nil }
 
-        for index in oldPosts.indices where oldPosts[index].id != newPosts[index].id {
+        for index in oldItems.indices where oldItems[index].post.id != newItems[index].post.id {
             return nil
         }
 
-        return (oldPosts.count..<newPosts.count).map { IndexPath(row: $0, section: 0) }
+        return (oldItems.count..<newItems.count).map { IndexPath(row: $0, section: 0) }
     }
 
     @objc private func handlePullToRefresh() {
@@ -171,7 +180,7 @@ extension PostTextureListView: ASTableDataSource {
     func tableNode(_ tableNode: ASTableNode, numberOfRowsInSection section: Int) -> Int {
         switch displayMode {
         case .content:
-            return posts.count
+            return items.count
         case .skeleton:
             return skeletonRowCount
         }
@@ -180,9 +189,9 @@ extension PostTextureListView: ASTableDataSource {
     func tableNode(_ tableNode: ASTableNode, nodeBlockForRowAt indexPath: IndexPath) -> ASCellNodeBlock {
         switch displayMode {
         case .content:
-            let post = posts[indexPath.row]
+            let item = items[indexPath.row]
             return {
-                PostSummaryCellNode(post: post)
+                PostSummaryCellNode(item: item)
             }
         case .skeleton:
             return {
@@ -202,6 +211,6 @@ extension PostTextureListView: ASTableDelegate {
     func tableNode(_ tableNode: ASTableNode, willDisplayRowWith node: ASCellNode) {
         guard displayMode == .content else { return }
         guard let indexPath = tableNode.indexPath(for: node) else { return }
-        delegate?.postTextureListView(self, didApproachBottomAt: indexPath.row, totalCount: posts.count)
+        delegate?.postTextureListView(self, didApproachBottomAt: indexPath.row, totalCount: items.count)
     }
 }
