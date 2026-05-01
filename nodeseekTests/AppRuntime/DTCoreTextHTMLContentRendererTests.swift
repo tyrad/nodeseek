@@ -781,15 +781,22 @@ struct DTCoreTextHTMLContentRendererTests {
             maxImageWidth: 240
         )
         let renderedText = combinedText(in: blocks)
+        let unsupportedReasons = unsupportedReasons(in: blocks)
 
         #expect(renderedText.contains("💻基本信息"))
-        #expect(renderedText.contains("硬件质量体检报告"))
+        #expect(renderedText.contains("硬件质量体检报告") == false)
+        #expect(renderedText.contains("https://github.com/xykt/HardwareQuality") == false)
         #expect(renderedText.contains("🎬IP质量"))
-        #expect(renderedText.contains("IP质量体检报告"))
+        #expect(renderedText.contains("IP质量体检报告") == false)
+        #expect(renderedText.contains("报告链接：https://Report.Check.Place/ip/demo.svg") == false)
         #expect(renderedText.contains("🌐网络质量"))
         #expect(renderedText.contains("📍回程路由"))
         #expect(renderedText.contains("xterm-fg-1") == false)
         #expect(renderedText.contains("hidden helper") == false)
+        #expect(unsupportedReasons == [
+            DTCoreTextHTMLContentRenderer.unsupportedXtermContentNotice,
+            DTCoreTextHTMLContentRenderer.unsupportedXtermContentNotice
+        ])
         #expect(imageURLs(in: blocks).map(\.absoluteString) == [
             "https://i.111666.best/image/network.webp",
             "https://i.111666.best/image/route.webp"
@@ -1074,6 +1081,13 @@ struct DTCoreTextHTMLContentRendererTests {
         blocks.compactMap { block in
             guard case .codeBlock(let codeBlock) = block else { return nil }
             return codeBlock
+        }
+    }
+
+    private func unsupportedReasons(in blocks: [RenderedContentBlock]) -> [String] {
+        blocks.compactMap { block in
+            guard case .unsupported(let reason) = block else { return nil }
+            return reason
         }
     }
 

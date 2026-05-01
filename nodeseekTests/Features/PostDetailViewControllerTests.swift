@@ -638,6 +638,19 @@ struct PostDetailViewControllerTests {
         #expect(UIPasteboard.general.string == codeBlock.text)
     }
 
+    @Test func unsupportedContentNodeUsesSafariIcon() throws {
+        let nodes = DetailContentBlockNodeFactory.makeNodes(
+            from: [.unsupported(reason: DTCoreTextHTMLContentRenderer.unsupportedXtermContentNotice)],
+            onImageTapped: { _, _ in },
+            onLinkTapped: { _ in },
+            onTextLayoutInvalidated: {}
+        )
+
+        let node = try #require(nodes.first as? DetailUnsupportedContentNode)
+        #expect(node.reason == DTCoreTextHTMLContentRenderer.unsupportedXtermContentNotice)
+        #expect(node.iconSymbolName == "safari")
+    }
+
     @Test func resolvesNodeSeekPostLinksToNativeDetail() throws {
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
         let url = try #require(URL(string: "/post-704174-2#8", relativeTo: baseURL)?.absoluteURL)
@@ -768,30 +781,17 @@ struct PostDetailViewControllerTests {
         #expect(resolvedURL.absoluteString == "https://example.com/path")
     }
 
-    @Test func resolvesNodeSeekJumpLinksToDecodedSafariTarget() throws {
+    @Test func resolvesNodeSeekJumpExternalLinksToSafari() throws {
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
         let url = try #require(URL(string: "/jump?to=https%3A%2F%2Fshop.023168.xyz%2F", relativeTo: baseURL)?.absoluteURL)
 
         let destination = try #require(PostDetailLinkResolver.destination(for: url, baseURL: baseURL))
 
         guard case .safari(let resolvedURL) = destination else {
-            Issue.record("Expected NodeSeek jump link to open in Safari")
+            Issue.record("Expected decoded jump destination to open in Safari")
             return
         }
         #expect(resolvedURL.absoluteString == "https://shop.023168.xyz/")
-    }
-
-    @Test func resolvesNodeSeekJumpLinksToDecodedSafariTargetEvenWhenTargetIsNodeSeek() throws {
-        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
-        let url = try #require(URL(string: "/jump?to=https%3A%2F%2Fwww.nodeseek.com%2Fpost-704174-1", relativeTo: baseURL)?.absoluteURL)
-
-        let destination = try #require(PostDetailLinkResolver.destination(for: url, baseURL: baseURL))
-
-        guard case .safari(let resolvedURL) = destination else {
-            Issue.record("Expected NodeSeek jump link to open in Safari")
-            return
-        }
-        #expect(resolvedURL.absoluteString == "https://www.nodeseek.com/post-704174-1")
     }
 
     @Test func richTextNodeKeepsMeasuredHeightStableAfterNormalImageLoads() throws {

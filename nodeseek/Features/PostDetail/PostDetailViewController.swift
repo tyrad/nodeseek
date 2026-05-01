@@ -36,12 +36,8 @@ enum PostDetailLinkResolver {
             return .safari(resolvedURL)
         }
 
-        if let redirectTargetURL = decodedHTTPRedirectTarget(from: resolvedURL) {
-            return .safari(redirectTargetURL)
-        }
-
-        if isNodeSeekRedirector(resolvedURL) {
-            return .safari(resolvedURL)
+        if let jumpURL = decodedExternalJumpURL(from: resolvedURL) {
+            return .safari(jumpURL)
         }
 
         if let anchorID = normalizedAnchorID(from: resolvedURL),
@@ -78,12 +74,8 @@ enum PostDetailLinkResolver {
         return fragment.hasPrefix("#") ? String(fragment.dropFirst()) : fragment
     }
 
-    private static func isNodeSeekRedirector(_ url: URL) -> Bool {
-        url.path == "/jump"
-    }
-
-    private static func decodedHTTPRedirectTarget(from url: URL) -> URL? {
-        guard isNodeSeekRedirector(url),
+    private static func decodedExternalJumpURL(from url: URL) -> URL? {
+        guard url.path == "/jump",
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let rawTarget = components.queryItems?.first(where: { $0.name == "to" })?.value?
                   .trimmingCharacters(in: .whitespacesAndNewlines),

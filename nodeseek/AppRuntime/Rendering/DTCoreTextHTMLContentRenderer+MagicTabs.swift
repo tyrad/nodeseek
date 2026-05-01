@@ -74,9 +74,12 @@ extension DTCoreTextHTMLContentRenderer {
     }
 
     func simplifiedMagicTabBodyHTML(_ bodyHTML: String) -> String {
-        let containsXtermRows = bodyHTML.contains("xterm-rows")
+        if isXtermMagicTabBodyHTML(bodyHTML) {
+            return unsupportedContentHTML(reason: Self.unsupportedXtermContentNotice)
+        }
+
         let mayContainANSICode = bodyHTML.contains("language-ansi") || bodyHTML.contains("data-ansicode")
-        guard containsXtermRows || mayContainANSICode else { return bodyHTML }
+        guard mayContainANSICode else { return bodyHTML }
         guard let document = try? HTML(
             html: "<div id=\"__nodeseek_magic_tab_body__\">\(bodyHTML)</div>",
             encoding: .utf8
@@ -87,32 +90,16 @@ extension DTCoreTextHTMLContentRenderer {
 
         var blocks: [String] = []
 
-        if containsXtermRows {
-            blocks.append(contentsOf: root.css(".xterm-rows").compactMap { rows -> String? in
-                let lines = rows.children.compactMap { row -> String? in
-                    guard let text = row.text?.trimmingCharacters(in: .whitespacesAndNewlines),
-                          text.isEmpty == false else {
-                        return nil
-                    }
-                    return text
-                }
-                guard lines.isEmpty == false else { return nil }
-                return "<pre><code>\(escapedHTML(lines.joined(separator: "\n")))</code></pre>"
-            })
-        }
-
-        if mayContainANSICode {
-            blocks.append(contentsOf: root.css("pre > code").compactMap { code -> String? in
-                let isANSICode = hasClass("language-ansi", in: code) || (code.toHTML?.contains("data-ansicode") == true)
-                guard isANSICode else { return nil }
-                guard let rawText = code.text, rawText.isEmpty == false else { return nil }
-                let normalizedText = stripANSICodes(from: rawText)
-                guard normalizedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
-                    return nil
-                }
-                return "<pre><code>\(escapedHTML(normalizedText))</code></pre>"
-            })
-        }
+        blocks.append(contentsOf: root.css("pre > code").compactMap { code -> String? in
+            let isANSICode = hasClass("language-ansi", in: code) || (code.toHTML?.contains("data-ansicode") == true)
+            guard isANSICode else { return nil }
+            guard let rawText = code.text, rawText.isEmpty == false else { return nil }
+            let normalizedText = stripANSICodes(from: rawText)
+            guard normalizedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+                return nil
+            }
+            return "<pre><code>\(escapedHTML(normalizedText))</code></pre>"
+        })
 
         for image in root.css("img") {
             if let imageHTML = image.toHTML {
@@ -121,6 +108,18 @@ extension DTCoreTextHTMLContentRenderer {
         }
 
         return blocks.isEmpty ? bodyHTML : blocks.joined(separator: "\n")
+    }
+
+    func isXtermMagicTabBodyHTML(_ bodyHTML: String) -> Bool {
+        let normalizedHTML = bodyHTML.lowercased()
+        if normalizedHTML.contains("xterm-rows") {
+            return true
+        }
+        return normalizedHTML.contains("terminal-container") && normalizedHTML.contains("xterm")
+    }
+
+    func unsupportedContentHTML(reason: String) -> String {
+        "<p class=\"\(Self.unsupportedContentClassName)\">\(escapedHTML(reason))</p>"
     }
 
     func escapedHTML(_ text: String) -> String {
