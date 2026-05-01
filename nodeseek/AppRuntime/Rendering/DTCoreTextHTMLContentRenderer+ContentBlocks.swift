@@ -194,7 +194,10 @@ extension DTCoreTextHTMLContentRenderer {
             return nil
         }
         let reason = marker.text?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return .unsupported(reason: reason?.isEmpty == false ? reason! : Self.unsupportedXtermContentNotice)
+        if let reason, reason.isEmpty == false {
+            return .unsupported(reason: reason)
+        }
+        return .unsupported(reason: Self.unsupportedXtermContentNotice)
     }
 
     func tableBlock(from tableNode: XMLElement, baseURL: URL) -> RenderedTableBlock? {

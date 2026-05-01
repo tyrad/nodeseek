@@ -63,6 +63,8 @@ struct DTCoreTextHTMLContentRenderer {
         pattern: "(?is)<(p|div|section)\\b[^>]*>.*?</\\1>",
         options: []
     )
+    static let unsupportedXtermContentNotice = "不支持显示此内容，请前往网页查看。"
+    static let unsupportedContentClassName = "nodeseek-unsupported-content"
     static let listMarkerRegex = try! NSRegularExpression(
         pattern: "\\t((?:\\d+[.)])|[•◦▪])\\t",
         options: []
@@ -71,8 +73,6 @@ struct DTCoreTextHTMLContentRenderer {
         pattern: "(?:\\u001B\\[|\\[)\\d{1,3}(?:;\\d{1,3})*m",
         options: []
     )
-    static let unsupportedXtermContentNotice = "不支持显示此内容，请前往网页查看。"
-    static let unsupportedContentClassName = "nodeseek-unsupported-content"
     static let logger = Logger(subsystem: "com.nodeseek.app", category: "DetailDTCoreTextRenderer")
 
     func render(fragment: String, baseURL: URL) -> [RenderedContentBlock] {

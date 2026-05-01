@@ -111,11 +111,22 @@ extension DTCoreTextHTMLContentRenderer {
     }
 
     func isXtermMagicTabBodyHTML(_ bodyHTML: String) -> Bool {
-        let normalizedHTML = bodyHTML.lowercased()
-        if normalizedHTML.contains("xterm-rows") {
+        guard let document = try? HTML(
+            html: "<div id=\"__nodeseek_magic_tab_body__\">\(bodyHTML)</div>",
+            encoding: .utf8
+        ),
+              let root = document.at_css("#__nodeseek_magic_tab_body__") else {
+            let normalizedHTML = bodyHTML.lowercased()
+            return normalizedHTML.contains("xterm-rows")
+                || normalizedHTML.contains("class=\"terminal-container embedmode\"")
+                || normalizedHTML.contains("class='terminal-container embedmode'")
+        }
+
+        if root.at_css(".xterm-rows") != nil {
             return true
         }
-        return normalizedHTML.contains("terminal-container") && normalizedHTML.contains("xterm")
+
+        return root.css(".terminal-container").contains { hasClass("embedMode", in: $0) }
     }
 
     func unsupportedContentHTML(reason: String) -> String {
