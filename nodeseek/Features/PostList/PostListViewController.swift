@@ -587,4 +587,9 @@ extension PostListViewController: PostTexturePageContainerViewDelegate {
         applySelectedCategory(category, syncPage: false, pageAnimated: false)
         presenter.didSelectCategory(category)
     }
+
+    func postTexturePageContainerViewDidRequestLeadingSideMenu(_ containerView: PostTexturePageContainerView) {
+        menuButtonFeedbackGenerator.impactOccurred()
+        sideMenuViewController.show(animated: true)
+    }
 }
