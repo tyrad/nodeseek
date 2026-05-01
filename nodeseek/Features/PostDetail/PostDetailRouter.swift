@@ -20,7 +20,8 @@ class PostDetailRouter: PostDetailRouterProtocol {
         let presenter = PostDetailPresenter(
             interactor: interactor,
             router: router,
-            initialPage: page
+            initialPage: page,
+            visitedStore: VisitedPostStore.shared
         )
         
         interactor.presenter = presenter

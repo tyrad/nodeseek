@@ -3,6 +3,7 @@
 //  nodeseekTests
 //
 
+import Foundation
 import Testing
 @testable import nodeseek
 
@@ -21,6 +22,35 @@ struct PostDetailPresenterTests {
         router.capturedOnClose?()
 
         #expect(interactor.loadedPages == [3])
+    }
+
+    @Test func loadingDetailMarksPostAsVisited() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let visitedStore = SpyVisitedPostStore()
+        let presenter = PostDetailPresenter(
+            interactor: interactor,
+            router: router,
+            initialPage: 2,
+            visitedStore: visitedStore
+        )
+        let detail = PostDetail(
+            id: "706958",
+            title: "详情标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [],
+            page: 2,
+            isLastPage: true
+        )
+
+        presenter.didLoadPostDetail(PostDetailResponse(detail: detail))
+
+        #expect(visitedStore.markedPosts.map(\.id) == ["706958"])
+        #expect(visitedStore.markedPosts.first?.title == "详情标题")
+        #expect(visitedStore.markedPosts.first?.url.absoluteString == "https://www.nodeseek.com/post-706958-2")
     }
 
     @Test func selectingOtherPageReloadsThatPage() {
@@ -215,4 +245,20 @@ private final class SpyPostDetailView: PostDetailViewProtocol {
     func finishReplySubmission() { finishReplySubmissionCount += 1 }
     func render(detail: PostDetail) {}
     func renderLoginRequired(message: String) {}
+}
+
+private final class SpyVisitedPostStore: VisitedPostStoreProtocol {
+    private(set) var markedPosts: [PostSummary] = []
+
+    func isVisited(postID: String) -> Bool {
+        false
+    }
+
+    func markVisited(post: PostSummary, visitedAt: Date) {
+        markedPosts.append(post)
+    }
+
+    func recentRecords(limit: Int) -> [VisitedPostRecord] {
+        []
+    }
 }
