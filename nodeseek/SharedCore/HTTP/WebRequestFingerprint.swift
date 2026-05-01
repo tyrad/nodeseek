@@ -35,7 +35,7 @@ enum WebRequestFingerprint {
         }.joined(separator: ",")
     }
 
-    nonisolated static let referer = "https://www.nodeseek.com/"
+    nonisolated static let referer = NodeSeekSite.referer
     nonisolated static let htmlAccept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
     nonisolated static let imageAccept = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
 

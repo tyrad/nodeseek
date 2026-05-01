@@ -10,8 +10,6 @@ import UIKit
 import WebKit
 
 final class UserInfoWebViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
-    private static let nodeSeekBaseURL = URL(string: "https://www.nodeseek.com")!
-
     private let profileURL: URL
     private let webView: WKWebView
     private let cookieBridge: CookieBridge
@@ -54,7 +52,7 @@ final class UserInfoWebViewController: UIViewController, WKNavigationDelegate, W
 
     static func normalizedProfileURL(_ url: URL) -> URL {
         let absoluteURL = url.scheme == nil
-            ? URL(string: url.absoluteString, relativeTo: nodeSeekBaseURL)?.absoluteURL ?? url
+            ? URL(string: url.absoluteString, relativeTo: NodeSeekSite.baseURL)?.absoluteURL ?? url
             : url.absoluteURL
         guard absoluteURL.path.hasPrefix("/space/") else { return absoluteURL }
         guard var components = URLComponents(url: absoluteURL, resolvingAgainstBaseURL: true) else { return absoluteURL }
@@ -155,8 +153,7 @@ final class UserInfoWebViewController: UIViewController, WKNavigationDelegate, W
     }
 
     private func isNodeSeekHost(_ url: URL) -> Bool {
-        guard let host = url.host?.lowercased() else { return false }
-        return host == "nodeseek.com" || host.hasSuffix(".nodeseek.com")
+        NodeSeekSite.isNodeSeekHost(url)
     }
 
     private func handleExternalNavigationIfNeeded(_ url: URL) -> Bool {

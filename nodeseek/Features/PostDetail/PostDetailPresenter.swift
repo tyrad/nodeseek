@@ -77,9 +77,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
 
     private func markDetailVisited(_ detail: PostDetail) {
         let page = max(1, detail.page)
-        guard let url = URL(string: "https://www.nodeseek.com/post-\(detail.id)-\(page)") else {
-            return
-        }
+        let url = NodeSeekSite.postURL(id: detail.id, page: page)
 
         let post = PostSummary(
             id: detail.id,

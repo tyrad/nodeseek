@@ -15,8 +15,6 @@ protocol LoginCookieSynchronizing: AnyObject {
 extension CookieBridge: LoginCookieSynchronizing {}
 
 final class LoginWebViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
-    private static let loginURL = URL(string: "https://www.nodeseek.com/signIn.html")!
-
     private let cookieSynchronizer: LoginCookieSynchronizing
     private let onClose: @MainActor () -> Void
     private let webView: WKWebView
@@ -150,7 +148,7 @@ final class LoginWebViewController: UIViewController, WKNavigationDelegate, WKUI
             await cookieSynchronizer.syncURLSessionCookiesToWebView()
             guard !Task.isCancelled else { return }
 
-            var request = URLRequest(url: Self.loginURL)
+            var request = URLRequest(url: NodeSeekSite.loginURL)
             request.timeoutInterval = 20
             request.cachePolicy = .reloadRevalidatingCacheData
             WebRequestFingerprint.applyHTMLHeaders(to: &request)

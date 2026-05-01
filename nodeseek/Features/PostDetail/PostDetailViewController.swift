@@ -112,8 +112,7 @@ enum PostDetailLinkResolver {
     }
 
     private static func isNodeSeekHost(_ url: URL) -> Bool {
-        guard let host = url.host?.lowercased() else { return false }
-        return host == "nodeseek.com" || host.hasSuffix(".nodeseek.com")
+        NodeSeekSite.isNodeSeekHost(url)
     }
 }
 
@@ -132,7 +131,7 @@ class PostDetailViewController: UIViewController {
     }
 
     let presenter: PostDetailPresenterProtocol
-    let baseURL = URL(string: "https://www.nodeseek.com")!
+    let baseURL = NodeSeekSite.baseURL
     var currentPage: Int
     var currentHeaderContent: PostDetailHeaderContent?
     var pagination: PostDetailPagination?

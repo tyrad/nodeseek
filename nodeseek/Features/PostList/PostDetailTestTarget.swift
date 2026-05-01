@@ -9,7 +9,6 @@ import Foundation
 
 #if DEBUG
 struct PostDetailTestTarget: Equatable {
-    private static let baseURL = URL(string: "https://www.nodeseek.com")!
     private static let postPathRegex = try! NSRegularExpression(
         pattern: "^/post-([0-9]+)(?:-([0-9]+))?/?$",
         options: []
@@ -21,8 +20,8 @@ struct PostDetailTestTarget: Equatable {
     init?(rawValue: String) {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false,
-              let url = URL(string: trimmed, relativeTo: Self.baseURL)?.absoluteURL,
-              Self.isNodeSeekHost(url),
+              let url = URL(string: trimmed, relativeTo: NodeSeekSite.baseURL)?.absoluteURL,
+              NodeSeekSite.isNodeSeekHost(url),
               let match = Self.postMatch(in: url.path) else {
             return nil
         }
@@ -62,9 +61,5 @@ struct PostDetailTestTarget: Equatable {
         )
     }
 
-    private static func isNodeSeekHost(_ url: URL) -> Bool {
-        guard let host = url.host?.lowercased() else { return false }
-        return host == "nodeseek.com" || host.hasSuffix(".nodeseek.com")
-    }
 }
 #endif

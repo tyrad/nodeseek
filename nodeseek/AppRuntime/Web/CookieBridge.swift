@@ -58,7 +58,7 @@ final class CookieBridge {
     init(
         webCookieStore: WebCookieStore? = nil,
         urlCookieStorage: HTTPCookieStorage = .shared,
-        allowedDomains: [String] = ["nodeseek.com"],
+        allowedDomains: [String] = NodeSeekSite.allowedCookieDomains,
         makeDefaultWebCookieStore: @escaping @MainActor () -> WebCookieStore = {
             WKWebCookieStoreAdapter(
                 store: WKWebsiteDataStore.default().httpCookieStore

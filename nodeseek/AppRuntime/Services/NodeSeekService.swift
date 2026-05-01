@@ -16,7 +16,7 @@ struct NodeSeekService: Sendable {
     private let logger = Logger(subsystem: "com.nodeseek.app", category: "NodeSeekService")
 
     init(
-        baseURL: URL = URL(string: "https://www.nodeseek.com")!,
+        baseURL: URL = NodeSeekSite.baseURL,
         htmlClient: any HTMLClient = HiddenWebViewHTMLClient(),
         parser: (any NodeSeekParser)? = nil,
         challengeDetector: ChallengeDetector = ChallengeDetector()
@@ -111,8 +111,10 @@ struct NodeSeekService: Sendable {
     }
 
     private func postDetailURL(postID: String, page: Int) -> URL {
-        let normalized = max(1, page)
-        return baseURL.appendingPathComponent("post-\(postID)-\(normalized)")
+        if baseURL == NodeSeekSite.baseURL {
+            return NodeSeekSite.postURL(id: postID, page: page)
+        }
+        return baseURL.appendingPathComponent("post-\(postID)-\(max(1, page))")
     }
 }
 

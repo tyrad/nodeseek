@@ -134,14 +134,13 @@ extension PostDetailViewController {
 
     func resolvedDetailURL() -> URL? {
         if let postID = currentHeaderContent?.postID, postID.isEmpty == false {
-            return URL(string: "https://www.nodeseek.com/post-\(postID)-\(currentPage)")
+            return NodeSeekSite.postURL(id: postID, page: currentPage)
         }
 
         return sourcePostURL
     }
 
     func isNodeSeekHost(_ url: URL) -> Bool {
-        guard let host = url.host?.lowercased() else { return false }
-        return host == "nodeseek.com" || host.hasSuffix(".nodeseek.com")
+        NodeSeekSite.isNodeSeekHost(url)
     }
 }

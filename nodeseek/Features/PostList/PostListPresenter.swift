@@ -81,7 +81,7 @@ class PostListPresenter: PostListPresenterProtocol {
     func didSubmitDetailTestURL(_ rawURL: String) {
         guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }
         guard let target = PostDetailTestTarget(rawValue: rawURL) else {
-            view?.showError(message: "请输入 NodeSeek 帖子详情链接，例如 https://www.nodeseek.com/post-705039-1")
+            view?.showError(message: "请输入 NodeSeek 帖子详情链接，例如 \(NodeSeekSite.postURL(id: "705039", page: 1).absoluteString)")
             return
         }
 

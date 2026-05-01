@@ -22,7 +22,7 @@ final class AvatarImageLoader {
     typealias Completion = (LoadResult) -> Void
 
     static let shared = AvatarImageLoader()
-    nonisolated static let defaultBaseURL = URL(string: "https://www.nodeseek.com")!
+    nonisolated static let defaultBaseURL = NodeSeekSite.baseURL
 
     private enum AvatarRender {
         static let size = CGSize(width: 56, height: 56)

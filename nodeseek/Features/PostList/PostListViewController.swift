@@ -411,7 +411,7 @@ extension PostListViewController: PostListViewProtocol {
             preferredStyle: .alert
         )
         alert.addTextField { textField in
-            textField.placeholder = "https://www.nodeseek.com/post-705039-1"
+            textField.placeholder = NodeSeekSite.postURL(id: "705039", page: 1).absoluteString
             textField.keyboardType = .URL
             textField.textContentType = .URL
             textField.autocapitalizationType = .none

@@ -160,7 +160,7 @@ struct HiddenWebViewHTMLClient: HTMLClient {
 
 @MainActor
 enum NodeSeekWebViewPrewarmer {
-    private static let defaultPostListURL = URL(string: "https://www.nodeseek.com/page-1?sortBy=replyTime")!
+    private static let defaultPostListURL = NodeSeekSite.defaultPostListURL
     private static let defaultPostListPreloadWaitInterval: TimeInterval = 0.45
 
     static func prewarm() {
@@ -386,7 +386,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         await cookieBridge.syncWebViewCookiesToURLSession()
         await cookieBridge.syncURLSessionCookiesToWebView()
         let cookieNames = HTTPCookieStorage.shared
-            .cookies(for: request.url ?? URL(string: "https://www.nodeseek.com")!)?
+            .cookies(for: request.url ?? NodeSeekSite.baseURL)?
             .map(\.name)
             .sorted() ?? []
         logger.info("已同步 Cookie 到 WebView，cookieCount=\(cookieNames.count, privacy: .public)")

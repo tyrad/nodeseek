@@ -57,7 +57,7 @@ final class NodeSeekCommentSubmitter {
     private let automation: CommentSubmissionAutomating
 
     init(
-        baseURL: URL = URL(string: "https://www.nodeseek.com")!,
+        baseURL: URL = NodeSeekSite.baseURL,
         automation: CommentSubmissionAutomating = WebViewCommentSubmissionAutomator()
     ) {
         self.baseURL = baseURL
