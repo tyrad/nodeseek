@@ -80,6 +80,22 @@ struct PostSummaryCellNodeTests {
         #expect(metadataText.string.contains("6h 30min ago"))
     }
 
+    @Test func visitedPostTitleUsesSecondaryColor() {
+        let post = PostSummary(
+            id: "6",
+            title: "已访问标题",
+            url: URL(string: "https://www.nodeseek.com/post-6")!,
+            authorName: "mist",
+            nodeName: "NodeSeek",
+            replyCount: 1,
+            lastActivityText: "just now"
+        )
+
+        let titleText = PostSummaryCellNode.titleAttributedText(for: post, isVisited: true)
+
+        #expect(titleText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor == .secondaryLabel)
+    }
+
     @Test func pinnedPostTitleShowsPinSymbolBeforeTitle() throws {
         let post = PostSummary(
             id: "1033",
