@@ -16,6 +16,7 @@ final class DetailInlineImageView: AnimatedImageView {
     private let targetPixelWidth: CGFloat
     private let displayScale: CGFloat
     private let allowsInlineAnimation: Bool
+    private let usesDetailImageOptimization: Bool
     private let onImageLoaded: (URL, CGSize) -> Void
     private let onImageTapped: (URL) -> Void
     private var loadToken: UUID?
@@ -27,6 +28,7 @@ final class DetailInlineImageView: AnimatedImageView {
         targetPixelWidth: CGFloat,
         displayScale: CGFloat,
         allowsInlineAnimation: Bool,
+        usesDetailImageOptimization: Bool,
         onImageLoaded: @escaping (URL, CGSize) -> Void,
         onImageTapped: @escaping (URL) -> Void
     ) {
@@ -34,6 +36,7 @@ final class DetailInlineImageView: AnimatedImageView {
         self.targetPixelWidth = targetPixelWidth
         self.displayScale = displayScale
         self.allowsInlineAnimation = allowsInlineAnimation
+        self.usesDetailImageOptimization = usesDetailImageOptimization
         self.onImageLoaded = onImageLoaded
         self.onImageTapped = onImageTapped
         super.init(frame: frame)
@@ -75,7 +78,8 @@ final class DetailInlineImageView: AnimatedImageView {
         DetailImageLoader.shared.loadImageForInline(
             imageURL,
             maxPixelWidth: targetPixelWidth,
-            displayScale: displayScale
+            displayScale: displayScale,
+            allowsOptimization: usesDetailImageOptimization
         ) { [weak self] image in
             DispatchQueue.main.async {
                 guard let self, self.loadToken == token else { return }

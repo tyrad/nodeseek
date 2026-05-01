@@ -171,6 +171,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
                 originalSize: attachment.originalSize,
                 isSticker: isStickerAttachment
             ),
+            usesDetailImageOptimization: isStickerAttachment == false,
             onImageLoaded: { [weak self] loadedURL, imageSize in
                 self?.handleLoadedImage(loadedURL, imageSize: imageSize)
             },
