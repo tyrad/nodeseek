@@ -78,7 +78,7 @@ enum DetailContentBlockNodeFactory {
             case .imagePlaceholder(let url):
                 return plainTextNode(url?.absoluteString ?? "[图片]")
             case .unsupported(let reason):
-                return DetailUnsupportedContentNode(reason: reason)
+                return plainTextNode(reason)
             }
         }
     }
@@ -97,47 +97,6 @@ enum DetailContentBlockNodeFactory {
             ]
         )
         return node
-    }
-}
-
-final class DetailUnsupportedContentNode: ASDisplayNode {
-    let reason: String
-    let iconSymbolName = "safari"
-
-    private let textNode = ASTextNode()
-    private let iconNode = ASImageNode()
-
-    init(reason: String) {
-        self.reason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
-        super.init()
-        automaticallyManagesSubnodes = true
-        isAccessibilityElement = true
-        accessibilityLabel = self.reason
-
-        textNode.maximumNumberOfLines = 0
-        textNode.attributedText = NSAttributedString(
-            string: self.reason,
-            attributes: [
-                .font: UIFont.preferredFont(forTextStyle: .body),
-                .foregroundColor: UIColor.secondaryLabel
-            ]
-        )
-
-        let icon = UIImage(systemName: iconSymbolName)?
-            .withTintColor(.secondaryLabel, renderingMode: .alwaysOriginal)
-        iconNode.image = icon
-        iconNode.style.preferredSize = CGSize(width: 17, height: 17)
-        iconNode.isAccessibilityElement = false
-    }
-
-    override func layoutSpecThatFits(_ constrainedSize: ASSizeRange) -> ASLayoutSpec {
-        textNode.style.flexShrink = 1
-
-        let stack = ASStackLayoutSpec.horizontal()
-        stack.alignItems = .center
-        stack.spacing = 6
-        stack.children = [textNode, iconNode]
-        return stack
     }
 }
 

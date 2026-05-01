@@ -19,6 +19,7 @@ class PostListViewController: UIViewController {
     private var sortToggleCollapseWorkItem: DispatchWorkItem?
     private var isSortToggleExpanded = false
     private let sideMenuViewController = PostListSideMenuViewController()
+    private let menuButtonFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
     
     var hasCompactTopButton: Bool {
         compactTopButton.superview != nil
@@ -142,6 +143,7 @@ class PostListViewController: UIViewController {
         pageContainerView.delegate = self
         pageContainerView.attach(to: self)
         compactTopButton.addTarget(self, action: #selector(leftButtonTapped), for: .touchUpInside)
+        compactTopButton.addTarget(self, action: #selector(prepareMenuButtonFeedback), for: .touchDown)
         sortToggleButton.addTarget(self, action: #selector(sortToggleButtonTapped), for: .touchUpInside)
         view.addSubview(pageContainerView)
         view.addSubview(compactTopButton)
@@ -197,7 +199,12 @@ class PostListViewController: UIViewController {
     }
     
     // MARK: - Actions
+    @objc private func prepareMenuButtonFeedback() {
+        menuButtonFeedbackGenerator.prepare()
+    }
+
     @objc private func leftButtonTapped() {
+        menuButtonFeedbackGenerator.impactOccurred()
         sideMenuViewController.show(animated: true)
     }
 
@@ -583,5 +590,10 @@ extension PostListViewController: PostTexturePageContainerViewDelegate {
         selectedCategory = category
         applySelectedCategory(category, syncPage: false, pageAnimated: false)
         presenter.didSelectCategory(category)
+    }
+
+    func postTexturePageContainerViewDidRequestLeadingSideMenu(_ containerView: PostTexturePageContainerView) {
+        menuButtonFeedbackGenerator.impactOccurred()
+        sideMenuViewController.show(animated: true)
     }
 }

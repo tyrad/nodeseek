@@ -12,6 +12,7 @@ protocol PostTexturePageContainerViewDelegate: AnyObject {
     func postTexturePageContainerViewDidRequestRefresh(_ containerView: PostTexturePageContainerView, category: PostListCategory)
     func postTexturePageContainerView(_ containerView: PostTexturePageContainerView, didApproachBottomAt index: Int, totalCount: Int, category: PostListCategory)
     func postTexturePageContainerView(_ containerView: PostTexturePageContainerView, didScrollTo category: PostListCategory)
+    func postTexturePageContainerViewDidRequestLeadingSideMenu(_ containerView: PostTexturePageContainerView)
 }
 
 final class PostTexturePageContainerView: UIView {
@@ -23,6 +24,8 @@ final class PostTexturePageContainerView: UIView {
     private var categories: [PostListCategory] = []
     private var hostViewControllers: [PostListCategory: PostTextureListHostViewController] = [:]
     private var currentCategory: PostListCategory?
+    private weak var pagingScrollView: UIScrollView?
+    private var maximumLeadingBoundaryPullDistance: CGFloat = 0
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -59,6 +62,7 @@ final class PostTexturePageContainerView: UIView {
         if let pagingScrollView = pageVC.view.subviews.compactMap({ $0 as? UIScrollView }).first {
             pagingScrollView.isDirectionalLockEnabled = true
             pagingScrollView.showsHorizontalScrollIndicator = false
+            installLeadingBoundaryPanListener(on: pagingScrollView)
         }
 
         showInitialPageIfNeeded()
@@ -157,6 +161,59 @@ final class PostTexturePageContainerView: UIView {
             }
         }
     }
+
+    private func installLeadingBoundaryPanListener(on scrollView: UIScrollView) {
+        guard pagingScrollView !== scrollView else { return }
+        pagingScrollView?.panGestureRecognizer.removeTarget(self, action: #selector(handleLeadingBoundaryPan(_:)))
+        scrollView.panGestureRecognizer.addTarget(self, action: #selector(handleLeadingBoundaryPan(_:)))
+        pagingScrollView = scrollView
+    }
+
+    @objc private func handleLeadingBoundaryPan(_ gesture: UIPanGestureRecognizer) {
+        guard isAtLeadingBoundary else {
+            maximumLeadingBoundaryPullDistance = 0
+            return
+        }
+
+        switch gesture.state {
+        case .began:
+            maximumLeadingBoundaryPullDistance = leadingBoundaryPullDistance(from: gesture)
+        case .changed:
+            maximumLeadingBoundaryPullDistance = max(
+                maximumLeadingBoundaryPullDistance,
+                leadingBoundaryPullDistance(from: gesture)
+            )
+        case .ended:
+            let shouldOpenSideMenu = maximumLeadingBoundaryPullDistance >= LeadingBoundaryPullLayout.triggerDistance
+            maximumLeadingBoundaryPullDistance = 0
+            if shouldOpenSideMenu {
+                delegate?.postTexturePageContainerViewDidRequestLeadingSideMenu(self)
+            }
+        case .cancelled, .failed:
+            maximumLeadingBoundaryPullDistance = 0
+        default:
+            break
+        }
+    }
+
+    private func leadingBoundaryPullDistance(from gesture: UIPanGestureRecognizer) -> CGFloat {
+        let translation = gesture.translation(in: self)
+        guard translation.x > 0 else { return 0 }
+        guard abs(translation.x) > abs(translation.y) * LeadingBoundaryPullLayout.horizontalTranslationBias else {
+            return 0
+        }
+        return translation.x
+    }
+
+    private var isAtLeadingBoundary: Bool {
+        guard let firstCategory = categories.first else { return false }
+        return currentCategory == firstCategory
+    }
+}
+
+private enum LeadingBoundaryPullLayout {
+    static let triggerDistance: CGFloat = 72
+    static let horizontalTranslationBias: CGFloat = 1.15
 }
 
 extension PostTexturePageContainerView: UIPageViewControllerDataSource {

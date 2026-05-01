@@ -115,9 +115,14 @@ final class CookieSharedWebViewController: UIViewController, WKNavigationDelegat
     }
 
     private func handleExternalNavigationIfNeeded(_ url: URL) -> Bool {
-        guard case .safari(let safariURL) = PostDetailLinkResolver.destination(for: url, baseURL: self.url) else {
+        guard let destination = PostDetailLinkResolver.destination(for: url, baseURL: self.url) else {
             return false
         }
+
+        guard case .safari(let safariURL) = destination else {
+            return false
+        }
+
         openInSafariViewController(safariURL)
         return true
     }

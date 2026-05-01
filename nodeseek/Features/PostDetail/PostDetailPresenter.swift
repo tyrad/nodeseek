@@ -13,6 +13,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
     private weak var view: PostDetailViewProtocol?
     private let interactor: PostDetailInteractorInput
     private let router: PostDetailRouterProtocol
+    private let visitedStore: VisitedPostStoreProtocol
     private var currentPage: Int
     private var loadingPage: Int?
     private var currentDetail: PostDetail?
@@ -23,10 +24,12 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
     init(
         interactor: PostDetailInteractorInput,
         router: PostDetailRouterProtocol,
-        initialPage: Int = 1
+        initialPage: Int = 1,
+        visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore()
     ) {
         self.interactor = interactor
         self.router = router
+        self.visitedStore = visitedStore
         self.currentPage = max(1, initialPage)
     }
     
@@ -71,6 +74,26 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         view?.setReplySubmitting(true)
         interactor.submitReply(content: normalizedContent)
     }
+
+    private func markDetailVisited(_ detail: PostDetail) {
+        let page = max(1, detail.page)
+        guard let url = URL(string: "https://www.nodeseek.com/post-\(detail.id)-\(page)") else {
+            return
+        }
+
+        let post = PostSummary(
+            id: detail.id,
+            title: detail.title,
+            url: url,
+            authorName: detail.authorName,
+            nodeName: nil,
+            replyCount: detail.comments.count,
+            viewCount: 0,
+            lastActivityText: detail.metadataText,
+            avatarURL: detail.avatarURL
+        )
+        visitedStore.markVisited(post: post, visitedAt: Date())
+    }
 }
 
 // MARK: - Interactor Output
@@ -81,6 +104,7 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
         isRefreshingAfterReplySubmission = false
         currentPage = max(1, response.detail.page)
         currentDetail = response.detail
+        markDetailVisited(response.detail)
         view?.hideLoading()
         view?.render(detail: response.detail)
     }

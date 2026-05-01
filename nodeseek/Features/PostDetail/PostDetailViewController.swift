@@ -12,6 +12,7 @@ import OSLog
 enum PostDetailLinkDestination {
     case currentPageAnchor(String)
     case nativePost(postID: String, page: Int, url: URL)
+    case userProfile(URL)
     case web(URL)
     case safari(URL)
 }
@@ -36,8 +37,12 @@ enum PostDetailLinkResolver {
             return .safari(resolvedURL)
         }
 
-        if let jumpURL = decodedExternalJumpURL(from: resolvedURL) {
-            return .safari(jumpURL)
+        if let redirectTargetURL = decodedHTTPRedirectTarget(from: resolvedURL) {
+            return .safari(redirectTargetURL)
+        }
+
+        if isNodeSeekRedirector(resolvedURL) {
+            return .safari(resolvedURL)
         }
 
         if let anchorID = normalizedAnchorID(from: resolvedURL),
@@ -46,6 +51,10 @@ enum PostDetailLinkResolver {
         }
 
         let path = resolvedURL.path
+        if isUserProfilePath(path) {
+            return .userProfile(resolvedURL)
+        }
+
         let range = NSRange(path.startIndex..<path.endIndex, in: path)
         if let match = postPathRegex.firstMatch(in: path, options: [], range: range),
            match.numberOfRanges >= 3,
@@ -74,8 +83,12 @@ enum PostDetailLinkResolver {
         return fragment.hasPrefix("#") ? String(fragment.dropFirst()) : fragment
     }
 
-    private static func decodedExternalJumpURL(from url: URL) -> URL? {
-        guard url.path == "/jump",
+    private static func isNodeSeekRedirector(_ url: URL) -> Bool {
+        url.path == "/jump"
+    }
+
+    private static func decodedHTTPRedirectTarget(from url: URL) -> URL? {
+        guard isNodeSeekRedirector(url),
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let rawTarget = components.queryItems?.first(where: { $0.name == "to" })?.value?
                   .trimmingCharacters(in: .whitespacesAndNewlines),
@@ -90,6 +103,12 @@ enum PostDetailLinkResolver {
     private static func isHTTPURL(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased() else { return false }
         return scheme == "http" || scheme == "https"
+    }
+
+    private static func isUserProfilePath(_ path: String) -> Bool {
+        let components = path.split(separator: "/", omittingEmptySubsequences: true)
+        guard components.count == 2, components[0] == "space" else { return false }
+        return components[1].isEmpty == false
     }
 
     private static func isNodeSeekHost(_ url: URL) -> Bool {

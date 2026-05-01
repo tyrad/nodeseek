@@ -118,8 +118,7 @@ extension DTCoreTextHTMLContentRenderer {
               let root = document.at_css("#__nodeseek_magic_tab_body__") else {
             let normalizedHTML = bodyHTML.lowercased()
             return normalizedHTML.contains("xterm-rows")
-                || normalizedHTML.contains("class=\"terminal-container embedmode\"")
-                || normalizedHTML.contains("class='terminal-container embedmode'")
+                || (normalizedHTML.contains("terminal-container") && normalizedHTML.contains("embedmode"))
         }
 
         if root.at_css(".xterm-rows") != nil {

@@ -66,6 +66,8 @@ extension PostDetailViewController {
             )
             let viewController = PostDetailRouter.createModule(post: post, page: page)
             showDetailDestination(viewController)
+        case .userProfile(let url):
+            openUserInfo(profileURL: url)
         case .web(let url):
             let webViewController = CookieSharedWebViewController(url: url)
             showDetailDestination(webViewController)
