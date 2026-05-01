@@ -15,7 +15,8 @@ enum SQLiteVisitedPostPersistenceError: Error, Equatable {
     case invalidStoredURL(String)
 }
 
-final class SQLiteVisitedPostPersistence: VisitedPostPersistence {
+// SQLite 连接使用 SQLITE_OPEN_FULLMUTEX；该实现只跨队列传递值类型记录。
+final class SQLiteVisitedPostPersistence: VisitedPostPersistence, @unchecked Sendable {
     private let databaseURL: URL
     private var database: OpaquePointer?
 
@@ -85,6 +86,22 @@ final class SQLiteVisitedPostPersistence: VisitedPostPersistence {
         sqlite3_bind_double(statement, 4, record.visitedAt.timeIntervalSince1970)
 
         try stepDone(statement)
+    }
+
+    func upsert(_ records: [VisitedPostRecord], keepingLatest limit: Int) throws {
+        guard !records.isEmpty else { return }
+
+        try execute("BEGIN IMMEDIATE TRANSACTION;")
+        do {
+            for record in records {
+                try upsert(record)
+            }
+            try trim(keepingLatest: limit)
+            try execute("COMMIT;")
+        } catch {
+            try? execute("ROLLBACK;")
+            throw error
+        }
     }
 
     func trim(keepingLatest limit: Int) throws {
@@ -194,6 +211,9 @@ private final class NoopVisitedPostPersistence: VisitedPostPersistence {
     }
 
     func upsert(_ record: VisitedPostRecord) throws {
+    }
+
+    func upsert(_ records: [VisitedPostRecord], keepingLatest limit: Int) throws {
     }
 
     func trim(keepingLatest limit: Int) throws {

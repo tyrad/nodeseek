@@ -247,6 +247,7 @@ private final class SpyPostDetailView: PostDetailViewProtocol {
     func renderLoginRequired(message: String) {}
 }
 
+@MainActor
 private final class SpyVisitedPostStore: VisitedPostStoreProtocol {
     private(set) var markedPosts: [PostSummary] = []
 

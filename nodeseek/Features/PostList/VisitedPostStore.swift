@@ -19,20 +19,23 @@ struct PostListItem: Equatable, Sendable {
     let isVisited: Bool
 }
 
+@MainActor
 protocol VisitedPostStoreProtocol: AnyObject {
     func isVisited(postID: String) -> Bool
     func markVisited(post: PostSummary, visitedAt: Date)
     func recentRecords(limit: Int) -> [VisitedPostRecord]
 }
 
-protocol VisitedPostPersistence: AnyObject {
+protocol VisitedPostPersistence: AnyObject, Sendable {
     func loadRecent(limit: Int) throws -> [VisitedPostRecord]
     func upsert(_ record: VisitedPostRecord) throws
+    func upsert(_ records: [VisitedPostRecord], keepingLatest limit: Int) throws
     func trim(keepingLatest limit: Int) throws
 }
 
+@MainActor
 final class VisitedPostStore: VisitedPostStoreProtocol {
-    static let defaultLimit = 1500
+    nonisolated static let defaultLimit = 1500
 
     private let persistence: VisitedPostPersistence
     private let limit: Int
@@ -93,7 +96,9 @@ final class VisitedPostStore: VisitedPostStoreProtocol {
     private func scheduleFlush() {
         scheduledFlushWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
-            self?.flushPendingRecords()
+            Task { @MainActor [weak self] in
+                self?.flushPendingRecords()
+            }
         }
         scheduledFlushWorkItem = workItem
         writeQueue.asyncAfter(deadline: .now() + 0.5, execute: workItem)
@@ -101,21 +106,43 @@ final class VisitedPostStore: VisitedPostStoreProtocol {
 
     private func flushPendingRecords() {
         guard !pendingRecords.isEmpty else { return }
-        let recordsToPersist = pendingRecords
+        let recordsToPersist = coalescedPendingRecords(pendingRecords)
         pendingRecords.removeAll()
+        let persistence = persistence
+        let limit = limit
 
-        for record in recordsToPersist {
+        writeQueue.async {
             do {
-                try persistence.upsert(record)
-                try persistence.trim(keepingLatest: limit)
+                try persistence.upsert(recordsToPersist, keepingLatest: limit)
             } catch {
                 // UI 已经按内存状态更新，持久化失败不回滚用户可见状态。
             }
         }
     }
+
+    private func coalescedPendingRecords(_ records: [VisitedPostRecord]) -> [VisitedPostRecord] {
+        var orderedIDs: [String] = []
+        var latestRecordByID: [String: VisitedPostRecord] = [:]
+
+        for record in records {
+            if latestRecordByID[record.postID] == nil {
+                orderedIDs.append(record.postID)
+            }
+            if let existing = latestRecordByID[record.postID],
+               existing.visitedAt > record.visitedAt {
+                continue
+            }
+            latestRecordByID[record.postID] = record
+        }
+
+        return orderedIDs.compactMap { latestRecordByID[$0] }
+    }
 }
 
+@MainActor
 final class EmptyVisitedPostStore: VisitedPostStoreProtocol {
+    nonisolated init() {}
+
     func isVisited(postID: String) -> Bool {
         false
     }

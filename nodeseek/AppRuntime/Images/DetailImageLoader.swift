@@ -42,9 +42,10 @@ final class DetailImageLoader {
     }
 
     private struct ThumbnailResult {
-        let data: Data
+        let cacheData: Data?
         let image: UIImage
         let quality: CGFloat
+        let byteCount: Int
     }
 
     private typealias PayloadCompletion = (ImagePayload) -> Void
@@ -292,17 +293,17 @@ final class DetailImageLoader {
                 from: downsampled,
                 maxBytes: maxThumbnailBytes
             )
-            if payload.isFallback == false {
-                try? self.writeData(thumbnail.data, to: self.thumbnailCacheURL(for: resolvedURL))
+            if payload.isFallback == false, let cacheData = thumbnail.cacheData {
+                try? self.writeData(cacheData, to: self.thumbnailCacheURL(for: resolvedURL))
             }
 
             self.logOptimization(
                 mode: mode,
-                "thumbnail generated url=\(resolvedURL.absoluteString) source=\(payload.source.rawValue) originalBytes=\(payload.data.count) originalPixels=\(Self.string(from: payload.pixelSize)) thumbnailBytes=\(thumbnail.data.count) thumbnailPixels=\(Self.string(from: thumbnail.image.size)) quality=\(Self.numberString(thumbnail.quality)) maxPixelSide=\(pixelSide) maxBytes=\(maxThumbnailBytes)"
+                "thumbnail generated url=\(resolvedURL.absoluteString) source=\(payload.source.rawValue) originalBytes=\(payload.data.count) originalPixels=\(Self.string(from: payload.pixelSize)) thumbnailBytes=\(thumbnail.byteCount) thumbnailCached=\(thumbnail.cacheData != nil) thumbnailPixels=\(Self.string(from: thumbnail.image.size)) quality=\(Self.numberString(thumbnail.quality)) maxPixelSide=\(pixelSide) maxBytes=\(maxThumbnailBytes)"
             )
 
             let callbacks = self.stateQueue.sync {
-                if payload.isFallback == false {
+                if payload.isFallback == false, thumbnail.cacheData != nil {
                     self.thumbnailImageCache[resolvedURL] = thumbnail.image
                 }
                 return self.thumbnailCallbacks.removeValue(forKey: resolvedURL) ?? []
@@ -607,7 +608,12 @@ final class DetailImageLoader {
                     lastData = data
                     lastQuality = quality
                     if data.count <= byteLimit {
-                        return ThumbnailResult(data: data, image: workingImage, quality: quality)
+                        return ThumbnailResult(
+                            cacheData: data,
+                            image: workingImage,
+                            quality: quality,
+                            byteCount: data.count
+                        )
                     }
                 }
                 quality -= 0.09
@@ -626,7 +632,12 @@ final class DetailImageLoader {
             workingImage = resizedImage
         }
 
-        return ThumbnailResult(data: lastData, image: workingImage, quality: lastQuality)
+        return ThumbnailResult(
+            cacheData: nil,
+            image: workingImage,
+            quality: lastQuality,
+            byteCount: lastData.count
+        )
     }
 
     private func resizedImage(_ image: UIImage, scale: CGFloat) -> UIImage? {

@@ -11,6 +11,7 @@ import UIKit
 @testable import nodeseek
 
 @MainActor
+@Suite(.serialized)
 struct DetailImageLoaderTests {
     @Test func defaultOptimizationConfigEnablesThumbnailCache() {
         #expect(DetailImageConfig.optimizationMode == .enabled(
@@ -73,6 +74,31 @@ struct DetailImageLoaderTests {
 
         #expect(inlineImage != nil)
         #expect(loader.cachedOriginalData(for: url) == nil)
+        #expect(loader.cachedThumbnailData(for: url) == nil)
+    }
+
+    @Test func optimizedInlineLoadDoesNotCacheThumbnailWhenByteLimitCannotBeMet() async throws {
+        let url = try #require(URL(string: "https://images.example.com/tiny-limit.jpg"))
+        let sourceData = try Self.makeNoisyJPEGData(width: 900, height: 700, quality: 0.95)
+        let cacheDirectory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: cacheDirectory) }
+
+        let protocolType = DetailImageURLProtocol.self
+        protocolType.reset()
+        protocolType.stub(data: sourceData, mimeType: "image/jpeg", for: url)
+        let session = URLSession(configuration: Self.urlSessionConfiguration(protocolType: protocolType))
+        let loader = DetailImageLoader(
+            session: session,
+            cacheDirectory: cacheDirectory,
+            optimizationModeProvider: {
+                .enabled(maxPixelSide: 360, maxThumbnailBytes: 256, loggingEnabled: false)
+            }
+        )
+
+        let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 900)
+
+        #expect(inlineImage != nil)
+        #expect(loader.cachedOriginalData(for: url) == sourceData)
         #expect(loader.cachedThumbnailData(for: url) == nil)
     }
 

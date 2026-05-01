@@ -27,7 +27,8 @@ struct VisitedPostStoreTests {
 
     @Test func markVisitedUpdatesMemoryImmediatelyAndPersistsAsynchronously() {
         let persistence = SpyVisitedPostPersistence(records: [])
-        let store = VisitedPostStore(persistence: persistence, limit: 3)
+        let writeQueue = DispatchQueue(label: "VisitedPostStoreTests.markVisited")
+        let store = VisitedPostStore(persistence: persistence, limit: 3, writeQueue: writeQueue)
         let post = post(id: "1", title: "标题")
         let visitedAt = Date(timeIntervalSince1970: 100)
 
@@ -38,9 +39,29 @@ struct VisitedPostStoreTests {
         #expect(store.recentRecords(limit: 1).first?.title == "标题")
 
         store.flush()
+        writeQueue.sync {}
 
-        #expect(persistence.upsertedRecords.map(\.postID) == ["1"])
-        #expect(persistence.trimLimits == [3])
+        #expect(persistence.persistedBatches.map { $0.records.map(\.postID) } == [["1"]])
+        #expect(persistence.persistedBatches.map(\.limit) == [3])
+    }
+
+    @Test func flushCoalescesRepeatedPendingRecordsByLatestVisit() {
+        let persistence = SpyVisitedPostPersistence(records: [])
+        let writeQueue = DispatchQueue(label: "VisitedPostStoreTests.coalesce")
+        let store = VisitedPostStore(persistence: persistence, limit: 3, writeQueue: writeQueue)
+
+        store.markVisited(post: post(id: "1", title: "旧标题"), visitedAt: Date(timeIntervalSince1970: 100))
+        store.markVisited(post: post(id: "2", title: "其他"), visitedAt: Date(timeIntervalSince1970: 150))
+        store.markVisited(post: post(id: "1", title: "新标题"), visitedAt: Date(timeIntervalSince1970: 200))
+        store.flush()
+        writeQueue.sync {}
+
+        #expect(persistence.persistedBatches.count == 1)
+        let records = persistence.persistedBatches.first?.records ?? []
+        #expect(Set(records.map(\.postID)) == Set(["1", "2"]))
+        #expect(records.first(where: { $0.postID == "1" })?.title == "新标题")
+        #expect(records.first(where: { $0.postID == "1" })?.visitedAt == Date(timeIntervalSince1970: 200))
+        #expect(persistence.persistedBatches.first?.limit == 3)
     }
 
     @Test func repeatedVisitMovesRecordToFrontAndUpdatesMetadata() {
@@ -75,10 +96,14 @@ struct VisitedPostStoreTests {
 
 @MainActor
 private final class SpyVisitedPostPersistence: VisitedPostPersistence {
+    struct PersistedBatch: Equatable {
+        let records: [VisitedPostRecord]
+        let limit: Int
+    }
+
     var records: [VisitedPostRecord]
     var loadLimits: [Int] = []
-    var upsertedRecords: [VisitedPostRecord] = []
-    var trimLimits: [Int] = []
+    var persistedBatches: [PersistedBatch] = []
 
     init(records: [VisitedPostRecord]) {
         self.records = records
@@ -90,11 +115,15 @@ private final class SpyVisitedPostPersistence: VisitedPostPersistence {
     }
 
     func upsert(_ record: VisitedPostRecord) throws {
-        upsertedRecords.append(record)
+        persistedBatches.append(PersistedBatch(records: [record], limit: -1))
     }
 
     func trim(keepingLatest limit: Int) throws {
-        trimLimits.append(limit)
+        persistedBatches.append(PersistedBatch(records: [], limit: limit))
+    }
+
+    func upsert(_ records: [VisitedPostRecord], keepingLatest limit: Int) throws {
+        persistedBatches.append(PersistedBatch(records: records, limit: limit))
     }
 }
 
