@@ -439,10 +439,11 @@ extension PostListViewController: PostListViewProtocol {
         }
     }
     func render(items: [PostListItem]) {
-        pageContainerView.setPosts(items.map(\.post), for: selectedCategory)
+        pageContainerView.setItems(items, for: selectedCategory)
     }
 
     func renderVisitedState(at index: Int, isVisited: Bool) {
+        pageContainerView.updateVisitedState(at: index, isVisited: isVisited, for: selectedCategory)
     }
 }
 

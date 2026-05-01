@@ -18,6 +18,7 @@ final class PostSummaryCellNode: ASCellNode {
     }
 
     private let post: PostSummary
+    private let isVisited: Bool
     private let avatarLoader = AvatarImageLoader.shared
     private var hasRequestedAvatar = false
     private var hasDisplayableAuthor: Bool {
@@ -43,8 +44,17 @@ final class PostSummaryCellNode: ASCellNode {
     private weak var avatarImageView: UIImageView?
     private var lastAppliedUserInterfaceStyle: UIUserInterfaceStyle?
 
-    init(post: PostSummary) {
+    convenience init(post: PostSummary) {
+        self.init(post: post, isVisited: false)
+    }
+
+    convenience init(item: PostListItem) {
+        self.init(post: item.post, isVisited: item.isVisited)
+    }
+
+    init(post: PostSummary, isVisited: Bool) {
         self.post = post
+        self.isVisited = isVisited
         super.init()
         automaticallyManagesSubnodes = true
         selectionStyle = .none
@@ -99,7 +109,7 @@ final class PostSummaryCellNode: ASCellNode {
     private func configureText() {
         titleNode.maximumNumberOfLines = PostSummaryCellStyle.titleMaximumNumberOfLines
         titleNode.truncationMode = .byTruncatingTail
-        titleNode.attributedText = Self.titleAttributedText(for: post)
+        titleNode.attributedText = Self.titleAttributedText(for: post, isVisited: isVisited)
 
         metadataNode.maximumNumberOfLines = PostSummaryCellStyle.metadataMaximumNumberOfLines
         metadataNode.truncationMode = .byTruncatingTail
@@ -178,11 +188,11 @@ final class PostSummaryCellNode: ASCellNode {
         return metadata
     }
 
-    static func titleAttributedText(for post: PostSummary) -> NSAttributedString {
+    static func titleAttributedText(for post: PostSummary, isVisited: Bool = false) -> NSAttributedString {
         let font = PostSummaryCellStyle.titleFont
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: UIColor.label
+            .foregroundColor: isVisited ? UIColor.secondaryLabel : UIColor.label
         ]
         let title = NSMutableAttributedString()
         let configuration = UIImage.SymbolConfiguration(font: font, scale: .small)
