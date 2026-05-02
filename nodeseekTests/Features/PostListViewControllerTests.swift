@@ -185,7 +185,8 @@ struct PostListViewControllerTests {
         viewController.view.layoutIfNeeded()
         UIView.setAnimationsEnabled(animationsWereEnabled)
 
-        #expect(presenter.didTapNewDiscussionCount == 1)
+        #expect(presenter.didTapLoginCount == 1)
+        #expect(presenter.didTapNewDiscussionCount == 0)
         #expect(sideMenu.frame.maxX <= 0.5)
 
         UIView.setAnimationsEnabled(false)
@@ -206,9 +207,36 @@ struct PostListViewControllerTests {
         viewController.view.layoutIfNeeded()
         UIView.setAnimationsEnabled(animationsWereEnabled)
 
-        #expect(presenter.didTapLoginCount == 1)
+        #expect(presenter.didTapLoginCount == 2)
         #expect(sideMenu.frame.maxX <= 0.5)
         #expect(backdrop.isHidden == true)
+    }
+
+    @Test func loggedInSideMenuNewDiscussionRoutesToComposer() async throws {
+        let defaults = try #require(UserDefaults(suiteName: "post-list-side-menu-\(UUID().uuidString)"))
+        let store = CurrentAccountStore(userDefaults: defaults, storageKey: "account")
+        await store.save(AccountResponse(displayName: "mistj", isLoggedIn: true))
+        let viewController = PostListSideMenuViewController(
+            currentAccountStore: store,
+            accountRefresher: StubCurrentAccountRefresher()
+        )
+        var newDiscussionTapCount = 0
+        var loginTapCount = 0
+        viewController.onNewDiscussionTapped = {
+            newDiscussionTapCount += 1
+        }
+        viewController.onLoginTapped = {
+            loginTapCount += 1
+        }
+
+        viewController.loadViewIfNeeded()
+        let nameLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-name-label"))
+        try await waitUntil { nameLabel.text == "mistj" }
+        let button = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-new-discussion-button"))
+        button.sendActions(for: .touchUpInside)
+
+        #expect(newDiscussionTapCount == 1)
+        #expect(loginTapCount == 0)
     }
 
     @Test func loggedInSideMenuAccountHeaderRoutesToProfileInsteadOfLogin() async throws {
@@ -236,7 +264,9 @@ struct PostListViewControllerTests {
         }
 
         viewController.loadViewIfNeeded()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        try await waitUntil {
+            viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-name-label")?.text == "mistj"
+        }
         viewController.view.layoutIfNeeded()
 
         let accountHeaderButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-account-header-button"))
@@ -412,5 +442,21 @@ private extension UIView {
         }
 
         return nil
+    }
+}
+
+@MainActor
+private func waitUntil(
+    timeoutNanoseconds: UInt64 = 1_000_000_000,
+    condition: @escaping @MainActor () -> Bool
+) async throws {
+    let step: UInt64 = 25_000_000
+    var waited: UInt64 = 0
+    while waited < timeoutNanoseconds {
+        if condition() {
+            return
+        }
+        try await Task.sleep(nanoseconds: step)
+        waited += step
     }
 }

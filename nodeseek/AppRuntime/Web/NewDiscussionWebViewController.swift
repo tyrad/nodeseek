@@ -15,6 +15,8 @@ final class NewDiscussionWebViewController: UIViewController, WKNavigationDelega
     private let cookieBridge: CookieBridge
     private let loadingIndicator = UIActivityIndicatorView(style: .medium)
     private var loadTask: Task<Void, Never>?
+    private var lastResponseStatusCode: Int?
+    private var hasPresentedLoginRequiredHint = false
 
     init(targetURL: URL = NewDiscussionWebViewController.newDiscussionURL) {
         self.targetURL = targetURL
@@ -99,6 +101,8 @@ final class NewDiscussionWebViewController: UIViewController, WKNavigationDelega
 
     private func loadNewDiscussionPage() {
         loadingIndicator.startAnimating()
+        lastResponseStatusCode = nil
+        hasPresentedLoginRequiredHint = false
         loadTask = Task { @MainActor [weak self] in
             guard let self else { return }
             await cookieBridge.syncURLSessionCookiesToWebView()
@@ -133,6 +137,39 @@ final class NewDiscussionWebViewController: UIViewController, WKNavigationDelega
         present(SFSafariViewController(url: url), animated: true)
     }
 
+    private func presentLoginRequiredHint(message: String) {
+        guard !hasPresentedLoginRequiredHint else { return }
+        guard view.window != nil else { return }
+        hasPresentedLoginRequiredHint = true
+
+        let alert = UIAlertController(title: "需要登录", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "去登录", style: .default) { [weak self] _ in
+            let loginViewController = LoginWebViewController()
+            if let navigationController = self?.navigationController {
+                navigationController.pushViewController(loginViewController, animated: true)
+                return
+            }
+            self?.present(UINavigationController(rootViewController: loginViewController), animated: true)
+        })
+        present(alert, animated: true)
+    }
+
+    private func checkLoginRequiredFallback() {
+        let statusCode = lastResponseStatusCode
+        webView.evaluateJavaScript("document.body.innerText") { [weak self] result, _ in
+            guard let self else { return }
+            let responseText = result as? String ?? ""
+            guard let message = Self.loginRequiredMessage(
+                statusCode: statusCode,
+                responseText: responseText
+            ) else {
+                return
+            }
+            self.presentLoginRequiredHint(message: message)
+        }
+    }
+
     private func handleExternalNavigationIfNeeded(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
             return false
@@ -144,6 +181,16 @@ final class NewDiscussionWebViewController: UIViewController, WKNavigationDelega
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         loadingIndicator.stopAnimating()
+        checkLoginRequiredFallback()
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationResponse: WKNavigationResponse,
+        decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
+    ) {
+        lastResponseStatusCode = (navigationResponse.response as? HTTPURLResponse)?.statusCode
+        decisionHandler(.allow)
     }
 
     func webView(
@@ -256,6 +303,12 @@ final class NewDiscussionWebViewController: UIViewController, WKNavigationDelega
             completionHandler(alert?.textFields?.first?.text)
         })
         present(alert, animated: true)
+    }
+
+    static func loginRequiredMessage(statusCode: Int?, responseText: String) -> String? {
+        guard statusCode == 404 else { return nil }
+        guard responseText.uppercased().contains("USER NOT FOUND") else { return nil }
+        return "用户可能还未登录，请先登录。"
     }
 
     private func webDialogTitle(from frame: WKFrameInfo) -> String {

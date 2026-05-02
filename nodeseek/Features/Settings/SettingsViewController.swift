@@ -92,17 +92,20 @@ final class SettingsViewController: UITableViewController {
 
     private let cacheManager: SettingsCacheManaging
     private let sessionManager: SettingsSessionManaging
+    private let currentAccountStore: CurrentAccountStore
     private let confirmsActionsImmediately: Bool
     private let onLogout: @MainActor () -> Void
     private let onLogFile: @MainActor () -> Void
     private let onDetailTest: (@MainActor () -> Void)?
     private var cacheByteSize: UInt64?
+    private var isLoggedIn = false
     private var isClearingCache = false
     private var isLoggingOut = false
 
     init(
         cacheManager: SettingsCacheManaging? = nil,
         sessionManager: SettingsSessionManaging? = nil,
+        currentAccountStore: CurrentAccountStore = .shared,
         confirmsActionsImmediately: Bool = false,
         onLogout: @escaping @MainActor () -> Void = {},
         onLogFile: @escaping @MainActor () -> Void = {},
@@ -110,6 +113,7 @@ final class SettingsViewController: UITableViewController {
     ) {
         self.cacheManager = cacheManager ?? DefaultSettingsCacheManager()
         self.sessionManager = sessionManager ?? DefaultSettingsSessionManager()
+        self.currentAccountStore = currentAccountStore
         self.confirmsActionsImmediately = confirmsActionsImmediately
         self.onLogout = onLogout
         self.onLogFile = onLogFile
@@ -127,6 +131,7 @@ final class SettingsViewController: UITableViewController {
         tableView.accessibilityIdentifier = "settings-table-view"
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "SettingsCell")
         refreshCacheSize()
+        refreshAccountState()
     }
 
     override func numberOfSections(in tableView: UITableView) -> Int {
@@ -136,6 +141,9 @@ final class SettingsViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         if Section(rawValue: section) == .debug {
             return DebugRow.visibleRows.count
+        }
+        if Section(rawValue: section) == .account {
+            return isLoggedIn ? 1 : 0
         }
         return 1
     }
@@ -147,7 +155,7 @@ final class SettingsViewController: UITableViewController {
         case .debug:
             return "调试"
         case .account:
-            return "账号"
+            return isLoggedIn ? "账号" : nil
         case .none:
             return nil
         }
@@ -174,6 +182,7 @@ final class SettingsViewController: UITableViewController {
         case .debug:
             handleDebugSelection(at: indexPath)
         case .account:
+            guard isLoggedIn else { return }
             confirmLogout()
         case .none:
             break
@@ -240,6 +249,15 @@ final class SettingsViewController: UITableViewController {
             guard let self else { return }
             cacheByteSize = await cacheManager.cacheByteSize()
             tableView.reloadSections(IndexSet(integer: Section.cache.rawValue), with: .none)
+        }
+    }
+
+    private func refreshAccountState() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let snapshot = await currentAccountStore.snapshot()
+            isLoggedIn = snapshot?.account.isLoggedIn == true
+            tableView.reloadSections(IndexSet(integer: Section.account.rawValue), with: .none)
         }
     }
 
@@ -330,7 +348,8 @@ final class SettingsViewController: UITableViewController {
             guard let self else { return }
             await sessionManager.logout()
             isLoggingOut = false
-            tableView.reloadRows(at: [IndexPath(row: 0, section: Section.account.rawValue)], with: .none)
+            isLoggedIn = false
+            tableView.reloadSections(IndexSet(integer: Section.account.rawValue), with: .none)
             onLogout()
             navigationController?.popViewController(animated: true)
         }

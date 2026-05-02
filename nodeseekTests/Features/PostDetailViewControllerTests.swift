@@ -1350,6 +1350,7 @@ struct PostDetailViewControllerTests {
 }
 
 @MainActor
+@Suite(.serialized)
 struct PostDetailLoginViewControllerTests {
     @Test func loginRequiredStateShowsLoginButtonAndSendsTapToPresenter() throws {
         let presenter = SpyPostDetailPresenter()
@@ -1415,7 +1416,7 @@ struct PostDetailLoginViewControllerTests {
         #expect(button.isHidden)
     }
 
-    @Test func detailUsesOnlyFloatingReplyEntry() throws {
+    @Test func detailUsesOnlyFloatingReplyEntry() async throws {
         let presenter = SpyPostDetailPresenter()
         let viewController = PostDetailViewController(presenter: presenter)
 
@@ -1429,6 +1430,7 @@ struct PostDetailLoginViewControllerTests {
             contentHTML: "<p>正文</p>",
             comments: []
         ))
+        await waitForDetailContent(in: viewController, expectedRowCount: 1)
 
         #expect(viewController.view.firstTextView(accessibilityIdentifier: "post-detail-comment-input") == nil)
         #expect(viewController.view.firstButton(accessibilityIdentifier: "post-detail-comment-send-button") == nil)
@@ -1448,7 +1450,7 @@ struct PostDetailLoginViewControllerTests {
         #expect(tapGesture.cancelsTouchesInView == false)
     }
 
-    @Test func replyAndQuoteActionsUpdateComposerState() throws {
+    @Test func replyAndQuoteActionsUpdateComposerState() async throws {
         let presenter = SpyPostDetailPresenter()
         let viewController = PostDetailViewController(presenter: presenter)
         let comment = Comment(
@@ -1472,6 +1474,7 @@ struct PostDetailLoginViewControllerTests {
             contentHTML: "<p>正文</p>",
             comments: [],
         ))
+        await waitForDetailContent(in: viewController, expectedRowCount: 1)
         viewController.handleReply(to: comment)
         let contextLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-detail-reply-context-label"))
         #expect(contextLabel.text == "回复 netcup #10")

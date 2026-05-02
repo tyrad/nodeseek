@@ -11,18 +11,22 @@ import UIKit
 
 @MainActor
 struct SettingsViewControllerTests {
-    @Test func settingsPageShowsCacheActionAndLogoutAtBottom() async throws {
+    @Test func settingsPageShowsCacheActionAndLogoutAtBottomWhenLoggedIn() async throws {
         let previousFileLogging = NodeSeekDebugConfig.enableFileLogging
         defer { NodeSeekDebugConfig.enableFileLogging = previousFileLogging }
         NodeSeekDebugConfig.enableFileLogging = false
+        let defaults = try #require(UserDefaults(suiteName: "settings-account-\(UUID().uuidString)"))
+        let accountStore = CurrentAccountStore(userDefaults: defaults, storageKey: "account")
+        await accountStore.save(AccountResponse(displayName: "mistj", isLoggedIn: true))
         let viewController = SettingsViewController(
             cacheManager: FakeSettingsCacheManager(cacheByteSize: 4_096),
-            sessionManager: FakeSettingsSessionManager()
+            sessionManager: FakeSettingsSessionManager(),
+            currentAccountStore: accountStore
         )
         viewController.loadViewIfNeeded()
         viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         viewController.view.layoutIfNeeded()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        try await waitUntil { viewController.tableView.numberOfRows(inSection: 2) == 1 }
 
         let tableView = try #require(viewController.tableView)
         #expect(viewController.title == "设置")
@@ -64,6 +68,21 @@ struct SettingsViewControllerTests {
         #expect(logoutCell.textLabel?.textColor == .systemRed)
     }
 
+    @Test func settingsPageHidesLogoutWhenNotLoggedIn() async throws {
+        let defaults = try #require(UserDefaults(suiteName: "settings-account-\(UUID().uuidString)"))
+        let accountStore = CurrentAccountStore(userDefaults: defaults, storageKey: "account")
+        let viewController = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 4_096),
+            sessionManager: FakeSettingsSessionManager(),
+            currentAccountStore: accountStore
+        )
+
+        viewController.loadViewIfNeeded()
+        try await waitUntil { viewController.tableView.numberOfRows(inSection: 2) == 0 }
+
+        #expect(viewController.tableView.numberOfRows(inSection: 2) == 0)
+    }
+
     @Test func selectingClearCacheClearsCacheWithoutLoggingOut() async throws {
         let cacheManager = FakeSettingsCacheManager(cacheByteSize: 4_096)
         let sessionManager = FakeSettingsSessionManager()
@@ -87,16 +106,21 @@ struct SettingsViewControllerTests {
     @Test func selectingLogoutLogsOutAndRunsCallback() async throws {
         let cacheManager = FakeSettingsCacheManager(cacheByteSize: 4_096)
         let sessionManager = FakeSettingsSessionManager()
+        let defaults = try #require(UserDefaults(suiteName: "settings-account-\(UUID().uuidString)"))
+        let accountStore = CurrentAccountStore(userDefaults: defaults, storageKey: "account")
+        await accountStore.save(AccountResponse(displayName: "mistj", isLoggedIn: true))
         var logoutCallbackCount = 0
         let viewController = SettingsViewController(
             cacheManager: cacheManager,
             sessionManager: sessionManager,
+            currentAccountStore: accountStore,
             confirmsActionsImmediately: true,
             onLogout: {
                 logoutCallbackCount += 1
             }
         )
         viewController.loadViewIfNeeded()
+        try await waitUntil { viewController.tableView.numberOfRows(inSection: 2) == 1 }
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
@@ -184,5 +208,21 @@ private final class FakeSettingsSessionManager: SettingsSessionManaging {
 
     func logout() async {
         logoutCount += 1
+    }
+}
+
+@MainActor
+private func waitUntil(
+    timeoutNanoseconds: UInt64 = 1_000_000_000,
+    condition: @escaping @MainActor () -> Bool
+) async throws {
+    let step: UInt64 = 25_000_000
+    var waited: UInt64 = 0
+    while waited < timeoutNanoseconds {
+        if condition() {
+            return
+        }
+        try await Task.sleep(nanoseconds: step)
+        waited += step
     }
 }

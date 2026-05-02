@@ -291,7 +291,11 @@ final class PostListSideMenuViewController: UIViewController {
 
     @objc private func newDiscussionButtonTapped() {
         hide(animated: true)
-        onNewDiscussionTapped?()
+        if accountController.isLoggedIn {
+            onNewDiscussionTapped?()
+        } else {
+            onLoginTapped?()
+        }
     }
 
     @objc private func recentVisitedButtonTapped() {
