@@ -70,29 +70,32 @@ final class DefaultSettingsSessionManager: SettingsSessionManaging {
 final class SettingsViewController: UITableViewController {
     private enum Section: Int, CaseIterable {
         case cache
-        #if DEBUG
         case debug
-        #endif
         case account
     }
 
-    #if DEBUG
     private enum DebugRow: Int, CaseIterable {
+        case fileLogging
         case logFile
         case detailTest
 
         static var visibleRows: [DebugRow] {
-            NodeSeekDebugConfig.enablePostDetailTestEntry ? allCases : [.logFile]
+            var rows: [DebugRow] = [.fileLogging, .logFile]
+            #if DEBUG
+            if NodeSeekDebugConfig.enablePostDetailTestEntry {
+                rows.append(.detailTest)
+            }
+            #endif
+            return rows
         }
     }
-    #endif
 
     private let cacheManager: SettingsCacheManaging
     private let sessionManager: SettingsSessionManaging
     private let confirmsActionsImmediately: Bool
     private let onLogout: @MainActor () -> Void
     private let onLogFile: @MainActor () -> Void
-    private let onDetailTest: @MainActor () -> Void
+    private let onDetailTest: (@MainActor () -> Void)?
     private var cacheByteSize: UInt64?
     private var isClearingCache = false
     private var isLoggingOut = false
@@ -103,7 +106,7 @@ final class SettingsViewController: UITableViewController {
         confirmsActionsImmediately: Bool = false,
         onLogout: @escaping @MainActor () -> Void = {},
         onLogFile: @escaping @MainActor () -> Void = {},
-        onDetailTest: @escaping @MainActor () -> Void = {}
+        onDetailTest: (@MainActor () -> Void)? = nil
     ) {
         self.cacheManager = cacheManager ?? DefaultSettingsCacheManager()
         self.sessionManager = sessionManager ?? DefaultSettingsSessionManager()
@@ -131,11 +134,9 @@ final class SettingsViewController: UITableViewController {
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        #if DEBUG
         if Section(rawValue: section) == .debug {
             return DebugRow.visibleRows.count
         }
-        #endif
         return 1
     }
 
@@ -143,10 +144,8 @@ final class SettingsViewController: UITableViewController {
         switch Section(rawValue: section) {
         case .cache:
             return "缓存"
-        #if DEBUG
         case .debug:
             return "调试"
-        #endif
         case .account:
             return "账号"
         case .none:
@@ -158,10 +157,8 @@ final class SettingsViewController: UITableViewController {
         switch Section(rawValue: indexPath.section) {
         case .cache:
             return cacheCell(for: indexPath)
-        #if DEBUG
         case .debug:
             return debugCell(for: indexPath)
-        #endif
         case .account:
             return logoutCell(for: indexPath)
         case .none:
@@ -174,10 +171,8 @@ final class SettingsViewController: UITableViewController {
         switch Section(rawValue: indexPath.section) {
         case .cache:
             confirmClearCache()
-        #if DEBUG
         case .debug:
             handleDebugSelection(at: indexPath)
-        #endif
         case .account:
             confirmLogout()
         case .none:
@@ -207,10 +202,19 @@ final class SettingsViewController: UITableViewController {
         return cell
     }
 
-    #if DEBUG
     private func debugCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
         switch DebugRow.visibleRows[indexPath.row] {
+        case .fileLogging:
+            cell.textLabel?.text = "记录日志"
+            let loggingSwitch = UISwitch()
+            loggingSwitch.isOn = NodeSeekDebugConfig.enableFileLogging
+            loggingSwitch.accessibilityIdentifier = "settings-file-logging-switch"
+            loggingSwitch.addTarget(self, action: #selector(fileLoggingSwitchChanged(_:)), for: .valueChanged)
+            cell.accessoryView = loggingSwitch
+            cell.selectionStyle = .none
+            cell.accessibilityIdentifier = "settings-file-logging-cell"
+            return cell
         case .logFile:
             cell.textLabel?.text = "日志文件"
             cell.imageView?.image = UIImage(systemName: "doc.text")
@@ -223,7 +227,6 @@ final class SettingsViewController: UITableViewController {
         cell.accessoryType = .disclosureIndicator
         return cell
     }
-    #endif
 
     private var cacheDetailText: String {
         guard let cacheByteSize else {
@@ -278,12 +281,14 @@ final class SettingsViewController: UITableViewController {
         present(alert, animated: true)
     }
 
-    #if DEBUG
     private func handleDebugSelection(at indexPath: IndexPath) {
         switch DebugRow.visibleRows[indexPath.row] {
+        case .fileLogging:
+            break
         case .logFile:
             onLogFile()
         case .detailTest:
+            guard let onDetailTest else { return }
             if let navigationController {
                 navigationController.popViewController(animated: true)
                 DispatchQueue.main.async { [onDetailTest] in
@@ -294,7 +299,10 @@ final class SettingsViewController: UITableViewController {
             onDetailTest()
         }
     }
-    #endif
+
+    @objc private func fileLoggingSwitchChanged(_ sender: UISwitch) {
+        NodeSeekDebugConfig.enableFileLogging = sender.isOn
+    }
 
     private func performClearCache() {
         isClearingCache = true

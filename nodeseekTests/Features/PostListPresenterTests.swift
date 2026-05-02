@@ -772,7 +772,7 @@ private final class SpyPostListRouter: PostListRouterProtocol {
     func navigateToSettings(
         onLogout: @escaping @MainActor () -> Void,
         onLogFile: @escaping @MainActor () -> Void,
-        onDetailTest: @escaping @MainActor () -> Void
+        onDetailTest: (@MainActor () -> Void)?
     ) {
         navigateToSettingsCount += 1
         onSettingsLogout = onLogout

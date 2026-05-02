@@ -104,7 +104,6 @@ private final class AppLogFileWriter: @unchecked Sendable {
     nonisolated(unsafe) private var directoryOverride: URL?
 
     nonisolated func write(level: AppLogLevel, type: AppLogType, message: String) {
-        #if DEBUG
         guard NodeSeekDebugConfig.enableFileLogging else { return }
         queue.async {
             let directory = self.directoryOverride ?? Self.defaultDirectory()
@@ -126,7 +125,6 @@ private final class AppLogFileWriter: @unchecked Sendable {
                     .error("文件日志写入失败: \(error.localizedDescription, privacy: .public)")
             }
         }
-        #endif
     }
 
     nonisolated func logURL() -> URL {

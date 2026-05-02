@@ -93,13 +93,9 @@ enum DetailImageLayout {
         }
 
         let aspectRatio = originalSize.width / originalSize.height
-        let isExtremeRatio = aspectRatio >= extremeAspectRatio || aspectRatio <= 1 / extremeAspectRatio
-        guard isExtremeRatio else {
-            return DetailImagePresentation(size: fixedNormalImageSize(maxWidth: maxWidth), mode: .thumbnailCrop)
-        }
-
+        let maxHeight = aspectRatio <= 1 / extremeAspectRatio ? maxImageHeight : nil
         return DetailImagePresentation(
-            size: scaledSize(for: originalSize, maxWidth: maxWidth, maxHeight: maxImageHeight),
+            size: scaledSize(for: originalSize, maxWidth: maxWidth, maxHeight: maxHeight),
             mode: .aspectFit
         )
     }
@@ -113,10 +109,7 @@ enum DetailImageLayout {
             return true
         }
 
-        return presentation(
-            for: originalSize,
-            maxWidth: maxWidth,
-            isSticker: false
-        ).mode == .thumbnailCrop
+        guard originalSize.width > 0, originalSize.height > 0 else { return false }
+        return originalSize.width / originalSize.height > 1 / extremeAspectRatio
     }
 }

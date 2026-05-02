@@ -94,6 +94,13 @@ class PostListPresenter: PostListPresenterProtocol {
 
     func didTapSettings() {
         #if DEBUG
+        let detailTestAction: (@MainActor () -> Void)? = { [weak self] in
+            self?.didTapDetailTest()
+        }
+        #else
+        let detailTestAction: (@MainActor () -> Void)? = nil
+        #endif
+
         router.navigateToSettings(
             onLogout: { [weak self] in
                 self?.presentCurrentCategory(useCache: false)
@@ -101,22 +108,15 @@ class PostListPresenter: PostListPresenterProtocol {
             onLogFile: { [weak self] in
                 self?.didTapLogFile()
             },
-            onDetailTest: { [weak self] in
-                self?.didTapDetailTest()
-            }
+            onDetailTest: detailTestAction
         )
-        #else
-        router.navigateToSettings { [weak self] in
-            self?.presentCurrentCategory(useCache: false)
-        }
-        #endif
     }
 
-    #if DEBUG
     func didTapLogFile() {
         router.navigateToLogFile()
     }
 
+    #if DEBUG
     func didTapDetailTest() {
         guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }
         view?.showDetailTestInput()

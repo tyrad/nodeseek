@@ -43,16 +43,17 @@ struct DetailImageLayoutTests {
         #expect(size.height == 187)
     }
 
-    @Test func normalPhotoUsesCroppedThumbnailPresentation() {
+    @Test func normalPhotoUsesAspectFitPresentation() {
         let presentation = DetailImageLayout.presentation(
             for: CGSize(width: 1200, height: 800),
             maxWidth: 320,
             isSticker: false
         )
 
-        #expect(presentation.size == CGSize(width: 160, height: 160))
-        #expect(presentation.mode == .thumbnailCrop)
-        #expect(presentation.targetPointSide == 160)
+        #expect(presentation.size.width == 320)
+        #expect(abs(presentation.size.height - 213.333) < 0.01)
+        #expect(presentation.mode == .aspectFit)
+        #expect(presentation.targetPointSide == 320)
     }
 
     @Test func tallScreenshotUsesContainedPresentation() {

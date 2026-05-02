@@ -415,6 +415,45 @@ struct DTCoreTextHTMLContentRendererTests {
         ])
     }
 
+    @Test func splitsNormalImageFromMixedParagraphIntoImageBlock() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: """
+            <p><img src="https://cdn.example.com/wide.png" alt="image"><br>
+            6，设置二步验证登录（可选）<br>
+            7，原始邮箱改密及验证。</p>
+            """,
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+
+        guard case .image(let imageBlock) = blocks.first else {
+            Issue.record("Expected leading normal image to be split into an image block")
+            return
+        }
+        #expect(imageBlock.url.absoluteString == "https://cdn.example.com/wide.png")
+        #expect(combinedText(in: Array(blocks.dropFirst())).contains("设置二步验证登录"))
+    }
+
+    @Test func splitsNormalImageBetweenParagraphTextWithoutLeakingContainerTags() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: """
+            <p>前置说明<br><img src="https://cdn.example.com/photo.png" alt="photo"><br>后续说明</p>
+            """,
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+
+        #expect(imageBlocks(in: blocks).map(\.url.absoluteString) == ["https://cdn.example.com/photo.png"])
+        let text = combinedText(in: blocks)
+        #expect(text.contains("前置说明"))
+        #expect(text.contains("后续说明"))
+        #expect(text.contains("</p>") == false)
+    }
+
     @Test func rendersRelativeImageAsAttachmentWithResolvedURL() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
@@ -443,7 +482,7 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(attachmentURL?.absoluteString == "https://www.nodeseek.com/static/image/sticker/xhj/003.png")
     }
 
-    @Test func usesHalfWidthSquareForNonStickerImageAttachments() throws {
+    @Test func usesAspectFitForNonStickerImageAttachments() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
         let blocks = renderer.render(
@@ -469,8 +508,8 @@ struct DTCoreTextHTMLContentRendererTests {
         }
 
         let displaySize = try #require(attachment?.displaySize)
-        #expect(displaySize.width == 160)
-        #expect(displaySize.height == 160)
+        #expect(displaySize.width == 320)
+        #expect(abs(displaySize.height - 213.333) < 0.01)
     }
 
     @Test func usesContainedPresentationForExtremeRatioImageAttachments() throws {

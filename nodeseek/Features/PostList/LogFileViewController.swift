@@ -84,7 +84,7 @@ final class LogFileViewController: UIViewController {
     @objc private func deleteButtonTapped() {
         let alert = UIAlertController(
             title: "删除日志文件？",
-            message: "将删除当前 DEBUG 文件日志，操作不可撤销。",
+            message: "将删除当前文件日志，操作不可撤销。",
             preferredStyle: .alert
         )
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
@@ -104,10 +104,9 @@ final class LogFileViewController: UIViewController {
     }
 
     private func reloadContent() {
-        #if DEBUG
         let pathLine = "路径：\(AppLog.fileLogURL.path)"
         if NodeSeekDebugConfig.enableFileLogging == false {
-            textView.text = "文件日志未开启\n\(pathLine)\n\n将 NodeSeekDebugConfig.enableFileLogging 设为 true 后，新的 AppLog 记录会写入这里。"
+            textView.text = "文件日志未开启\n\(pathLine)\n\n可在设置中打开“记录日志”，新的 AppLog 记录会写入这里。"
             scrollToBottom()
             return
         }
@@ -119,10 +118,6 @@ final class LogFileViewController: UIViewController {
         } catch {
             textView.text = "读取文件日志失败：\(error.localizedDescription)\n\(pathLine)"
         }
-        #else
-        textView.text = "文件日志只在 DEBUG 环境可用。"
-        scrollToBottom()
-        #endif
     }
 
     private func scrollToBottom() {

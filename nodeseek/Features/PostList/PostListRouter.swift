@@ -71,11 +71,10 @@ class PostListRouter: PostListRouterProtocol {
         show(recentViewController)
     }
 
-    #if DEBUG
     func navigateToSettings(
         onLogout: @escaping @MainActor () -> Void,
         onLogFile: @escaping @MainActor () -> Void,
-        onDetailTest: @escaping @MainActor () -> Void
+        onDetailTest: (@MainActor () -> Void)?
     ) {
         show(SettingsViewController(
             onLogout: onLogout,
@@ -87,11 +86,6 @@ class PostListRouter: PostListRouterProtocol {
     func navigateToLogFile() {
         show(LogFileViewController())
     }
-    #else
-    func navigateToSettings(onLogout: @escaping @MainActor () -> Void) {
-        show(SettingsViewController(onLogout: onLogout))
-    }
-    #endif
 
     private func show(_ targetViewController: UIViewController) {
         if let navigationController = viewController?.navigationController {

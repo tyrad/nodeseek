@@ -37,6 +37,12 @@ struct RenderedImageBlock: Equatable {
     let altText: String?
 }
 
+struct HTMLContainerShell: Equatable {
+    let openingTag: String
+    let innerHTML: String
+    let closingTag: String
+}
+
 enum RenderedContentBlock {
     case text(NSAttributedString)
     case table(RenderedTableBlock)

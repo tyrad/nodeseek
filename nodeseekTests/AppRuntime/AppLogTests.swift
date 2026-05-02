@@ -13,6 +13,12 @@ import UIKit
 @MainActor
 @Suite(.serialized)
 struct AppLogTests {
+    @Test func fileLoggingDefaultsToDisabled() {
+        NodeSeekDebugConfig.resetRuntimeLoggingForTesting()
+
+        #expect(NodeSeekDebugConfig.enableFileLogging == false)
+    }
+
     @Test func fileLoggingWritesOnlyWhenDebugSwitchIsEnabled() async throws {
         try withTemporaryFileLogging { directory in
             NodeSeekDebugConfig.enableFileLogging = false

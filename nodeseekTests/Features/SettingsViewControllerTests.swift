@@ -12,6 +12,9 @@ import UIKit
 @MainActor
 struct SettingsViewControllerTests {
     @Test func settingsPageShowsCacheActionAndLogoutAtBottom() async throws {
+        let previousFileLogging = NodeSeekDebugConfig.enableFileLogging
+        defer { NodeSeekDebugConfig.enableFileLogging = previousFileLogging }
+        NodeSeekDebugConfig.enableFileLogging = false
         let viewController = SettingsViewController(
             cacheManager: FakeSettingsCacheManager(cacheByteSize: 4_096),
             sessionManager: FakeSettingsSessionManager()
@@ -25,7 +28,7 @@ struct SettingsViewControllerTests {
         #expect(viewController.title == "设置")
         #expect(tableView.numberOfSections == 3)
         #expect(tableView.numberOfRows(inSection: 0) == 1)
-        #expect(tableView.numberOfRows(inSection: 1) == 2)
+        #expect(tableView.numberOfRows(inSection: 1) == 3)
         #expect(tableView.numberOfRows(inSection: 2) == 1)
         #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 1) == "调试")
 
@@ -37,9 +40,13 @@ struct SettingsViewControllerTests {
             tableView,
             cellForRowAt: IndexPath(row: 0, section: 1)
         ))
-        let detailTestCell = try #require(tableView.dataSource?.tableView(
+        let logFileCell = try #require(tableView.dataSource?.tableView(
             tableView,
             cellForRowAt: IndexPath(row: 1, section: 1)
+        ))
+        let detailTestCell = try #require(tableView.dataSource?.tableView(
+            tableView,
+            cellForRowAt: IndexPath(row: 2, section: 1)
         ))
         let logoutCell = try #require(tableView.dataSource?.tableView(
             tableView,
@@ -48,7 +55,10 @@ struct SettingsViewControllerTests {
 
         #expect(cacheCell.textLabel?.text == "清除缓存")
         #expect(cacheCell.detailTextLabel?.text == "4 KB")
-        #expect(logCell.textLabel?.text == "日志文件")
+        #expect(logCell.textLabel?.text == "记录日志")
+        let loggingSwitch = try #require(logCell.accessoryView as? UISwitch)
+        #expect(loggingSwitch.isOn == false)
+        #expect(logFileCell.textLabel?.text == "日志文件")
         #expect(detailTestCell.textLabel?.text == "详情测试")
         #expect(logoutCell.textLabel?.text == "退出登录")
         #expect(logoutCell.textLabel?.textColor == .systemRed)
@@ -116,15 +126,36 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 1)
+            didSelectRowAt: IndexPath(row: 1, section: 1)
         )
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 1, section: 1)
+            didSelectRowAt: IndexPath(row: 2, section: 1)
         )
 
         #expect(logFileTapCount == 1)
         #expect(detailTestTapCount == 1)
+    }
+
+    @Test func togglingFileLoggingSwitchUpdatesRuntimeConfig() throws {
+        let previousFileLogging = NodeSeekDebugConfig.enableFileLogging
+        defer { NodeSeekDebugConfig.enableFileLogging = previousFileLogging }
+        NodeSeekDebugConfig.enableFileLogging = false
+        let viewController = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager()
+        )
+        viewController.loadViewIfNeeded()
+
+        let cell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: IndexPath(row: 0, section: 1)
+        ))
+        let loggingSwitch = try #require(cell.accessoryView as? UISwitch)
+        loggingSwitch.isOn = true
+        loggingSwitch.sendActions(for: .valueChanged)
+
+        #expect(NodeSeekDebugConfig.enableFileLogging == true)
     }
 }
 

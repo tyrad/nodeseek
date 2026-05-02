@@ -147,6 +147,13 @@ extension DTCoreTextHTMLContentRenderer {
                 blocks.append(unsupportedBlock)
             } else if let imageBlocks = standaloneImageBlocks(fromHTML: candidateHTML, baseURL: baseURL) {
                 blocks.append(contentsOf: imageBlocks.map(RenderedContentBlock.image))
+            } else if appendMixedNormalImageBlocks(
+                fromHTML: candidateHTML,
+                into: &blocks,
+                baseURL: baseURL,
+                maxImageWidth: maxImageWidth
+            ) {
+                // 普通图片按块级内容渲染，避免 DTCoreText attachment 行高和真实图片高度不同步。
             } else {
                 appendTextBlocks(
                     fromHTML: candidateHTML,
@@ -370,6 +377,147 @@ extension DTCoreTextHTMLContentRenderer {
             url: url,
             altText: altText?.isEmpty == false ? altText : nil
         )
+    }
+
+    func imageBlock(fromImageTag tag: String, baseURL: URL) -> RenderedImageBlock? {
+        guard let document = try? HTML(html: tag, encoding: .utf8),
+              let imageNode = document.at_css("img") else {
+            return nil
+        }
+        return imageBlock(from: imageNode, baseURL: baseURL)
+    }
+
+    func appendMixedNormalImageBlocks(
+        fromHTML html: String,
+        into blocks: inout [RenderedContentBlock],
+        baseURL: URL,
+        maxImageWidth: CGFloat
+    ) -> Bool {
+        guard let shell = containerShell(fromHTML: html) else { return false }
+
+        let source = shell.innerHTML as NSString
+        let fullRange = NSRange(location: 0, length: source.length)
+        let matches = Self.imageTagRegex.matches(in: shell.innerHTML, options: [], range: fullRange)
+        guard matches.isEmpty == false else { return false }
+
+        var emittedImageBlock = false
+        var currentLocation = 0
+        var localBlocks: [RenderedContentBlock] = []
+        for match in matches {
+            guard match.range.location >= currentLocation else { continue }
+            let imageTag = source.substring(with: match.range)
+            let beforeRange = NSRange(location: currentLocation, length: match.range.location - currentLocation)
+            let beforeHTML = source.substring(with: beforeRange)
+            let afterHTML = source.substring(from: NSMaxRange(match.range))
+            guard shouldSplitMixedImageTag(imageTag, beforeHTML: beforeHTML, afterHTML: afterHTML),
+                  let imageBlock = imageBlock(fromImageTag: imageTag, baseURL: baseURL) else {
+                continue
+            }
+
+            appendContainerTextBlocks(
+                fromHTML: beforeHTML,
+                shell: shell,
+                into: &localBlocks,
+                baseURL: baseURL,
+                maxImageWidth: maxImageWidth
+            )
+            localBlocks.append(.image(imageBlock))
+            emittedImageBlock = true
+            currentLocation = NSMaxRange(match.range)
+            currentLocation = rangeAfterAdjacentLineBreaks(in: source, startingAt: currentLocation).location
+        }
+
+        guard emittedImageBlock else { return false }
+        let remainingRange = NSRange(location: currentLocation, length: fullRange.length - currentLocation)
+        appendContainerTextBlocks(
+            fromHTML: source.substring(with: remainingRange),
+            shell: shell,
+            into: &localBlocks,
+            baseURL: baseURL,
+            maxImageWidth: maxImageWidth
+        )
+        blocks.append(contentsOf: localBlocks)
+        return true
+    }
+
+    func containerShell(fromHTML html: String) -> HTMLContainerShell? {
+        let source = html as NSString
+        let fullRange = NSRange(location: 0, length: source.length)
+        guard let match = Self.containerShellRegex.firstMatch(in: html, options: [], range: fullRange),
+              match.numberOfRanges >= 5 else {
+            return nil
+        }
+
+        let openingTagRange = match.range(at: 1)
+        let innerRange = match.range(at: 3)
+        let closingTagRange = match.range(at: 4)
+        guard openingTagRange.location != NSNotFound,
+              innerRange.location != NSNotFound,
+              closingTagRange.location != NSNotFound else {
+            return nil
+        }
+
+        return HTMLContainerShell(
+            openingTag: source.substring(with: openingTagRange),
+            innerHTML: source.substring(with: innerRange),
+            closingTag: source.substring(with: closingTagRange)
+        )
+    }
+
+    func appendContainerTextBlocks(
+        fromHTML html: String,
+        shell: HTMLContainerShell,
+        into blocks: inout [RenderedContentBlock],
+        baseURL: URL,
+        maxImageWidth: CGFloat
+    ) {
+        guard html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else { return }
+        appendTextBlocks(
+            fromHTML: shell.openingTag + html + shell.closingTag,
+            into: &blocks,
+            baseURL: baseURL,
+            maxImageWidth: maxImageWidth
+        )
+    }
+
+    func shouldSplitMixedImageTag(_ tag: String, beforeHTML: String, afterHTML: String) -> Bool {
+        guard let source = preferredImageSource(in: tag),
+              source.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().hasPrefix("data:") == false else {
+            return false
+        }
+        return hasBlockBoundaryBeforeImage(beforeHTML) && hasBlockBoundaryAfterImage(afterHTML)
+    }
+
+    func hasBlockBoundaryBeforeImage(_ html: String) -> Bool {
+        let trimmed = html.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else { return true }
+        if trimmed.range(of: #"(?i)^<(?:p|div|section|article)\b[^>]*>$"#, options: .regularExpression) != nil {
+            return true
+        }
+        return trimmed.range(of: #"(?i)<br\s*/?>$"#, options: .regularExpression) != nil
+    }
+
+    func hasBlockBoundaryAfterImage(_ html: String) -> Bool {
+        let trimmed = html.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else { return true }
+        return trimmed.range(of: #"(?i)^(?:<br\s*/?>|</)"#, options: .regularExpression) != nil
+    }
+
+    func rangeAfterAdjacentLineBreaks(in source: NSString, startingAt location: Int) -> NSRange {
+        var currentLocation = location
+        let fullLength = source.length
+        while currentLocation < fullLength {
+            let remaining = source.substring(from: currentLocation)
+            guard let match = Self.adjacentLineBreakRegex.firstMatch(
+                in: remaining,
+                options: [],
+                range: NSRange(location: 0, length: (remaining as NSString).length)
+            ) else {
+                break
+            }
+            currentLocation += match.range.length
+        }
+        return NSRange(location: currentLocation, length: fullLength - currentLocation)
     }
 
     func isStandaloneImageContainer(_ node: XMLElement) -> Bool {

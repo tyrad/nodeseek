@@ -888,7 +888,7 @@ struct PostDetailViewControllerTests {
         #expect(resolvedURL.absoluteString == "https://www.nodeseek.com/post-704174-1")
     }
 
-    @Test func richTextNodeKeepsMeasuredHeightStableAfterNormalImageLoads() throws {
+    @Test func richTextNodeUpdatesMeasuredHeightAfterNormalImageLoads() throws {
         let imageURL = try #require(URL(string: "https://i.111666.best/image/network.webp"))
         let blocks = DTCoreTextHTMLContentRenderer().render(
             fragment: "<p>配图<img src=\"\(imageURL.absoluteString)\" alt=\"image\">正文</p>",
@@ -910,15 +910,54 @@ struct PostDetailViewControllerTests {
         )
 
         let initialHeight = node.layoutThatFits(constrainedSize).size.height
+        let displaySize = DetailImageLayout.presentation(
+            for: CGSize(width: 1200, height: 800),
+            maxWidth: 320,
+            isSticker: false
+        ).size
         let didUpdate = node.updateAttachmentLayout(
             matching: imageURL,
             originalSize: CGSize(width: 1200, height: 800),
-            displaySize: DetailImageLayout.fixedNormalImageSize(maxWidth: 320)
+            displaySize: displaySize
         )
         let updatedHeight = node.layoutThatFits(constrainedSize).size.height
 
         #expect(didUpdate)
-        #expect(updatedHeight == initialHeight)
+        #expect(updatedHeight > initialHeight)
+    }
+
+    @Test func rendererSplitsWideBlockImageBeforeFollowingText() throws {
+        let imageURL = try #require(URL(string: "https://i.111666.best/image/wide.webp"))
+        let blocks = DTCoreTextHTMLContentRenderer().render(
+            fragment: """
+            <p><img src="\(imageURL.absoluteString)" alt="image"><br>
+            6，设置二步验证登录（可选）<br>
+            7，原始邮箱改密及验证，关于 outlook 等不作赘述。</p>
+            <p>本次刚好来自国际知名的瑞士匿名邮箱 protonmail。</p>
+            """,
+            baseURL: URL(string: "https://www.nodeseek.com")!,
+            maxImageWidth: 320
+        )
+        guard case .image(let imageBlock) = blocks.first else {
+            Issue.record("Expected leading block image to be rendered outside rich text")
+            return
+        }
+        let textBlocks = blocks.dropFirst().compactMap { block -> NSAttributedString? in
+            guard case .text(let text) = block else { return nil }
+            return text
+        }
+        let attributedText = try #require(textBlocks.first)
+        let combinedText = textBlocks.map(\.string).joined(separator: "\n")
+
+        let imageLayout = DetailImageBlockLayout.measure(
+            originalSize: CGSize(width: 1200, height: 180),
+            constrainedSize: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
+        )
+
+        #expect(imageBlock.url == imageURL)
+        #expect(imageLayout == CGSize(width: 320, height: 48))
+        #expect(attributedText.string.contains("设置二步验证登录"))
+        #expect(combinedText.contains("protonmail"))
     }
 
     @Test func richTextNodeMeasuresTextAfterImageAndLineBreak() throws {
@@ -931,11 +970,16 @@ struct PostDetailViewControllerTests {
             baseURL: URL(string: "https://www.nodeseek.com")!,
             maxImageWidth: 320
         )
-        let attributedText = try #require(blocks.compactMap { block -> NSAttributedString? in
+        guard case .image(let imageBlock) = blocks.first else {
+            Issue.record("Expected leading block image to be rendered outside rich text")
+            return
+        }
+        let attributedText = try #require(blocks.dropFirst().compactMap { block -> NSAttributedString? in
             guard case .text(let text) = block else { return nil }
             return text
         }.first)
         #expect(attributedText.string.contains("上个月啥都没干"))
+        #expect(imageBlock.url == imageURL)
 
         let node = DetailRichTextNode(
             attributedText: attributedText,
@@ -947,7 +991,7 @@ struct PostDetailViewControllerTests {
             max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
         ))
 
-        #expect(layout.size.height > DetailImageLayout.fixedNormalImageSize(maxWidth: 320).height + 40)
+        #expect(layout.size.height > 40)
     }
 
     @Test func richTextViewUsesVideoStickerViewForVideoStickerAttachment() throws {
@@ -1087,7 +1131,7 @@ struct PostDetailViewControllerTests {
         #expect(options[AVURLAssetHTTPUserAgentKey] as? String == WebRequestFingerprint.userAgent)
     }
 
-    @Test func imageBlockUsesStablePlaceholderHeightForNormalImages() {
+    @Test func imageBlockUpdatesToRealAspectRatioHeightForNormalImages() {
         let initialLayout = DetailImageBlockLayout.measure(
             originalSize: .zero,
             constrainedSize: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
@@ -1099,7 +1143,22 @@ struct PostDetailViewControllerTests {
 
         #expect(initialLayout.width == 320)
         #expect(initialLayout.height == 160)
-        #expect(loadedLayout == initialLayout)
+        #expect(loadedLayout.width == 320)
+        #expect(abs(loadedLayout.height - 214) < 0.01)
+    }
+
+    @Test func imageBlockUsesRealAspectRatioHeightForVeryWideImages() {
+        let layout = DetailImageBlockLayout.measure(
+            originalSize: CGSize(width: 1200, height: 180),
+            constrainedSize: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
+        )
+        let imageFrame = DetailImageBlockLayout.imageFrame(
+            originalSize: CGSize(width: 1200, height: 180),
+            bounds: CGRect(x: 0, y: 0, width: 320, height: layout.height)
+        )
+
+        #expect(layout == CGSize(width: 320, height: 48))
+        #expect(imageFrame == CGRect(x: 0, y: 0, width: 320, height: 48))
     }
 
     @Test func richTextNodeUsesDTCoreTextHeightForFixture() throws {
