@@ -592,6 +592,26 @@ struct PostDetailViewControllerTests {
         #expect(node.debugAuthorAttributedTitle?.string == "ipv4")
     }
 
+    @Test func commentCellShowsPosterBadgeBesideAuthorName() {
+        let comment = Comment(
+            id: "1",
+            authorName: "大油桃",
+            isPoster: true,
+            avatarURL: nil,
+            floorText: "#1",
+            createdAtText: "刚刚",
+            contentHTML: "<p>楼主回复</p>"
+        )
+        let node = CommentCellNode(
+            comment: comment,
+            renderedBody: [],
+            onImageTapped: { _, _ in },
+            onTextLayoutInvalidated: {}
+        )
+
+        #expect(node.debugPosterBadgeAttributedText?.string == "楼主")
+    }
+
     @Test func tableNodeKeepsViewportWidthAndMeasuresContentHeight() {
         let table = RenderedTableBlock(rows: [
             .init(cells: [

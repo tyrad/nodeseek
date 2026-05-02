@@ -27,7 +27,6 @@ enum AppLogLevel: String {
 }
 
 enum AppLog {
-    nonisolated static let accountDebugMessageKey = "message"
     nonisolated private static let subsystem = "com.nodeseek.app"
     nonisolated private static let fileWriter = AppLogFileWriter()
     nonisolated private static let loggers: [AppLogType: Logger] = Dictionary(
@@ -58,18 +57,6 @@ enum AppLog {
 
     nonisolated static func log(_ level: AppLogLevel, _ type: AppLogType, _ message: @autoclosure () -> String) {
         write(level, type, message())
-    }
-
-    nonisolated static func debugPanel(_ type: AppLogType, _ message: @autoclosure () -> String) {
-        let value = message()
-        write(.debug, type, value)
-        #if DEBUG
-        NotificationCenter.default.post(
-            name: .nodeSeekCurrentAccountDebugMessage,
-            object: nil,
-            userInfo: [accountDebugMessageKey: value]
-        )
-        #endif
     }
 
     nonisolated static var fileLogURL: URL {
@@ -190,8 +177,4 @@ private final class AppLogFileWriter: @unchecked Sendable {
     nonisolated private static func timestamp() -> String {
         ISO8601DateFormatter().string(from: Date())
     }
-}
-
-extension Notification.Name {
-    nonisolated static let nodeSeekCurrentAccountDebugMessage = Notification.Name("nodeSeekCurrentAccountDebugMessage")
 }

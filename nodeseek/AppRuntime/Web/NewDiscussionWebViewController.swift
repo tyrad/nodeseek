@@ -8,7 +8,7 @@ import UIKit
 import WebKit
 
 final class NewDiscussionWebViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
-    static let newDiscussionURL = URL(string: "https://www.nodeseek.com/new-discussion")!
+    static let newDiscussionURL = NodeSeekSite.newDiscussionURL
 
     private let targetURL: URL
     private let webView: WKWebView

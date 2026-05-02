@@ -34,17 +34,26 @@ enum PostListCategory: String, CaseIterable, Sendable {
         }
     }
 
-    var pathComponent: String? {
+    private var categoryPathComponent: String {
         switch self {
-        case .all:
-            return nil
-        case .award:
-            return rawValue
         case .df:
             // 站点顶部 DF 对应 dev 频道内容。
             return "dev"
         default:
             return rawValue
+        }
+    }
+
+    func pathComponents(page: Int) -> [String] {
+        let normalized = max(1, page)
+        switch self {
+        case .all:
+            return ["page-\(normalized)"]
+        case .award:
+            return [categoryPathComponent, "page-\(normalized)"]
+        default:
+            guard normalized > 1 else { return ["categories", categoryPathComponent] }
+            return ["categories", categoryPathComponent, "page-\(normalized)"]
         }
     }
 }

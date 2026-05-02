@@ -62,6 +62,11 @@ final class AvatarImageLoader {
         imageView.kf.cancelDownloadTask()
     }
 
+    func clearMemoryCaches() {
+        svgImageCache.removeAllObjects()
+        knownSVGURLs.removeAll()
+    }
+
     nonisolated static func resolveImageURL(
         _ rawValue: String?,
         baseURL: URL = AvatarImageLoader.defaultBaseURL

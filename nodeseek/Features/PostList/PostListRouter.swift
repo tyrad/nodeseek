@@ -44,35 +44,15 @@ class PostListRouter: PostListRouterProtocol {
 
     func navigateToLogin(onClose: @escaping @MainActor () -> Void) {
         let loginViewController = LoginWebViewController(onClose: onClose)
-        if let navigationController = viewController?.navigationController {
-            navigationController.pushViewController(loginViewController, animated: true)
-            return
-        }
-
-        let navigationWrapper = UINavigationController(rootViewController: loginViewController)
-        viewController?.present(navigationWrapper, animated: true)
+        show(loginViewController)
     }
 
     func navigateToUserProfile(profileURL: URL) {
-        let userInfoViewController = UserInfoWebViewController(profileURL: profileURL)
-        if let navigationController = viewController?.navigationController {
-            navigationController.pushViewController(userInfoViewController, animated: true)
-            return
-        }
-
-        let navigationWrapper = UINavigationController(rootViewController: userInfoViewController)
-        viewController?.present(navigationWrapper, animated: true)
+        show(UserInfoWebViewController(profileURL: profileURL))
     }
 
     func navigateToNewDiscussion() {
-        let newDiscussionViewController = NewDiscussionWebViewController()
-        if let navigationController = viewController?.navigationController {
-            navigationController.pushViewController(newDiscussionViewController, animated: true)
-            return
-        }
-
-        let navigationWrapper = UINavigationController(rootViewController: newDiscussionViewController)
-        viewController?.present(navigationWrapper, animated: true)
+        show(NewDiscussionWebViewController())
     }
 
     func navigateToRecentVisitedPosts(visitedStore: VisitedPostStoreProtocol) {
@@ -88,27 +68,40 @@ class PostListRouter: PostListRouterProtocol {
             self?.viewController?.navigationController?.pushViewController(detailViewController, animated: true)
         }
 
-        if let navigationController = viewController?.navigationController {
-            navigationController.pushViewController(recentViewController, animated: true)
-            return
-        }
-
-        let navigationWrapper = UINavigationController(rootViewController: recentViewController)
-        viewController?.present(navigationWrapper, animated: true)
+        show(recentViewController)
     }
 
     #if DEBUG
+    func navigateToSettings(
+        onLogout: @escaping @MainActor () -> Void,
+        onLogFile: @escaping @MainActor () -> Void,
+        onDetailTest: @escaping @MainActor () -> Void
+    ) {
+        show(SettingsViewController(
+            onLogout: onLogout,
+            onLogFile: onLogFile,
+            onDetailTest: onDetailTest
+        ))
+    }
+
     func navigateToLogFile() {
-        let logViewController = LogFileViewController()
+        show(LogFileViewController())
+    }
+    #else
+    func navigateToSettings(onLogout: @escaping @MainActor () -> Void) {
+        show(SettingsViewController(onLogout: onLogout))
+    }
+    #endif
+
+    private func show(_ targetViewController: UIViewController) {
         if let navigationController = viewController?.navigationController {
-            navigationController.pushViewController(logViewController, animated: true)
+            navigationController.pushViewController(targetViewController, animated: true)
             return
         }
 
-        let navigationWrapper = UINavigationController(rootViewController: logViewController)
+        let navigationWrapper = UINavigationController(rootViewController: targetViewController)
         viewController?.present(navigationWrapper, animated: true)
     }
-    #endif
 
     private static func postSummary(from record: VisitedPostRecord) -> PostSummary {
         PostSummary(

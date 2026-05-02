@@ -99,6 +99,48 @@ struct PostListPresenterTests {
         #expect(router.recentVisitedStore === visitedStore)
     }
 
+    @Test func tappingSettingsRoutesToSettingsPage() {
+        let interactor = SpyPostListInteractor()
+        let router = SpyPostListRouter()
+        let presenter = PostListPresenter(interactor: interactor, router: router)
+
+        presenter.didTapSettings()
+
+        #expect(router.navigateToSettingsCount == 1)
+    }
+
+    @Test func settingsLogoutReloadsCurrentCategoryWithoutCache() {
+        let view = SpyPostListView()
+        let interactor = SpyPostListInteractor()
+        let router = SpyPostListRouter()
+        let presenter = PostListPresenter(interactor: interactor, router: router)
+        presenter.setView(view)
+        presenter.viewDidLoad()
+        interactor.loadPostsCallCount = 0
+        interactor.loadPostsCategories.removeAll()
+
+        presenter.didTapSettings()
+        router.onSettingsLogout?()
+
+        #expect(interactor.loadPostsCallCount == 1)
+        #expect(interactor.loadPostsCategories == [.all])
+    }
+
+    @Test func settingsDebugCallbacksReuseExistingLogAndDetailActions() {
+        let view = SpyPostListView()
+        let interactor = SpyPostListInteractor()
+        let router = SpyPostListRouter()
+        let presenter = PostListPresenter(interactor: interactor, router: router)
+        presenter.setView(view)
+
+        presenter.didTapSettings()
+        router.onSettingsLogFile?()
+        router.onSettingsDetailTest?()
+
+        #expect(router.navigateToLogFileCount == 1)
+        #expect(view.events.contains("showDetailTestInput"))
+    }
+
     @Test func recommendedReadingCategoryRendersLast() {
         let view = SpyPostListView()
         let interactor = SpyPostListInteractor()
@@ -698,8 +740,12 @@ private final class SpyPostListRouter: PostListRouterProtocol {
     var userProfileURL: URL?
     var navigateToLoginCount = 0
     var navigateToNewDiscussionCount = 0
+    var navigateToSettingsCount = 0
     var navigateToLogFileCount = 0
     var onLoginClose: (@MainActor () -> Void)?
+    var onSettingsLogout: (@MainActor () -> Void)?
+    var onSettingsLogFile: (@MainActor () -> Void)?
+    var onSettingsDetailTest: (@MainActor () -> Void)?
 
     func navigateToPostDetail(post: PostSummary) {
         selectedPost = post
@@ -721,6 +767,17 @@ private final class SpyPostListRouter: PostListRouterProtocol {
 
     func navigateToNewDiscussion() {
         navigateToNewDiscussionCount += 1
+    }
+
+    func navigateToSettings(
+        onLogout: @escaping @MainActor () -> Void,
+        onLogFile: @escaping @MainActor () -> Void,
+        onDetailTest: @escaping @MainActor () -> Void
+    ) {
+        navigateToSettingsCount += 1
+        onSettingsLogout = onLogout
+        onSettingsLogFile = onLogFile
+        onSettingsDetailTest = onDetailTest
     }
 
     func navigateToUserProfile(profileURL: URL) {

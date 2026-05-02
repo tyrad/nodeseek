@@ -385,7 +385,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
             .map(\.name)
             .sorted() ?? []
         AppLog.info(.webView, "已同步 Cookie 到 WebView，cookieCount=\(cookieNames.count)")
-        AppLog.debugPanel(.account, "webview: cookies count=\(cookieNames.count) names=\(cookieNames.joined(separator: ","))")
+        AppLog.debug(.account, "webview: cookies count=\(cookieNames.count) names=\(cookieNames.joined(separator: ","))")
 
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation

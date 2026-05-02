@@ -115,7 +115,7 @@ struct PostListViewControllerTests {
         #expect(presenter.didRetryFirstPageCount == 1)
     }
 
-    @Test func menuButtonPresentsSideMenuWithAccountHeaderSettingsAndDetailTestButton() throws {
+    @Test func menuButtonPresentsSideMenuWithAccountHeaderSettingsAndMovesDebugEntriesToSettings() throws {
         let presenter = SpyPostListPresenter()
         let viewController = PostListViewController(presenter: presenter)
         viewController.loadViewIfNeeded()
@@ -129,8 +129,6 @@ struct PostListViewControllerTests {
         let nameLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-name-label"))
         let statsLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-stats-label"))
         let accountHeaderButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-account-header-button"))
-        let detailTestButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-detail-test-button"))
-        let logFileButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-log-file-button"))
         let newDiscussionButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-new-discussion-button"))
         let recentVisitedButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-recent-visited-button"))
         let settingsButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-settings-button"))
@@ -147,11 +145,9 @@ struct PostListViewControllerTests {
         #expect(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-login-button") == nil)
         #expect(viewController.view.firstView(accessibilityIdentifier: "post-list-side-menu-account-debug-text-view") == nil)
         #expect(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-account-debug-copy-button") == nil)
+        #expect(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-detail-test-button") == nil)
+        #expect(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-log-file-button") == nil)
         #expect(accountHeaderButton.accessibilityLabel == "登录账号")
-        #expect(detailTestButton.configuration?.title == "详情测试")
-        #expect(detailTestButton.configuration?.image != nil)
-        #expect(logFileButton.configuration?.title == "文件日志")
-        #expect(logFileButton.configuration?.image != nil)
         #expect(newDiscussionButton.configuration?.title == "发帖")
         #expect(newDiscussionButton.configuration?.image != nil)
         #expect(recentVisitedButton.configuration?.title == "最近浏览")
@@ -171,8 +167,6 @@ struct PostListViewControllerTests {
         #expect(accountHeaderButton.frame.contains(avatar.frame))
         #expect(recentVisitedButton.frame.maxY < settingsButton.frame.minY)
         #expect(newDiscussionButton.frame.maxY < recentVisitedButton.frame.minY)
-        #expect(logFileButton.frame.maxY < recentVisitedButton.frame.minY)
-        #expect(detailTestButton.frame.maxY < settingsButton.frame.minY)
         #expect(settingsButton.frame.maxY < viewController.view.bounds.maxY)
 
         UIView.setAnimationsEnabled(false)
@@ -197,21 +191,11 @@ struct PostListViewControllerTests {
         UIView.setAnimationsEnabled(false)
         menuButton.sendActions(for: .touchUpInside)
         viewController.view.layoutIfNeeded()
-        logFileButton.sendActions(for: .touchUpInside)
+        settingsButton.sendActions(for: .touchUpInside)
         viewController.view.layoutIfNeeded()
         UIView.setAnimationsEnabled(animationsWereEnabled)
 
-        #expect(presenter.didTapLogFileCount == 1)
-        #expect(sideMenu.frame.maxX <= 0.5)
-
-        UIView.setAnimationsEnabled(false)
-        menuButton.sendActions(for: .touchUpInside)
-        viewController.view.layoutIfNeeded()
-        detailTestButton.sendActions(for: .touchUpInside)
-        viewController.view.layoutIfNeeded()
-        UIView.setAnimationsEnabled(animationsWereEnabled)
-
-        #expect(presenter.didTapDetailTestCount == 1)
+        #expect(presenter.didTapSettingsCount == 1)
         #expect(sideMenu.frame.maxX <= 0.5)
         #expect(backdrop.isHidden == true)
 
@@ -277,6 +261,7 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
     private(set) var didTapLoginCount = 0
     private(set) var didTapRecentVisitedCount = 0
     private(set) var didTapNewDiscussionCount = 0
+    private(set) var didTapSettingsCount = 0
     private(set) var accountProfileURLs: [URL] = []
     private(set) var didTapLogFileCount = 0
     private(set) var didTapDetailTestCount = 0
@@ -307,6 +292,10 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
 
     func didTapRecentVisited() {
         didTapRecentVisitedCount += 1
+    }
+
+    func didTapSettings() {
+        didTapSettingsCount += 1
     }
 
     func didTapNewDiscussion() {

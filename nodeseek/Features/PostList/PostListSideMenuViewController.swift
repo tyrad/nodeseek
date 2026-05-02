@@ -14,10 +14,7 @@ final class PostListSideMenuViewController: UIViewController {
     var onAccountProfileTapped: ((URL) -> Void)?
     var onNewDiscussionTapped: (() -> Void)?
     var onRecentVisitedTapped: (() -> Void)?
-    #if DEBUG
-    var onLogFileTapped: (() -> Void)?
-    var onDetailTestTapped: (() -> Void)?
-    #endif
+    var onSettingsTapped: (() -> Void)?
     private let accountController: PostListSideMenuAccountController
     private let avatarLoader = AvatarImageLoader.shared
 
@@ -114,21 +111,6 @@ final class PostListSideMenuViewController: UIViewController {
         return button
     }()
 
-    #if DEBUG
-    private let logFileButton: UIButton = {
-        let button = PostListSideMenuViewController.makeMenuButton(title: "文件日志", systemImageName: "doc.text")
-        button.accessibilityIdentifier = "post-list-side-menu-log-file-button"
-        return button
-    }()
-
-    private let detailTestButton: UIButton = {
-        let button = PostListSideMenuViewController.makeMenuButton(title: "详情测试", systemImageName: "doc.text.magnifyingglass")
-        button.accessibilityIdentifier = "post-list-side-menu-detail-test-button"
-        button.isHidden = !NodeSeekDebugConfig.enablePostDetailTestEntry
-        return button
-    }()
-    #endif
-
     init(
         currentAccountStore: CurrentAccountStore = .shared,
         accountRefresher: (any CurrentAccountRefreshing)? = nil,
@@ -220,12 +202,6 @@ final class PostListSideMenuViewController: UIViewController {
         view.isHidden = true
         backdropView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(backdropTapped)))
         accountHeaderButton.addTarget(self, action: #selector(accountHeaderTapped), for: .touchUpInside)
-        #if DEBUG
-        logFileButton.addTarget(self, action: #selector(logFileButtonTapped), for: .touchUpInside)
-        if NodeSeekDebugConfig.enablePostDetailTestEntry {
-            detailTestButton.addTarget(self, action: #selector(detailTestButtonTapped), for: .touchUpInside)
-        }
-        #endif
         settingsButton.addTarget(self, action: #selector(settingsButtonTapped), for: .touchUpInside)
         newDiscussionButton.addTarget(self, action: #selector(newDiscussionButtonTapped), for: .touchUpInside)
         recentVisitedButton.addTarget(self, action: #selector(recentVisitedButtonTapped), for: .touchUpInside)
@@ -236,12 +212,6 @@ final class PostListSideMenuViewController: UIViewController {
         sideMenuView.addSubview(nameLabel)
         sideMenuView.addSubview(statsLabel)
         sideMenuView.addSubview(accountHeaderButton)
-        #if DEBUG
-        if NodeSeekDebugConfig.enablePostDetailTestEntry {
-            sideMenuView.addSubview(detailTestButton)
-        }
-        sideMenuView.addSubview(logFileButton)
-        #endif
         sideMenuView.addSubview(newDiscussionButton)
         sideMenuView.addSubview(recentVisitedButton)
         sideMenuView.addSubview(settingsButton)
@@ -296,26 +266,6 @@ final class PostListSideMenuViewController: UIViewController {
             newDiscussionButton.bottomAnchor.constraint(equalTo: recentVisitedButton.topAnchor, constant: -8),
             newDiscussionButton.heightAnchor.constraint(equalToConstant: 48)
         ])
-
-        #if DEBUG
-        NSLayoutConstraint.activate([
-            logFileButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
-            logFileButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
-            logFileButton.bottomAnchor.constraint(equalTo: newDiscussionButton.topAnchor, constant: -8),
-            logFileButton.heightAnchor.constraint(equalToConstant: 48)
-        ])
-        #endif
-
-        #if DEBUG
-        if NodeSeekDebugConfig.enablePostDetailTestEntry {
-            NSLayoutConstraint.activate([
-                detailTestButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
-                detailTestButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
-                detailTestButton.bottomAnchor.constraint(equalTo: logFileButton.topAnchor, constant: -8),
-                detailTestButton.heightAnchor.constraint(equalToConstant: 48)
-            ])
-        }
-        #endif
     }
 
     @objc private func backdropTapped() {
@@ -334,20 +284,9 @@ final class PostListSideMenuViewController: UIViewController {
         onLoginTapped?()
     }
 
-    #if DEBUG
-    @objc private func logFileButtonTapped() {
-        hide(animated: true)
-        onLogFileTapped?()
-    }
-
-    @objc private func detailTestButtonTapped() {
-        hide(animated: true)
-        onDetailTestTapped?()
-    }
-    #endif
-
     @objc private func settingsButtonTapped() {
         hide(animated: true)
+        onSettingsTapped?()
     }
 
     @objc private func newDiscussionButtonTapped() {

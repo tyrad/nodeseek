@@ -542,6 +542,45 @@ struct KannaNodeSeekParserTests {
         #expect(detail.comments.first?.contentHTML.contains("非 ul/li 评论也要解析") == true)
     }
 
+    @Test func parsesPosterBadgeFromCommentAuthorInfo() throws {
+        let html = """
+        <html>
+        <head><title>测试详情</title></head>
+        <body>
+          <div class="nsk-post">
+            <div class="content-item">
+              <a class="author-name" href="/space/42974">大油桃</a>
+              <article class="post-content"><p>正文</p></article>
+            </div>
+          </div>
+          <ul class="comments">
+            <li class="content-item" id="1" data-comment-id="100">
+              <div class="author-info">
+                <a href="/space/42974" class="author-name">大油桃</a>
+                <span class="is-poster role-tag nsk-badge">楼主</span>
+              </div>
+              <div class="content-info">
+                <span class="date-created">
+                  <time title="2026-05-02 15:27:49" datetime="2026-05-02T07:27:49.000Z">1h 55min ago</time>
+                </span>
+              </div>
+              <article class="post-content"><p>楼主回复</p></article>
+            </li>
+          </ul>
+        </body>
+        </html>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(
+            html: html,
+            url: URL(string: "https://www.nodeseek.com/post-1-1")!
+        )
+
+        let comment = try #require(detail.comments.first)
+        #expect(comment.isPoster)
+    }
+
     @Test func parsesAuthorProfileURLFromAvatarWrapperFallback() throws {
         let html = """
         <html>

@@ -23,7 +23,7 @@ struct NodeSeekService: Sendable {
         self.htmlClient = htmlClient
         self.parser = parser ?? KannaNodeSeekParser(
             baseURL: baseURL,
-            debugLogger: { AppLog.debugPanel(.account, $0) }
+            debugLogger: { AppLog.debug(.account, $0) }
         )
         self.challengeDetector = challengeDetector
     }
@@ -51,23 +51,23 @@ struct NodeSeekService: Sendable {
     func loadAccount() async throws -> NodeSeekResult<AccountResponse> {
         let targetURL = baseURL
         AppLog.info(.service, "开始抓取 NodeSeek 账号信息: \(targetURL.absoluteString)")
-        AppLog.debugPanel(.account, "service: request \(targetURL.absoluteString)")
+        AppLog.debug(.account, "service: request \(targetURL.absoluteString)")
         let response = try await htmlClient.get(targetURL)
         AppLog.info(.service, "账号信息抓取返回 status=\(response.statusCode), htmlLength=\(response.html.count), finalURL=\(response.finalURL.absoluteString)")
-        AppLog.debugPanel(
+        AppLog.debug(
             .account,
             "service: response status=\(response.statusCode) len=\(response.html.count) final=\(response.finalURL.path) userCard=\(response.html.contains("user-card")) usercardMe=\(response.html.contains("usercard-me")) tempScript=\(response.html.contains("temp-script")) capturedConfig=\(response.html.contains("nodeseek-captured-config")) memberID=\(response.html.contains("member_id"))"
         )
 
         if let challenge = challengeDetector.detect(response: response) {
             AppLog.warning(.service, "检测到账号信息 challenge: \(challenge.logDescription)")
-            AppLog.debugPanel(.account, "service: challenge \(challenge.logDescription)")
+            AppLog.debug(.account, "service: challenge \(challenge.logDescription)")
             return .challenge(challenge)
         }
 
         let account = try parser.parseAccount(html: response.html)
         AppLog.info(.service, "账号信息解析完成，loggedIn=\(account.isLoggedIn), displayName=\(account.displayName)")
-        AppLog.debugPanel(.account, "service: parsed loggedIn=\(account.isLoggedIn) name=\(account.displayName) avatar=\(account.avatarURL?.path ?? "nil") profile=\(account.profileURL?.path ?? "nil") stats=\(account.stats.joined(separator: "|"))")
+        AppLog.debug(.account, "service: parsed loggedIn=\(account.isLoggedIn) name=\(account.displayName) avatar=\(account.avatarURL?.path ?? "nil") profile=\(account.profileURL?.path ?? "nil") stats=\(account.stats.joined(separator: "|"))")
         return .value(account)
     }
 
@@ -88,31 +88,9 @@ struct NodeSeekService: Sendable {
     }
 
     private func postListURL(page: Int, category: PostListCategory, sortMode: PostListSortMode) -> URL {
-        let normalized = max(1, page)
-        let url: URL
-        guard let pathComponent = category.pathComponent else {
-            url = baseURL.appendingPathComponent("page-\(normalized)")
-            return url.appendingSortQuery(sortMode)
+        let url = category.pathComponents(page: page).reduce(baseURL) { partialURL, pathComponent in
+            partialURL.appendingPathComponent(pathComponent)
         }
-
-        if category == .award {
-            url = baseURL
-                .appendingPathComponent(pathComponent)
-                .appendingPathComponent("page-\(normalized)")
-            return url.appendingSortQuery(sortMode)
-        }
-
-        if normalized == 1 {
-            url = baseURL
-                .appendingPathComponent("categories")
-                .appendingPathComponent(pathComponent)
-            return url.appendingSortQuery(sortMode)
-        }
-
-        url = baseURL
-            .appendingPathComponent("categories")
-            .appendingPathComponent(pathComponent)
-            .appendingPathComponent("page-\(normalized)")
         return url.appendingSortQuery(sortMode)
     }
 

@@ -32,32 +32,32 @@ actor CurrentAccountRefresher: CurrentAccountRefreshing {
     func refreshIfNeeded(force: Bool = false, maxAge: TimeInterval) async -> AccountResponse? {
         if !force, await store.shouldRefresh(maxAge: maxAge) == false {
             let account = await store.snapshot()?.account
-            AppLog.debugPanel(.account, "refresher: skip, cache fresh -> \(account.debugSummary)")
+            AppLog.debug(.account, "refresher: skip, cache fresh -> \(account.debugSummary)")
             return account
         }
 
         if let inFlightTask {
-            AppLog.debugPanel(.account, "refresher: join in-flight task")
+            AppLog.debug(.account, "refresher: join in-flight task")
             return await inFlightTask.value
         }
 
-        AppLog.debugPanel(.account, "refresher: start loadAccount force=\(force) maxAge=\(Int(maxAge))")
+        AppLog.debug(.account, "refresher: start loadAccount force=\(force) maxAge=\(Int(maxAge))")
         let task = Task<AccountResponse?, Never> {
             do {
                 let result = try await service.loadAccount()
                 switch result {
                 case .value(let account):
                     await store.save(account)
-                    AppLog.debugPanel(.account, "refresher: save -> \(account.debugSummary)")
+                    AppLog.debug(.account, "refresher: save -> \(account.debugSummary)")
                     return account
                 case .challenge:
                     let account = await store.snapshot()?.account
-                    AppLog.debugPanel(.account, "refresher: challenge -> cached \(account.debugSummary)")
+                    AppLog.debug(.account, "refresher: challenge -> cached \(account.debugSummary)")
                     return account
                 }
             } catch {
                 let account = await store.snapshot()?.account
-                AppLog.debugPanel(.account, "refresher: error \(error.localizedDescription) -> cached \(account.debugSummary)")
+                AppLog.debug(.account, "refresher: error \(error.localizedDescription) -> cached \(account.debugSummary)")
                 return account
             }
         }

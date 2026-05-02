@@ -50,6 +50,7 @@ final class CommentCellNode: ASCellNode {
     }
 
     private let authorButtonNode = ASButtonNode()
+    private let posterBadgeNode = ASTextNode()
     private let timeNode = ASTextNode()
     private let floorNode = ASTextNode()
     private let replyButtonNode = ASButtonNode()
@@ -135,6 +136,7 @@ final class CommentCellNode: ASCellNode {
 
     override func layoutSpecThatFits(_ constrainedSize: ASSizeRange) -> ASLayoutSpec {
         authorButtonNode.style.flexShrink = 1
+        posterBadgeNode.style.flexShrink = 0
         timeNode.style.flexShrink = 1
         floorNode.style.flexShrink = 0
         replyButtonNode.style.flexShrink = 0
@@ -147,6 +149,9 @@ final class CommentCellNode: ASCellNode {
         var identityChildren: [ASLayoutElement] = []
         if hasDisplayableAuthor {
             identityChildren.append(authorButtonNode)
+        }
+        if comment.isPoster {
+            identityChildren.append(posterBadgeNode)
         }
         if comment.createdAtText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
             identityChildren.append(timeNode)
@@ -226,6 +231,16 @@ final class CommentCellNode: ASCellNode {
         )
         authorButtonNode.accessibilityLabel = "查看 \(AuthorDisplayPolicy.displayName(from: comment.authorName) ?? "作者") 的主页"
 
+        posterBadgeNode.maximumNumberOfLines = 1
+        posterBadgeNode.attributedText = NSAttributedString(
+            string: "楼主",
+            attributes: [
+                .font: UIFont.preferredFont(forTextStyle: .caption2),
+                .foregroundColor: UIColor.systemOrange
+            ]
+        )
+        posterBadgeNode.accessibilityLabel = "楼主"
+
         timeNode.maximumNumberOfLines = 1
         timeNode.truncationMode = .byTruncatingTail
         timeNode.attributedText = NSAttributedString(
@@ -285,6 +300,10 @@ final class CommentCellNode: ASCellNode {
 
     var debugAuthorAttributedTitle: NSAttributedString? {
         authorButtonNode.attributedTitle(for: .normal)
+    }
+
+    var debugPosterBadgeAttributedText: NSAttributedString? {
+        comment.isPoster ? posterBadgeNode.attributedText : nil
     }
 
     @objc private func replyTapped() {

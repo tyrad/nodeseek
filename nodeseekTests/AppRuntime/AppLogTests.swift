@@ -13,23 +13,6 @@ import UIKit
 @MainActor
 @Suite(.serialized)
 struct AppLogTests {
-    @Test func debugPanelPostsAccountMessageNotification() async throws {
-        var receivedMessage: String?
-        let observer = NotificationCenter.default.addObserver(
-            forName: .nodeSeekCurrentAccountDebugMessage,
-            object: nil,
-            queue: .main
-        ) { notification in
-            receivedMessage = notification.userInfo?[AppLog.accountDebugMessageKey] as? String
-        }
-        defer { NotificationCenter.default.removeObserver(observer) }
-
-        AppLog.debugPanel(.account, "account refresh started")
-        try await Task.sleep(nanoseconds: 20_000_000)
-
-        #expect(receivedMessage == "account refresh started")
-    }
-
     @Test func fileLoggingWritesOnlyWhenDebugSwitchIsEnabled() async throws {
         try withTemporaryFileLogging { directory in
             NodeSeekDebugConfig.enableFileLogging = false

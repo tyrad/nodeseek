@@ -37,6 +37,7 @@ protocol PostListPresenterProtocol: AnyObject {
     func didTapAccountProfile(profileURL: URL)
     func didTapNewDiscussion()
     func didTapRecentVisited()
+    func didTapSettings()
     #if DEBUG
     func didTapLogFile()
     func didTapDetailTest()
@@ -70,6 +71,15 @@ protocol PostListRouterProtocol: AnyObject {
     func navigateToUserProfile(profileURL: URL)
     func navigateToNewDiscussion()
     func navigateToRecentVisitedPosts(visitedStore: VisitedPostStoreProtocol)
+    #if DEBUG
+    func navigateToSettings(
+        onLogout: @escaping @MainActor () -> Void,
+        onLogFile: @escaping @MainActor () -> Void,
+        onDetailTest: @escaping @MainActor () -> Void
+    )
+    #else
+    func navigateToSettings(onLogout: @escaping @MainActor () -> Void)
+    #endif
     #if DEBUG
     func navigateToLogFile()
     #endif

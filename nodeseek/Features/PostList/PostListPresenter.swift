@@ -92,6 +92,26 @@ class PostListPresenter: PostListPresenterProtocol {
         router.navigateToRecentVisitedPosts(visitedStore: visitedStore)
     }
 
+    func didTapSettings() {
+        #if DEBUG
+        router.navigateToSettings(
+            onLogout: { [weak self] in
+                self?.presentCurrentCategory(useCache: false)
+            },
+            onLogFile: { [weak self] in
+                self?.didTapLogFile()
+            },
+            onDetailTest: { [weak self] in
+                self?.didTapDetailTest()
+            }
+        )
+        #else
+        router.navigateToSettings { [weak self] in
+            self?.presentCurrentCategory(useCache: false)
+        }
+        #endif
+    }
+
     #if DEBUG
     func didTapLogFile() {
         router.navigateToLogFile()

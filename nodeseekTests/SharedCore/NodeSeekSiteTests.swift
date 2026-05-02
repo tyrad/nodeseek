@@ -20,6 +20,7 @@ struct NodeSeekSiteTests {
         #expect(NodeSeekSite.allowedCookieDomains == ["nodeseek.com"])
         #expect(NodeSeekSite.referer == "https://www.nodeseek.com/")
         #expect(NodeSeekSite.loginURL.absoluteString == "https://www.nodeseek.com/signIn.html")
+        #expect(NodeSeekSite.newDiscussionURL.absoluteString == "https://www.nodeseek.com/new-discussion")
         #expect(NodeSeekSite.defaultPostListURL.absoluteString == "https://www.nodeseek.com/page-1?sortBy=replyTime")
         #expect(NodeSeekSite.postURL(id: "705039", page: 2).absoluteString == "https://www.nodeseek.com/post-705039-2")
     }

@@ -364,14 +364,9 @@ class PostListViewController: UIViewController {
         sideMenuViewController.onRecentVisitedTapped = { [weak self] in
             self?.presenter.didTapRecentVisited()
         }
-        #if DEBUG
-        sideMenuViewController.onLogFileTapped = { [weak self] in
-            self?.presenter.didTapLogFile()
+        sideMenuViewController.onSettingsTapped = { [weak self] in
+            self?.presenter.didTapSettings()
         }
-        sideMenuViewController.onDetailTestTapped = { [weak self] in
-            self?.presenter.didTapDetailTest()
-        }
-        #endif
         addChild(sideMenuViewController)
         view.addSubview(sideMenuViewController.view)
         sideMenuViewController.view.translatesAutoresizingMaskIntoConstraints = false

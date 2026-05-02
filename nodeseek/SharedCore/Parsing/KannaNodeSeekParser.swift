@@ -468,6 +468,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
             id: id,
             anchorID: item["id"]?.trimmedNonEmpty,
             authorName: authorName,
+            isPoster: item.at_xpath(XPathRules.contentPosterBadge) != nil,
             avatarURL: avatarURL,
             authorProfileURL: authorProfileURL,
             floorText: firstText(in: item, xpaths: [XPathRules.contentFloor]),

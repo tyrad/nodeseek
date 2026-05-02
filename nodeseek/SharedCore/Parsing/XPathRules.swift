@@ -43,6 +43,7 @@ enum XPathRules {
     static let pagerNext = ".//*[contains(@class, 'pager-next') and not(@aria-disabled='true')]"
     static let postDetailNextPage = "//*[contains(@class, 'comment-container')]//a[@rel='next' and contains(@class, 'pager-next')]"
     static let contentAuthor = ".//*[contains(@class, 'author-name')]"
+    static let contentPosterBadge = ".//*[contains(concat(' ', normalize-space(@class), ' '), ' author-info ')]//*[contains(concat(' ', normalize-space(@class), ' '), ' is-poster ') and normalize-space()='楼主']"
     static let contentAuthorProfileLink = ".//*[contains(@class, 'author-name') and @href]"
     static let contentAvatarProfileLink = ".//*[contains(concat(' ', normalize-space(@class), ' '), ' avatar-wrapper ')]//a[contains(@href, '/space/')]"
     static let contentCreatedAt = ".//*[contains(@class, 'date-created')]//time"

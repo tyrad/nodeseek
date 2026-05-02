@@ -133,6 +133,7 @@ struct Comment: Equatable, Sendable {
     let id: String
     let anchorID: String?
     let authorName: String
+    let isPoster: Bool
     let avatarURL: URL?
     let authorProfileURL: URL?
     let floorText: String?
@@ -144,6 +145,7 @@ struct Comment: Equatable, Sendable {
         id: String,
         anchorID: String? = nil,
         authorName: String,
+        isPoster: Bool = false,
         avatarURL: URL?,
         authorProfileURL: URL? = nil,
         floorText: String?,
@@ -154,6 +156,7 @@ struct Comment: Equatable, Sendable {
         self.id = id
         self.anchorID = anchorID
         self.authorName = authorName
+        self.isPoster = isPoster
         self.avatarURL = avatarURL
         self.authorProfileURL = authorProfileURL
         self.floorText = floorText
