@@ -6,6 +6,7 @@
 //
 
 import AsyncDisplayKit
+import UIKit
 
 extension PostDetailViewController {
     var visiblePagination: PostDetailPagination? {
@@ -200,5 +201,9 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
               case .comment(let commentIndex) = rows[indexPath.row] else { return }
         guard comments.indices.contains(commentIndex) else { return }
         scheduleCommentRenderIfNeeded(for: comments[commentIndex])
+    }
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        updateNavigationAuthorVisibility(contentOffsetY: scrollView.contentOffset.y, animated: true)
     }
 }

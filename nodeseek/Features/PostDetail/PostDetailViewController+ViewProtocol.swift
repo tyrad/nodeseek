@@ -83,7 +83,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
     }
 
     func render(detail: PostDetail) {
-        title = "详情"
+        title = nil
         loginButton.isHidden = true
         showsReplyEntry = true
         let targetPage = max(1, detail.page)
@@ -333,7 +333,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
 
     func renderLoginRequired(message: String) {
         cancelPendingInitialContentReveal()
-        title = "详情"
+        title = nil
         loginButton.isHidden = false
         showsReplyEntry = false
         replyComposerMode = .plain

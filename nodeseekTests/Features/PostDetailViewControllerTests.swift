@@ -537,6 +537,33 @@ struct PostDetailViewControllerTests {
         #expect(presenter.loadCount == 2)
     }
 
+    @Test func navigationAuthorTitleUsesHeaderAuthorAndFollowsScrollThreshold() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        viewController.loadViewIfNeeded()
+
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: URL(string: "https://www.nodeseek.com/avatar/34378.png"),
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [],
+        ))
+        await waitForDetailContent(in: viewController, expectedRowCount: 1)
+
+        #expect(viewController.title == nil)
+        #expect(viewController.testNavigationAuthorName() == "ipv4")
+        #expect(viewController.testNavigationAuthorTitleIsVisible == false)
+
+        viewController.updateNavigationAuthorVisibility(contentOffsetY: 84)
+        #expect(viewController.testNavigationAuthorTitleIsVisible)
+
+        viewController.updateNavigationAuthorVisibility(contentOffsetY: 12)
+        #expect(viewController.testNavigationAuthorTitleIsVisible == false)
+    }
+
     @Test func copyCurrentPostLinkCopiesResolvedDetailURL() throws {
         let presenter = SpyPostDetailPresenter()
         let header = PostDetailHeaderContent(
@@ -1710,6 +1737,15 @@ private extension PageScrubberView {
 private extension PostDetailViewController {
     func testRowCount(inSection section: Int) -> Int {
         tableNode(ASTableNode(style: .plain), numberOfRowsInSection: section)
+    }
+
+    var testNavigationAuthorTitleIsVisible: Bool {
+        guard let titleView = navigationItem.titleView else { return false }
+        return titleView.isHidden == false && titleView.alpha > 0.5
+    }
+
+    func testNavigationAuthorName() -> String? {
+        navigationItem.titleView?.firstSubview(of: UILabel.self)?.text
     }
 
     func testHeaderContent() -> PostDetailHeaderContent? {
