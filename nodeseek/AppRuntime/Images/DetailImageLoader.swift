@@ -11,6 +11,16 @@ import ImageIO
 import SwiftDraw
 import UIKit
 
+struct DetailOriginalImagePayload: Equatable {
+    let data: Data
+    let mimeType: String?
+    let suggestedFileExtension: String
+}
+
+enum DetailOriginalImageError: Error, Equatable {
+    case unavailable
+}
+
 final class DetailImageLoader {
     private enum ImageLoadSource: String {
         case dataURL
@@ -110,6 +120,24 @@ final class DetailImageLoader {
                 "preview load source=\(payload.source.rawValue) fallback=\(payload.isFallback) url=\(imageURL.absoluteString) bytes=\(payload.data.count) pixelSize=\(Self.string(from: payload.pixelSize))"
             )
             completion(image ?? Self.fallbackImage)
+        }
+    }
+
+    func loadOriginalImagePayload(
+        for imageURL: URL,
+        completion: @escaping (Result<DetailOriginalImagePayload, DetailOriginalImageError>) -> Void
+    ) {
+        fetchOriginalData(for: imageURL) { payload in
+            guard payload.isFallback == false else {
+                completion(.failure(.unavailable))
+                return
+            }
+
+            completion(.success(DetailOriginalImagePayload(
+                data: payload.data,
+                mimeType: payload.mimeType,
+                suggestedFileExtension: Self.suggestedFileExtension(for: imageURL, mimeType: payload.mimeType)
+            )))
         }
     }
 
@@ -451,6 +479,36 @@ final class DetailImageLoader {
             return imageURL
         }
         return AvatarImageLoader.resolveImageURL(imageURL)
+    }
+
+    static func suggestedFileExtension(for imageURL: URL, mimeType: String?) -> String {
+        let extensionFromURL = imageURL.pathExtension
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        if extensionFromURL.isEmpty == false {
+            return extensionFromURL == "jpeg" ? "jpg" : extensionFromURL
+        }
+
+        switch mimeType?.lowercased().split(separator: ";", maxSplits: 1).first.map(String.init) {
+        case "image/jpeg", "image/jpg":
+            return "jpg"
+        case "image/png":
+            return "png"
+        case "image/gif":
+            return "gif"
+        case "image/webp":
+            return "webp"
+        case "image/heic":
+            return "heic"
+        case "image/heif":
+            return "heif"
+        case "image/tiff":
+            return "tiff"
+        case "image/bmp":
+            return "bmp"
+        default:
+            return "jpg"
+        }
     }
 
     private func completePayload(for url: URL, payload: ImagePayload) {

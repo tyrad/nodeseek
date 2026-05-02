@@ -102,6 +102,49 @@ struct DetailImageLoaderTests {
         #expect(loader.cachedThumbnailData(for: url) == nil)
     }
 
+    @Test func originalImagePayloadPreservesNetworkDataAndSuggestsExtensionFromURL() async throws {
+        let url = try #require(URL(string: "https://images.example.com/photo.webp?token=abc"))
+        let sourceData = try Self.makeNoisyJPEGData(width: 80, height: 60, quality: 0.85)
+        let cacheDirectory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: cacheDirectory) }
+
+        let protocolType = DetailImageURLProtocol.self
+        protocolType.reset()
+        protocolType.stub(data: sourceData, mimeType: "image/webp", for: url)
+        let session = URLSession(configuration: Self.urlSessionConfiguration(protocolType: protocolType))
+        let loader = DetailImageLoader(session: session, cacheDirectory: cacheDirectory)
+
+        let payload = try await Self.loadOriginalImagePayload(loader: loader, url: url)
+
+        #expect(payload.data == sourceData)
+        #expect(payload.mimeType == "image/webp")
+        #expect(payload.suggestedFileExtension == "webp")
+        #expect(protocolType.totalRequestCount() == 1)
+    }
+
+    @Test func suggestedFileExtensionUsesMimeTypeWhenURLHasNoExtension() throws {
+        let url = try #require(URL(string: "https://images.example.com/download?id=1"))
+
+        #expect(DetailImageLoader.suggestedFileExtension(for: url, mimeType: "image/png") == "png")
+        #expect(DetailImageLoader.suggestedFileExtension(for: url, mimeType: "image/jpeg; charset=binary") == "jpg")
+    }
+
+    @Test func originalImagePayloadFailsForInvalidImageDataInsteadOfReturningFallback() async throws {
+        let url = try #require(URL(string: "https://images.example.com/broken.gif"))
+        let cacheDirectory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: cacheDirectory) }
+
+        let protocolType = DetailImageURLProtocol.self
+        protocolType.reset()
+        protocolType.stub(data: Data("<html>not an image</html>".utf8), mimeType: "text/html", for: url)
+        let session = URLSession(configuration: Self.urlSessionConfiguration(protocolType: protocolType))
+        let loader = DetailImageLoader(session: session, cacheDirectory: cacheDirectory)
+
+        await #expect(throws: DetailOriginalImageError.unavailable) {
+            try await Self.loadOriginalImagePayload(loader: loader, url: url)
+        }
+    }
+
     @Test func clearsDetailImageDiskAndMemoryCaches() async throws {
         let url = try #require(URL(string: "https://images.example.com/clear.jpg"))
         let sourceData = try Self.makeNoisyJPEGData(width: 900, height: 700, quality: 0.9)
@@ -150,6 +193,17 @@ struct DetailImageLoaderTests {
         await withCheckedContinuation { continuation in
             loader.loadImageForPreview(url) { image in
                 continuation.resume(returning: image)
+            }
+        }
+    }
+
+    private static func loadOriginalImagePayload(
+        loader: DetailImageLoader,
+        url: URL
+    ) async throws -> DetailOriginalImagePayload {
+        try await withCheckedThrowingContinuation { continuation in
+            loader.loadOriginalImagePayload(for: url) { result in
+                continuation.resume(with: result)
             }
         }
     }
@@ -253,12 +307,12 @@ private final class DetailImageURLProtocol: URLProtocol, @unchecked Sendable {
             return
         }
 
-        let response = HTTPURLResponse(
+        let response = URLResponse(
             url: url,
-            statusCode: 200,
-            httpVersion: nil,
-            headerFields: ["Content-Type": stub.mimeType]
-        )!
+            mimeType: stub.mimeType,
+            expectedContentLength: stub.data.count,
+            textEncodingName: nil
+        )
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: stub.data)
         client?.urlProtocolDidFinishLoading(self)
