@@ -43,6 +43,16 @@ extension PostDetailViewController {
         present(activityViewController, animated: true)
     }
 
+    func copyCurrentPostLink() {
+        guard let targetURL = resolvedDetailURL() else {
+            showError(message: "当前帖子链接无效，暂时无法复制。")
+            return
+        }
+
+        UIPasteboard.general.string = targetURL.absoluteString
+        showToast(message: "已复制链接")
+    }
+
     func handleContentLinkTap(_ url: URL) {
         guard let destination = PostDetailLinkResolver.destination(
             for: url,

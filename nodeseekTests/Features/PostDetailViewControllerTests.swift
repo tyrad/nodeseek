@@ -451,8 +451,31 @@ struct PostDetailViewControllerTests {
         #expect(items.count == 2)
         let moreButton = try #require(items.first { $0.accessibilityLabel == "更多" })
         _ = try #require(moreButton.menu?.children.first { $0.title == "刷新" } as? UIAction)
+        _ = try #require(moreButton.menu?.children.first { $0.title == "复制链接" } as? UIAction)
         viewController.refreshTapped()
         #expect(presenter.loadCount == 2)
+    }
+
+    @Test func copyCurrentPostLinkCopiesResolvedDetailURL() throws {
+        let presenter = SpyPostDetailPresenter()
+        let header = PostDetailHeaderContent(
+            postID: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚"
+        )
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            initialHeader: header,
+            currentPage: 2
+        )
+        viewController.loadViewIfNeeded()
+        UIPasteboard.general.string = nil
+
+        viewController.copyCurrentPostLink()
+
+        #expect(UIPasteboard.general.string == "https://www.nodeseek.com/post-703863-2")
     }
 
     @Test func detailTextureCellsCanBeConstructedOffMainThread() async throws {

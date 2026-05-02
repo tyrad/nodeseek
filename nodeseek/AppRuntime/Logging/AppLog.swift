@@ -37,23 +37,27 @@ enum AppLog {
     )
 
     nonisolated static func debug(_ type: AppLogType, _ message: @autoclosure () -> String) {
-        write(.debug, type, message())
+        log(.debug, type, message())
     }
 
     nonisolated static func info(_ type: AppLogType, _ message: @autoclosure () -> String) {
-        write(.info, type, message())
+        log(.info, type, message())
     }
 
     nonisolated static func notice(_ type: AppLogType, _ message: @autoclosure () -> String) {
-        write(.notice, type, message())
+        log(.notice, type, message())
     }
 
     nonisolated static func warning(_ type: AppLogType, _ message: @autoclosure () -> String) {
-        write(.warning, type, message())
+        log(.warning, type, message())
     }
 
     nonisolated static func error(_ type: AppLogType, _ message: @autoclosure () -> String) {
-        write(.error, type, message())
+        log(.error, type, message())
+    }
+
+    nonisolated static func log(_ level: AppLogLevel, _ type: AppLogType, _ message: @autoclosure () -> String) {
+        write(level, type, message())
     }
 
     nonisolated static func debugPanel(_ type: AppLogType, _ message: @autoclosure () -> String) {
@@ -74,6 +78,10 @@ enum AppLog {
 
     nonisolated static func fileLogContent() throws -> String {
         try fileWriter.readContent()
+    }
+
+    nonisolated static func deleteFileLog() throws {
+        try fileWriter.deleteLogFile()
     }
 
     #if DEBUG
@@ -147,6 +155,14 @@ private final class AppLogFileWriter: @unchecked Sendable {
                 return ""
             }
             return try String(contentsOf: logURL, encoding: .utf8)
+        }
+    }
+
+    nonisolated func deleteLogFile() throws {
+        try queue.sync {
+            let logURL = Self.logURL(in: directoryOverride ?? Self.defaultDirectory())
+            guard FileManager.default.fileExists(atPath: logURL.path) else { return }
+            try FileManager.default.removeItem(at: logURL)
         }
     }
 

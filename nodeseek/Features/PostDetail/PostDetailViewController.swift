@@ -396,10 +396,16 @@ class PostDetailViewController: UIViewController {
         ) { [weak self] _ in
             self?.shareCurrentPost(sourceItem: moreButton)
         }
+        let copyLinkAction = UIAction(
+            title: "复制链接",
+            image: UIImage(systemName: "link")
+        ) { [weak self] _ in
+            self?.copyCurrentPostLink()
+        }
 
         moreButton = UIBarButtonItem(
             image: UIImage(systemName: "ellipsis.circle"),
-            menu: UIMenu(children: [refreshAction, shareAction])
+            menu: UIMenu(children: [refreshAction, copyLinkAction, shareAction])
         )
         moreButton?.accessibilityLabel = "更多"
 

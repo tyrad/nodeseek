@@ -27,21 +27,24 @@ final class LogFileViewController: UIViewController {
         title = "文件日志"
         view.backgroundColor = .systemBackground
         navigationItem.largeTitleDisplayMode = .never
-        let copyButton = UIBarButtonItem(
-            image: UIImage(systemName: "doc.on.doc"),
-            style: .plain,
-            target: self,
-            action: #selector(copyButtonTapped)
-        )
-        let refreshButton = UIBarButtonItem(
-            image: UIImage(systemName: "arrow.clockwise"),
-            style: .plain,
-            target: self,
-            action: #selector(refreshButtonTapped)
-        )
-        copyButton.accessibilityLabel = "复制文件日志"
-        refreshButton.accessibilityLabel = "刷新文件日志"
-        navigationItem.rightBarButtonItems = [copyButton, refreshButton]
+        navigationItem.rightBarButtonItems = [
+            makeBarButton(
+                systemName: "trash",
+                accessibilityLabel: "删除文件日志",
+                action: #selector(deleteButtonTapped),
+                tintColor: .systemRed
+            ),
+            makeBarButton(
+                systemName: "doc.on.doc",
+                accessibilityLabel: "复制文件日志",
+                action: #selector(copyButtonTapped)
+            ),
+            makeBarButton(
+                systemName: "arrow.clockwise",
+                accessibilityLabel: "刷新文件日志",
+                action: #selector(refreshButtonTapped)
+            )
+        ]
 
         view.addSubview(textView)
         NSLayoutConstraint.activate([
@@ -53,6 +56,23 @@ final class LogFileViewController: UIViewController {
         reloadContent()
     }
 
+    private func makeBarButton(
+        systemName: String,
+        accessibilityLabel: String,
+        action: Selector,
+        tintColor: UIColor? = nil
+    ) -> UIBarButtonItem {
+        let button = UIBarButtonItem(
+            image: UIImage(systemName: systemName),
+            style: .plain,
+            target: self,
+            action: action
+        )
+        button.accessibilityLabel = accessibilityLabel
+        button.tintColor = tintColor
+        return button
+    }
+
     @objc private func refreshButtonTapped() {
         reloadContent()
     }
@@ -61,22 +81,56 @@ final class LogFileViewController: UIViewController {
         UIPasteboard.general.string = textView.text
     }
 
+    @objc private func deleteButtonTapped() {
+        let alert = UIAlertController(
+            title: "删除日志文件？",
+            message: "将删除当前 DEBUG 文件日志，操作不可撤销。",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { [weak self] _ in
+            self?.deleteLogFile()
+        })
+        present(alert, animated: true)
+    }
+
+    private func deleteLogFile() {
+        do {
+            try AppLog.deleteFileLog()
+            reloadContent()
+        } catch {
+            textView.text = "删除文件日志失败：\(error.localizedDescription)"
+        }
+    }
+
     private func reloadContent() {
         #if DEBUG
         let pathLine = "路径：\(AppLog.fileLogURL.path)"
         if NodeSeekDebugConfig.enableFileLogging == false {
             textView.text = "文件日志未开启\n\(pathLine)\n\n将 NodeSeekDebugConfig.enableFileLogging 设为 true 后，新的 AppLog 记录会写入这里。"
+            scrollToBottom()
             return
         }
 
         do {
             let content = try AppLog.fileLogContent()
             textView.text = content.isEmpty ? "暂无文件日志\n\(pathLine)" : "\(pathLine)\n\n\(content)"
+            scrollToBottom()
         } catch {
             textView.text = "读取文件日志失败：\(error.localizedDescription)\n\(pathLine)"
         }
         #else
         textView.text = "文件日志只在 DEBUG 环境可用。"
+        scrollToBottom()
         #endif
+    }
+
+    private func scrollToBottom() {
+        let textLength = (textView.text as NSString).length
+        guard textLength > 0 else { return }
+        let bottomRange = NSRange(location: textLength - 1, length: 1)
+        DispatchQueue.main.async { [weak self] in
+            self?.textView.scrollRangeToVisible(bottomRange)
+        }
     }
 }

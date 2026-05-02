@@ -9,7 +9,10 @@ import UIKit
 
 struct NodeSeekDebugConfig {
     #if DEBUG
-    private nonisolated static let storage = NodeSeekDebugConfigStorage(fileLoggingEnabled: true)
+    private nonisolated static let storage = NodeSeekDebugConfigStorage(
+        fileLoggingEnabled: true,
+        avatarImageLoggingEnabled: false
+    )
 
     static let enablePostDetailTestEntry = true
     static let enableWebViewDebugOverlay = false
@@ -18,11 +21,16 @@ struct NodeSeekDebugConfig {
         get { storage.fileLoggingEnabled }
         set { storage.fileLoggingEnabled = newValue }
     }
+    nonisolated static var enableAvatarImageLogs: Bool {
+        get { storage.avatarImageLoggingEnabled }
+        set { storage.avatarImageLoggingEnabled = newValue }
+    }
     #else
     static let enablePostDetailTestEntry = false
     static let enableWebViewDebugOverlay = false
     static let enableDetailRenderDiagnostics = false
     static let enableFileLogging = false
+    static let enableAvatarImageLogs = false
     #endif
 
     static let webViewDebugOverlaySize = CGSize(width: 180, height: 120)
@@ -33,24 +41,37 @@ struct NodeSeekDebugConfig {
 #if DEBUG
 private final class NodeSeekDebugConfigStorage: @unchecked Sendable {
     private let lock = NSLock()
-    // 只允许通过 fileLoggingEnabled 访问，NSLock 负责同步测试和后台日志线程。
+    // 只允许通过下方属性访问，NSLock 负责同步测试和后台日志线程。
     nonisolated(unsafe) private var _fileLoggingEnabled: Bool
+    nonisolated(unsafe) private var _avatarImageLoggingEnabled: Bool
 
-    init(fileLoggingEnabled: Bool) {
+    init(fileLoggingEnabled: Bool, avatarImageLoggingEnabled: Bool) {
         _fileLoggingEnabled = fileLoggingEnabled
+        _avatarImageLoggingEnabled = avatarImageLoggingEnabled
     }
 
     nonisolated var fileLoggingEnabled: Bool {
         get {
-            lock.lock()
-            defer { lock.unlock() }
-            return _fileLoggingEnabled
+            withLock { _fileLoggingEnabled }
         }
         set {
-            lock.lock()
-            defer { lock.unlock() }
-            _fileLoggingEnabled = newValue
+            withLock { _fileLoggingEnabled = newValue }
         }
+    }
+
+    nonisolated var avatarImageLoggingEnabled: Bool {
+        get {
+            withLock { _avatarImageLoggingEnabled }
+        }
+        set {
+            withLock { _avatarImageLoggingEnabled = newValue }
+        }
+    }
+
+    nonisolated private func withLock<T>(_ body: () throws -> T) rethrows -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return try body()
     }
 }
 #endif
