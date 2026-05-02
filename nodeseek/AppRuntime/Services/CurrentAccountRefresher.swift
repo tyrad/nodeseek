@@ -32,32 +32,32 @@ actor CurrentAccountRefresher: CurrentAccountRefreshing {
     func refreshIfNeeded(force: Bool = false, maxAge: TimeInterval) async -> AccountResponse? {
         if !force, await store.shouldRefresh(maxAge: maxAge) == false {
             let account = await store.snapshot()?.account
-            CurrentAccountDebugLog.post("refresher: skip, cache fresh -> \(account.debugSummary)")
+            AppLog.debugPanel(.account, "refresher: skip, cache fresh -> \(account.debugSummary)")
             return account
         }
 
         if let inFlightTask {
-            CurrentAccountDebugLog.post("refresher: join in-flight task")
+            AppLog.debugPanel(.account, "refresher: join in-flight task")
             return await inFlightTask.value
         }
 
-        CurrentAccountDebugLog.post("refresher: start loadAccount force=\(force) maxAge=\(Int(maxAge))")
+        AppLog.debugPanel(.account, "refresher: start loadAccount force=\(force) maxAge=\(Int(maxAge))")
         let task = Task<AccountResponse?, Never> {
             do {
                 let result = try await service.loadAccount()
                 switch result {
                 case .value(let account):
                     await store.save(account)
-                    CurrentAccountDebugLog.post("refresher: save -> \(account.debugSummary)")
+                    AppLog.debugPanel(.account, "refresher: save -> \(account.debugSummary)")
                     return account
                 case .challenge:
                     let account = await store.snapshot()?.account
-                    CurrentAccountDebugLog.post("refresher: challenge -> cached \(account.debugSummary)")
+                    AppLog.debugPanel(.account, "refresher: challenge -> cached \(account.debugSummary)")
                     return account
                 }
             } catch {
                 let account = await store.snapshot()?.account
-                CurrentAccountDebugLog.post("refresher: error \(error.localizedDescription) -> cached \(account.debugSummary)")
+                AppLog.debugPanel(.account, "refresher: error \(error.localizedDescription) -> cached \(account.debugSummary)")
                 return account
             }
         }
@@ -70,21 +70,6 @@ actor CurrentAccountRefresher: CurrentAccountRefreshing {
 
 extension Notification.Name {
     static let nodeSeekLoginSessionDidClose = Notification.Name("nodeSeekLoginSessionDidClose")
-    static let nodeSeekCurrentAccountDebugMessage = Notification.Name("nodeSeekCurrentAccountDebugMessage")
-}
-
-enum CurrentAccountDebugLog {
-    static let messageKey = "message"
-
-    nonisolated static func post(_ message: String) {
-        #if DEBUG
-        NotificationCenter.default.post(
-            name: .nodeSeekCurrentAccountDebugMessage,
-            object: nil,
-            userInfo: [messageKey: message]
-        )
-        #endif
-    }
 }
 
 private extension Optional where Wrapped == AccountResponse {

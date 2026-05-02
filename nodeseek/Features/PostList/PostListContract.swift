@@ -36,6 +36,7 @@ protocol PostListPresenterProtocol: AnyObject {
     func didTapLogin()
     func didTapRecentVisited()
     #if DEBUG
+    func didTapLogFile()
     func didTapDetailTest()
     func didSubmitDetailTestURL(_ rawURL: String)
     #endif
@@ -65,4 +66,7 @@ protocol PostListRouterProtocol: AnyObject {
     func navigateToPostDetail(post: PostSummary, page: Int)
     func navigateToLogin(onClose: @escaping @MainActor () -> Void)
     func navigateToRecentVisitedPosts(visitedStore: VisitedPostStoreProtocol)
+    #if DEBUG
+    func navigateToLogFile()
+    #endif
 }

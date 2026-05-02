@@ -4,11 +4,9 @@
 //
 
 import Foundation
-import OSLog
 
 struct HiddenWebViewCommentSubmissionClient {
     private let timeoutInterval: TimeInterval
-    private let logger = Logger(subsystem: "com.nodeseek.app", category: "HiddenWebViewCommentSubmission")
 
     init(timeoutInterval: TimeInterval = 20) {
         self.timeoutInterval = timeoutInterval
@@ -17,7 +15,7 @@ struct HiddenWebViewCommentSubmissionClient {
     func submitComment(postID: Int, content: String, referer: URL) async throws -> CommentAutomationResponse {
         let requestLock = HiddenWebViewRequestLock.shared
         await requestLock.acquire()
-        logger.info("准备通过隐藏 WebView 模拟评论提交: postID=\(postID), referer=\(referer.absoluteString)")
+        AppLog.info(.webView, "准备通过隐藏 WebView 模拟评论提交: postID=\(postID), referer=\(referer.absoluteString)")
         do {
             let loader = await MainActor.run {
                 HiddenWebViewLoader.shared

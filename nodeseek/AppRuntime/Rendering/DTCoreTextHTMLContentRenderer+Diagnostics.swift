@@ -8,13 +8,12 @@
 import DTCoreText
 import Foundation
 import Kanna
-import OSLog
 import UIKit
 
 extension DTCoreTextHTMLContentRenderer {
     func logDiagnostics(_ message: String) {
         guard NodeSeekDebugConfig.enableDetailRenderDiagnostics else { return }
-        Self.logger.info("\(message, privacy: .public)")
+        AppLog.info(.rendering, message)
     }
 
     func attachmentDiagnostics(in attributedText: NSAttributedString) -> String {

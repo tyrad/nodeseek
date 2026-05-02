@@ -122,7 +122,7 @@ final class PostListSideMenuAccountController {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            let message = notification.userInfo?[CurrentAccountDebugLog.messageKey] as? String
+            let message = notification.userInfo?[AppLog.accountDebugMessageKey] as? String
             Task { @MainActor [weak self, message] in
                 guard let self, let message else { return }
                 self.appendDebug(message)

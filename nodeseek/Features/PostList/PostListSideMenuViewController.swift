@@ -13,6 +13,7 @@ final class PostListSideMenuViewController: UIViewController {
     var onLoginTapped: (() -> Void)?
     var onRecentVisitedTapped: (() -> Void)?
     #if DEBUG
+    var onLogFileTapped: (() -> Void)?
     var onDetailTestTapped: (() -> Void)?
     #endif
     private let accountController: PostListSideMenuAccountController
@@ -158,6 +159,22 @@ final class PostListSideMenuViewController: UIViewController {
     #endif
 
     #if DEBUG
+    private let logFileButton: UIButton = {
+        let button = UIButton(type: .system)
+        let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+        var configuration = UIButton.Configuration.plain()
+        configuration.image = UIImage(systemName: "doc.text", withConfiguration: symbolConfiguration)
+        configuration.imagePadding = 10
+        configuration.baseForegroundColor = .label
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)
+        configuration.title = "文件日志"
+        button.configuration = configuration
+        button.contentHorizontalAlignment = .leading
+        button.accessibilityIdentifier = "post-list-side-menu-log-file-button"
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     private let detailTestButton: UIButton = {
         let button = UIButton(type: .system)
         let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
@@ -259,6 +276,7 @@ final class PostListSideMenuViewController: UIViewController {
         accountHeaderButton.addTarget(self, action: #selector(accountHeaderTapped), for: .touchUpInside)
         #if DEBUG
         accountDebugCopyButton.addTarget(self, action: #selector(copyAccountDebugLogTapped), for: .touchUpInside)
+        logFileButton.addTarget(self, action: #selector(logFileButtonTapped), for: .touchUpInside)
         if NodeSeekDebugConfig.enablePostDetailTestEntry {
             detailTestButton.addTarget(self, action: #selector(detailTestButtonTapped), for: .touchUpInside)
         }
@@ -280,6 +298,7 @@ final class PostListSideMenuViewController: UIViewController {
         if NodeSeekDebugConfig.enablePostDetailTestEntry {
             sideMenuView.addSubview(detailTestButton)
         }
+        sideMenuView.addSubview(logFileButton)
         #endif
         sideMenuView.addSubview(recentVisitedButton)
         sideMenuView.addSubview(settingsButton)
@@ -332,6 +351,11 @@ final class PostListSideMenuViewController: UIViewController {
 
         #if DEBUG
         NSLayoutConstraint.activate([
+            logFileButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
+            logFileButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
+            logFileButton.bottomAnchor.constraint(equalTo: recentVisitedButton.topAnchor, constant: -8),
+            logFileButton.heightAnchor.constraint(equalToConstant: 48),
+
             accountDebugCopyButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
             accountDebugCopyButton.topAnchor.constraint(equalTo: accountHeaderButton.bottomAnchor, constant: 14),
             accountDebugCopyButton.heightAnchor.constraint(equalToConstant: 32),
@@ -340,7 +364,7 @@ final class PostListSideMenuViewController: UIViewController {
             accountDebugTextView.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
             accountDebugTextView.topAnchor.constraint(equalTo: accountDebugCopyButton.bottomAnchor, constant: 6),
             accountDebugTextView.heightAnchor.constraint(greaterThanOrEqualToConstant: 120),
-            accountDebugTextView.bottomAnchor.constraint(lessThanOrEqualTo: recentVisitedButton.topAnchor, constant: -12)
+            accountDebugTextView.bottomAnchor.constraint(lessThanOrEqualTo: logFileButton.topAnchor, constant: -12)
         ])
         #endif
 
@@ -349,7 +373,7 @@ final class PostListSideMenuViewController: UIViewController {
             NSLayoutConstraint.activate([
                 detailTestButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
                 detailTestButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
-                detailTestButton.bottomAnchor.constraint(equalTo: recentVisitedButton.topAnchor, constant: -8),
+                detailTestButton.bottomAnchor.constraint(equalTo: logFileButton.topAnchor, constant: -8),
                 detailTestButton.heightAnchor.constraint(equalToConstant: 48),
                 accountDebugTextView.bottomAnchor.constraint(lessThanOrEqualTo: detailTestButton.topAnchor, constant: -12)
             ])
@@ -374,6 +398,11 @@ final class PostListSideMenuViewController: UIViewController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
             self?.accountDebugCopyButton.configuration?.title = "复制日志"
         }
+    }
+
+    @objc private func logFileButtonTapped() {
+        hide(animated: true)
+        onLogFileTapped?()
     }
 
     @objc private func detailTestButtonTapped() {

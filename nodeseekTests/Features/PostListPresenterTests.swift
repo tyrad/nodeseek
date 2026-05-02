@@ -99,6 +99,18 @@ struct PostListPresenterTests {
         #expect(router.recentVisitedStore === visitedStore)
     }
 
+    @Test func tappingLogFileRoutesToLogFileViewer() {
+        let view = SpyPostListView()
+        let interactor = SpyPostListInteractor()
+        let router = SpyPostListRouter()
+        let presenter = PostListPresenter(interactor: interactor, router: router)
+        presenter.setView(view)
+
+        presenter.didTapLogFile()
+
+        #expect(router.navigateToLogFileCount == 1)
+    }
+
     @Test func submittingDetailTestURLNavigatesToParsedPostPage() throws {
         let view = SpyPostListView()
         let interactor = SpyPostListInteractor()
@@ -651,6 +663,7 @@ private final class SpyPostListRouter: PostListRouterProtocol {
     var selectedPage: Int?
     var recentVisitedStore: VisitedPostStoreProtocol?
     var navigateToLoginCount = 0
+    var navigateToLogFileCount = 0
     var onLoginClose: (@MainActor () -> Void)?
 
     func navigateToPostDetail(post: PostSummary) {
@@ -669,6 +682,10 @@ private final class SpyPostListRouter: PostListRouterProtocol {
 
     func navigateToRecentVisitedPosts(visitedStore: VisitedPostStoreProtocol) {
         recentVisitedStore = visitedStore
+    }
+
+    func navigateToLogFile() {
+        navigateToLogFileCount += 1
     }
 
 }

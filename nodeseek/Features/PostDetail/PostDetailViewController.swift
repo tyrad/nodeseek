@@ -7,7 +7,6 @@
 
 import UIKit
 import AsyncDisplayKit
-import OSLog
 
 enum PostDetailLinkDestination {
     case currentPageAnchor(String)
@@ -117,8 +116,6 @@ enum PostDetailLinkResolver {
 }
 
 class PostDetailViewController: UIViewController {
-    static let detailRenderLogger = Logger(subsystem: "com.nodeseek.app", category: "DetailRenderPipeline")
-
     enum DisplayMode {
         case content
         case pageSkeleton

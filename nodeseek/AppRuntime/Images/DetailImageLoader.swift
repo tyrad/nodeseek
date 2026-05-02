@@ -8,7 +8,6 @@
 import Foundation
 import CryptoKit
 import ImageIO
-import OSLog
 import SwiftDraw
 import UIKit
 
@@ -63,7 +62,6 @@ final class DetailImageLoader {
         static let thumbnailMinimumPixelSide: CGFloat = 64
     }
 
-    private let logger = Logger(subsystem: "com.nodeseek.app", category: "DetailImageLoader")
     private let session: URLSession
     private let cacheDirectory: URL
     private let optimizationModeProvider: () -> DetailImageOptimizationMode
@@ -245,7 +243,7 @@ final class DetailImageLoader {
     ) {
         let pixelSide = max(1, Int(ceil(maxPixelSide)))
         guard let resolvedURL = resolvedCacheURL(for: imageURL) else {
-            logger.error("attachment URL 非法，使用兜底图 url=\(imageURL.absoluteString, privacy: .public)")
+            AppLog.error(.image, "attachment URL 非法，使用兜底图 url=\(imageURL.absoluteString)")
             completion(Self.fallbackImage)
             return
         }
@@ -325,7 +323,7 @@ final class DetailImageLoader {
         }
 
         guard let resolvedURL = AvatarImageLoader.resolveImageURL(imageURL) else {
-            logger.error("attachment URL 非法，使用兜底图 url=\(imageURL.absoluteString, privacy: .public)")
+            AppLog.error(.image, "attachment URL 非法，使用兜底图 url=\(imageURL.absoluteString)")
             completion(Self.fallbackPayload)
             return
         }
@@ -382,7 +380,7 @@ final class DetailImageLoader {
         }
 
         guard let resolvedURL = AvatarImageLoader.resolveImageURL(imageURL) else {
-            logger.error("attachment URL 非法，使用兜底图 url=\(imageURL.absoluteString, privacy: .public)")
+            AppLog.error(.image, "attachment URL 非法，使用兜底图 url=\(imageURL.absoluteString)")
             completion(Self.fallbackDataPayload(source: .network))
             return
         }
@@ -472,25 +470,19 @@ final class DetailImageLoader {
         error: Error?
     ) -> ImagePayload {
         guard let data else {
-            logger.error(
-                "attachment 下载失败，使用兜底图 url=\(resolvedURL.absoluteString, privacy: .public), error=\(error?.localizedDescription ?? "unknown", privacy: .public)"
-            )
+            AppLog.error(.image, "attachment 下载失败，使用兜底图 url=\(resolvedURL.absoluteString), error=\(error?.localizedDescription ?? "unknown")")
             return Self.fallbackPayload
         }
 
         if dataLooksLikeHTML(data) {
-            logger.error(
-                "attachment 返回HTML内容，使用兜底图 url=\(resolvedURL.absoluteString, privacy: .public), bytes=\(data.count, privacy: .public), snippet=\(self.snippet(from: data), privacy: .public)"
-            )
+            AppLog.error(.image, "attachment 返回HTML内容，使用兜底图 url=\(resolvedURL.absoluteString), bytes=\(data.count), snippet=\(self.snippet(from: data))")
             return Self.fallbackPayload
         }
 
         let image = decodedImage(data: data, mimeType: mimeType)
 
         guard let image else {
-            logger.error(
-                "attachment 图片解码失败，使用兜底图 url=\(resolvedURL.absoluteString, privacy: .public), bytes=\(data.count, privacy: .public), mime=\(mimeType ?? "unknown", privacy: .public)"
-            )
+            AppLog.error(.image, "attachment 图片解码失败，使用兜底图 url=\(resolvedURL.absoluteString), bytes=\(data.count), mime=\(mimeType ?? "unknown")")
             return Self.fallbackPayload
         }
 
@@ -501,21 +493,15 @@ final class DetailImageLoader {
               imageSize.height > 0,
               imageSize.width <= Limits.maxPixelSide,
               imageSize.height <= Limits.maxPixelSide else {
-            logger.error(
-                "attachment 图片尺寸异常，使用兜底图 url=\(resolvedURL.absoluteString, privacy: .public), size=\(NSCoder.string(for: imageSize), privacy: .public), bytes=\(data.count, privacy: .public), mime=\(mimeType ?? "unknown", privacy: .public)"
-            )
+            AppLog.error(.image, "attachment 图片尺寸异常，使用兜底图 url=\(resolvedURL.absoluteString), size=\(NSCoder.string(for: imageSize)), bytes=\(data.count), mime=\(mimeType ?? "unknown")")
             return Self.fallbackPayload
         }
 
         if let mimeType, mimeType.lowercased().hasPrefix("image/") == false {
-            logger.warning(
-                "attachment MIME非image但已解码成功，继续展示 url=\(resolvedURL.absoluteString, privacy: .public), mime=\(mimeType, privacy: .public)"
-            )
+            AppLog.warning(.image, "attachment MIME非image但已解码成功，继续展示 url=\(resolvedURL.absoluteString), mime=\(mimeType)")
         }
 
-        logger.debug(
-            "attachment 下载并校验通过 url=\(resolvedURL.absoluteString, privacy: .public), size=\(NSCoder.string(for: imageSize), privacy: .public), bytes=\(data.count, privacy: .public), mime=\(mimeType ?? "unknown", privacy: .public)"
-        )
+        AppLog.debug(.image, "attachment 下载并校验通过 url=\(resolvedURL.absoluteString), size=\(NSCoder.string(for: imageSize)), bytes=\(data.count), mime=\(mimeType ?? "unknown")")
         return ImagePayload(
             data: data,
             mimeType: mimeType,
@@ -532,23 +518,17 @@ final class DetailImageLoader {
         source: ImageLoadSource
     ) -> ImageDataPayload {
         guard let data else {
-            logger.error(
-                "attachment 下载失败，使用兜底图 url=\(resolvedURL.absoluteString, privacy: .public), error=\(error?.localizedDescription ?? "unknown", privacy: .public)"
-            )
+            AppLog.error(.image, "attachment 下载失败，使用兜底图 url=\(resolvedURL.absoluteString), error=\(error?.localizedDescription ?? "unknown")")
             return Self.fallbackDataPayload(source: source)
         }
 
         if dataLooksLikeHTML(data) {
-            logger.error(
-                "attachment 返回HTML内容，使用兜底图 url=\(resolvedURL.absoluteString, privacy: .public), bytes=\(data.count, privacy: .public), snippet=\(self.snippet(from: data), privacy: .public)"
-            )
+            AppLog.error(.image, "attachment 返回HTML内容，使用兜底图 url=\(resolvedURL.absoluteString), bytes=\(data.count), snippet=\(self.snippet(from: data))")
             return Self.fallbackDataPayload(source: source)
         }
 
         guard let imageSize = imagePixelSize(data: data, mimeType: mimeType) else {
-            logger.error(
-                "attachment 图片解码失败，使用兜底图 url=\(resolvedURL.absoluteString, privacy: .public), bytes=\(data.count, privacy: .public), mime=\(mimeType ?? "unknown", privacy: .public)"
-            )
+            AppLog.error(.image, "attachment 图片解码失败，使用兜底图 url=\(resolvedURL.absoluteString), bytes=\(data.count), mime=\(mimeType ?? "unknown")")
             return Self.fallbackDataPayload(source: source)
         }
 
@@ -558,9 +538,7 @@ final class DetailImageLoader {
               imageSize.height > 0,
               imageSize.width <= Limits.maxPixelSide,
               imageSize.height <= Limits.maxPixelSide else {
-            logger.error(
-                "attachment 图片尺寸异常，使用兜底图 url=\(resolvedURL.absoluteString, privacy: .public), size=\(NSCoder.string(for: imageSize), privacy: .public), bytes=\(data.count, privacy: .public), mime=\(mimeType ?? "unknown", privacy: .public)"
-            )
+            AppLog.error(.image, "attachment 图片尺寸异常，使用兜底图 url=\(resolvedURL.absoluteString), size=\(NSCoder.string(for: imageSize)), bytes=\(data.count), mime=\(mimeType ?? "unknown")")
             return Self.fallbackDataPayload(source: source)
         }
 
@@ -826,12 +804,12 @@ final class DetailImageLoader {
 
     private func logDiagnostics(_ message: String) {
         guard NodeSeekDebugConfig.enableDetailRenderDiagnostics else { return }
-        logger.info("\(message, privacy: .public)")
+        AppLog.info(.image, message)
     }
 
     private func logOptimization(mode: DetailImageOptimizationMode, _ message: String) {
         guard case .enabled(_, _, let loggingEnabled) = mode, loggingEnabled else { return }
-        logger.info("\(message, privacy: .public)")
+        AppLog.info(.image, message)
     }
 
     private static func string(from size: CGSize) -> String {

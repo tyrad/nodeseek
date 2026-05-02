@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import OSLog
 
 class PostDetailInteractor: PostDetailInteractorInput {
     
@@ -17,7 +16,6 @@ class PostDetailInteractor: PostDetailInteractorInput {
     private let initialPage: Int
     private let commentSubmitter: NodeSeekCommentSubmitter
     private let sessionStore: NodeSeekSessionStore
-    private let logger = Logger(subsystem: "com.nodeseek.app", category: "PostDetailInteractor")
     
     // MARK: - Initialization
     init(
@@ -47,22 +45,22 @@ class PostDetailInteractor: PostDetailInteractorInput {
 
         let normalizedPage = max(1, page)
         Task {
-            logger.info("开始加载帖子详情，postID=\(post.id, privacy: .public), page=\(normalizedPage)")
+            AppLog.info(.postDetail, "开始加载帖子详情，postID=\(post.id), page=\(normalizedPage)")
             do {
                 guard let detail = try await loadDetail(postID: post.id, page: normalizedPage) else {
                     return
                 }
-                logger.info("帖子详情加载成功，postID=\(detail.id, privacy: .public), 评论数量: \(detail.comments.count)")
+                AppLog.info(.postDetail, "帖子详情加载成功，postID=\(detail.id), 评论数量: \(detail.comments.count)")
                 await MainActor.run {
                     presenter?.didLoadPostDetail(PostDetailResponse(detail: detail))
                 }
             } catch {
                 await MainActor.run {
                     if Self.isCancelledLoad(error) {
-                        logger.info("帖子详情加载取消，postID=\(post.id, privacy: .public)")
+                        AppLog.info(.postDetail, "帖子详情加载取消，postID=\(post.id)")
                         presenter?.didCancelLoadPostDetail()
                     } else {
-                        logger.error("帖子详情加载失败，postID=\(post.id, privacy: .public): \(error.localizedDescription)")
+                        AppLog.error(.postDetail, "帖子详情加载失败，postID=\(post.id): \(error.localizedDescription)")
                         presenter?.didFailLoadPostDetail(error: error.localizedDescription)
                     }
                 }
@@ -83,7 +81,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
         }
 
         Task {
-            logger.info("开始通过 WebView 提交回复，postID=\(post.id, privacy: .public)")
+            AppLog.info(.postDetail, "开始通过 WebView 提交回复，postID=\(post.id)")
             do {
                 let response = try await commentSubmitter.submitComment(
                     postID: post.id,
@@ -95,7 +93,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
                     presenter?.didSubmitReply(PostDetailSubmitReplyResponse(message: response.message))
                 }
             } catch {
-                logger.error("回复提交失败: \(error.localizedDescription)")
+                AppLog.error(.postDetail, "回复提交失败: \(error.localizedDescription)")
                 await MainActor.run {
                     presenter?.didFailSubmitReply(error: error.localizedDescription)
                 }
@@ -104,14 +102,14 @@ class PostDetailInteractor: PostDetailInteractorInput {
     }
 
     private func loadDetail(postID: String, page: Int) async throws -> PostDetail? {
-        logger.info("详情请求开始，postID=\(postID, privacy: .public), page=\(page)")
+        AppLog.info(.postDetail, "详情请求开始，postID=\(postID), page=\(page)")
         let result = try await service.loadPostDetail(postID: postID, page: page)
         switch result {
         case .value(let detail):
             await sessionStore.recordSuccess()
             return detail
         case .challenge(let challenge):
-            logger.warning("详情请求命中验证，postID=\(postID, privacy: .public): \(challenge.logDescription)")
+            AppLog.warning(.postDetail, "详情请求命中验证，postID=\(postID): \(challenge.logDescription)")
             let message = await sessionStore.recordChallenge(challenge)
             if case .loginRequired = challenge {
                 await MainActor.run {

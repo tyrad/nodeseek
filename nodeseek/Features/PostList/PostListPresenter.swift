@@ -85,6 +85,10 @@ class PostListPresenter: PostListPresenterProtocol {
     }
 
     #if DEBUG
+    func didTapLogFile() {
+        router.navigateToLogFile()
+    }
+
     func didTapDetailTest() {
         guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }
         view?.showDetailTestInput()

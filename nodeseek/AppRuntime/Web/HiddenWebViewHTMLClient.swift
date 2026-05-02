@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import OSLog
 import UIKit
 import WebKit
 
@@ -24,7 +23,6 @@ private enum WebViewCachePolicy {
 private final class WebViewCacheTuner {
     private static let lock = NSLock()
     private static var tuned = false
-    private static let logger = Logger(subsystem: "com.nodeseek.app", category: "HiddenWebViewCache")
 
     private static let minMemoryCapacity = 64 * 1024 * 1024
     private static let minDiskCapacity = 512 * 1024 * 1024
@@ -43,7 +41,7 @@ private final class WebViewCacheTuner {
             diskPath: "com.nodeseek.web-cache"
         )
         tuned = true
-        logger.info("已调优 URLCache 容量 memory=\(memoryCapacity / 1024 / 1024)MB, disk=\(diskCapacity / 1024 / 1024)MB")
+        AppLog.info(.webView, "已调优 URLCache 容量 memory=\(memoryCapacity / 1024 / 1024)MB, disk=\(diskCapacity / 1024 / 1024)MB")
     }
 }
 
@@ -84,7 +82,6 @@ struct HiddenWebViewHTMLClient: HTMLClient {
     private let timeoutInterval: TimeInterval
     private let requestLock: HiddenWebViewRequestLock
     private let channel: HiddenWebViewChannel
-    private let logger = Logger(subsystem: "com.nodeseek.app", category: "HiddenWebViewHTMLClient")
 
     init(
         timeoutInterval: TimeInterval = 20,
@@ -136,7 +133,7 @@ struct HiddenWebViewHTMLClient: HTMLClient {
 
     private func load(request: URLRequest) async throws -> HTMLResponse {
         await requestLock.acquire()
-        logger.info("准备通过隐藏 WebView 抓取 HTML: \(request.url?.absoluteString ?? "nil")")
+        AppLog.info(.webView, "准备通过隐藏 WebView 抓取 HTML: \(request.url?.absoluteString ?? "nil")")
         do {
             let loader = await MainActor.run {
                 HiddenWebViewLoader.loader(for: channel)
@@ -192,7 +189,6 @@ private final class HiddenWebViewPreloadLoader: NSObject, WKNavigationDelegate {
     private var preloadWaiters: [UUID: CheckedContinuation<Void, Never>] = [:]
     private var preloadWaiterTimeoutTasks: [UUID: Task<Void, Never>] = [:]
     private var didPreload = false
-    private let logger = Logger(subsystem: "com.nodeseek.app", category: "HiddenWebViewPreload")
 
     private override init() {
         super.init()
@@ -223,10 +219,10 @@ private final class HiddenWebViewPreloadLoader: NSObject, WKNavigationDelegate {
         request.cachePolicy = WebViewCachePolicy.getRequestPolicy
         WebRequestFingerprint.applyHTMLHeaders(to: &request)
 
-        logger.info("预加载 NodeSeek 首屏缓存: \(url.absoluteString, privacy: .public)")
+        AppLog.info(.webView, "预加载 NodeSeek 首屏缓存: \(url.absoluteString)")
         navigation = webView.load(request)
         guard navigation != nil else {
-            logger.warning("预加载未开始: \(url.absoluteString, privacy: .public)")
+            AppLog.warning(.webView, "预加载未开始: \(url.absoluteString)")
             finishPreload()
             return
         }
@@ -237,7 +233,7 @@ private final class HiddenWebViewPreloadLoader: NSObject, WKNavigationDelegate {
     func waitForActivePreload(url: URL, maxWait: TimeInterval) async {
         guard maxWait > 0, isLoading(url) else { return }
 
-        logger.info("等待 NodeSeek 首屏缓存预加载完成，最多 \(Int(maxWait * 1000), privacy: .public)ms")
+        AppLog.info(.webView, "等待 NodeSeek 首屏缓存预加载完成，最多 \(Int(maxWait * 1000))ms")
         let waiterID = UUID()
         await withCheckedContinuation { continuation in
             guard self.isLoading(url) else {
@@ -250,22 +246,22 @@ private final class HiddenWebViewPreloadLoader: NSObject, WKNavigationDelegate {
                 let nanoseconds = UInt64(maxWait * 1_000_000_000)
                 try? await Task.sleep(nanoseconds: nanoseconds)
                 guard !Task.isCancelled else { return }
-                self?.logger.info("NodeSeek 首屏缓存预加载等待超时，继续业务请求")
+                AppLog.info(.webView, "NodeSeek 首屏缓存预加载等待超时，继续业务请求")
                 self?.resumePreloadWaiter(id: waiterID)
             }
         }
-        logger.info("NodeSeek 首屏缓存预加载等待结束")
+        AppLog.info(.webView, "NodeSeek 首屏缓存预加载等待结束")
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard navigation === self.navigation else { return }
-        logger.info("NodeSeek 首屏缓存预加载完成: \(webView.url?.absoluteString ?? "nil", privacy: .public)")
+        AppLog.info(.webView, "NodeSeek 首屏缓存预加载完成: \(webView.url?.absoluteString ?? "nil")")
         finishPreload()
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         guard navigation === self.navigation else { return }
-        logger.warning("NodeSeek 首屏缓存预加载失败: \(error.localizedDescription, privacy: .public)")
+        AppLog.warning(.webView, "NodeSeek 首屏缓存预加载失败: \(error.localizedDescription)")
         finishPreload()
     }
 
@@ -275,7 +271,7 @@ private final class HiddenWebViewPreloadLoader: NSObject, WKNavigationDelegate {
         withError error: Error
     ) {
         guard navigation === self.navigation else { return }
-        logger.warning("NodeSeek 首屏缓存预加载 provisional 失败: \(error.localizedDescription, privacy: .public)")
+        AppLog.warning(.webView, "NodeSeek 首屏缓存预加载 provisional 失败: \(error.localizedDescription)")
         finishPreload()
     }
 
@@ -286,7 +282,7 @@ private final class HiddenWebViewPreloadLoader: NSObject, WKNavigationDelegate {
             let nanoseconds = UInt64(timeoutInterval * 1_000_000_000)
             try? await Task.sleep(nanoseconds: nanoseconds)
             guard !Task.isCancelled else { return }
-            logger.warning("NodeSeek 首屏缓存预加载超时")
+            AppLog.warning(.webView, "NodeSeek 首屏缓存预加载超时")
             webView?.stopLoading()
             finishPreload()
         }
@@ -355,7 +351,6 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     private let maxChallengePollCount = 10
     private let challengePollIntervalNanoseconds: UInt64 = 1_200_000_000
     private var debugOverlayConstraints: [NSLayoutConstraint] = []
-    private let logger = Logger(subsystem: "com.nodeseek.app", category: "HiddenWebViewLoader")
 
     private override init() {
         WebViewCacheTuner.tuneIfNeeded()
@@ -382,22 +377,22 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         resetForNextRequest()
         initialURL = request.url
         updateDebugOverlayIfNeeded()
-        logger.info("开始加载页面: \(request.url?.absoluteString ?? "nil"), timeout: \(Int(self.timeoutInterval))s")
+        AppLog.info(.webView, "开始加载页面: \(request.url?.absoluteString ?? "nil"), timeout: \(Int(self.timeoutInterval))s")
         await cookieBridge.syncWebViewCookiesToURLSession()
         await cookieBridge.syncURLSessionCookiesToWebView()
         let cookieNames = HTTPCookieStorage.shared
             .cookies(for: request.url ?? NodeSeekSite.baseURL)?
             .map(\.name)
             .sorted() ?? []
-        logger.info("已同步 Cookie 到 WebView，cookieCount=\(cookieNames.count, privacy: .public)")
-        CurrentAccountDebugLog.post("webview: cookies count=\(cookieNames.count) names=\(cookieNames.joined(separator: ","))")
+        AppLog.info(.webView, "已同步 Cookie 到 WebView，cookieCount=\(cookieNames.count)")
+        AppLog.debugPanel(.account, "webview: cookies count=\(cookieNames.count) names=\(cookieNames.joined(separator: ","))")
 
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
             scheduleTimeout()
             let navigation = webView.load(request)
             if navigation == nil {
-                logger.error("webView.load 返回 nil，导航未开始")
+                AppLog.error(.webView, "webView.load 返回 nil，导航未开始")
                 resolve(.failure(HiddenWebViewHTMLClientError.noNavigationStarted))
             }
         }
@@ -426,7 +421,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        logger.info("WebView didFinish: \(webView.url?.absoluteString ?? "nil")")
+        AppLog.info(.webView, "WebView didFinish: \(webView.url?.absoluteString ?? "nil")")
         guard continuation != nil else { return }
         htmlPollingTask?.cancel()
         htmlPollingTask = Task { @MainActor [weak self] in
@@ -440,9 +435,9 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
                     let shouldResolve = !isChallengePage || self.challengePollCount >= self.maxChallengePollCount
 
                     if hasUsableContent || shouldResolve {
-                        logger.info("结束轮询，challenge 状态: \(isChallengePage), usableContent: \(hasUsableContent), pollCount: \(self.challengePollCount)")
+                        AppLog.info(.webView, "结束轮询，challenge 状态: \(isChallengePage), usableContent: \(hasUsableContent), pollCount: \(self.challengePollCount)")
                         await self.cookieBridge.syncWebViewCookiesToURLSession()
-                        logger.info("已同步 WebView Cookie 到 URLSession")
+                        AppLog.info(.webView, "已同步 WebView Cookie 到 URLSession")
                         self.resolve(.success(HTMLResponse(
                             statusCode: self.statusCode,
                             headers: self.headers,
@@ -453,10 +448,10 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
                     }
 
                     self.challengePollCount += 1
-                    self.logger.warning("仍在 challenge 页面，usableContent=\(hasUsableContent)，继续轮询: \(self.challengePollCount)/\(self.maxChallengePollCount)")
+                    AppLog.warning(.webView, "仍在 challenge 页面，usableContent=\(hasUsableContent)，继续轮询: \(self.challengePollCount)/\(self.maxChallengePollCount)")
                     try? await Task.sleep(nanoseconds: self.challengePollIntervalNanoseconds)
                 } catch {
-                    self.logger.error("轮询 outerHTML 失败: \(error.localizedDescription)")
+                    AppLog.error(.webView, "轮询 outerHTML 失败: \(error.localizedDescription)")
                     self.resolve(.failure(error))
                     return
                 }
@@ -475,13 +470,13 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
                 guard let key = item.key as? String else { return }
                 result[key] = String(describing: item.value)
             }
-            logger.info("收到响应: status=\(response.statusCode), url=\(response.url?.absoluteString ?? "nil")")
+            AppLog.info(.webView, "收到响应: status=\(response.statusCode), url=\(response.url?.absoluteString ?? "nil")")
         }
         decisionHandler(.allow)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        logger.error("导航失败 didFail: \(error.localizedDescription)")
+        AppLog.error(.webView, "导航失败 didFail: \(error.localizedDescription)")
         resolve(.failure(error))
     }
 
@@ -490,12 +485,12 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: Error
     ) {
-        logger.error("导航失败 didFailProvisionalNavigation: \(error.localizedDescription)")
+        AppLog.error(.webView, "导航失败 didFailProvisionalNavigation: \(error.localizedDescription)")
         resolve(.failure(error))
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        logger.error("Web 内容进程终止")
+        AppLog.error(.webView, "Web 内容进程终止")
         resolve(.failure(HiddenWebViewHTMLClientError.processTerminated))
     }
 
@@ -511,7 +506,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     }
 
     private func timeout() {
-        logger.error("隐藏 WebView 抓取超时")
+        AppLog.error(.webView, "隐藏 WebView 抓取超时")
         resolve(.failure(HiddenWebViewHTMLClientError.timeout))
     }
 
@@ -526,10 +521,10 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
 
         switch result {
         case .success(let response):
-            logger.info("抓取完成: status=\(response.statusCode), htmlLength=\(response.html.count), finalURL=\(response.finalURL.absoluteString)")
+            AppLog.info(.webView, "抓取完成: status=\(response.statusCode), htmlLength=\(response.html.count), finalURL=\(response.finalURL.absoluteString)")
             continuation.resume(returning: response)
         case .failure(let error):
-            logger.error("抓取失败收敛: \(error.localizedDescription)")
+            AppLog.error(.webView, "抓取失败收敛: \(error.localizedDescription)")
             continuation.resume(throwing: error)
         }
     }
@@ -569,7 +564,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
             )
         } catch {
             let nsError = error as NSError
-            logger.error("评论脚本执行异常: domain=\(nsError.domain, privacy: .public), code=\(nsError.code), info=\(String(describing: nsError.userInfo), privacy: .public)")
+            AppLog.error(.webView, "评论脚本执行异常: domain=\(nsError.domain), code=\(nsError.code), info=\(String(describing: nsError.userInfo))")
             return CommentAutomationResponse(
                 ok: false,
                 message: error.localizedDescription,

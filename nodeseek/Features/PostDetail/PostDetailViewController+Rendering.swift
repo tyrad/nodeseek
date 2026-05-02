@@ -6,7 +6,6 @@
 //
 
 import AsyncDisplayKit
-import OSLog
 import UIKit
 
 extension PostDetailViewController {
@@ -60,16 +59,14 @@ extension PostDetailViewController {
             guard let self, self.isViewLoaded else { return }
             if NodeSeekDebugConfig.enableDetailRenderDiagnostics {
                 let visibleRows = self.tableNode.indexPathsForVisibleRows().map { "\($0.section):\($0.row)" }.joined(separator: ",")
-                Self.detailRenderLogger.info(
-                    "scheduleAttachmentLayoutRefresh fire visible=\(visibleRows, privacy: .public) rows=\(self.tableNode(self.tableNode, numberOfRowsInSection: 0), privacy: .public)"
-                )
+                AppLog.info(.rendering, "scheduleAttachmentLayoutRefresh fire visible=\(visibleRows) rows=\(self.tableNode(self.tableNode, numberOfRowsInSection: 0))")
             }
             self.tableNode.relayoutItems()
             self.tableNode.performBatch(animated: false, updates: {})
         }
         attachmentLayoutRefreshWorkItem = workItem
         if NodeSeekDebugConfig.enableDetailRenderDiagnostics {
-            Self.detailRenderLogger.info("scheduleAttachmentLayoutRefresh queued")
+            AppLog.info(.rendering, "scheduleAttachmentLayoutRefresh queued")
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: workItem)
     }

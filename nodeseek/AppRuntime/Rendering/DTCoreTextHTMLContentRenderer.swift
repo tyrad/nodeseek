@@ -7,7 +7,6 @@
 
 import DTCoreText
 import Foundation
-import OSLog
 import UIKit
 
 struct DTCoreTextHTMLContentRenderer {
@@ -73,8 +72,6 @@ struct DTCoreTextHTMLContentRenderer {
         pattern: "(?:\\u001B\\[|\\[)\\d{1,3}(?:;\\d{1,3})*m",
         options: []
     )
-    static let logger = Logger(subsystem: "com.nodeseek.app", category: "DetailDTCoreTextRenderer")
-
     func render(fragment: String, baseURL: URL) -> [RenderedContentBlock] {
         render(fragment: fragment, baseURL: baseURL, maxImageWidth: Layout.defaultMaxImageWidth)
     }

@@ -6,12 +6,9 @@
 //
 
 import Kingfisher
-import OSLog
 import UIKit
 
 final class DetailInlineImageView: AnimatedImageView {
-    private static let logger = Logger(subsystem: "com.nodeseek.app", category: "DetailInlineImageView")
-
     private let imageURL: URL
     private let targetPixelWidth: CGFloat
     private let displayScale: CGFloat
@@ -139,7 +136,7 @@ final class DetailInlineImageView: AnimatedImageView {
 
     private func logDiagnostics(_ message: String) {
         guard NodeSeekDebugConfig.enableDetailRenderDiagnostics else { return }
-        Self.logger.info("[\(self.diagnosticID, privacy: .public)] \(message, privacy: .public)")
+        AppLog.info(.rendering, "[\(diagnosticID)] \(message)")
     }
 
     private static func string(from rect: CGRect) -> String {

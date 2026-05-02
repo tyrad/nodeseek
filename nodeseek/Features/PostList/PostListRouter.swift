@@ -75,6 +75,19 @@ class PostListRouter: PostListRouterProtocol {
         viewController?.present(navigationWrapper, animated: true)
     }
 
+    #if DEBUG
+    func navigateToLogFile() {
+        let logViewController = LogFileViewController()
+        if let navigationController = viewController?.navigationController {
+            navigationController.pushViewController(logViewController, animated: true)
+            return
+        }
+
+        let navigationWrapper = UINavigationController(rootViewController: logViewController)
+        viewController?.present(navigationWrapper, animated: true)
+    }
+    #endif
+
     private static func postSummary(from record: VisitedPostRecord) -> PostSummary {
         PostSummary(
             id: record.postID,

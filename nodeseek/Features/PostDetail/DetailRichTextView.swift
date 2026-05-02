@@ -7,7 +7,6 @@
 
 import DTCoreText
 import Kingfisher
-import OSLog
 import UIKit
 
 final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextContentViewDelegate {
@@ -16,8 +15,6 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         static let borderColor = UIColor.separator
         static let cornerRadius: CGFloat = 4
     }
-
-    private static let logger = Logger(subsystem: "com.nodeseek.app", category: "DetailRichTextView")
 
     private var imageTapHandler: (([URL], Int) -> Void)?
     private var linkTapHandler: ((URL) -> Void)?
@@ -503,7 +500,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
 
     private func logDiagnostics(_ message: String) {
         guard NodeSeekDebugConfig.enableDetailRenderDiagnostics else { return }
-        Self.logger.info("[\(self.diagnosticID, privacy: .public)] \(message, privacy: .public)")
+        AppLog.info(.rendering, "[\(diagnosticID)] \(message)")
     }
 
     private func attachmentDiagnostics() -> String {

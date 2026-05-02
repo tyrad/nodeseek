@@ -7,7 +7,6 @@
 
 import AsyncDisplayKit
 import DTCoreText
-import OSLog
 import UIKit
 
 final class PostBodyCellNode: ASCellNode {
@@ -287,7 +286,6 @@ extension ASCellNode {
 
 final class DetailRichTextNode: ASDisplayNode {
     nonisolated private static let defaultMeasureWidth: CGFloat = 320
-    private static let logger = Logger(subsystem: "com.nodeseek.app", category: "DetailRichTextNode")
 
     private let attributedText: NSMutableAttributedString
     private let attributedTextLock = NSLock()
@@ -445,7 +443,7 @@ final class DetailRichTextNode: ASDisplayNode {
 
     private func logDiagnostics(_ message: String) {
         guard NodeSeekDebugConfig.enableDetailRenderDiagnostics else { return }
-        Self.logger.info("[\(self.diagnosticID, privacy: .public)] \(message, privacy: .public)")
+        AppLog.info(.rendering, "[\(diagnosticID)] \(message)")
     }
 
     nonisolated private static func attachmentDiagnostics(in attributedText: NSAttributedString) -> String {

@@ -7,7 +7,6 @@
 
 import Foundation
 import Kingfisher
-import OSLog
 import SwiftDraw
 import UIKit
 
@@ -37,7 +36,6 @@ final class AvatarImageLoader {
         }
     }()
 
-    private let logger = Logger(subsystem: "com.nodeseek.app", category: "PostListAvatar")
     private let downloader: ImageDownloader
     private let directSession: URLSession
     private let cookieBridge: CookieBridge
@@ -128,13 +126,13 @@ final class AvatarImageLoader {
         imageView.image = Self.placeholderImage
 
         guard let avatarURL = Self.resolveImageURL(avatarURL) else {
-            logger.notice("头像URL缺失或非法 id=\(postID, privacy: .public)")
+            AppLog.notice(.image, "头像URL缺失或非法 id=\(postID)")
             finishIfCurrent(token, for: imageView)
             return
         }
 
         if knownSVGURLs.contains(avatarURL.absoluteString) {
-            logger.debug("命中已知 SVG 快速路径 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)")
+            AppLog.debug(.image, "命中已知 SVG 快速路径 id=\(postID), url=\(avatarURL.absoluteString)")
             loadKnownSVGAvatar(
                 into: imageView,
                 token: token,
@@ -146,7 +144,7 @@ final class AvatarImageLoader {
             return
         }
 
-        logger.debug("开始加载头像 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)")
+        AppLog.debug(.image, "开始加载头像 id=\(postID), url=\(avatarURL.absoluteString)")
         loadWithKingfisher(
             into: imageView,
             token: token,
@@ -182,15 +180,13 @@ final class AvatarImageLoader {
             completionHandler: { [weak self, weak imageView] result in
                 guard let self, let imageView else { return }
                 guard self.isCurrent(token, for: imageView) else {
-                    self.logger.debug("忽略过期头像回调 id=\(postID, privacy: .public)")
+                    AppLog.debug(.image, "忽略过期头像回调 id=\(postID)")
                     return
                 }
 
                 switch result {
                 case .success(let retrieveResult):
-                    self.logger.debug(
-                        "头像加载成功 id=\(postID, privacy: .public), cache=\(String(describing: retrieveResult.cacheType), privacy: .public)"
-                    )
+                    AppLog.debug(.image, "头像加载成功 id=\(postID), cache=\(String(describing: retrieveResult.cacheType))")
                     self.completeSuccess(
                         token: token,
                         imageView: imageView,
@@ -225,9 +221,7 @@ final class AvatarImageLoader {
     ) {
         if let svgData = svgDataIfAvailable(from: error) {
             knownSVGURLs.insert(avatarURL.absoluteString)
-            logger.info(
-                "检测到 SVG 头像，准备渲染 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)"
-            )
+            AppLog.info(.image, "检测到 SVG 头像，准备渲染 id=\(postID), url=\(avatarURL.absoluteString)")
             Task { @MainActor [weak self, weak imageView] in
                 guard let self, let imageView else { return }
                 guard self.isCurrent(token, for: imageView) else { return }
@@ -244,15 +238,13 @@ final class AvatarImageLoader {
         }
 
         if allowCookieRetry, shouldRetryAfterCookieSync(error: error) {
-            logger.warning(
-                "头像疑似 challenge 页面，准备同步 Cookie 后重试 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)"
-            )
+            AppLog.warning(.image, "头像疑似 challenge 页面，准备同步 Cookie 后重试 id=\(postID), url=\(avatarURL.absoluteString)")
             Task { @MainActor [weak self, weak imageView] in
                 guard let self, let imageView else { return }
                 guard self.isCurrent(token, for: imageView) else { return }
                 await self.cookieBridge.syncWebViewCookiesToURLSession()
                 guard self.isCurrent(token, for: imageView) else { return }
-                self.logger.info("头像重试前已同步 WebView Cookie 到 URLSession id=\(postID, privacy: .public)")
+                AppLog.info(.image, "头像重试前已同步 WebView Cookie 到 URLSession id=\(postID)")
                 self.loadWithKingfisher(
                     into: imageView,
                     token: token,
@@ -266,9 +258,7 @@ final class AvatarImageLoader {
         }
 
         let details = failureDetails(for: error)
-        logger.error(
-            "头像加载失败 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public), error=\(details, privacy: .public)"
-        )
+        AppLog.error(.image, "头像加载失败 id=\(postID), url=\(avatarURL.absoluteString), error=\(details)")
         completeFailure(
             token: token,
             imageView: imageView,
@@ -289,7 +279,7 @@ final class AvatarImageLoader {
         let cacheKey = avatarURL.absoluteString as NSString
         if let cachedImage = svgImageCache.object(forKey: cacheKey) {
             imageView.image = cachedImage
-            logger.debug("SVG 快速路径缓存命中 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)")
+            AppLog.debug(.image, "SVG 快速路径缓存命中 id=\(postID), url=\(avatarURL.absoluteString)")
             completeSuccess(token: token, imageView: imageView, url: avatarURL, cacheType: .memory, completion: completion)
             return
         }
@@ -315,7 +305,7 @@ final class AvatarImageLoader {
                 }
 
                 if self.dataLooksLikeHTML(data), allowCookieRetry {
-                    self.logger.warning("SVG 快速路径疑似 challenge 页面，准备同步 Cookie 后重试 id=\(postID, privacy: .public)")
+                    AppLog.warning(.image, "SVG 快速路径疑似 challenge 页面，准备同步 Cookie 后重试 id=\(postID)")
                     await self.cookieBridge.syncWebViewCookiesToURLSession()
                     guard self.isCurrent(token, for: imageView) else { return }
                     self.loadKnownSVGAvatar(
@@ -332,9 +322,7 @@ final class AvatarImageLoader {
                 if let bitmapImage = UIImage(data: data) {
                     self.knownSVGURLs.remove(avatarURL.absoluteString)
                     imageView.image = bitmapImage
-                    self.logger.notice(
-                        "已知 SVG URL 返回位图，已回退普通路径 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)"
-                    )
+                    AppLog.notice(.image, "已知 SVG URL 返回位图，已回退普通路径 id=\(postID), url=\(avatarURL.absoluteString)")
                     self.completeSuccess(token: token, imageView: imageView, url: avatarURL, cacheType: .none, completion: completion)
                     return
                 }
@@ -342,9 +330,7 @@ final class AvatarImageLoader {
                 throw SVGRenderError.unsupportedData
             } catch {
                 guard self.isCurrent(token, for: imageView) else { return }
-                self.logger.error(
-                    "SVG 快速路径失败 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public), error=\(error.localizedDescription, privacy: .public)"
-                )
+                AppLog.error(.image, "SVG 快速路径失败 id=\(postID), url=\(avatarURL.absoluteString), error=\(error.localizedDescription)")
                 self.completeFailure(
                     token: token,
                     imageView: imageView,
@@ -367,7 +353,7 @@ final class AvatarImageLoader {
         let cacheKey = avatarURL.absoluteString as NSString
         if let cachedImage = svgImageCache.object(forKey: cacheKey) {
             imageView.image = cachedImage
-            logger.debug("SVG 头像缓存命中 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)")
+            AppLog.debug(.image, "SVG 头像缓存命中 id=\(postID), url=\(avatarURL.absoluteString)")
             completeSuccess(token: token, imageView: imageView, url: avatarURL, cacheType: .memory, completion: completion)
             return
         }
@@ -381,13 +367,11 @@ final class AvatarImageLoader {
             guard isCurrent(token, for: imageView) else { return }
             imageView.image = renderedImage
             svgImageCache.setObject(renderedImage, forKey: cacheKey)
-            logger.info("SVG 头像渲染成功 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public)")
+            AppLog.info(.image, "SVG 头像渲染成功 id=\(postID), url=\(avatarURL.absoluteString)")
             completeSuccess(token: token, imageView: imageView, url: avatarURL, cacheType: .none, completion: completion)
         } catch {
             guard isCurrent(token, for: imageView) else { return }
-            logger.error(
-                "SVG 头像渲染失败 id=\(postID, privacy: .public), url=\(avatarURL.absoluteString, privacy: .public), error=\(error.localizedDescription, privacy: .public)"
-            )
+            AppLog.error(.image, "SVG 头像渲染失败 id=\(postID), url=\(avatarURL.absoluteString), error=\(error.localizedDescription)")
             completeFailure(
                 token: token,
                 imageView: imageView,
