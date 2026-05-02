@@ -23,6 +23,7 @@ struct PostDetailSubmitReplyResponse: Equatable {
 struct PostDetailHeaderContent: Equatable {
     let postID: String
     let title: String
+    let requiredReadingLevel: Int?
     let authorName: String
     let avatarURL: URL?
     let authorProfileURL: URL?
@@ -36,10 +37,12 @@ struct PostDetailHeaderContent: Equatable {
         avatarURL: URL?,
         authorProfileURL: URL? = nil,
         metadataText: String?,
-        contentHTML: String = ""
+        contentHTML: String = "",
+        requiredReadingLevel: Int? = nil
     ) {
         self.postID = postID
         self.title = title
+        self.requiredReadingLevel = requiredReadingLevel
         self.authorName = authorName
         self.avatarURL = avatarURL
         self.authorProfileURL = authorProfileURL
@@ -60,7 +63,8 @@ struct PostDetailHeaderContent: Equatable {
             authorName: post.authorName,
             avatarURL: post.avatarURL,
             authorProfileURL: nil,
-            metadataText: metadata.isEmpty ? nil : metadata
+            metadataText: metadata.isEmpty ? nil : metadata,
+            requiredReadingLevel: nil
         )
     }
 
@@ -72,7 +76,8 @@ struct PostDetailHeaderContent: Equatable {
             avatarURL: detail.avatarURL,
             authorProfileURL: detail.authorProfileURL,
             metadataText: detail.metadataText,
-            contentHTML: detail.contentHTML
+            contentHTML: detail.contentHTML,
+            requiredReadingLevel: detail.requiredReadingLevel
         )
     }
 }

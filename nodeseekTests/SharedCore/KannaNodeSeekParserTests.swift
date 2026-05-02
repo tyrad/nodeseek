@@ -345,6 +345,41 @@ struct KannaNodeSeekParserTests {
         #expect(detail.comments.isEmpty)
     }
 
+    @Test func parsesPostDetailTitleLinkBeforeRequiredReadingLevelBadge() throws {
+        let html = """
+        <div id="nsk-body" class="nsk-container">
+            <div id="nsk-body-left">
+                <div class="nsk-post-wrapper">
+                    <div class="nsk-post">
+                        <div class="post-title">
+                            <h1>
+                                <a href="/post-710379-1" class="post-title-link">闲置顶级亚太线路 成本价拼车 </a>
+                                <span style="margin-left:5px;color: rgb(255 152 152);">
+                                    <svg class="iconpark-icon" style="width: 14px;height: 14px;vertical-align: baseline;"></svg>
+                                    <span style="font-size: 14px;font-family: sans-serif;"> 1 </span>
+                                </span>
+                            </h1>
+                        </div>
+                        <div class="content-item">
+                            <a class="author-name" href="/space/1">mist</a>
+                            <article class="post-content"><p>正文</p></article>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(
+            html: html,
+            url: URL(string: "https://www.nodeseek.com/post-710379-1")!
+        )
+
+        #expect(detail.title == "闲置顶级亚太线路 成本价拼车")
+        #expect(detail.requiredReadingLevel == 1)
+    }
+
     @Test func parsesPostDetailPaginationFromFixture() throws {
         let html = try FixtureLoader.html(named: "post-703863-1")
         let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)

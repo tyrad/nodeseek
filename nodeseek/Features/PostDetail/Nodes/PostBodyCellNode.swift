@@ -154,13 +154,7 @@ final class PostBodyCellNode: ASCellNode {
 
     private func configureText() {
         titleNode.maximumNumberOfLines = 0
-        titleNode.attributedText = NSAttributedString(
-            string: content.title,
-            attributes: [
-                .font: UIFont.preferredFont(forTextStyle: .title2),
-                .foregroundColor: UIColor.label
-            ]
-        )
+        titleNode.attributedText = Self.titleAttributedText(for: content)
 
         authorButtonNode.setAttributedTitle(
             NSAttributedString(
@@ -182,6 +176,51 @@ final class PostBodyCellNode: ASCellNode {
                 .foregroundColor: UIColor.secondaryLabel
             ]
         )
+    }
+
+    private static func titleAttributedText(for content: PostDetailHeaderContent) -> NSAttributedString {
+        let titleFont = UIFont.preferredFont(forTextStyle: .title2)
+        let result = NSMutableAttributedString(
+            string: content.title,
+            attributes: [
+                .font: titleFont,
+                .foregroundColor: UIColor.label
+            ]
+        )
+
+        guard let requiredReadingLevel = content.requiredReadingLevel else {
+            return result
+        }
+
+        let badgeFont = UIFont.preferredFont(forTextStyle: .subheadline)
+        let badgeColor = UIColor.systemRed
+        result.append(NSAttributedString(string: " "))
+
+        if let lockImage = UIImage(
+            systemName: "lock.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: badgeFont.pointSize, weight: .semibold)
+        )?.withTintColor(badgeColor, renderingMode: .alwaysOriginal) {
+            let attachment = NSTextAttachment()
+            attachment.image = lockImage
+            attachment.bounds = CGRect(
+                x: 0,
+                y: (titleFont.capHeight - badgeFont.pointSize) / 2,
+                width: badgeFont.pointSize,
+                height: badgeFont.pointSize
+            )
+            result.append(NSAttributedString(attachment: attachment))
+        }
+
+        result.append(NSAttributedString(
+            string: " \(requiredReadingLevel)",
+            attributes: [
+                .font: badgeFont,
+                .foregroundColor: badgeColor,
+                .baselineOffset: (titleFont.capHeight - badgeFont.capHeight) / 2
+            ]
+        ))
+
+        return result
     }
 
     @discardableResult

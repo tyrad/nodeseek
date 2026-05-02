@@ -32,7 +32,9 @@ enum XPathRules {
     static let fallbackNode = ".//a[contains(@href, '/go/') or contains(@href, '/categories/')]"
     static let fallbackLastActive = ".//time"
 
-    static let postDetailTitle = "//*[contains(@class, 'post-title')]//a[contains(@class, 'post-title-link')] | //*[contains(@class, 'post-title')]//h1"
+    static let postDetailTitleLink = "//*[contains(@class, 'post-title')]//a[contains(@class, 'post-title-link')]"
+    static let postDetailTitleFallback = "//*[contains(@class, 'post-title')]//h1"
+    static let postDetailRequiredReadingLevel = "//*[contains(@class, 'post-title')]//a[contains(@class, 'post-title-link')]/following-sibling::*[.//*[local-name()='svg']][1]//*[normalize-space()][last()]"
     static let postDetailBodyItem = "//*[contains(concat(' ', normalize-space(@class), ' '), ' nsk-post ')]//*[contains(concat(' ', normalize-space(@class), ' '), ' content-item ') and not(ancestor::ul[contains(concat(' ', normalize-space(@class), ' '), ' comments ')])][1]"
     static let postDetailComments = "//*[contains(concat(' ', normalize-space(@class), ' '), ' comments ')]/*[contains(concat(' ', normalize-space(@class), ' '), ' content-item ')]"
     static let postDetailPagination = "//*[contains(@class, 'post-top-pager') or contains(@class, 'post-bottom-pager')][1]"

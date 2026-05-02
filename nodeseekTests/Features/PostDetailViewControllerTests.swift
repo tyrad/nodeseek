@@ -522,6 +522,31 @@ struct PostDetailViewControllerTests {
         #expect(node.debugTitleAttributedText?.string == "主题切换标题")
     }
 
+    @Test func postBodyTitleShowsRequiredReadingLevelWithLockAttachment() throws {
+        let header = PostDetailHeaderContent(
+            postID: "710379",
+            title: "闲置顶级亚太线路 成本价拼车",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            requiredReadingLevel: 1
+        )
+        let node = PostBodyCellNode(
+            content: header,
+            renderedContent: [],
+            onImageTapped: { _, _ in },
+            onTextLayoutInvalidated: {}
+        )
+
+        let title = try #require(node.debugTitleAttributedText)
+
+        #expect(title.string.contains("闲置顶级亚太线路 成本价拼车"))
+        #expect(title.string.contains("1"))
+        #expect(title.containsAttachment)
+        #expect(title.foregroundColor(for: "1") == .systemRed)
+    }
+
     @Test func commentCellRefreshAppearanceRebuildsAuthorNameText() {
         let comment = Comment(
             id: "1",
@@ -1265,6 +1290,25 @@ private final class SpyPostDetailPresenter: PostDetailPresenterProtocol {
 private func deleteVideoAssetTestCookies(from storage: HTTPCookieStorage) {
     for cookie in storage.cookies ?? [] where cookie.name == "video_asset_test_cookie" {
         storage.deleteCookie(cookie)
+    }
+}
+
+private extension NSAttributedString {
+    var containsAttachment: Bool {
+        var found = false
+        enumerateAttribute(.attachment, in: NSRange(location: 0, length: length)) { value, _, stop in
+            if value is NSTextAttachment {
+                found = true
+                stop.pointee = true
+            }
+        }
+        return found
+    }
+
+    func foregroundColor(for substring: String) -> UIColor? {
+        let range = (string as NSString).range(of: substring)
+        guard range.location != NSNotFound else { return nil }
+        return attribute(.foregroundColor, at: range.location, effectiveRange: nil) as? UIColor
     }
 }
 

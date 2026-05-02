@@ -272,7 +272,8 @@ struct KannaNodeSeekParser: NodeSeekParser {
     func parsePostDetail(html: String, url: URL) throws -> PostDetail {
         let document = try HTML(html: html, encoding: .utf8)
 
-        let title = document.at_xpath(XPathRules.postDetailTitle)?.text?.normalizedNonEmpty
+        let title = document.at_xpath(XPathRules.postDetailTitleLink)?.text?.normalizedNonEmpty
+            ?? document.at_xpath(XPathRules.postDetailTitleFallback)?.text?.normalizedNonEmpty
             ?? document.at_xpath("//meta[@property='og:title']")?["content"]?.trimmedNonEmpty
             ?? document.at_xpath("//meta[@name='twitter:title']")?["content"]?.trimmedNonEmpty
             ?? document.at_xpath("//title")?.text?.normalizedNonEmpty
@@ -295,6 +296,11 @@ struct KannaNodeSeekParser: NodeSeekParser {
         let categoryText = bodyItem.flatMap { firstText(in: $0, xpaths: [XPathRules.contentCategory]) }
         let metadataText = [createdAtText, categoryText].compactMap(\.self).joined(separator: " · ").trimmedNonEmpty
         let contentHTML = postDetailContentHTML(bodyItem: bodyItem, document: document)
+        let requiredReadingLevel = document
+            .at_xpath(XPathRules.postDetailRequiredReadingLevel)?
+            .text?
+            .normalizedNonEmpty
+            .flatMap(Self.firstInteger(in:))
 
         let comments = document.xpath(XPathRules.postDetailComments).compactMap { item -> Comment? in
             parseComment(item)
@@ -305,6 +311,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
         return PostDetail(
             id: Self.postID(from: url) ?? title,
             title: title,
+            requiredReadingLevel: requiredReadingLevel,
             authorName: authorName,
             avatarURL: avatarURL,
             authorProfileURL: authorProfileURL,
@@ -365,7 +372,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
         return postPage(from: url)
     }
     
-    private static func firstInteger(in text: String) -> Int? {
+    nonisolated private static func firstInteger(in text: String) -> Int? {
         guard let range = text.range(of: #"\d+"#, options: .regularExpression) else {
             return nil
         }

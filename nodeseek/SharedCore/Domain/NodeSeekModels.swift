@@ -89,6 +89,7 @@ struct PostDetailPagination: Equatable, Sendable {
 struct PostDetail: Equatable, Sendable {
     let id: String
     let title: String
+    let requiredReadingLevel: Int?
     let authorName: String
     let avatarURL: URL?
     let authorProfileURL: URL?
@@ -102,6 +103,7 @@ struct PostDetail: Equatable, Sendable {
     init(
         id: String,
         title: String,
+        requiredReadingLevel: Int? = nil,
         authorName: String,
         avatarURL: URL?,
         authorProfileURL: URL? = nil,
@@ -114,6 +116,7 @@ struct PostDetail: Equatable, Sendable {
     ) {
         self.id = id
         self.title = title
+        self.requiredReadingLevel = requiredReadingLevel
         self.authorName = authorName
         self.avatarURL = avatarURL
         self.authorProfileURL = authorProfileURL
