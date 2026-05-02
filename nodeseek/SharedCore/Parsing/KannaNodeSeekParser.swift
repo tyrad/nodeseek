@@ -294,7 +294,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
         let createdAtText = bodyItem.flatMap { firstText(in: $0, xpaths: [XPathRules.contentCreatedAt]) }
         let categoryText = bodyItem.flatMap { firstText(in: $0, xpaths: [XPathRules.contentCategory]) }
         let metadataText = [createdAtText, categoryText].compactMap(\.self).joined(separator: " · ").trimmedNonEmpty
-        let contentHTML = bodyItem?.at_xpath(XPathRules.contentArticle)?.innerHTML?.trimmedNonEmpty ?? ""
+        let contentHTML = postDetailContentHTML(bodyItem: bodyItem, document: document)
 
         let comments = document.xpath(XPathRules.postDetailComments).compactMap { item -> Comment? in
             parseComment(item)
@@ -315,6 +315,18 @@ struct KannaNodeSeekParser: NodeSeekParser {
             pagination: pagination,
             isLastPage: document.at_xpath(XPathRules.postDetailNextPage) == nil
         )
+    }
+
+    private func postDetailContentHTML(bodyItem: Kanna.XMLElement?, document: HTMLDocument) -> String {
+        if let contentHTML = bodyItem?.at_xpath(XPathRules.contentArticle)?.innerHTML?.trimmedNonEmpty {
+            return contentHTML
+        }
+
+        if let notice = document.at_xpath(XPathRules.postDetailLoginRequiredNotice)?.text?.normalizedNonEmpty {
+            return notice
+        }
+
+        return ""
     }
 
     func parseCheckInState(html: String, pageURL: URL) throws -> CheckInState {

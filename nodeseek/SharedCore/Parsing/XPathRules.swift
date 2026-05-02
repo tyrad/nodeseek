@@ -47,4 +47,5 @@ enum XPathRules {
     static let contentCategory = ".//*[contains(@class, 'content-category')]//a"
     static let contentFloor = ".//*[contains(@class, 'floor-link')]"
     static let contentArticle = ".//*[self::article or self::div][contains(concat(' ', normalize-space(@class), ' '), ' post-content ')]"
+    static let postDetailLoginRequiredNotice = "//*[@id='nsk-body-left']//*[contains(normalize-space(.), '需要注册用户才能查看') and not(*)][1] | //*[contains(concat(' ', normalize-space(@class), ' '), ' restricted-post ')]//*[contains(normalize-space(.), '需要注册用户才能查看')][1]"
 }

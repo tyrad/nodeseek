@@ -315,6 +315,36 @@ struct KannaNodeSeekParserTests {
         #expect(detail.isLastPage == false)
     }
 
+    @Test func parsesLoginRequiredNoticeFromBodyLeftFallback() throws {
+        let html = """
+        <body class="bg1 light-layout">
+            <header></header>
+            <section id="nsk-frame">
+                <div id="nsk-body" class="nsk-container">
+                    <div id="nsk-body-left">
+                        <div style="min-height:300px;display:flex;align-items:center;justify-content:center;font-size:2rem;">
+                            <div style="line-height: 1.25;"> 本帖需要注册用户才能查看😭 </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="search-panel-mount"></div>
+            </section>
+            <title>受限帖子 - NodeSeek</title>
+        </body>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(
+            html: html,
+            url: URL(string: "https://www.nodeseek.com/post-704286-1")!
+        )
+
+        #expect(detail.id == "704286")
+        #expect(detail.title == "受限帖子 - NodeSeek")
+        #expect(detail.contentHTML == "本帖需要注册用户才能查看😭")
+        #expect(detail.comments.isEmpty)
+    }
+
     @Test func parsesPostDetailPaginationFromFixture() throws {
         let html = try FixtureLoader.html(named: "post-703863-1")
         let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
