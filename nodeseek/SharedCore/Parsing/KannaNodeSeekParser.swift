@@ -278,7 +278,9 @@ struct KannaNodeSeekParser: NodeSeekParser {
             ?? document.at_xpath("//meta[@property='og:title']")?["content"]?.trimmedNonEmpty
             ?? document.at_xpath("//meta[@name='twitter:title']")?["content"]?.trimmedNonEmpty
             ?? document.at_xpath("//title")?.text?.normalizedNonEmpty
-        let title = Self.isGenericPostDetailTitle(parsedTitle) ? restrictedNotice : parsedTitle
+        let title = Self.isGenericPostDetailTitle(parsedTitle)
+            ? restrictedNotice.map { _ in "受限帖子" }
+            : parsedTitle
 
         guard let title else {
             throw NodeSeekParserError.postDetailNotFound

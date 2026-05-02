@@ -371,7 +371,7 @@ struct KannaNodeSeekParserTests {
         )
 
         #expect(detail.id == "704286")
-        #expect(detail.title == "查看本帖需要Lv2，您的权限不足😑，请赚取🍗升级您的用户等级")
+        #expect(detail.title == "受限帖子")
         #expect(detail.requiredReadingLevel == 2)
         #expect(detail.contentHTML == "查看本帖需要Lv2，您的权限不足😑，请赚取🍗升级您的用户等级")
         #expect(detail.comments.isEmpty)
