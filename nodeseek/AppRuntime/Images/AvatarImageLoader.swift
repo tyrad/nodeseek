@@ -73,9 +73,10 @@ final class AvatarImageLoader {
         guard trimmed.isEmpty == false else { return nil }
 
         if let absolute = URL(string: trimmed), absolute.scheme != nil {
-            return absolute
+            return secureImageURL(absolute)
         }
-        return URL(string: trimmed, relativeTo: baseURL)?.absoluteURL
+        guard let resolved = URL(string: trimmed, relativeTo: baseURL)?.absoluteURL else { return nil }
+        return secureImageURL(resolved)
     }
 
     nonisolated static func resolveImageURL(
@@ -84,9 +85,23 @@ final class AvatarImageLoader {
     ) -> URL? {
         guard let url else { return nil }
         if url.scheme != nil {
+            return secureImageURL(url)
+        }
+        guard let resolved = URL(string: url.relativeString, relativeTo: baseURL)?.absoluteURL else { return nil }
+        return secureImageURL(resolved)
+    }
+
+    nonisolated private static func secureImageURL(_ url: URL) -> URL {
+        guard url.scheme?.lowercased() == "http",
+              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             return url
         }
-        return URL(string: url.relativeString, relativeTo: baseURL)?.absoluteURL
+
+        components.scheme = "https"
+        if components.port == 80 {
+            components.port = nil
+        }
+        return components.url ?? url
     }
 
     func loadImage(

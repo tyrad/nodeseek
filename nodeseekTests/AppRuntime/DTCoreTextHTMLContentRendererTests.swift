@@ -393,6 +393,28 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(imageBlocks(in: blocks).count == 1)
     }
 
+    @Test func upgradesHTTPImageSourceToHTTPSBeforeRendering() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: """
+            <article class="post-content">
+            <p>
+            "阿里云北京就是，内蒙古乌兰察布也是好像"
+            <br>
+            <img src="http://img.vortexfast.com/images/2026/04/28/image.png" alt="image" class>
+            </p>
+            </article>
+            """,
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+
+        #expect(imageURLs(in: blocks).map(\.absoluteString) == [
+            "https://img.vortexfast.com/images/2026/04/28/image.png"
+        ])
+    }
+
     @Test func rendersRelativeImageAsAttachmentWithResolvedURL() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
