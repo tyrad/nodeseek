@@ -80,6 +80,10 @@ class PostListPresenter: PostListPresenterProtocol {
         }
     }
 
+    func didTapRecentVisited() {
+        router.navigateToRecentVisitedPosts(visitedStore: visitedStore)
+    }
+
     #if DEBUG
     func didTapDetailTest() {
         guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }

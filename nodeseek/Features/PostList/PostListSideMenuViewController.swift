@@ -11,6 +11,7 @@ final class PostListSideMenuViewController: UIViewController {
     private var sideMenuLeadingConstraint: NSLayoutConstraint?
     private var isSideMenuVisible = false
     var onLoginTapped: (() -> Void)?
+    var onRecentVisitedTapped: (() -> Void)?
     #if DEBUG
     var onDetailTestTapped: (() -> Void)?
     #endif
@@ -104,6 +105,22 @@ final class PostListSideMenuViewController: UIViewController {
         button.configuration = configuration
         button.contentHorizontalAlignment = .leading
         button.accessibilityIdentifier = "post-list-side-menu-settings-button"
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
+    private let recentVisitedButton: UIButton = {
+        let button = UIButton(type: .system)
+        let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+        var configuration = UIButton.Configuration.plain()
+        configuration.image = UIImage(systemName: "clock.arrow.circlepath", withConfiguration: symbolConfiguration)
+        configuration.imagePadding = 10
+        configuration.baseForegroundColor = .label
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)
+        configuration.title = "最近浏览"
+        button.configuration = configuration
+        button.contentHorizontalAlignment = .leading
+        button.accessibilityIdentifier = "post-list-side-menu-recent-visited-button"
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -247,6 +264,7 @@ final class PostListSideMenuViewController: UIViewController {
         }
         #endif
         settingsButton.addTarget(self, action: #selector(settingsButtonTapped), for: .touchUpInside)
+        recentVisitedButton.addTarget(self, action: #selector(recentVisitedButtonTapped), for: .touchUpInside)
 
         view.addSubview(backdropView)
         view.addSubview(sideMenuView)
@@ -263,6 +281,7 @@ final class PostListSideMenuViewController: UIViewController {
             sideMenuView.addSubview(detailTestButton)
         }
         #endif
+        sideMenuView.addSubview(recentVisitedButton)
         sideMenuView.addSubview(settingsButton)
 
         let sideMenuLeadingConstraint = sideMenuView.leadingAnchor.constraint(
@@ -303,7 +322,12 @@ final class PostListSideMenuViewController: UIViewController {
             settingsButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
             settingsButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
             settingsButton.bottomAnchor.constraint(equalTo: sideMenuView.safeAreaLayoutGuide.bottomAnchor, constant: -18),
-            settingsButton.heightAnchor.constraint(equalToConstant: 48)
+            settingsButton.heightAnchor.constraint(equalToConstant: 48),
+
+            recentVisitedButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
+            recentVisitedButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
+            recentVisitedButton.bottomAnchor.constraint(equalTo: settingsButton.topAnchor, constant: -8),
+            recentVisitedButton.heightAnchor.constraint(equalToConstant: 48)
         ])
 
         #if DEBUG
@@ -316,7 +340,7 @@ final class PostListSideMenuViewController: UIViewController {
             accountDebugTextView.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
             accountDebugTextView.topAnchor.constraint(equalTo: accountDebugCopyButton.bottomAnchor, constant: 6),
             accountDebugTextView.heightAnchor.constraint(greaterThanOrEqualToConstant: 120),
-            accountDebugTextView.bottomAnchor.constraint(lessThanOrEqualTo: settingsButton.topAnchor, constant: -12)
+            accountDebugTextView.bottomAnchor.constraint(lessThanOrEqualTo: recentVisitedButton.topAnchor, constant: -12)
         ])
         #endif
 
@@ -325,7 +349,7 @@ final class PostListSideMenuViewController: UIViewController {
             NSLayoutConstraint.activate([
                 detailTestButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
                 detailTestButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
-                detailTestButton.bottomAnchor.constraint(equalTo: settingsButton.topAnchor, constant: -8),
+                detailTestButton.bottomAnchor.constraint(equalTo: recentVisitedButton.topAnchor, constant: -8),
                 detailTestButton.heightAnchor.constraint(equalToConstant: 48),
                 accountDebugTextView.bottomAnchor.constraint(lessThanOrEqualTo: detailTestButton.topAnchor, constant: -12)
             ])
@@ -360,6 +384,11 @@ final class PostListSideMenuViewController: UIViewController {
 
     @objc private func settingsButtonTapped() {
         hide(animated: true)
+    }
+
+    @objc private func recentVisitedButtonTapped() {
+        hide(animated: true)
+        onRecentVisitedTapped?()
     }
 
     private func setVisible(_ visible: Bool, animated: Bool) {

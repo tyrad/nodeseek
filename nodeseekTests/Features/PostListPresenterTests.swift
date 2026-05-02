@@ -86,6 +86,19 @@ struct PostListPresenterTests {
         #expect(router.selectedPost?.id == "1")
     }
 
+    @Test func tappingRecentVisitedRoutesVisitedStore() {
+        let view = SpyPostListView()
+        let interactor = SpyPostListInteractor()
+        let router = SpyPostListRouter()
+        let visitedStore = FakeVisitedPostStore()
+        let presenter = PostListPresenter(interactor: interactor, router: router, visitedStore: visitedStore)
+        presenter.setView(view)
+
+        presenter.didTapRecentVisited()
+
+        #expect(router.recentVisitedStore === visitedStore)
+    }
+
     @Test func submittingDetailTestURLNavigatesToParsedPostPage() throws {
         let view = SpyPostListView()
         let interactor = SpyPostListInteractor()
@@ -579,6 +592,9 @@ private final class SpyPostListView: PostListViewProtocol {
 private final class FakeVisitedPostStore: VisitedPostStoreProtocol {
     var visitedIDs: Set<String> = []
     var markedPosts: [PostSummary] = []
+    var records: [VisitedPostRecord] = []
+    var recentRecordLimits: [Int] = []
+    var clearAllCount = 0
 
     func isVisited(postID: String) -> Bool {
         visitedIDs.contains(postID)
@@ -590,7 +606,20 @@ private final class FakeVisitedPostStore: VisitedPostStoreProtocol {
     }
 
     func recentRecords(limit: Int) -> [VisitedPostRecord] {
-        []
+        recentRecordLimits.append(limit)
+        return Array(records.prefix(limit))
+    }
+
+    func recentRecords(offset: Int, limit: Int) -> [VisitedPostRecord] {
+        recentRecordLimits.append(limit)
+        guard offset < records.count else { return [] }
+        return Array(records.dropFirst(max(0, offset)).prefix(max(0, limit)))
+    }
+
+    func clearAll() {
+        clearAllCount += 1
+        records.removeAll()
+        visitedIDs.removeAll()
     }
 }
 
@@ -620,6 +649,7 @@ private final class SpyPostListInteractor: PostListInteractorInput {
 private final class SpyPostListRouter: PostListRouterProtocol {
     var selectedPost: PostSummary?
     var selectedPage: Int?
+    var recentVisitedStore: VisitedPostStoreProtocol?
     var navigateToLoginCount = 0
     var onLoginClose: (@MainActor () -> Void)?
 
@@ -635,6 +665,10 @@ private final class SpyPostListRouter: PostListRouterProtocol {
     func navigateToLogin(onClose: @escaping @MainActor () -> Void) {
         navigateToLoginCount += 1
         onLoginClose = onClose
+    }
+
+    func navigateToRecentVisitedPosts(visitedStore: VisitedPostStoreProtocol) {
+        recentVisitedStore = visitedStore
     }
 
 }

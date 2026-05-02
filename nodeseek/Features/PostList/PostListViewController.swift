@@ -355,6 +355,9 @@ class PostListViewController: UIViewController {
         sideMenuViewController.onLoginTapped = { [weak self] in
             self?.presenter.didTapLogin()
         }
+        sideMenuViewController.onRecentVisitedTapped = { [weak self] in
+            self?.presenter.didTapRecentVisited()
+        }
         #if DEBUG
         sideMenuViewController.onDetailTestTapped = { [weak self] in
             self?.presenter.didTapDetailTest()

@@ -12,6 +12,7 @@ struct VisitedPostRecord: Equatable, Sendable {
     let title: String
     let url: URL
     let visitedAt: Date
+    let avatarURL: URL?
 }
 
 struct PostListItem: Equatable, Sendable {
@@ -24,6 +25,8 @@ protocol VisitedPostStoreProtocol: AnyObject {
     func isVisited(postID: String) -> Bool
     func markVisited(post: PostSummary, visitedAt: Date)
     func recentRecords(limit: Int) -> [VisitedPostRecord]
+    func recentRecords(offset: Int, limit: Int) -> [VisitedPostRecord]
+    func clearAll()
 }
 
 protocol VisitedPostPersistence: AnyObject, Sendable {
@@ -31,6 +34,7 @@ protocol VisitedPostPersistence: AnyObject, Sendable {
     func upsert(_ record: VisitedPostRecord) throws
     func upsert(_ records: [VisitedPostRecord], keepingLatest limit: Int) throws
     func trim(keepingLatest limit: Int) throws
+    func deleteAll() throws
 }
 
 @MainActor
@@ -69,7 +73,8 @@ final class VisitedPostStore: VisitedPostStoreProtocol {
             postID: post.id,
             title: post.title,
             url: post.url,
-            visitedAt: visitedAt
+            visitedAt: visitedAt,
+            avatarURL: post.avatarURL
         )
 
         records.removeAll { $0.postID == record.postID }
@@ -84,7 +89,27 @@ final class VisitedPostStore: VisitedPostStoreProtocol {
     }
 
     func recentRecords(limit: Int) -> [VisitedPostRecord] {
-        Array(records.prefix(limit))
+        recentRecords(offset: 0, limit: limit)
+    }
+
+    func recentRecords(offset: Int, limit: Int) -> [VisitedPostRecord] {
+        let safeOffset = max(0, offset)
+        let safeLimit = max(0, limit)
+        guard safeLimit > 0, safeOffset < records.count else { return [] }
+        return Array(records.dropFirst(safeOffset).prefix(safeLimit))
+    }
+
+    func clearAll() {
+        scheduledFlushWorkItem?.cancel()
+        scheduledFlushWorkItem = nil
+        pendingRecords.removeAll()
+        records.removeAll()
+        visitedIDs.removeAll()
+
+        let persistence = persistence
+        writeQueue.async {
+            try? persistence.deleteAll()
+        }
     }
 
     func flush() {
@@ -152,5 +177,12 @@ final class EmptyVisitedPostStore: VisitedPostStoreProtocol {
 
     func recentRecords(limit: Int) -> [VisitedPostRecord] {
         []
+    }
+
+    func recentRecords(offset: Int, limit: Int) -> [VisitedPostRecord] {
+        []
+    }
+
+    func clearAll() {
     }
 }

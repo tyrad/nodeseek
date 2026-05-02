@@ -29,7 +29,11 @@ struct VisitedPostStoreTests {
         let persistence = SpyVisitedPostPersistence(records: [])
         let writeQueue = DispatchQueue(label: "VisitedPostStoreTests.markVisited")
         let store = VisitedPostStore(persistence: persistence, limit: 3, writeQueue: writeQueue)
-        let post = post(id: "1", title: "标题")
+        let post = post(
+            id: "1",
+            title: "标题",
+            avatarURL: URL(string: "https://www.nodeseek.com/avatar/1.png")
+        )
         let visitedAt = Date(timeIntervalSince1970: 100)
 
         store.markVisited(post: post, visitedAt: visitedAt)
@@ -37,11 +41,13 @@ struct VisitedPostStoreTests {
         #expect(store.isVisited(postID: "1"))
         #expect(store.recentRecords(limit: 1).first?.postID == "1")
         #expect(store.recentRecords(limit: 1).first?.title == "标题")
+        #expect(store.recentRecords(limit: 1).first?.avatarURL?.absoluteString == "https://www.nodeseek.com/avatar/1.png")
 
         store.flush()
         writeQueue.sync {}
 
         #expect(persistence.persistedBatches.map { $0.records.map(\.postID) } == [["1"]])
+        #expect(persistence.persistedBatches.first?.records.first?.avatarURL?.absoluteString == "https://www.nodeseek.com/avatar/1.png")
         #expect(persistence.persistedBatches.map(\.limit) == [3])
     }
 
@@ -92,6 +98,34 @@ struct VisitedPostStoreTests {
         #expect(store.isVisited(postID: "2"))
         #expect(!store.isVisited(postID: "1"))
     }
+
+    @Test func recentRecordsSupportsOffsetPagination() {
+        let records = (0..<5).map { index in
+            record(id: "\(index)", visitedAt: Date(timeIntervalSince1970: TimeInterval(100 - index)))
+        }
+        let persistence = SpyVisitedPostPersistence(records: records)
+        let store = VisitedPostStore(persistence: persistence, limit: 5)
+
+        #expect(store.recentRecords(offset: 0, limit: 2).map(\.postID) == ["0", "1"])
+        #expect(store.recentRecords(offset: 2, limit: 2).map(\.postID) == ["2", "3"])
+        #expect(store.recentRecords(offset: 4, limit: 2).map(\.postID) == ["4"])
+        #expect(store.recentRecords(offset: 10, limit: 2).isEmpty)
+    }
+
+    @Test func clearAllRemovesMemoryAndDeletesPersistence() {
+        let persistence = SpyVisitedPostPersistence(records: [
+            record(id: "1", visitedAt: Date(timeIntervalSince1970: 1))
+        ])
+        let writeQueue = DispatchQueue(label: "VisitedPostStoreTests.clearAll")
+        let store = VisitedPostStore(persistence: persistence, limit: 3, writeQueue: writeQueue)
+
+        store.clearAll()
+        writeQueue.sync {}
+
+        #expect(store.recentRecords(limit: 10).isEmpty)
+        #expect(!store.isVisited(postID: "1"))
+        #expect(persistence.deleteAllCount == 1)
+    }
 }
 
 @MainActor
@@ -104,6 +138,7 @@ private final class SpyVisitedPostPersistence: VisitedPostPersistence {
     var records: [VisitedPostRecord]
     var loadLimits: [Int] = []
     var persistedBatches: [PersistedBatch] = []
+    var deleteAllCount = 0
 
     init(records: [VisitedPostRecord]) {
         self.records = records
@@ -125,9 +160,14 @@ private final class SpyVisitedPostPersistence: VisitedPostPersistence {
     func upsert(_ records: [VisitedPostRecord], keepingLatest limit: Int) throws {
         persistedBatches.append(PersistedBatch(records: records, limit: limit))
     }
+
+    func deleteAll() throws {
+        deleteAllCount += 1
+        records.removeAll()
+    }
 }
 
-private func post(id: String, title: String) -> PostSummary {
+private func post(id: String, title: String, avatarURL: URL? = nil) -> PostSummary {
     PostSummary(
         id: id,
         title: title,
@@ -135,19 +175,22 @@ private func post(id: String, title: String) -> PostSummary {
         authorName: "mist",
         nodeName: "开发",
         replyCount: 1,
-        lastActivityText: "刚刚"
+        lastActivityText: "刚刚",
+        avatarURL: avatarURL
     )
 }
 
 private func record(
     id: String,
     title: String = "标题",
-    visitedAt: Date
+    visitedAt: Date,
+    avatarURL: URL? = nil
 ) -> VisitedPostRecord {
     VisitedPostRecord(
         postID: id,
         title: title,
         url: URL(string: "https://www.nodeseek.com/post-\(id)")!,
-        visitedAt: visitedAt
+        visitedAt: visitedAt,
+        avatarURL: avatarURL
     )
 }

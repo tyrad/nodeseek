@@ -262,4 +262,11 @@ private final class SpyVisitedPostStore: VisitedPostStoreProtocol {
     func recentRecords(limit: Int) -> [VisitedPostRecord] {
         []
     }
+
+    func recentRecords(offset: Int, limit: Int) -> [VisitedPostRecord] {
+        []
+    }
+
+    func clearAll() {
+    }
 }

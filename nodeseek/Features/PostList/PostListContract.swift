@@ -34,6 +34,7 @@ protocol PostListPresenterProtocol: AnyObject {
     func didReselectCategory(_ category: PostListCategory)
     func didToggleSortMode()
     func didTapLogin()
+    func didTapRecentVisited()
     #if DEBUG
     func didTapDetailTest()
     func didSubmitDetailTestURL(_ rawURL: String)
@@ -63,4 +64,5 @@ protocol PostListRouterProtocol: AnyObject {
     func navigateToPostDetail(post: PostSummary)
     func navigateToPostDetail(post: PostSummary, page: Int)
     func navigateToLogin(onClose: @escaping @MainActor () -> Void)
+    func navigateToRecentVisitedPosts(visitedStore: VisitedPostStoreProtocol)
 }

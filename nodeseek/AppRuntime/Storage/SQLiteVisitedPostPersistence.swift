@@ -36,7 +36,7 @@ final class SQLiteVisitedPostPersistence: VisitedPostPersistence, @unchecked Sen
 
     func loadRecent(limit: Int) throws -> [VisitedPostRecord] {
         let sql = """
-        SELECT post_id, title, url, visited_at
+        SELECT post_id, title, url, visited_at, avatar_url
         FROM visited_posts
         ORDER BY visited_at DESC
         LIMIT ?;
@@ -53,6 +53,7 @@ final class SQLiteVisitedPostPersistence: VisitedPostPersistence, @unchecked Sen
             let title = textColumn(statement, index: 1)
             let urlString = textColumn(statement, index: 2)
             let visitedAt = Date(timeIntervalSince1970: sqlite3_column_double(statement, 3))
+            let avatarURLString = nullableTextColumn(statement, index: 4)
             guard let url = URL(string: urlString) else {
                 throw SQLiteVisitedPostPersistenceError.invalidStoredURL(urlString)
             }
@@ -60,7 +61,8 @@ final class SQLiteVisitedPostPersistence: VisitedPostPersistence, @unchecked Sen
                 postID: postID,
                 title: title,
                 url: url,
-                visitedAt: visitedAt
+                visitedAt: visitedAt,
+                avatarURL: avatarURLString.flatMap(URL.init(string:))
             ))
         }
 
@@ -69,12 +71,13 @@ final class SQLiteVisitedPostPersistence: VisitedPostPersistence, @unchecked Sen
 
     func upsert(_ record: VisitedPostRecord) throws {
         let sql = """
-        INSERT INTO visited_posts (post_id, title, url, visited_at)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO visited_posts (post_id, title, url, visited_at, avatar_url)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(post_id) DO UPDATE SET
             title = excluded.title,
             url = excluded.url,
-            visited_at = excluded.visited_at;
+            visited_at = excluded.visited_at,
+            avatar_url = excluded.avatar_url;
         """
         var statement: OpaquePointer?
         try prepare(sql, statement: &statement)
@@ -84,6 +87,7 @@ final class SQLiteVisitedPostPersistence: VisitedPostPersistence, @unchecked Sen
         bind(record.title, to: statement, index: 2)
         bind(record.url.absoluteString, to: statement, index: 3)
         sqlite3_bind_double(statement, 4, record.visitedAt.timeIntervalSince1970)
+        bindNullable(record.avatarURL?.absoluteString, to: statement, index: 5)
 
         try stepDone(statement)
     }
@@ -122,6 +126,10 @@ final class SQLiteVisitedPostPersistence: VisitedPostPersistence, @unchecked Sen
         try stepDone(statement)
     }
 
+    func deleteAll() throws {
+        try execute("DELETE FROM visited_posts;")
+    }
+
     static func defaultDatabaseURL() throws -> URL {
         let baseURL = try FileManager.default.url(
             for: .applicationSupportDirectory,
@@ -150,13 +158,33 @@ final class SQLiteVisitedPostPersistence: VisitedPostPersistence, @unchecked Sen
             post_id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
             url TEXT NOT NULL,
-            visited_at REAL NOT NULL
+            visited_at REAL NOT NULL,
+            avatar_url TEXT
         );
         """)
+        try addColumnIfNeeded(name: "avatar_url", definition: "avatar_url TEXT")
         try execute("""
         CREATE INDEX IF NOT EXISTS idx_visited_posts_visited_at
         ON visited_posts(visited_at DESC);
         """)
+    }
+
+    private func addColumnIfNeeded(name: String, definition: String) throws {
+        guard try !tableColumns(table: "visited_posts").contains(name) else { return }
+        try execute("ALTER TABLE visited_posts ADD COLUMN \(definition);")
+    }
+
+    private func tableColumns(table: String) throws -> Set<String> {
+        let sql = "PRAGMA table_info(\(table));"
+        var statement: OpaquePointer?
+        try prepare(sql, statement: &statement)
+        defer { sqlite3_finalize(statement) }
+
+        var columns = Set<String>()
+        while sqlite3_step(statement) == SQLITE_ROW {
+            columns.insert(textColumn(statement, index: 1))
+        }
+        return columns
     }
 
     private func execute(_ sql: String) throws {
@@ -181,9 +209,23 @@ final class SQLiteVisitedPostPersistence: VisitedPostPersistence, @unchecked Sen
         sqlite3_bind_text(statement, index, string, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
     }
 
+    private func bindNullable(_ string: String?, to statement: OpaquePointer?, index: Int32) {
+        guard let string else {
+            sqlite3_bind_null(statement, index)
+            return
+        }
+        bind(string, to: statement, index: index)
+    }
+
     private func textColumn(_ statement: OpaquePointer?, index: Int32) -> String {
         guard let text = sqlite3_column_text(statement, index) else { return "" }
         return String(cString: text)
+    }
+
+    private func nullableTextColumn(_ statement: OpaquePointer?, index: Int32) -> String? {
+        guard sqlite3_column_type(statement, index) != SQLITE_NULL else { return nil }
+        let text = textColumn(statement, index: index)
+        return text.isEmpty ? nil : text
     }
 
     private func databaseMessage() -> String {
@@ -217,5 +259,8 @@ private final class NoopVisitedPostPersistence: VisitedPostPersistence {
     }
 
     func trim(keepingLatest limit: Int) throws {
+    }
+
+    func deleteAll() throws {
     }
 }

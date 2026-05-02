@@ -38,6 +38,30 @@ struct SQLiteVisitedPostPersistenceTests {
         #expect(records.first?.visitedAt == Date(timeIntervalSince1970: 3))
     }
 
+    @Test func upsertAndLoadRecentPreservesAvatarURL() throws {
+        let persistence = try makePersistence()
+        let avatarURL = URL(string: "https://www.nodeseek.com/avatar/1.png")
+
+        try persistence.upsert(record(id: "1", visitedAt: Date(timeIntervalSince1970: 1), avatarURL: avatarURL))
+
+        let records = try persistence.loadRecent(limit: 10)
+        #expect(records.first?.avatarURL == avatarURL)
+    }
+
+    @Test func openingOldDatabaseAddsNullableAvatarURLColumn() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let databaseURL = directory.appendingPathComponent("visited-posts.sqlite3")
+        try createLegacyDatabase(at: databaseURL)
+
+        let persistence = try SQLiteVisitedPostPersistence(databaseURL: databaseURL)
+
+        let records = try persistence.loadRecent(limit: 10)
+        #expect(records.first?.postID == "1")
+        #expect(records.first?.avatarURL == nil)
+    }
+
     @Test func trimKeepsOnlyLatestRecords() throws {
         let persistence = try makePersistence()
         try persistence.upsert(record(id: "1", visitedAt: Date(timeIntervalSince1970: 1)))
@@ -48,6 +72,17 @@ struct SQLiteVisitedPostPersistenceTests {
 
         let records = try persistence.loadRecent(limit: 10)
         #expect(records.map(\.postID) == ["3", "2"])
+    }
+
+    @Test func deleteAllRemovesVisitedPosts() throws {
+        let persistence = try makePersistence()
+        try persistence.upsert(record(id: "1", visitedAt: Date(timeIntervalSince1970: 1)))
+        try persistence.upsert(record(id: "2", visitedAt: Date(timeIntervalSince1970: 2)))
+
+        try persistence.deleteAll()
+
+        let records = try persistence.loadRecent(limit: 10)
+        #expect(records.isEmpty)
     }
 
     @Test func batchUpsertWritesRecordsAndTrimsOnce() throws {
@@ -118,15 +153,40 @@ private func installRejectingTitleTrigger(databaseURL: URL) throws {
     }
 }
 
+private func createLegacyDatabase(at databaseURL: URL) throws {
+    var database: OpaquePointer?
+    guard sqlite3_open_v2(databaseURL.path, &database, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else {
+        throw SQLiteVisitedPostPersistenceError.openFailed("Unable to open legacy test database")
+    }
+    defer { sqlite3_close(database) }
+
+    let sql = """
+    CREATE TABLE visited_posts (
+        post_id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        url TEXT NOT NULL,
+        visited_at REAL NOT NULL
+    );
+    INSERT INTO visited_posts (post_id, title, url, visited_at)
+    VALUES ('1', '旧记录', 'https://www.nodeseek.com/post-1', 1);
+    """
+    guard sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK else {
+        let message = sqlite3_errmsg(database).map { String(cString: $0) } ?? "Unknown SQLite error"
+        throw SQLiteVisitedPostPersistenceError.stepFailed(message)
+    }
+}
+
 private func record(
     id: String,
     title: String = "标题",
-    visitedAt: Date
+    visitedAt: Date,
+    avatarURL: URL? = nil
 ) -> VisitedPostRecord {
     VisitedPostRecord(
         postID: id,
         title: title,
         url: URL(string: "https://www.nodeseek.com/post-\(id)")!,
-        visitedAt: visitedAt
+        visitedAt: visitedAt,
+        avatarURL: avatarURL
     )
 }
