@@ -1937,6 +1937,39 @@ struct PostDetailLoginViewControllerTests {
         #expect(presenter.sentReplyContent?.contains("第二段") == false)
     }
 
+    @Test func inlineReplyEditorPlacesStickerButtonBelowSendButton() throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.showsReplyEntry = true
+        viewController.displayMode = .content
+
+        viewController.presentReplyEditor(mode: .plain)
+        viewController.view.layoutIfNeeded()
+
+        let sendButton = try #require(
+            viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-send-button")
+        )
+        let stickerButton = try #require(
+            viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-sticker-button")
+        )
+        #expect(stickerButton.frame.minY > sendButton.frame.maxY)
+    }
+
+    @Test func insertingStickerTokenUpdatesReplyTextAtSelection() throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        viewController.loadViewIfNeeded()
+        viewController.replyTextView.text = "hello world"
+        viewController.replyTextView.selectedRange = NSRange(location: 6, length: 5)
+
+        viewController.insertStickerToken("xhj022")
+
+        #expect(viewController.replyTextView.text == "hello :xhj022:")
+        #expect(viewController.replyTextView.selectedRange.location == 14)
+    }
+
     @Test func renderShowsToastMessage() throws {
         let presenter = SpyPostDetailPresenter()
         let viewController = PostDetailViewController(presenter: presenter)

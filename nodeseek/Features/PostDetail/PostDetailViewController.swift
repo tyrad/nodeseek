@@ -149,8 +149,10 @@ class PostDetailViewController: UIViewController {
     var displayMode: DisplayMode = .skeleton
     var hasRenderedDetailContent = false
     var showsReplyEntry = false
+    let stickerCookieBridge = CookieBridge()
     var replyComposerMode: CommentComposerMode = .plain
     var replyContextBarHeightConstraint: NSLayoutConstraint?
+    var replyStickerPickerHeightConstraint: NSLayoutConstraint?
     var pageLoadingTargetPage: Int?
     #if DEBUG
     var pendingScrollToRow: Int?
@@ -309,6 +311,22 @@ class PostDetailViewController: UIViewController {
         return button
     }()
 
+    let replyStickerButton: UIButton = {
+        let button = UIButton(type: .system)
+        var configuration = UIButton.Configuration.plain()
+        configuration.image = UIImage(systemName: "face.smiling")
+        configuration.baseForegroundColor = .label
+        configuration.background.backgroundColor = .clear
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6)
+        button.configuration = configuration
+        button.accessibilityIdentifier = "post-detail-reply-sticker-button"
+        button.accessibilityLabel = "表情"
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
+    let replyStickerPickerView = NodeSeekStickerPickerView()
+
     let toastContainerView: UIView = {
         let view = UIView()
         view.backgroundColor = UIColor.label.withAlphaComponent(0.92)
@@ -452,7 +470,9 @@ class PostDetailViewController: UIViewController {
             constant: -12
         )
         let replyContextBarHeightConstraint = replyContextBar.heightAnchor.constraint(equalToConstant: 0)
+        let replyStickerPickerHeightConstraint = replyStickerPickerView.heightAnchor.constraint(equalToConstant: 0)
         self.replyContextBarHeightConstraint = replyContextBarHeightConstraint
+        self.replyStickerPickerHeightConstraint = replyStickerPickerHeightConstraint
         NSLayoutConstraint.activate([
             tableNode.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableNode.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -515,14 +535,24 @@ class PostDetailViewController: UIViewController {
 
             replyTextView.leadingAnchor.constraint(equalTo: replyEditorContainer.leadingAnchor, constant: 12),
             replyTextView.topAnchor.constraint(equalTo: replyContextBar.bottomAnchor, constant: 8),
-            replyTextView.bottomAnchor.constraint(equalTo: replyEditorContainer.bottomAnchor, constant: -12),
             replyTextView.trailingAnchor.constraint(equalTo: inlineReplySendButton.leadingAnchor, constant: -8),
-            replyTextView.heightAnchor.constraint(greaterThanOrEqualToConstant: 72),
+            replyTextView.heightAnchor.constraint(greaterThanOrEqualToConstant: 88),
 
             inlineReplySendButton.trailingAnchor.constraint(equalTo: replyEditorContainer.trailingAnchor, constant: -12),
-            inlineReplySendButton.centerYAnchor.constraint(equalTo: replyTextView.centerYAnchor),
+            inlineReplySendButton.topAnchor.constraint(equalTo: replyTextView.topAnchor, constant: 4),
             inlineReplySendButton.widthAnchor.constraint(equalToConstant: 40),
-            inlineReplySendButton.heightAnchor.constraint(equalToConstant: 40)
+            inlineReplySendButton.heightAnchor.constraint(equalToConstant: 40),
+
+            replyStickerButton.centerXAnchor.constraint(equalTo: inlineReplySendButton.centerXAnchor),
+            replyStickerButton.topAnchor.constraint(equalTo: inlineReplySendButton.bottomAnchor, constant: 8),
+            replyStickerButton.widthAnchor.constraint(equalToConstant: 40),
+            replyStickerButton.heightAnchor.constraint(equalToConstant: 40),
+
+            replyStickerPickerView.leadingAnchor.constraint(equalTo: replyEditorContainer.leadingAnchor, constant: 12),
+            replyStickerPickerView.trailingAnchor.constraint(equalTo: replyEditorContainer.trailingAnchor, constant: -12),
+            replyStickerPickerView.topAnchor.constraint(equalTo: replyTextView.bottomAnchor, constant: 10),
+            replyStickerPickerView.bottomAnchor.constraint(equalTo: replyEditorContainer.bottomAnchor, constant: -12),
+            replyStickerPickerHeightConstraint
         ])
 
         NotificationCenter.default.addObserver(
@@ -549,12 +579,18 @@ class PostDetailViewController: UIViewController {
         replyEditorBackdrop.addTarget(self, action: #selector(dismissReplyEditor), for: .touchUpInside)
         view.addSubview(replyEditorBackdrop)
         inlineReplySendButton.addTarget(self, action: #selector(sendReplyTapped), for: .touchUpInside)
+        replyStickerButton.addTarget(self, action: #selector(toggleStickerPicker), for: .touchUpInside)
+        replyStickerPickerView.onSelectSticker = { [weak self] item in
+            self?.insertStickerToken(item.token)
+        }
         replyContextCloseButton.addTarget(self, action: #selector(clearReplyContext), for: .touchUpInside)
         replyContextBar.addSubview(replyContextLabel)
         replyContextBar.addSubview(replyContextCloseButton)
         replyEditorContainer.addSubview(replyContextBar)
         replyEditorContainer.addSubview(replyTextView)
         replyEditorContainer.addSubview(inlineReplySendButton)
+        replyEditorContainer.addSubview(replyStickerButton)
+        replyEditorContainer.addSubview(replyStickerPickerView)
         view.addSubview(replyEditorContainer)
     }
 

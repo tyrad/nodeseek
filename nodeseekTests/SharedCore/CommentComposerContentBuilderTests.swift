@@ -70,4 +70,28 @@ struct CommentComposerContentBuilderTests {
         bb
         """)
     }
+
+    @Test func stickerTokenInsertionAddsReadableSpacingAtCaret() {
+        let result = StickerTokenInsertion.inserting(
+            token: "yct001",
+            into: "hello",
+            selectedRange: NSRange(location: 5, length: 0)
+        )
+
+        #expect(result.text == "hello :yct001:")
+        #expect(result.selectedRange.location == 14)
+        #expect(result.selectedRange.length == 0)
+    }
+
+    @Test func stickerTokenInsertionReplacesSelectionWithBoundedSpaces() {
+        let result = StickerTokenInsertion.inserting(
+            token: "xhj022",
+            into: "hello world",
+            selectedRange: NSRange(location: 6, length: 5)
+        )
+
+        #expect(result.text == "hello :xhj022:")
+        #expect(result.selectedRange.location == 14)
+        #expect(result.selectedRange.length == 0)
+    }
 }

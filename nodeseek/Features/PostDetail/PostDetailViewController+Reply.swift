@@ -108,6 +108,7 @@ extension PostDetailViewController {
     @objc
     func dismissReplyEditor() {
         replyTextView.resignFirstResponder()
+        setStickerPickerVisible(false, animated: false)
         replyEditorBackdrop.isHidden = true
         replyEditorContainer.isHidden = true
         replyComposerMode = .plain
@@ -137,5 +138,58 @@ extension PostDetailViewController {
             mode: replyComposerMode,
             postURL: resolvedDetailURL() ?? baseURL
         )
+    }
+
+    @objc
+    func toggleStickerPicker() {
+        let shouldShow = replyStickerPickerView.isHidden
+        if shouldShow {
+            replyTextView.resignFirstResponder()
+            Task { [weak self] in
+                guard let self else { return }
+                await stickerCookieBridge.syncWebViewCookiesToURLSession()
+                setStickerPickerVisible(true, animated: true)
+            }
+            return
+        }
+        setStickerPickerVisible(false, animated: true)
+    }
+
+    func insertStickerToken(_ token: String) {
+        let result = StickerTokenInsertion.inserting(
+            token: token,
+            into: replyTextView.text ?? "",
+            selectedRange: replyTextView.selectedRange
+        )
+        replyTextView.text = result.text
+        replyTextView.selectedRange = result.selectedRange
+    }
+
+    func setStickerPickerVisible(_ isVisible: Bool, animated: Bool) {
+        replyStickerPickerView.isHidden = false
+        replyStickerPickerHeightConstraint?.constant = isVisible ? 260 : 0
+        replyStickerButton.tintColor = isVisible ? .systemBlue : nil
+
+        let animations = {
+            self.replyStickerPickerView.alpha = isVisible ? 1 : 0
+            self.view.layoutIfNeeded()
+        }
+
+        let completion: (Bool) -> Void = { _ in
+            self.replyStickerPickerView.isHidden = isVisible == false
+        }
+
+        if animated {
+            UIView.animate(
+                withDuration: 0.22,
+                delay: 0,
+                options: [.curveEaseInOut, .beginFromCurrentState],
+                animations: animations,
+                completion: completion
+            )
+        } else {
+            animations()
+            completion(true)
+        }
     }
 }
