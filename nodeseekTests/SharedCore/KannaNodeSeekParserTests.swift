@@ -192,6 +192,50 @@ struct KannaNodeSeekParserTests {
         #expect(post.avatarURL == nil)
     }
 
+    @Test func parsesCommentReactionCountsFromDetailCommentMenuDOM() throws {
+        let html = """
+        <div class="nsk-post">
+            <div class="post-title"><h1><a class="post-title-link" href="/post-1-1">测试详情</a></h1></div>
+            <div id="0" data-comment-id="100" class="content-item">
+                <div class="author-info"><a class="author-name" href="/space/1">楼主</a></div>
+                <article class="post-content"><p>正文</p></article>
+            </div>
+            <ul class="comments">
+                <li id="1" data-comment-id="101" class="content-item">
+                    <div class="author-info"><a class="author-name" href="/space/2">alice</a></div>
+                    <article class="post-content"><p>评论</p></article>
+                    <div class="comment-menu-mount">
+                        <div data-v-254da704 class="comment-menu">
+                            <div data-v-254da704 title="点赞" class="menu-item">
+                                <svg data-v-254da704 class="iconpark-icon"></svg>
+                                <span data-v-254da704>0</span>
+                            </div>
+                            <div data-v-254da704 title="加鸡腿" class="menu-item">
+                                <svg data-v-254da704 class="iconpark-icon"></svg>
+                                <span data-v-254da704>1</span>
+                            </div>
+                            <div data-v-254da704 title="反对" class="menu-item">
+                                <svg data-v-254da704 class="iconpark-icon">
+                                    <use data-v-254da704 href="#bad-one"></use>
+                                </svg>
+                                <span data-v-254da704>0</span>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            </ul>
+        </div>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(html: html, url: URL(string: "https://www.nodeseek.com/post-1-1")!)
+
+        let comment = try #require(detail.comments.first)
+        #expect(comment.likeCount == 0)
+        #expect(comment.chickenLegCount == 1)
+        #expect(comment.opposeCount == 0)
+    }
+
     @Test func parsesMissingPostListAuthorAsEmpty() throws {
         let html = """
         <ul class="post-list">
@@ -540,6 +584,54 @@ struct KannaNodeSeekParserTests {
 
         #expect(detail.comments.count == 1)
         #expect(detail.comments.first?.contentHTML.contains("非 ul/li 评论也要解析") == true)
+    }
+
+    @Test func parsesHotCommentBadgeAndAuthorRoleBadges() throws {
+        let html = """
+        <div class="nsk-post-wrapper">
+            <div class="nsk-post">
+                <div class="post-title">
+                    <h1><a href="/post-1-1" class="post-title-link">测试详情</a></h1>
+                </div>
+                <div id="0" data-comment-id="100" class="content-item">
+                    <div class="author-info"><a href="/space/1" class="author-name">楼主</a></div>
+                    <article class="post-content"><p>正文</p></article>
+                </div>
+            </div>
+            <div class="comment-container">
+                <ul class="comments">
+                    <li data-comment-id="278265" id="326" class="content-item">
+                        <div class="nsk-content-meta-info">
+                            <div class="avatar-wrapper"></div>
+                            <div>
+                                <div class="author-info">
+                                    <a href="/space/148" class="author-name">hostlocmjj</a>
+                                    <span class="nsk-badge role-tag role-abandon">
+                                        <span>已停用</span>
+                                    </span>
+                                </div>
+                                <div class="content-info"></div>
+                            </div>
+                            <div class="floor-link-wrapper">
+                                <div class="hot-badge">
+                                    <a href="#326" class="floor-link">#326</a>
+                                </div>
+                            </div>
+                        </div>
+                        <article class="post-content"><p>热门评论</p></article>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(html: html, url: URL(string: "https://www.nodeseek.com/post-1-1")!)
+
+        let comment = try #require(detail.comments.first)
+        #expect(comment.floorText == "#326")
+        #expect(comment.isHot)
+        #expect(comment.authorBadgeTexts == ["已停用"])
     }
 
     @Test func parsesPosterBadgeFromCommentAuthorInfo() throws {

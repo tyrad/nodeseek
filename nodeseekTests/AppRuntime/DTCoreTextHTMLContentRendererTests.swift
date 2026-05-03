@@ -282,6 +282,56 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(textBlocks?.contains { $0.backgroundColor != nil } == true)
     }
 
+    @Test func preservesBlockquoteAroundStickerQuote() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: """
+            <article class="post-content">
+            <p><a href="/post-711278-1">NS探针疑云</a></p>
+            <blockquote>
+            <p>
+            "[!question]"
+            <br>
+            " 依旧连不上主控."
+            <br>
+            <img class="sticker" src="/static/image/sticker/xhj/032.png" loading="lazy" alt="xhj032">
+            </p>
+            </blockquote>
+            <h3>后续标题</h3>
+            </article>
+            """,
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributed = try #require(
+            blocks.compactMap { block -> NSAttributedString? in
+                guard case .text(let text) = block else { return nil }
+                return text
+            }.first { $0.string.contains("依旧连不上主控") }
+        )
+
+        let range = (attributed.string as NSString).range(of: "依旧连不上主控")
+        #expect(range.location != NSNotFound)
+        let textBlocks = attributed.attribute(
+            NSAttributedString.Key(DTTextBlocksAttribute),
+            at: range.location,
+            effectiveRange: nil
+        ) as? [DTTextBlock]
+        #expect(textBlocks?.contains { $0.backgroundColor != nil } == true)
+
+        var attachmentURL: URL?
+        attributed.enumerateAttribute(
+            .attachment,
+            in: NSRange(location: 0, length: attributed.length)
+        ) { value, _, stop in
+            guard let attachment = value as? DTTextAttachment else { return }
+            attachmentURL = attachment.contentURL
+            stop.pointee = true
+        }
+        #expect(attachmentURL?.absoluteString == "https://www.nodeseek.com/static/image/sticker/xhj/032.png")
+    }
+
     @Test func rendersBlockquoteWithCompactHorizontalAndRoomyVerticalPadding() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))

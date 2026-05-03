@@ -51,7 +51,9 @@ final class CommentCellNode: ASCellNode {
 
     private let authorButtonNode = ASButtonNode()
     private let posterBadgeNode = ASTextNode()
+    private let authorBadgeNodes: [ASButtonNode]
     private let timeNode = ASTextNode()
+    private let hotBadgeNode = ASImageNode()
     private let floorNode = ASTextNode()
     private let likeButtonNode = ASButtonNode()
     private let chickenLegButtonNode = ASButtonNode()
@@ -103,6 +105,7 @@ final class CommentCellNode: ASCellNode {
         self.onReplyTapped = onReplyTapped
         self.onQuoteTapped = onQuoteTapped
         self.onTextLayoutInvalidated = onTextLayoutInvalidated
+        self.authorBadgeNodes = comment.authorBadgeTexts.map { Self.makeAuthorBadgeNode(text: $0) }
         self.bodyNodes = DetailContentBlockNodeFactory.makeNodes(
             from: renderedBody ?? [],
             onImageTapped: onImageTapped,
@@ -145,7 +148,10 @@ final class CommentCellNode: ASCellNode {
     override func layoutSpecThatFits(_ constrainedSize: ASSizeRange) -> ASLayoutSpec {
         authorButtonNode.style.flexShrink = 1
         posterBadgeNode.style.flexShrink = 0
+        authorBadgeNodes.forEach { $0.style.flexShrink = 0 }
         timeNode.style.flexShrink = 1
+        hotBadgeNode.style.preferredSize = CGSize(width: 13, height: 13)
+        hotBadgeNode.style.flexShrink = 0
         floorNode.style.flexShrink = 0
         likeButtonNode.style.flexShrink = 0
         chickenLegButtonNode.style.flexShrink = 0
@@ -164,6 +170,7 @@ final class CommentCellNode: ASCellNode {
         if comment.isPoster {
             identityChildren.append(posterBadgeNode)
         }
+        identityChildren.append(contentsOf: authorBadgeNodes)
         if comment.createdAtText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
             identityChildren.append(timeNode)
         }
@@ -179,7 +186,12 @@ final class CommentCellNode: ASCellNode {
             headerChildren.append(identityStack)
         }
         if comment.floorText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
-            headerChildren.append(floorNode)
+            let floorStack = ASStackLayoutSpec.horizontal()
+            floorStack.spacing = 4
+            floorStack.alignItems = .center
+            floorStack.children = comment.isHot ? [hotBadgeNode, floorNode] : [floorNode]
+            floorStack.style.flexShrink = 0
+            headerChildren.append(floorStack)
         }
         headerStack.children = headerChildren
 
@@ -245,6 +257,13 @@ final class CommentCellNode: ASCellNode {
         )
         posterBadgeNode.accessibilityLabel = "楼主"
 
+        hotBadgeNode.image = UIImage(
+            systemName: "flame.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        )?.withTintColor(.systemOrange, renderingMode: .alwaysOriginal)
+        hotBadgeNode.contentMode = .scaleAspectFit
+        hotBadgeNode.accessibilityLabel = "热门评论"
+
         timeNode.maximumNumberOfLines = 1
         timeNode.truncationMode = .byTruncatingTail
         timeNode.attributedText = NSAttributedString(
@@ -264,9 +283,9 @@ final class CommentCellNode: ASCellNode {
             ]
         )
 
-        configureActionButton(likeButtonNode, systemImageName: "hand.thumbsup", accessibilityLabel: "点赞")
-        configureActionButton(chickenLegButtonNode, systemImageName: "fork.knife", accessibilityLabel: "加鸡腿")
-        configureActionButton(opposeButtonNode, systemImageName: "hand.thumbsdown", accessibilityLabel: "反对")
+        configureActionButton(likeButtonNode, systemImageName: "hand.thumbsup", accessibilityLabel: "点赞", count: comment.likeCount)
+        configureActionButton(chickenLegButtonNode, systemImageName: "fork.knife", accessibilityLabel: "加鸡腿", count: comment.chickenLegCount)
+        configureActionButton(opposeButtonNode, systemImageName: "hand.thumbsdown", accessibilityLabel: "反对", count: comment.opposeCount)
         configureActionButton(replyButtonNode, systemImageName: "arrowshape.turn.up.left", accessibilityLabel: "回复评论")
         configureActionButton(quoteButtonNode, systemImageName: "quote.bubble", accessibilityLabel: "引用评论")
     }
@@ -278,6 +297,28 @@ final class CommentCellNode: ASCellNode {
         }
         replyButtonNode.addTarget(self, action: #selector(replyTapped), forControlEvents: .touchUpInside)
         quoteButtonNode.addTarget(self, action: #selector(quoteTapped), forControlEvents: .touchUpInside)
+    }
+
+    private static func makeAuthorBadgeNode(text: String) -> ASButtonNode {
+        let node = ASButtonNode()
+        let font = UIFont.preferredFont(forTextStyle: .caption2)
+        node.setAttributedTitle(
+            NSAttributedString(
+                string: text,
+                attributes: [
+                    .font: font,
+                    .foregroundColor: UIColor.label
+                ]
+            ),
+            for: .normal
+        )
+        node.contentEdgeInsets = UIEdgeInsets(top: 2, left: 5, bottom: 2, right: 5)
+        node.cornerRadius = 4
+        node.borderWidth = 1
+        node.borderColor = UIColor.separator.cgColor
+        node.isUserInteractionEnabled = false
+        node.accessibilityLabel = text
+        return node
     }
 
     private func makeFooterActionStack() -> ASLayoutSpec {
@@ -298,15 +339,48 @@ final class CommentCellNode: ASCellNode {
         return actionStack
     }
 
-    private func configureActionButton(_ button: ASButtonNode, systemImageName: String, accessibilityLabel: String) {
+    private func configureActionButton(
+        _ button: ASButtonNode,
+        systemImageName: String,
+        accessibilityLabel: String,
+        count: Int? = nil
+    ) {
         let configuration = UIImage.SymbolConfiguration(pointSize: 15, weight: .regular)
         let image = UIImage(systemName: systemImageName, withConfiguration: configuration)?
             .withTintColor(UIColor.secondaryLabel.withAlphaComponent(0.72), renderingMode: .alwaysOriginal)
-        button.setAttributedTitle(nil, for: .normal)
         button.setImage(image, for: .normal)
+        let displayCount = count.flatMap { $0 > 0 ? $0 : nil }
+        button.contentSpacing = displayCount == nil ? 0 : 4
         button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
-        button.style.preferredSize = CGSize(width: 40, height: 32)
-        button.accessibilityLabel = accessibilityLabel
+        if let displayCount {
+            let countText = Self.reactionCountText(displayCount)
+            let font = UIFont.preferredFont(forTextStyle: .caption1)
+            button.setAttributedTitle(
+                NSAttributedString(
+                    string: countText,
+                    attributes: [
+                        .font: font,
+                        .foregroundColor: UIColor.secondaryLabel
+                    ]
+                ),
+                for: .normal
+            )
+            button.style.preferredSize = CGSize(width: Self.actionButtonWidth(for: countText, font: font), height: 32)
+            button.accessibilityLabel = "\(accessibilityLabel) \(countText)"
+        } else {
+            button.setAttributedTitle(nil, for: .normal)
+            button.style.preferredSize = CGSize(width: 40, height: 32)
+            button.accessibilityLabel = accessibilityLabel
+        }
+    }
+
+    private static func reactionCountText(_ count: Int) -> String {
+        "\(max(0, count))"
+    }
+
+    private static func actionButtonWidth(for countText: String, font: UIFont) -> CGFloat {
+        let textWidth = (countText as NSString).size(withAttributes: [.font: font]).width
+        return max(52, ceil(15 + 4 + textWidth + 16))
     }
 
     @discardableResult
@@ -326,6 +400,24 @@ final class CommentCellNode: ASCellNode {
 
     var debugPosterBadgeAttributedText: NSAttributedString? {
         comment.isPoster ? posterBadgeNode.attributedText : nil
+    }
+
+    var debugAuthorBadgeTexts: [String] {
+        authorBadgeNodes.compactMap { $0.attributedTitle(for: .normal)?.string }
+    }
+
+    var debugAuthorBadgeBorderWidths: [CGFloat] {
+        authorBadgeNodes.map(\.borderWidth)
+    }
+
+    var debugAuthorBadgeTitleColors: [UIColor] {
+        authorBadgeNodes.compactMap {
+            $0.attributedTitle(for: .normal)?.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
+        }
+    }
+
+    var debugHotBadgeImage: UIImage? {
+        comment.isHot ? hotBadgeNode.image : nil
     }
 
     var debugReplyActionTitle: String? {
@@ -352,6 +444,14 @@ final class CommentCellNode: ASCellNode {
             replyButtonNode,
             quoteButtonNode
         ].map { $0.accessibilityLabel ?? "" }
+    }
+
+    var debugReactionActionTitles: [String?] {
+        [
+            likeButtonNode,
+            chickenLegButtonNode,
+            opposeButtonNode
+        ].map { $0.attributedTitle(for: .normal)?.string }
     }
 
     @objc private func replyTapped() {

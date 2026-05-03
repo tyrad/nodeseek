@@ -44,11 +44,13 @@ enum XPathRules {
     static let postDetailNextPage = "//*[contains(@class, 'comment-container')]//a[@rel='next' and contains(@class, 'pager-next')]"
     static let contentAuthor = ".//*[contains(@class, 'author-name')]"
     static let contentPosterBadge = ".//*[contains(concat(' ', normalize-space(@class), ' '), ' author-info ')]//*[contains(concat(' ', normalize-space(@class), ' '), ' is-poster ') and normalize-space()='楼主']"
+    static let contentAuthorBadges = ".//*[contains(concat(' ', normalize-space(@class), ' '), ' author-info ')]//*[contains(concat(' ', normalize-space(@class), ' '), ' nsk-badge ') or contains(concat(' ', normalize-space(@class), ' '), ' role-tag ')]"
     static let contentAuthorProfileLink = ".//*[contains(@class, 'author-name') and @href]"
     static let contentAvatarProfileLink = ".//*[contains(concat(' ', normalize-space(@class), ' '), ' avatar-wrapper ')]//a[contains(@href, '/space/')]"
     static let contentCreatedAt = ".//*[contains(@class, 'date-created')]//time"
     static let contentCategory = ".//*[contains(@class, 'content-category')]//a"
     static let contentFloor = ".//*[contains(@class, 'floor-link')]"
+    static let contentHotBadge = ".//*[contains(concat(' ', normalize-space(@class), ' '), ' hot-badge ')]"
     static let contentArticle = ".//*[self::article or self::div][contains(concat(' ', normalize-space(@class), ' '), ' post-content ')]"
     static let postDetailRestrictedNotice = "//*[@id='nsk-body-left']//*[(contains(normalize-space(.), '需要注册用户才能查看') or contains(normalize-space(.), '权限不足')) and not(*)][1] | //*[contains(concat(' ', normalize-space(@class), ' '), ' restricted-post ')]//*[(contains(normalize-space(.), '需要注册用户才能查看') or contains(normalize-space(.), '权限不足'))][1]"
 }

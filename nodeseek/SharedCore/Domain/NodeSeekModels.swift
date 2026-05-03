@@ -136,10 +136,15 @@ struct Comment: Equatable, Sendable {
     let isPoster: Bool
     let avatarURL: URL?
     let authorProfileURL: URL?
+    let authorBadgeTexts: [String]
     let floorText: String?
     let createdAtText: String?
     let createdAtTitleText: String?
     let contentHTML: String
+    let isHot: Bool
+    let likeCount: Int?
+    let chickenLegCount: Int?
+    let opposeCount: Int?
 
     init(
         id: String,
@@ -148,10 +153,15 @@ struct Comment: Equatable, Sendable {
         isPoster: Bool = false,
         avatarURL: URL?,
         authorProfileURL: URL? = nil,
+        authorBadgeTexts: [String] = [],
         floorText: String?,
         createdAtText: String?,
         createdAtTitleText: String? = nil,
-        contentHTML: String
+        contentHTML: String,
+        isHot: Bool = false,
+        likeCount: Int? = nil,
+        chickenLegCount: Int? = nil,
+        opposeCount: Int? = nil
     ) {
         self.id = id
         self.anchorID = anchorID
@@ -159,10 +169,15 @@ struct Comment: Equatable, Sendable {
         self.isPoster = isPoster
         self.avatarURL = avatarURL
         self.authorProfileURL = authorProfileURL
+        self.authorBadgeTexts = authorBadgeTexts
         self.floorText = floorText
         self.createdAtText = createdAtText
         self.createdAtTitleText = createdAtTitleText
         self.contentHTML = contentHTML
+        self.isHot = isHot
+        self.likeCount = likeCount
+        self.chickenLegCount = chickenLegCount
+        self.opposeCount = opposeCount
     }
 }
 

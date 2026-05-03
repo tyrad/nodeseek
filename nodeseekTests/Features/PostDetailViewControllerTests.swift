@@ -720,6 +720,48 @@ struct PostDetailViewControllerTests {
         #expect(node.debugPosterBadgeAttributedText?.string == "楼主")
     }
 
+    @Test func commentCellShowsHotIconBeforeFloorNumber() {
+        let comment = Comment(
+            id: "326",
+            authorName: "hostlocmjj",
+            avatarURL: nil,
+            floorText: "#326",
+            createdAtText: "刚刚",
+            contentHTML: "<p>热门评论</p>",
+            isHot: true
+        )
+        let node = CommentCellNode(
+            comment: comment,
+            renderedBody: [],
+            onImageTapped: { _, _ in },
+            onTextLayoutInvalidated: {}
+        )
+
+        #expect(node.debugHotBadgeImage != nil)
+    }
+
+    @Test func commentCellShowsDynamicAuthorBadgeText() {
+        let comment = Comment(
+            id: "326",
+            authorName: "hostlocmjj",
+            avatarURL: nil,
+            authorBadgeTexts: ["已停用"],
+            floorText: "#326",
+            createdAtText: "刚刚",
+            contentHTML: "<p>评论</p>"
+        )
+        let node = CommentCellNode(
+            comment: comment,
+            renderedBody: [],
+            onImageTapped: { _, _ in },
+            onTextLayoutInvalidated: {}
+        )
+
+        #expect(node.debugAuthorBadgeTexts == ["已停用"])
+        #expect(node.debugAuthorBadgeBorderWidths == [1])
+        #expect(node.debugAuthorBadgeTitleColors == [.label])
+    }
+
     @Test func commentCellUsesIconOnlyFooterActions() {
         let comment = Comment(
             id: "1",
@@ -746,6 +788,33 @@ struct PostDetailViewControllerTests {
         #expect(node.debugQuoteActionImage != nil)
         #expect(node.debugFooterActionAccessibilityLabels == ["点赞", "加鸡腿", "反对", "回复评论", "引用评论"])
         #expect(node.debugActionsAreDisplayedBelowBody)
+    }
+
+    @Test func commentCellShowsReactionCountsWhenAvailable() {
+        let comment = Comment(
+            id: "1",
+            authorName: "ipv4",
+            avatarURL: nil,
+            floorText: "#1",
+            createdAtText: "刚刚",
+            contentHTML: "<p>评论</p>",
+            likeCount: 0,
+            chickenLegCount: 1,
+            opposeCount: 0
+        )
+        let node = CommentCellNode(
+            comment: comment,
+            renderedBody: [],
+            onImageTapped: { _, _ in },
+            onTextLayoutInvalidated: {}
+        )
+        _ = node.layoutThatFits(ASSizeRange(
+            min: .zero,
+            max: CGSize(width: 360, height: CGFloat.greatestFiniteMagnitude)
+        ))
+
+        #expect(node.debugReactionActionTitles == [nil, "1", nil])
+        #expect(node.debugFooterActionAccessibilityLabels.prefix(3) == ["点赞", "加鸡腿 1", "反对"])
     }
 
     @Test func tableNodeKeepsViewportWidthAndMeasuresContentHeight() {

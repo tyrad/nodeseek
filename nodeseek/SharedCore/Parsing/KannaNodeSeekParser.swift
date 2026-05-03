@@ -471,6 +471,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
             isPoster: item.at_xpath(XPathRules.contentPosterBadge) != nil,
             avatarURL: avatarURL,
             authorProfileURL: authorProfileURL,
+            authorBadgeTexts: parseAuthorBadgeTexts(in: item),
             floorText: firstText(in: item, xpaths: [XPathRules.contentFloor]),
             createdAtText: firstText(in: item, xpaths: [XPathRules.contentCreatedAt]),
             createdAtTitleText: firstAttribute(
@@ -478,8 +479,106 @@ struct KannaNodeSeekParser: NodeSeekParser {
                 xpaths: [XPathRules.contentCreatedAt],
                 attribute: "title"
             ),
-            contentHTML: item.at_xpath(XPathRules.contentArticle)?.innerHTML?.trimmedNonEmpty ?? ""
+            contentHTML: item.at_xpath(XPathRules.contentArticle)?.innerHTML?.trimmedNonEmpty ?? "",
+            isHot: item.at_xpath(XPathRules.contentHotBadge) != nil,
+            likeCount: parseReactionCount(in: item, kind: .like),
+            chickenLegCount: parseReactionCount(in: item, kind: .chickenLeg),
+            opposeCount: parseReactionCount(in: item, kind: .oppose)
         )
+    }
+
+    private func parseAuthorBadgeTexts(in item: Kanna.XMLElement) -> [String] {
+        var seen = Set<String>()
+        return item.xpath(XPathRules.contentAuthorBadges).compactMap { node in
+            guard node.at_xpath("ancestor::*[contains(concat(' ', normalize-space(@class), ' '), ' hot-badge ')]") == nil else {
+                return nil
+            }
+            let value = node.text?.normalizedNonEmpty
+            guard let value, value != "楼主", seen.insert(value).inserted else {
+                return nil
+            }
+            return value
+        }
+    }
+
+    fileprivate enum ReactionKind {
+        case like
+        case chickenLeg
+        case oppose
+
+        var rootAttributes: [String] {
+            switch self {
+            case .like:
+                return ["data-like-count", "data-likes", "data-upvote-count", "data-up-count"]
+            case .chickenLeg:
+                return ["data-chicken-leg-count", "data-chicken-count", "data-stardust-count", "data-coin-count"]
+            case .oppose:
+                return ["data-oppose-count", "data-dislike-count", "data-downvote-count", "data-down-count"]
+            }
+        }
+
+        var countAttributes: [String] {
+            switch self {
+            case .like:
+                return ["data-like-count", "data-likes", "data-upvote-count", "data-up-count", "data-count", "aria-label", "title"]
+            case .chickenLeg:
+                return ["data-chicken-leg-count", "data-chicken-count", "data-stardust-count", "data-coin-count", "data-count", "aria-label", "title"]
+            case .oppose:
+                return ["data-oppose-count", "data-dislike-count", "data-downvote-count", "data-down-count", "data-count", "aria-label", "title"]
+            }
+        }
+
+        var markers: [String] {
+            switch self {
+            case .like:
+                return ["like", "upvote", "thumbsup", "thumb-up", "vote-up", "点赞", "赞同"]
+            case .chickenLeg:
+                return ["chicken", "chicken-leg", "stardust", "coin", "drumstick", "鸡腿", "加鸡腿"]
+            case .oppose:
+                return ["oppose", "dislike", "downvote", "thumbsdown", "thumb-down", "vote-down", "点踩", "反对"]
+            }
+        }
+    }
+
+    private func parseReactionCount(in item: Kanna.XMLElement, kind: ReactionKind) -> Int? {
+        if let count = firstInteger(inAttributesOf: item, attributes: kind.rootAttributes) {
+            return count
+        }
+
+        for node in item.xpath(".//*") where node.matchesReaction(kind) {
+            if let count = firstInteger(inAttributesOf: node, attributes: kind.countAttributes) {
+                return count
+            }
+
+            if let countText = node
+                .at_xpath(".//*[contains(concat(' ', normalize-space(@class), ' '), ' count ') or contains(@class, 'num') or contains(@class, 'badge')]")?
+                .text,
+               let count = Self.firstInteger(in: countText) {
+                return count
+            }
+
+            if let text = node.text, let count = Self.firstInteger(in: text) {
+                return count
+            }
+
+            if let siblingText = node.at_xpath("./following-sibling::*[1]")?.text,
+               let count = Self.firstInteger(in: siblingText) {
+                return count
+            }
+        }
+
+        return nil
+    }
+
+    private func firstInteger(inAttributesOf node: Kanna.XMLElement, attributes: [String]) -> Int? {
+        for attribute in attributes {
+            guard let value = node[attribute]?.trimmedNonEmpty else { continue }
+            if let integer = Self.firstInteger(in: value) {
+                return integer
+            }
+        }
+
+        return nil
     }
 
     private func parseUserProfileURL(in item: Kanna.XMLElement) -> URL? {
@@ -539,5 +638,27 @@ private extension String {
             .joined(separator: " ")
 
         return value.isEmpty ? nil : value
+    }
+}
+
+private extension Kanna.XMLElement {
+    func matchesReaction(_ kind: KannaNodeSeekParser.ReactionKind) -> Bool {
+        let haystack = [
+            self["class"],
+            self["id"],
+            self["name"],
+            self["role"],
+            self["aria-label"],
+            self["title"],
+            self["data-action"],
+            self["data-type"],
+            self["data-testid"]
+        ]
+            .compactMap { $0?.trimmedNonEmpty }
+            .joined(separator: " ")
+            .lowercased()
+
+        guard haystack.isEmpty == false else { return false }
+        return kind.markers.contains { haystack.contains($0.lowercased()) }
     }
 }

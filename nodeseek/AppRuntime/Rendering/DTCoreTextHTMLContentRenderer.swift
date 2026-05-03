@@ -59,7 +59,7 @@ struct DTCoreTextHTMLContentRenderer {
         options: []
     )
     static let standaloneImageContainerRegex = try! NSRegularExpression(
-        pattern: "(?is)<(p|div|section)\\b[^>]*>.*?</\\1>",
+        pattern: "(?is)<(p|div|section|blockquote)\\b[^>]*>.*?</\\1>",
         options: []
     )
     static let containerShellRegex = try! NSRegularExpression(
