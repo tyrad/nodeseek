@@ -129,12 +129,67 @@ final class WebViewCommentSubmissionAutomator: CommentSubmissionAutomating {
 }
 
 struct PostCollectionResponse: Equatable, Sendable {
+    let success: Bool?
     let message: String?
+    let postCollectionCount: Int?
+    let userCollectionCount: Int?
+
+    init(
+        success: Bool? = nil,
+        message: String? = nil,
+        postCollectionCount: Int? = nil,
+        userCollectionCount: Int? = nil
+    ) {
+        self.success = success
+        self.message = message
+        self.postCollectionCount = postCollectionCount
+        self.userCollectionCount = userCollectionCount
+    }
+}
+
+struct PostCollectionAutomationResponse: Equatable, Sendable {
+    let ok: Bool
+    let statusCode: Int?
+    let response: PostCollectionResponse
+    let reason: String
+    let body: String?
+
+    init(
+        ok: Bool,
+        statusCode: Int? = nil,
+        response: PostCollectionResponse,
+        reason: String,
+        body: String? = nil
+    ) {
+        self.ok = ok
+        self.statusCode = statusCode
+        self.response = response
+        self.reason = reason
+        self.body = body
+    }
+}
+
+@MainActor
+protocol PostCollectionAutomating: AnyObject {
+    func submitCollection(postID: Int, action: String, referer: URL) async throws -> PostCollectionAutomationResponse
+}
+
+final class WebViewPostCollectionAutomator: PostCollectionAutomating {
+    private let client: HiddenWebViewPostCollectionClient
+
+    init(client: HiddenWebViewPostCollectionClient = HiddenWebViewPostCollectionClient()) {
+        self.client = client
+    }
+
+    func submitCollection(postID: Int, action: String, referer: URL) async throws -> PostCollectionAutomationResponse {
+        try await client.submitCollection(postID: postID, action: action, referer: referer)
+    }
 }
 
 @MainActor
 protocol PostCollectionSubmitting: AnyObject {
     func addFavorite(postID: String, referer: URL) async throws -> PostCollectionResponse
+    func removeFavorite(postID: String, referer: URL) async throws -> PostCollectionResponse
 }
 
 enum NodeSeekPostCollectionSubmitterError: LocalizedError, Equatable {
@@ -157,21 +212,22 @@ enum NodeSeekPostCollectionSubmitterError: LocalizedError, Equatable {
 @MainActor
 final class NodeSeekPostCollectionSubmitter: PostCollectionSubmitting {
     private let baseURL: URL
-    private let session: URLSession
-    private let cookieSynchronizer: CookieSynchronizing
+    private let automation: PostCollectionAutomating
 
     init(
         baseURL: URL = NodeSeekSite.baseURL,
-        session: URLSession = .shared,
-        cookieSynchronizer: CookieSynchronizing? = nil
+        automation: PostCollectionAutomating? = nil
     ) {
         self.baseURL = baseURL
-        self.session = session
-        self.cookieSynchronizer = cookieSynchronizer ?? CookieBridge()
+        self.automation = automation ?? WebViewPostCollectionAutomator()
     }
 
     func addFavorite(postID: String, referer: URL) async throws -> PostCollectionResponse {
         try await submit(postID: postID, action: "add", referer: referer)
+    }
+
+    func removeFavorite(postID: String, referer: URL) async throws -> PostCollectionResponse {
+        try await submit(postID: postID, action: "remove", referer: referer)
     }
 
     private func submit(postID: String, action: String, referer: URL) async throws -> PostCollectionResponse {
@@ -179,44 +235,53 @@ final class NodeSeekPostCollectionSubmitter: PostCollectionSubmitting {
             throw NodeSeekPostCollectionSubmitterError.invalidPostID
         }
 
-        await cookieSynchronizer.syncWebViewCookiesToURLSession()
+        _ = baseURL
+        let automationResponse = try await automation.submitCollection(
+            postID: numericPostID,
+            action: action,
+            referer: referer
+        )
+        let collectionResponse = automationResponse.response
 
-        var request = URLRequest(url: baseURL.appendingPathComponent("api/statistics/collection"))
-        request.httpMethod = "POST"
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        WebRequestFingerprint.applyJSONHeaders(to: &request, referer: referer)
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "postId": numericPostID,
-            "action": action
-        ])
-
-        let (data, response) = try await session.data(for: request)
-        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
-        let message = Self.message(from: data)
-
-        guard (200..<300).contains(statusCode) else {
-            if let message {
+        if let statusCode = automationResponse.statusCode, !(200..<300).contains(statusCode) {
+            if let message = collectionResponse.message {
                 throw NodeSeekPostCollectionSubmitterError.serverMessage(message)
             }
             throw NodeSeekPostCollectionSubmitterError.httpStatus(statusCode)
         }
 
-        return PostCollectionResponse(message: message)
+        guard automationResponse.ok, collectionResponse.success != false else {
+            if let message = collectionResponse.message {
+                throw NodeSeekPostCollectionSubmitterError.serverMessage(message)
+            }
+            throw NodeSeekPostCollectionSubmitterError.serverMessage("收藏失败，请稍后重试。")
+        }
+
+        return collectionResponse
     }
 
-    private static func message(from data: Data) -> String? {
+    static func collectionResponse(from data: Data) -> PostCollectionResponse {
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            var message: String?
             for key in ["message", "msg", "error"] {
                 guard let value = json[key] as? String else { continue }
                 let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
                 if trimmed.isEmpty == false {
-                    return trimmed
+                    message = trimmed
+                    break
                 }
             }
+
+            return PostCollectionResponse(
+                success: json["success"] as? Bool,
+                message: message,
+                postCollectionCount: json["postCollectionCount"] as? Int,
+                userCollectionCount: json["userCollectionCount"] as? Int
+            )
         }
 
         let text = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+        return PostCollectionResponse(message: trimmed.isEmpty ? nil : trimmed)
     }
 }

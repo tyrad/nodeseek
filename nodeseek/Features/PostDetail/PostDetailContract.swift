@@ -16,8 +16,10 @@ protocol PostDetailViewProtocol: AnyObject {
     func showError(message: String)
     func showToast(message: String)
     func setReplySubmitting(_ isSubmitting: Bool)
+    func setFavoriteSubmitting(_ isSubmitting: Bool)
     func finishReplySubmission()
     func render(detail: PostDetail)
+    func updatePostBody(detail: PostDetail)
     func renderLoginRequired(message: String)
 }
 
@@ -36,6 +38,7 @@ protocol PostDetailInteractorInput: AnyObject {
     func loadPostDetail(page: Int)
     func submitReply(content: String)
     func addFavorite()
+    func removeFavorite()
 }
 
 // MARK: - Interactor Output (Interactor -> Presenter)
@@ -48,6 +51,8 @@ protocol PostDetailInteractorOutput: AnyObject {
     func didFailSubmitReply(error: String)
     func didAddFavorite(_ response: PostCollectionResponse)
     func didFailAddFavorite(error: String)
+    func didRemoveFavorite(_ response: PostCollectionResponse)
+    func didFailRemoveFavorite(error: String)
 }
 
 // MARK: - Router Protocol (Presenter -> Router)

@@ -14,6 +14,8 @@ enum XPathRules {
     static let accountStatSpans = ".//*[contains(concat(' ', normalize-space(@class), ' '), ' user-stat ')]//span[normalize-space()]"
     static let accountTempScript = "//script[@id='temp-script'][1]"
     static let accountCapturedConfig = "//script[@id='nodeseek-captured-config'][1]"
+    static let accountNotificationLink = "//*[@id='nsk-head']//a[contains(@href, '/notification')][1]"
+    static let accountNotificationIcon = ".//*[contains(concat(' ', normalize-space(@class), ' '), ' iconpark-icon ')][1]"
 
     static let postListItems = "//article[contains(@class, 'post-item')] | //li[contains(@class, 'post-list-item')]"
     static let postTitle = ".//*[contains(@class, 'post-title') and self::a] | .//*[contains(@class, 'post-title')]//a[contains(@href, '/post-') or contains(@href, '/post/')]"

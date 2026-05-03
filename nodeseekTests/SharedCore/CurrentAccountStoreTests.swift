@@ -20,7 +20,11 @@ struct CurrentAccountStoreTests {
             isLoggedIn: true,
             avatarURL: URL(string: "https://www.nodeseek.com/avatar/31037.png"),
             profileURL: URL(string: "https://www.nodeseek.com/space/31037"),
-            stats: ["等级 Lv 1", "鸡腿 306"]
+            stats: ["等级 Lv 1", "鸡腿 306"],
+            notification: AccountNotification(
+                url: try #require(URL(string: "https://www.nodeseek.com/notification")),
+                iconColorCSS: "rgb(243, 17, 17)"
+            )
         )
         let savedAt = Date(timeIntervalSince1970: 1_777_777_777)
 

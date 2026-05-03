@@ -82,6 +82,11 @@ extension PostDetailViewController: PostDetailViewProtocol {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: workItem)
     }
 
+    func setFavoriteSubmitting(_ isSubmitting: Bool) {
+        guard isSubmitting else { return }
+        showToast(message: "正在处理")
+    }
+
     func render(detail: PostDetail) {
         title = nil
         loginButton.isHidden = true
@@ -139,6 +144,45 @@ extension PostDetailViewController: PostDetailViewProtocol {
             shouldScrollToTop: shouldScrollToTop,
             shouldScheduleMissingRender: true
         )
+    }
+
+    func updatePostBody(detail: PostDetail) {
+        guard hasRenderedDetailContent else {
+            render(detail: detail)
+            return
+        }
+        let nextContent = PostDetailHeaderContent(detail: detail)
+        guard let previousContent = currentHeaderContent else {
+            configureHeader(nextContent, renderedContent: headerRenderedContent)
+            scheduleHeaderReload()
+            return
+        }
+
+        if Self.isHeaderLayoutEquivalent(previousContent, nextContent) {
+            currentHeaderContent = nextContent
+            if let row = detailRows.firstIndex(where: { if case .header = $0 { return true }; return false }),
+               let node = tableNode.nodeForRow(at: IndexPath(row: row, section: 0)) as? PostBodyCellNode {
+                node.updateFavoriteReaction(count: nextContent.favoriteCount, isCollected: nextContent.isFavoriteCollected)
+            }
+            return
+        }
+
+        configureHeader(nextContent, renderedContent: headerRenderedContent)
+        scheduleHeaderReload()
+    }
+
+    private static func isHeaderLayoutEquivalent(
+        _ lhs: PostDetailHeaderContent,
+        _ rhs: PostDetailHeaderContent
+    ) -> Bool {
+        lhs.postID == rhs.postID
+            && lhs.title == rhs.title
+            && lhs.requiredReadingLevel == rhs.requiredReadingLevel
+            && lhs.authorName == rhs.authorName
+            && lhs.avatarURL == rhs.avatarURL
+            && lhs.authorProfileURL == rhs.authorProfileURL
+            && lhs.metadataText == rhs.metadataText
+            && lhs.contentHTML == rhs.contentHTML
     }
 
     private var shouldPrepareInitialContentReveal: Bool {

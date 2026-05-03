@@ -13,11 +13,13 @@ final class PostListSideMenuViewController: UIViewController {
     var onLoginTapped: (() -> Void)?
     var onAccountProfileTapped: ((URL) -> Void)?
     var onNewDiscussionTapped: (() -> Void)?
+    var onNotificationTapped: ((URL) -> Void)?
     var onRecentVisitedTapped: (() -> Void)?
     var onSearchTapped: (() -> Void)?
     var onSettingsTapped: (() -> Void)?
     private let accountController: PostListSideMenuAccountController
     private let avatarLoader = AvatarImageLoader.shared
+    private var notificationURL = NodeSeekSite.baseURL.appendingPathComponent("notification")
 
     private static let defaultAvatarImage: UIImage? = {
         let configuration = UIImage.SymbolConfiguration(pointSize: 48, weight: .regular)
@@ -118,6 +120,12 @@ final class PostListSideMenuViewController: UIViewController {
         return button
     }()
 
+    private let notificationButton: UIButton = {
+        let button = PostListSideMenuViewController.makeMenuButton(title: "通知", systemImageName: "bell")
+        button.accessibilityIdentifier = "post-list-side-menu-notification-button"
+        return button
+    }()
+
     init(
         currentAccountStore: CurrentAccountStore = .shared,
         accountRefresher: (any CurrentAccountRefreshing)? = nil,
@@ -162,6 +170,62 @@ final class PostListSideMenuViewController: UIViewController {
         return button
     }
 
+    private static func color(fromCSSColor cssColor: String?) -> UIColor? {
+        guard let value = cssColor?.trimmingCharacters(in: .whitespacesAndNewlines), value.isEmpty == false else {
+            return nil
+        }
+
+        if value.hasPrefix("#") {
+            return color(fromHex: value)
+        }
+
+        let rgbPattern = #"(?i)^rgba?\s*\(([^)]+)\)$"#
+        guard let match = value.range(of: rgbPattern, options: .regularExpression) else {
+            return nil
+        }
+        let content = value[match]
+            .drop { $0 != "(" }
+            .dropFirst()
+            .dropLast()
+        let components = content
+            .split(separator: ",")
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard components.count >= 3,
+              let red = cssColorComponent(components[0]),
+              let green = cssColorComponent(components[1]),
+              let blue = cssColorComponent(components[2]) else {
+            return nil
+        }
+        let alpha = components.count >= 4 ? (Double(components[3]) ?? 1) : 1
+        return UIColor(
+            red: red,
+            green: green,
+            blue: blue,
+            alpha: max(0, min(1, CGFloat(alpha)))
+        )
+    }
+
+    private static func color(fromHex value: String) -> UIColor? {
+        let hex = value.dropFirst()
+        guard hex.count == 6, let raw = Int(hex, radix: 16) else {
+            return nil
+        }
+        return UIColor(
+            red: CGFloat((raw >> 16) & 0xFF) / 255,
+            green: CGFloat((raw >> 8) & 0xFF) / 255,
+            blue: CGFloat(raw & 0xFF) / 255,
+            alpha: 1
+        )
+    }
+
+    private static func cssColorComponent(_ value: String) -> CGFloat? {
+        if value.hasSuffix("%"), let percent = Double(value.dropLast()) {
+            return CGFloat(max(0, min(100, percent)) / 100)
+        }
+        guard let raw = Double(value) else { return nil }
+        return CGFloat(max(0, min(255, raw)) / 255)
+    }
+
     func show(animated: Bool) {
         accountController.refreshIfNeeded()
         setVisible(true, animated: animated)
@@ -178,6 +242,8 @@ final class PostListSideMenuViewController: UIViewController {
             : "登录后同步账号信息"
         accountHeaderButton.accessibilityLabel = account.isLoggedIn ? "账号信息" : "登录账号"
         accountHeaderButton.isEnabled = !account.isLoggedIn || account.profileURL != nil
+        notificationURL = account.notification?.url ?? NodeSeekSite.baseURL.appendingPathComponent("notification")
+        applyNotificationColor(account.notification?.iconColorCSS)
 
         if account.isLoggedIn {
             avatarLoader.loadAvatar(
@@ -211,6 +277,7 @@ final class PostListSideMenuViewController: UIViewController {
         accountHeaderButton.addTarget(self, action: #selector(accountHeaderTapped), for: .touchUpInside)
         settingsButton.addTarget(self, action: #selector(settingsButtonTapped), for: .touchUpInside)
         newDiscussionButton.addTarget(self, action: #selector(newDiscussionButtonTapped), for: .touchUpInside)
+        notificationButton.addTarget(self, action: #selector(notificationButtonTapped), for: .touchUpInside)
         recentVisitedButton.addTarget(self, action: #selector(recentVisitedButtonTapped), for: .touchUpInside)
         searchButton.addTarget(self, action: #selector(searchButtonTapped), for: .touchUpInside)
 
@@ -221,6 +288,7 @@ final class PostListSideMenuViewController: UIViewController {
         sideMenuView.addSubview(statsLabel)
         sideMenuView.addSubview(accountHeaderButton)
         sideMenuView.addSubview(newDiscussionButton)
+        sideMenuView.addSubview(notificationButton)
         sideMenuView.addSubview(searchButton)
         sideMenuView.addSubview(recentVisitedButton)
         sideMenuView.addSubview(settingsButton)
@@ -275,11 +343,22 @@ final class PostListSideMenuViewController: UIViewController {
             searchButton.bottomAnchor.constraint(equalTo: recentVisitedButton.topAnchor, constant: -8),
             searchButton.heightAnchor.constraint(equalToConstant: 48),
 
+            notificationButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
+            notificationButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
+            notificationButton.bottomAnchor.constraint(equalTo: searchButton.topAnchor, constant: -8),
+            notificationButton.heightAnchor.constraint(equalToConstant: 48),
+
             newDiscussionButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
             newDiscussionButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
-            newDiscussionButton.bottomAnchor.constraint(equalTo: searchButton.topAnchor, constant: -8),
+            newDiscussionButton.bottomAnchor.constraint(equalTo: notificationButton.topAnchor, constant: -8),
             newDiscussionButton.heightAnchor.constraint(equalToConstant: 48)
         ])
+    }
+
+    private func applyNotificationColor(_ cssColor: String?) {
+        var configuration = notificationButton.configuration
+        configuration?.baseForegroundColor = Self.color(fromCSSColor: cssColor) ?? .label
+        notificationButton.configuration = configuration
     }
 
     @objc private func backdropTapped() {
@@ -310,6 +389,11 @@ final class PostListSideMenuViewController: UIViewController {
         } else {
             onLoginTapped?()
         }
+    }
+
+    @objc private func notificationButtonTapped() {
+        hide(animated: true)
+        onNotificationTapped?(notificationURL)
     }
 
     @objc private func recentVisitedButtonTapped() {

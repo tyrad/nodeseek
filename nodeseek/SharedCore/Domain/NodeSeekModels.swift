@@ -107,6 +107,7 @@ struct PostDetail: Equatable, Sendable {
     let chickenLegCount: Int?
     let opposeCount: Int?
     let favoriteCount: Int?
+    let isFavoriteCollected: Bool
     let comments: [Comment]
     let page: Int
     let pagination: PostDetailPagination?
@@ -125,6 +126,7 @@ struct PostDetail: Equatable, Sendable {
         chickenLegCount: Int? = nil,
         opposeCount: Int? = nil,
         favoriteCount: Int? = nil,
+        isFavoriteCollected: Bool = false,
         comments: [Comment],
         page: Int = 1,
         pagination: PostDetailPagination? = nil,
@@ -142,6 +144,7 @@ struct PostDetail: Equatable, Sendable {
         self.chickenLegCount = chickenLegCount
         self.opposeCount = opposeCount
         self.favoriteCount = favoriteCount
+        self.isFavoriteCollected = isFavoriteCollected
         self.comments = comments
         self.page = max(1, page)
         self.pagination = pagination

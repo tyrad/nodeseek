@@ -361,6 +361,9 @@ class PostListViewController: UIViewController {
         sideMenuViewController.onNewDiscussionTapped = { [weak self] in
             self?.presenter.didTapNewDiscussion()
         }
+        sideMenuViewController.onNotificationTapped = { [weak self] url in
+            self?.presenter.didTapNotification(url: url)
+        }
         sideMenuViewController.onRecentVisitedTapped = { [weak self] in
             self?.presenter.didTapRecentVisited()
         }

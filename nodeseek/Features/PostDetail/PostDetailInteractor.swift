@@ -128,6 +128,29 @@ class PostDetailInteractor: PostDetailInteractorInput {
         }
     }
 
+    func removeFavorite() {
+        guard let post else {
+            presenter?.didFailRemoveFavorite(error: PostDetailFavoriteError.missingPost.localizedDescription)
+            return
+        }
+
+        Task {
+            AppLog.info(.postDetail, "开始取消收藏帖子，postID=\(post.id)")
+            do {
+                let response = try await collectionSubmitter.removeFavorite(postID: post.id, referer: post.url)
+                await sessionStore.recordSuccess()
+                await MainActor.run {
+                    presenter?.didRemoveFavorite(response)
+                }
+            } catch {
+                AppLog.error(.postDetail, "取消收藏帖子失败: \(error.localizedDescription)")
+                await MainActor.run {
+                    presenter?.didFailRemoveFavorite(error: error.localizedDescription)
+                }
+            }
+        }
+    }
+
     private func loadDetail(postID: String, page: Int) async throws -> PostDetail? {
         AppLog.info(.postDetail, "详情请求开始，postID=\(postID), page=\(page)")
         let result = try await service.loadPostDetail(postID: postID, page: page)

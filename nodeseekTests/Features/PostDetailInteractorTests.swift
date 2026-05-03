@@ -185,6 +185,42 @@ struct PostDetailInteractorTests {
         #expect(presenter.addFavoriteErrorMessage == nil)
     }
 
+    @Test func removeFavoriteUsesCollectionSubmitterAndReportsSuccess() async throws {
+        let collectionSubmitter = SpyPostCollectionSubmitting(response: PostCollectionResponse(message: "已取消收藏"))
+        let presenter = SpyPostDetailInteractorOutput()
+        let post = Self.makePost()
+        let interactor = PostDetailInteractor(
+            post: post,
+            service: Self.makeUnusedService(),
+            collectionSubmitter: collectionSubmitter,
+            sessionStore: NodeSeekSessionStore()
+        )
+        interactor.presenter = presenter
+
+        interactor.removeFavorite()
+        await waitForInteractorCallbacks()
+
+        #expect(collectionSubmitter.removedPostID == post.id)
+        #expect(collectionSubmitter.removedReferer == post.url)
+        #expect(presenter.removeFavoriteResponse == PostCollectionResponse(message: "已取消收藏"))
+        #expect(presenter.removeFavoriteErrorMessage == nil)
+    }
+
+    @Test func removeFavoriteReportsMissingPost() {
+        let presenter = SpyPostDetailInteractorOutput()
+        let interactor = PostDetailInteractor(
+            post: nil,
+            service: Self.makeUnusedService(),
+            sessionStore: NodeSeekSessionStore()
+        )
+        interactor.presenter = presenter
+
+        interactor.removeFavorite()
+
+        #expect(presenter.removeFavoriteResponse == nil)
+        #expect(presenter.removeFavoriteErrorMessage == "缺少帖子信息，无法收藏。")
+    }
+
     @Test func addFavoriteReportsMissingPost() {
         let presenter = SpyPostDetailInteractorOutput()
         let interactor = PostDetailInteractor(
@@ -237,6 +273,8 @@ private final class SpyPostDetailInteractorOutput: PostDetailInteractorOutput {
     var submitReplyErrorMessage: String?
     var addFavoriteResponse: PostCollectionResponse?
     var addFavoriteErrorMessage: String?
+    var removeFavoriteResponse: PostCollectionResponse?
+    var removeFavoriteErrorMessage: String?
 
     func didLoadPostDetail(_ response: PostDetailResponse) {
         loadedResponse = response
@@ -269,6 +307,14 @@ private final class SpyPostDetailInteractorOutput: PostDetailInteractorOutput {
 
     func didFailAddFavorite(error: String) {
         addFavoriteErrorMessage = error
+    }
+
+    func didRemoveFavorite(_ response: PostCollectionResponse) {
+        removeFavoriteResponse = response
+    }
+
+    func didFailRemoveFavorite(error: String) {
+        removeFavoriteErrorMessage = error
     }
 }
 
@@ -327,6 +373,8 @@ private final class SpyPostCollectionSubmitting: PostCollectionSubmitting {
     private let response: PostCollectionResponse
     private(set) var submittedPostID: String?
     private(set) var submittedReferer: URL?
+    private(set) var removedPostID: String?
+    private(set) var removedReferer: URL?
 
     init(response: PostCollectionResponse) {
         self.response = response
@@ -335,6 +383,12 @@ private final class SpyPostCollectionSubmitting: PostCollectionSubmitting {
     func addFavorite(postID: String, referer: URL) async throws -> PostCollectionResponse {
         submittedPostID = postID
         submittedReferer = referer
+        return response
+    }
+
+    func removeFavorite(postID: String, referer: URL) async throws -> PostCollectionResponse {
+        removedPostID = postID
+        removedReferer = referer
         return response
     }
 }

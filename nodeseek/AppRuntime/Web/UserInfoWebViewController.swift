@@ -11,13 +11,15 @@ import WebKit
 
 final class UserInfoWebViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     private let profileURL: URL
+    private let pageTitle: String
     private let webView: WKWebView
     private let cookieBridge: CookieBridge
     private let loadingIndicator = UIActivityIndicatorView(style: .medium)
     private var loadTask: Task<Void, Never>?
 
-    init(profileURL: URL) {
+    init(profileURL: URL, title: String = "用户主页") {
         self.profileURL = Self.normalizedProfileURL(profileURL)
+        self.pageTitle = title
 
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
@@ -43,7 +45,7 @@ final class UserInfoWebViewController: UIViewController, WKNavigationDelegate, W
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "用户主页"
+        title = pageTitle
         view.backgroundColor = .systemBackground
         configureNavigationItems()
         configureWebView()

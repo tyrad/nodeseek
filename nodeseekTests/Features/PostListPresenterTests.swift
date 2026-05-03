@@ -109,6 +109,17 @@ struct PostListPresenterTests {
         #expect(router.navigateToSearchCount == 1)
     }
 
+    @Test func tappingNotificationRoutesToNotificationPage() throws {
+        let interactor = SpyPostListInteractor()
+        let router = SpyPostListRouter()
+        let presenter = PostListPresenter(interactor: interactor, router: router)
+        let url = try #require(URL(string: "https://www.nodeseek.com/notification"))
+
+        presenter.didTapNotification(url: url)
+
+        #expect(router.notificationURL == url)
+    }
+
     @Test func tappingSettingsRoutesToSettingsPage() {
         let interactor = SpyPostListInteractor()
         let router = SpyPostListRouter()
@@ -748,6 +759,7 @@ private final class SpyPostListRouter: PostListRouterProtocol {
     var selectedPage: Int?
     var recentVisitedStore: VisitedPostStoreProtocol?
     var userProfileURL: URL?
+    var notificationURL: URL?
     var navigateToLoginCount = 0
     var navigateToNewDiscussionCount = 0
     var navigateToSearchCount = 0
@@ -778,6 +790,10 @@ private final class SpyPostListRouter: PostListRouterProtocol {
 
     func navigateToNewDiscussion() {
         navigateToNewDiscussionCount += 1
+    }
+
+    func navigateToNotification(notificationURL: URL) {
+        self.notificationURL = notificationURL
     }
 
     func navigateToSearch() {

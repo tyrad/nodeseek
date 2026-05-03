@@ -88,6 +88,10 @@ class PostListPresenter: PostListPresenterProtocol {
         router.navigateToNewDiscussion()
     }
 
+    func didTapNotification(url: URL) {
+        router.navigateToNotification(notificationURL: url)
+    }
+
     func didTapRecentVisited() {
         router.navigateToRecentVisitedPosts(visitedStore: visitedStore)
     }

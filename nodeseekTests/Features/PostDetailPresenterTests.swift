@@ -205,9 +205,11 @@ struct PostDetailPresenterTests {
         presenter.setView(view)
 
         presenter.didTapFavorite()
+        #expect(view.toastMessage == "正在处理")
         presenter.didAddFavorite(PostCollectionResponse(message: "已收藏"))
 
         #expect(interactor.favoriteSubmitCount == 1)
+        #expect(view.favoriteSubmittingStates == [true, false])
         #expect(view.toastMessage == "已收藏")
     }
 
@@ -222,6 +224,129 @@ struct PostDetailPresenterTests {
         #expect(interactor.favoriteSubmitCount == 1)
     }
 
+    @Test func secondFavoriteTapAfterAddRemovesCollection() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        let view = SpyPostDetailView()
+        presenter.setView(view)
+
+        presenter.didTapFavorite()
+        presenter.didAddFavorite(PostCollectionResponse(message: "added"))
+        presenter.didTapFavorite()
+        presenter.didRemoveFavorite(PostCollectionResponse(message: "removed"))
+
+        #expect(interactor.favoriteSubmitCount == 1)
+        #expect(interactor.favoriteRemoveCount == 1)
+        #expect(view.favoriteSubmittingStates == [true, false, true, false])
+        #expect(view.toastMessage == "已取消收藏")
+    }
+
+    @Test func tappingFavoriteOnInitiallyCollectedPostRemovesCollection() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        let view = SpyPostDetailView()
+        presenter.setView(view)
+
+        presenter.didLoadPostDetail(PostDetailResponse(detail: .init(
+            id: "711898",
+            title: "已收藏帖子",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            isFavoriteCollected: true,
+            comments: []
+        )))
+        presenter.didTapFavorite()
+
+        #expect(interactor.favoriteSubmitCount == 0)
+        #expect(interactor.favoriteRemoveCount == 1)
+    }
+
+    @Test func addingFavoriteUpdatesPostBodyFromResponse() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        let view = SpyPostDetailView()
+        presenter.setView(view)
+
+        presenter.didLoadPostDetail(PostDetailResponse(detail: .init(
+            id: "711898",
+            title: "未收藏帖子",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            favoriteCount: 1,
+            isFavoriteCollected: false,
+            comments: []
+        )))
+        presenter.didTapFavorite()
+        presenter.didAddFavorite(PostCollectionResponse(message: "added", postCollectionCount: 2))
+
+        #expect(view.updatedPostBodyDetails.last?.favoriteCount == 2)
+        #expect(view.updatedPostBodyDetails.last?.isFavoriteCollected == true)
+        #expect(view.favoriteSubmittingStates == [true, false])
+        #expect(view.toastMessage == "已收藏")
+    }
+
+    @Test func removingFavoriteUpdatesPostBodyFromResponseWithoutReloadingPage() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        let view = SpyPostDetailView()
+        presenter.setView(view)
+
+        presenter.didLoadPostDetail(PostDetailResponse(detail: .init(
+            id: "711898",
+            title: "已收藏帖子",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            favoriteCount: 2,
+            isFavoriteCollected: true,
+            comments: [],
+            page: 3
+        )))
+        presenter.didTapFavorite()
+        presenter.didRemoveFavorite(PostCollectionResponse(message: "removed", postCollectionCount: 1))
+
+        #expect(interactor.loadedPages == [])
+        #expect(view.pageLoadingCount == 0)
+        #expect(view.favoriteSubmittingStates == [true, false])
+        #expect(view.updatedPostBodyDetails.last?.favoriteCount == 1)
+        #expect(view.updatedPostBodyDetails.last?.isFavoriteCollected == false)
+        #expect(view.toastMessage == "已取消收藏")
+    }
+
+    @Test func favoriteSuccessSkipsPostBodyUpdateWhenStateAndCountAreUnchanged() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        let view = SpyPostDetailView()
+        presenter.setView(view)
+
+        presenter.didLoadPostDetail(PostDetailResponse(detail: .init(
+            id: "711898",
+            title: "已收藏帖子",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            favoriteCount: 2,
+            isFavoriteCollected: true,
+            comments: []
+        )))
+        presenter.didAddFavorite(PostCollectionResponse(postCollectionCount: 2))
+
+        #expect(view.updatedPostBodyDetails.isEmpty)
+        #expect(view.favoriteSubmittingStates == [false])
+        #expect(view.toastMessage == "已收藏")
+    }
+
     @Test func favoriteFailureCanRetry() {
         let interactor = SpyPostDetailInteractor()
         let router = SpyPostDetailRouter()
@@ -234,7 +359,35 @@ struct PostDetailPresenterTests {
         presenter.didTapFavorite()
 
         #expect(interactor.favoriteSubmitCount == 2)
+        #expect(view.favoriteSubmittingStates == [true, false, true])
         #expect(view.errorMessage == "请先登录")
+    }
+
+    @Test func optimisticFavoriteRevertsWhenAddFails() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        let view = SpyPostDetailView()
+        presenter.setView(view)
+
+        presenter.didLoadPostDetail(PostDetailResponse(detail: .init(
+            id: "711898",
+            title: "未收藏帖子",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            favoriteCount: 2,
+            isFavoriteCollected: false,
+            comments: []
+        )))
+        presenter.didTapFavorite()
+        presenter.didFailAddFavorite(error: "网络错误")
+
+        #expect(view.updatedPostBodyDetails.map(\.favoriteCount) == [3, 2])
+        #expect(view.updatedPostBodyDetails.map(\.isFavoriteCollected) == [true, false])
+        #expect(view.favoriteSubmittingStates == [true, false])
+        #expect(view.errorMessage == "网络错误")
     }
 }
 
@@ -243,6 +396,7 @@ private final class SpyPostDetailInteractor: PostDetailInteractorInput {
     private(set) var loadPostDetailCount = 0
     private(set) var submittedReplyContent: String?
     private(set) var favoriteSubmitCount = 0
+    private(set) var favoriteRemoveCount = 0
 
     func loadPostDetail() {
         loadPostDetail(page: 1)
@@ -259,6 +413,10 @@ private final class SpyPostDetailInteractor: PostDetailInteractorInput {
 
     func addFavorite() {
         favoriteSubmitCount += 1
+    }
+
+    func removeFavorite() {
+        favoriteRemoveCount += 1
     }
 }
 
@@ -278,8 +436,11 @@ private final class SpyPostDetailView: PostDetailViewProtocol {
     var errorMessage: String?
     var toastMessage: String?
     private(set) var replySubmittingStates: [Bool] = []
+    private(set) var favoriteSubmittingStates: [Bool] = []
     private(set) var finishReplySubmissionCount = 0
     private(set) var hideLoadingCount = 0
+    private(set) var renderedDetails: [PostDetail] = []
+    private(set) var updatedPostBodyDetails: [PostDetail] = []
 
     func showLoading() { loadingCount += 1 }
     func showPageLoading() { pageLoadingCount += 1 }
@@ -287,8 +448,15 @@ private final class SpyPostDetailView: PostDetailViewProtocol {
     func showError(message: String) { errorMessage = message }
     func showToast(message: String) { toastMessage = message }
     func setReplySubmitting(_ isSubmitting: Bool) { replySubmittingStates.append(isSubmitting) }
+    func setFavoriteSubmitting(_ isSubmitting: Bool) {
+        favoriteSubmittingStates.append(isSubmitting)
+        if isSubmitting {
+            toastMessage = "正在处理"
+        }
+    }
     func finishReplySubmission() { finishReplySubmissionCount += 1 }
-    func render(detail: PostDetail) {}
+    func render(detail: PostDetail) { renderedDetails.append(detail) }
+    func updatePostBody(detail: PostDetail) { updatedPostBodyDetails.append(detail) }
     func renderLoginRequired(message: String) {}
 }
 

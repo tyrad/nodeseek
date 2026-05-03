@@ -8,6 +8,7 @@ import Testing
 @testable import nodeseek
 
 @MainActor
+@Suite(.serialized)
 struct NodeSeekCommentSubmitterTests {
     @Test func submitsCommentThroughPageAutomation() async throws {
         let automation = CapturingCommentAutomation(response: .init(ok: true, statusCode: 200, message: nil, reason: "submitted"))
@@ -67,22 +68,21 @@ struct NodeSeekCommentSubmitterTests {
         }
     }
 
-    @Test func favoritePostUsesCollectionJSONAPIWithCurrentFingerprintAndCookies() async throws {
-        let protocolType = CollectionURLProtocol.self
-        protocolType.reset()
-        protocolType.stub(
-            data: #"{"message":"ok"}"#.data(using: .utf8)!,
+    @Test func favoritePostUsesPageAutomationToAvoidRiskAction() async throws {
+        let automation = CapturingCollectionAutomation(response: .init(
+            ok: true,
             statusCode: 200,
-            for: URL(string: "https://www.nodeseek.com/api/statistics/collection")!
-        )
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [protocolType]
-        let session = URLSession(configuration: configuration)
-        let cookieSynchronizer = CapturingCookieSynchronizer()
+            response: PostCollectionResponse(
+                success: true,
+                message: "added",
+                postCollectionCount: 1,
+                userCollectionCount: 2
+            ),
+            reason: "submitted"
+        ))
         let submitter = NodeSeekPostCollectionSubmitter(
             baseURL: URL(string: "https://www.nodeseek.com")!,
-            session: session,
-            cookieSynchronizer: cookieSynchronizer
+            automation: automation
         )
 
         let response = try await submitter.addFavorite(
@@ -90,18 +90,45 @@ struct NodeSeekCommentSubmitterTests {
             referer: URL(string: "https://www.nodeseek.com/post-711860-1")!
         )
 
-        let request = try #require(protocolType.requests.first)
-        let body = try #require(protocolType.requestBodies.first ?? nil)
-        let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
-        #expect(response.message == "ok")
-        #expect(cookieSynchronizer.syncCount == 1)
-        #expect(request.url?.absoluteString == "https://www.nodeseek.com/api/statistics/collection")
-        #expect(request.httpMethod == "POST")
-        #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
-        #expect(request.value(forHTTPHeaderField: "User-Agent") == WebRequestFingerprint.userAgent)
-        #expect(request.value(forHTTPHeaderField: "Referer") == "https://www.nodeseek.com/post-711860-1")
-        #expect(json["postId"] as? Int == 711860)
-        #expect(json["action"] as? String == "add")
+        let submission = try #require(automation.submissions.first)
+        #expect(response.success == true)
+        #expect(response.message == "added")
+        #expect(response.postCollectionCount == 1)
+        #expect(response.userCollectionCount == 2)
+        #expect(submission.postID == 711860)
+        #expect(submission.action == "add")
+        #expect(submission.referer.absoluteString == "https://www.nodeseek.com/post-711860-1")
+    }
+
+    @Test func removingFavoriteUsesPageAutomationWithRemoveAction() async throws {
+        let automation = CapturingCollectionAutomation(response: .init(
+            ok: true,
+            statusCode: 200,
+            response: PostCollectionResponse(
+                success: true,
+                message: "removed",
+                postCollectionCount: 0,
+                userCollectionCount: 1
+            ),
+            reason: "submitted"
+        ))
+        let submitter = NodeSeekPostCollectionSubmitter(
+            baseURL: URL(string: "https://www.nodeseek.com")!,
+            automation: automation
+        )
+
+        let response = try await submitter.removeFavorite(
+            postID: "711898",
+            referer: URL(string: "https://www.nodeseek.com/post-711898-1")!
+        )
+
+        let submission = try #require(automation.submissions.first)
+        #expect(response.message == "removed")
+        #expect(response.postCollectionCount == 0)
+        #expect(response.userCollectionCount == 1)
+        #expect(submission.postID == 711898)
+        #expect(submission.action == "remove")
+        #expect(submission.referer.absoluteString == "https://www.nodeseek.com/post-711898-1")
     }
 }
 
@@ -120,113 +147,16 @@ private final class CapturingCommentAutomation: CommentSubmissionAutomating {
 }
 
 @MainActor
-private final class CapturingCookieSynchronizer: CookieSynchronizing {
-    private(set) var syncCount = 0
+private final class CapturingCollectionAutomation: PostCollectionAutomating {
+    private(set) var submissions: [(postID: Int, action: String, referer: URL)] = []
+    private let response: PostCollectionAutomationResponse
 
-    func syncWebViewCookiesToURLSession() async {
-        syncCount += 1
-    }
-}
-
-private final class CollectionURLProtocol: URLProtocol, @unchecked Sendable {
-    private struct Stub: Sendable {
-        let data: Data
-        let statusCode: Int
+    init(response: PostCollectionAutomationResponse) {
+        self.response = response
     }
 
-    private static let lock = NSLock()
-    private static var stubs: [String: Stub] = [:]
-    private static var capturedRequests: [URLRequest] = []
-    private static var capturedRequestBodies: [Data?] = []
-
-    static var requests: [URLRequest] {
-        lock.lock()
-        defer { lock.unlock() }
-        return capturedRequests
-    }
-
-    static var requestBodies: [Data?] {
-        lock.lock()
-        defer { lock.unlock() }
-        return capturedRequestBodies
-    }
-
-    static func reset() {
-        lock.lock()
-        stubs.removeAll()
-        capturedRequests.removeAll()
-        capturedRequestBodies.removeAll()
-        lock.unlock()
-    }
-
-    static func stub(data: Data, statusCode: Int, for url: URL) {
-        lock.lock()
-        stubs[url.absoluteString] = Stub(data: data, statusCode: statusCode)
-        lock.unlock()
-    }
-
-    override class func canInit(with request: URLRequest) -> Bool {
-        true
-    }
-
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
-        request
-    }
-
-    override func startLoading() {
-        guard let url = request.url else {
-            client?.urlProtocol(self, didFailWithError: URLError(.badURL))
-            return
-        }
-
-        let requestBody = Self.bodyData(from: request)
-
-        Self.lock.lock()
-        Self.capturedRequests.append(request)
-        Self.capturedRequestBodies.append(requestBody)
-        let stub = Self.stubs[url.absoluteString]
-        Self.lock.unlock()
-
-        guard let stub else {
-            client?.urlProtocol(self, didFailWithError: URLError(.fileDoesNotExist))
-            return
-        }
-
-        let response = HTTPURLResponse(
-            url: url,
-            statusCode: stub.statusCode,
-            httpVersion: nil,
-            headerFields: ["Content-Type": "application/json"]
-        )!
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: stub.data)
-        client?.urlProtocolDidFinishLoading(self)
-    }
-
-    override func stopLoading() {}
-
-    private static func bodyData(from request: URLRequest) -> Data? {
-        if let body = request.httpBody {
-            return body
-        }
-
-        guard let stream = request.httpBodyStream else {
-            return nil
-        }
-
-        stream.open()
-        defer { stream.close() }
-
-        var data = Data()
-        var buffer = [UInt8](repeating: 0, count: 1024)
-        while stream.hasBytesAvailable {
-            let count = stream.read(&buffer, maxLength: buffer.count)
-            if count > 0 {
-                data.append(buffer, count: count)
-            } else {
-                break
-            }
-        }
-        return data
+    func submitCollection(postID: Int, action: String, referer: URL) async throws -> PostCollectionAutomationResponse {
+        submissions.append((postID: postID, action: action, referer: referer))
+        return response
     }
 }

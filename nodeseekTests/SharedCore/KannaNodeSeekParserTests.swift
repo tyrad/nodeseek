@@ -307,7 +307,7 @@ struct KannaNodeSeekParserTests {
                         </svg>
                         <span data-v-254da704>4</span>
                     </div>
-                    <div data-v-254da704 title="收藏" class="menu-item">
+                    <div data-v-254da704 title="收藏" class="menu-item clicked">
                         <svg data-v-254da704 class="iconpark-icon">
                             <use data-v-254da704 href="#star-6negdgdk"></use>
                         </svg>
@@ -325,6 +325,7 @@ struct KannaNodeSeekParserTests {
         #expect(detail.chickenLegCount == 3)
         #expect(detail.opposeCount == 4)
         #expect(detail.favoriteCount == 5)
+        #expect(detail.isFavoriteCollected == true)
     }
 
     @Test func parsesMissingPostListAuthorAsEmpty() throws {

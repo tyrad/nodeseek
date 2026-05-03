@@ -33,6 +33,8 @@ struct PostDetailHeaderContent: Equatable {
     let chickenLegCount: Int?
     let opposeCount: Int?
     let favoriteCount: Int?
+    let isFavoriteCollected: Bool
+    let isFavoriteSubmitting: Bool
 
     nonisolated init(
         postID: String,
@@ -46,7 +48,9 @@ struct PostDetailHeaderContent: Equatable {
         likeCount: Int? = nil,
         chickenLegCount: Int? = nil,
         opposeCount: Int? = nil,
-        favoriteCount: Int? = nil
+        favoriteCount: Int? = nil,
+        isFavoriteCollected: Bool = false,
+        isFavoriteSubmitting: Bool = false
     ) {
         self.postID = postID
         self.title = title
@@ -60,6 +64,8 @@ struct PostDetailHeaderContent: Equatable {
         self.chickenLegCount = chickenLegCount
         self.opposeCount = opposeCount
         self.favoriteCount = favoriteCount
+        self.isFavoriteCollected = isFavoriteCollected
+        self.isFavoriteSubmitting = isFavoriteSubmitting
     }
 
     nonisolated init(post: PostSummary) {
@@ -93,7 +99,47 @@ struct PostDetailHeaderContent: Equatable {
             likeCount: detail.likeCount,
             chickenLegCount: detail.chickenLegCount,
             opposeCount: detail.opposeCount,
-            favoriteCount: detail.favoriteCount
+            favoriteCount: detail.favoriteCount,
+            isFavoriteCollected: detail.isFavoriteCollected,
+            isFavoriteSubmitting: false
+        )
+    }
+
+    func updatingFavoriteSubmitting(_ isSubmitting: Bool) -> PostDetailHeaderContent {
+        PostDetailHeaderContent(
+            postID: postID,
+            title: title,
+            authorName: authorName,
+            avatarURL: avatarURL,
+            authorProfileURL: authorProfileURL,
+            metadataText: metadataText,
+            contentHTML: contentHTML,
+            requiredReadingLevel: requiredReadingLevel,
+            likeCount: likeCount,
+            chickenLegCount: chickenLegCount,
+            opposeCount: opposeCount,
+            favoriteCount: favoriteCount,
+            isFavoriteCollected: isFavoriteCollected,
+            isFavoriteSubmitting: isSubmitting
+        )
+    }
+
+    func updatingFavoriteReaction(count: Int?, isCollected: Bool) -> PostDetailHeaderContent {
+        PostDetailHeaderContent(
+            postID: postID,
+            title: title,
+            authorName: authorName,
+            avatarURL: avatarURL,
+            authorProfileURL: authorProfileURL,
+            metadataText: metadataText,
+            contentHTML: contentHTML,
+            requiredReadingLevel: requiredReadingLevel,
+            likeCount: likeCount,
+            chickenLegCount: chickenLegCount,
+            opposeCount: opposeCount,
+            favoriteCount: count,
+            isFavoriteCollected: isCollected,
+            isFavoriteSubmitting: isFavoriteSubmitting
         )
     }
 }

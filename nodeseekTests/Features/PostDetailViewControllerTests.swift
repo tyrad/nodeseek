@@ -477,6 +477,47 @@ struct PostDetailViewControllerTests {
         #expect(viewController.renderedCommentIDs.contains("1"))
     }
 
+    @Test func updatingPostBodyWithReactionOnlyDoesNotTriggerHeaderReload() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        let detail = PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>原帖正文</p>",
+            favoriteCount: 1,
+            isFavoriteCollected: false,
+            comments: [],
+            page: 1
+        )
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: detail)
+        await waitForDetailContent(in: viewController, expectedRowCount: 1)
+
+        let headerCache = [RenderedContentBlock.unsupported(reason: "cached-header")]
+        viewController.headerRenderedContent = headerCache
+
+        viewController.updatePostBody(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>原帖正文</p>",
+            favoriteCount: 2,
+            isFavoriteCollected: true,
+            comments: [],
+            page: 1
+        ))
+
+        #expect(viewController.headerRenderedContent?.testUnsupportedReasons() == ["cached-header"])
+        #expect(viewController.testHeaderContent()?.favoriteCount == 2)
+        #expect(viewController.testHeaderContent()?.isFavoriteCollected == true)
+    }
+
     @Test func renderingOtherPageKeepsPaginationWhenParserMissesPager() async throws {
         let presenter = SpyPostDetailPresenter()
         let viewController = PostDetailViewController(presenter: presenter)
@@ -689,7 +730,8 @@ struct PostDetailViewControllerTests {
             likeCount: 0,
             chickenLegCount: 1,
             opposeCount: 0,
-            favoriteCount: 2
+            favoriteCount: 2,
+            isFavoriteCollected: true
         )
         var favoriteTapCount = 0
         let node = PostBodyCellNode(
@@ -709,7 +751,54 @@ struct PostDetailViewControllerTests {
 
         #expect(node.debugReactionActionTitles == [nil, "1", nil, "2"])
         #expect(node.debugFooterActionAccessibilityLabels == ["点赞", "加鸡腿 1", "反对", "收藏 2"])
+        #expect(node.debugFavoriteActionColor == .systemYellow)
         #expect(favoriteTapCount == 1)
+    }
+
+    @Test func postBodyCellCompactsLargeReactionCounts() {
+        let header = PostDetailHeaderContent(
+            postID: "710379",
+            title: "带操作区的主题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            likeCount: 12_345,
+            chickenLegCount: 123_456,
+            opposeCount: 100_000_000,
+            favoriteCount: 2_000_000_000
+        )
+        let node = PostBodyCellNode(
+            content: header,
+            renderedContent: [],
+            onImageTapped: { _, _ in },
+            onTextLayoutInvalidated: {}
+        )
+
+        #expect(node.debugReactionActionTitles == ["1.2万", "12万", "1亿", "20亿"])
+        #expect(node.debugFooterActionAccessibilityLabels == ["点赞 12345", "加鸡腿 123456", "反对 100000000", "收藏 2000000000"])
+    }
+
+    @Test func postBodyCellKeepsFavoriteIconStyleWhileSubmitting() {
+        let header = PostDetailHeaderContent(
+            postID: "710379",
+            title: "带操作区的主题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            favoriteCount: 2,
+            isFavoriteCollected: true,
+            isFavoriteSubmitting: true
+        )
+        let node = PostBodyCellNode(
+            content: header,
+            renderedContent: [],
+            onImageTapped: { _, _ in },
+            onTextLayoutInvalidated: {}
+        )
+
+        #expect(node.debugFavoriteActionColor == .systemYellow)
     }
 
     @Test func commentCellRefreshAppearanceRebuildsAuthorNameText() {

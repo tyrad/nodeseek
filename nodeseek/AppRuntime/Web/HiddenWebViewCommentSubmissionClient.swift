@@ -34,6 +34,36 @@ struct HiddenWebViewCommentSubmissionClient {
     }
 }
 
+struct HiddenWebViewPostCollectionClient {
+    private let timeoutInterval: TimeInterval
+
+    init(timeoutInterval: TimeInterval = 20) {
+        self.timeoutInterval = timeoutInterval
+    }
+
+    func submitCollection(postID: Int, action: String, referer: URL) async throws -> PostCollectionAutomationResponse {
+        let requestLock = HiddenWebViewRequestLock.shared
+        await requestLock.acquire()
+        AppLog.info(.webView, "准备通过隐藏 WebView 提交收藏动作: postID=\(postID), action=\(action), referer=\(referer.absoluteString)")
+        do {
+            let loader = await MainActor.run {
+                HiddenWebViewLoader.shared
+            }
+            let response = try await loader.submitCollection(
+                pageURL: referer,
+                postID: postID,
+                action: action,
+                timeoutInterval: timeoutInterval
+            )
+            await requestLock.release()
+            return response
+        } catch {
+            await requestLock.release()
+            throw error
+        }
+    }
+}
+
 enum CommentSubmissionAutomationScript {
     static let source = """
     return await new Promise(async (resolve) => {
@@ -296,6 +326,70 @@ enum CommentSubmissionAutomationScript {
         finish({
           ok: false,
           reason: "javascript_exception",
+          message: String(error && error.message ? error.message : error)
+        });
+      }
+    });
+    """
+}
+
+enum PostCollectionAutomationScript {
+    static let source = """
+    return await new Promise(async (resolve) => {
+      let resolved = false;
+      let timer = null;
+
+      const finish = (payload) => {
+        if (resolved) return;
+        resolved = true;
+        if (timer) window.clearTimeout(timer);
+        resolve(payload);
+      };
+
+      const parseJSON = (body) => {
+        try {
+          return JSON.parse(body || "{}");
+        } catch (_) {
+          return {};
+        }
+      };
+
+      try {
+        timer = window.setTimeout(() => {
+          finish({ ok: false, reason: "submit_timeout" });
+        }, timeoutMs);
+
+        const response = await window.fetch("/api/statistics/collection", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            postId: postID,
+            action
+          })
+        });
+
+        const body = await response.text();
+        const json = parseJSON(body);
+        finish({
+          ok: response.status >= 200 && response.status < 300 && json.success !== false,
+          statusCode: response.status,
+          response: {
+            success: typeof json.success === "boolean" ? json.success : null,
+            message: json.message || json.msg || json.error || null,
+            postCollectionCount: typeof json.postCollectionCount === "number" ? json.postCollectionCount : null,
+            userCollectionCount: typeof json.userCollectionCount === "number" ? json.userCollectionCount : null
+          },
+          reason: response.status >= 200 && response.status < 300 && json.success !== false ? "submitted" : "server_error",
+          body
+        });
+      } catch (error) {
+        finish({
+          ok: false,
+          reason: "network_error",
           message: String(error && error.message ? error.message : error)
         });
       }

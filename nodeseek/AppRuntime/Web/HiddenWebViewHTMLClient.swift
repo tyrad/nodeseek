@@ -420,6 +420,37 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         return result
     }
 
+    func submitCollection(
+        pageURL: URL,
+        postID: Int,
+        action: String,
+        timeoutInterval: TimeInterval
+    ) async throws -> PostCollectionAutomationResponse {
+        var request = URLRequest(url: pageURL)
+        request.httpMethod = "GET"
+        request.timeoutInterval = timeoutInterval
+        request.cachePolicy = WebViewCachePolicy.getRequestPolicy
+        WebRequestFingerprint.applyHTMLHeaders(to: &request)
+
+        let response = try await load(request: request, timeoutInterval: timeoutInterval)
+        if let challenge = ChallengeDetector().detect(response: response) {
+            return PostCollectionAutomationResponse(
+                ok: false,
+                statusCode: response.statusCode,
+                response: PostCollectionResponse(message: Self.message(for: challenge)),
+                reason: "challenge"
+            )
+        }
+
+        let result = try await evaluatePostCollectionScript(
+            postID: postID,
+            action: action,
+            timeoutInterval: timeoutInterval
+        )
+        await cookieBridge.syncWebViewCookiesToURLSession()
+        return result
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         AppLog.info(.webView, "WebView didFinish: \(webView.url?.absoluteString ?? "nil")")
         guard continuation != nil else { return }
@@ -588,6 +619,73 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
             reason: reason,
             body: body
         )
+    }
+
+    private func evaluatePostCollectionScript(
+        postID: Int,
+        action: String,
+        timeoutInterval: TimeInterval
+    ) async throws -> PostCollectionAutomationResponse {
+        let timeoutMilliseconds = max(5_000, Int(timeoutInterval * 1_000))
+        let result: Any?
+        do {
+            result = try await webView.callAsyncJavaScript(
+                PostCollectionAutomationScript.source,
+                arguments: [
+                    "postID": postID,
+                    "action": action,
+                    "timeoutMs": timeoutMilliseconds
+                ],
+                in: nil,
+                contentWorld: .page
+            )
+        } catch {
+            let nsError = error as NSError
+            AppLog.error(.webView, "收藏脚本执行异常: domain=\(nsError.domain), code=\(nsError.code), info=\(String(describing: nsError.userInfo))")
+            return PostCollectionAutomationResponse(
+                ok: false,
+                response: PostCollectionResponse(message: error.localizedDescription),
+                reason: "javascript_exception"
+            )
+        }
+
+        guard let object = result as? [String: Any] else {
+            return PostCollectionAutomationResponse(
+                ok: false,
+                response: PostCollectionResponse(),
+                reason: "invalid_script_result"
+            )
+        }
+
+        let ok = object["ok"] as? Bool ?? false
+        let statusCode = (object["statusCode"] as? NSNumber)?.intValue ?? object["statusCode"] as? Int
+        let reason = object["reason"] as? String ?? "unknown"
+        let body = object["body"] as? String
+        let responseObject = object["response"] as? [String: Any]
+        let message = responseObject?["message"] as? String ?? object["message"] as? String
+        let response = PostCollectionResponse(
+            success: responseObject?["success"] as? Bool,
+            message: message,
+            postCollectionCount: Self.intValue(responseObject?["postCollectionCount"] as Any),
+            userCollectionCount: Self.intValue(responseObject?["userCollectionCount"] as Any)
+        )
+        return PostCollectionAutomationResponse(
+            ok: ok,
+            statusCode: statusCode,
+            response: response,
+            reason: reason,
+            body: body
+        )
+    }
+
+    private static func intValue(_ value: Any) -> Int? {
+        if let int = value as? Int {
+            return int
+        }
+        if let number = value as? NSNumber {
+            return number.intValue
+        }
+        return nil
     }
 
     private static func message(for challenge: ChallengeKind) -> String {

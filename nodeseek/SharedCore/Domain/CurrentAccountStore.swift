@@ -77,33 +77,41 @@ actor CurrentAccountStore {
     }
 }
 
-private struct Persisted: Codable {
+private nonisolated struct Persisted: Codable {
     let schemaVersion: Int
     let displayName: String
     let isLoggedIn: Bool
     let avatarURL: String?
     let profileURL: String?
     let stats: [String]
+    let notificationURL: String?
+    let notificationIconColorCSS: String?
     let updatedAt: TimeInterval
 
     init(snapshot: CurrentAccountStore.Snapshot) {
-        schemaVersion = 2
+        schemaVersion = 3
         displayName = snapshot.account.displayName
         isLoggedIn = snapshot.account.isLoggedIn
         avatarURL = snapshot.account.avatarURL?.absoluteString
         profileURL = snapshot.account.profileURL?.absoluteString
         stats = snapshot.account.stats
+        notificationURL = snapshot.account.notification?.url.absoluteString
+        notificationIconColorCSS = snapshot.account.notification?.iconColorCSS
         updatedAt = snapshot.updatedAt.timeIntervalSince1970
     }
 
     var snapshot: CurrentAccountStore.Snapshot {
-        CurrentAccountStore.Snapshot(
+        let notificationURL = notificationURL.flatMap(URL.init(string:))
+        return CurrentAccountStore.Snapshot(
             account: AccountResponse(
                 displayName: displayName,
                 isLoggedIn: isLoggedIn,
                 avatarURL: avatarURL.flatMap(URL.init(string:)),
                 profileURL: profileURL.flatMap(URL.init(string:)),
-                stats: stats
+                stats: stats,
+                notification: notificationURL.map {
+                    AccountNotification(url: $0, iconColorCSS: notificationIconColorCSS)
+                }
             ),
             updatedAt: Date(timeIntervalSince1970: updatedAt)
         )

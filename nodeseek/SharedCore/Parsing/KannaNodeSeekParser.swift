@@ -355,6 +355,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
             chickenLegCount: bodyItem.flatMap { parseReactionCount(in: $0, kind: .chickenLeg) },
             opposeCount: bodyItem.flatMap { parseReactionCount(in: $0, kind: .oppose) },
             favoriteCount: bodyItem.flatMap { parseReactionCount(in: $0, kind: .favorite) },
+            isFavoriteCollected: bodyItem.map { parseReactionClicked(in: $0, kind: .favorite) } ?? false,
             comments: comments,
             page: page,
             pagination: pagination,
@@ -610,6 +611,12 @@ struct KannaNodeSeekParser: NodeSeekParser {
         return nil
     }
 
+    private func parseReactionClicked(in item: Kanna.XMLElement, kind: ReactionKind) -> Bool {
+        item.xpath(".//*").contains { node in
+            node.matchesReaction(kind) && node.hasClass("clicked")
+        }
+    }
+
     private func firstInteger(inAttributesOf node: Kanna.XMLElement, attributes: [String]) -> Int? {
         for attribute in attributes {
             guard let value = node[attribute]?.trimmedNonEmpty else { continue }
@@ -713,5 +720,12 @@ private extension Kanna.XMLElement {
 
         guard haystack.isEmpty == false else { return false }
         return kind.markers.contains { haystack.contains($0.lowercased()) }
+    }
+
+    func hasClass(_ className: String) -> Bool {
+        guard let value = self["class"] else { return false }
+        return value
+            .split(whereSeparator: { $0.isWhitespace })
+            .contains { $0 == className }
     }
 }

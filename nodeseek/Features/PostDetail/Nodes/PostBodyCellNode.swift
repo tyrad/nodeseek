@@ -19,9 +19,10 @@ final class PostBodyCellNode: ASCellNode {
         )
         static let verticalSpacing: CGFloat = 12
         static let bodySpacing: CGFloat = 18
+        static let stableReactionActionWidth: CGFloat = 84
     }
 
-    private let content: PostDetailHeaderContent
+    private var content: PostDetailHeaderContent
     private let onImageTapped: ([URL], Int) -> Void
     private let onLinkTapped: (URL) -> Void
     private let onAuthorTapped: (URL) -> Void
@@ -201,7 +202,7 @@ final class PostBodyCellNode: ASCellNode {
         configureActionButton(likeButtonNode, systemImageName: "hand.thumbsup", accessibilityLabel: "点赞", count: content.likeCount)
         configureActionButton(chickenLegButtonNode, systemImageName: "fork.knife", accessibilityLabel: "加鸡腿", count: content.chickenLegCount)
         configureActionButton(opposeButtonNode, systemImageName: "hand.thumbsdown", accessibilityLabel: "反对", count: content.opposeCount)
-        configureActionButton(favoriteButtonNode, systemImageName: "star", accessibilityLabel: "收藏", count: content.favoriteCount)
+        configureFavoriteActionButton(count: content.favoriteCount, isCollected: content.isFavoriteCollected)
     }
 
     private static func titleAttributedText(for content: PostDetailHeaderContent) -> NSAttributedString {
@@ -293,11 +294,12 @@ final class PostBodyCellNode: ASCellNode {
         _ button: ASButtonNode,
         systemImageName: String,
         accessibilityLabel: String,
-        count: Int? = nil
+        count: Int? = nil,
+        color: UIColor = UIColor.secondaryLabel.withAlphaComponent(0.72)
     ) {
         let configuration = UIImage.SymbolConfiguration(pointSize: 15, weight: .regular)
         let image = UIImage(systemName: systemImageName, withConfiguration: configuration)?
-            .withTintColor(UIColor.secondaryLabel.withAlphaComponent(0.72), renderingMode: .alwaysOriginal)
+            .withTintColor(color, renderingMode: .alwaysOriginal)
         button.setImage(image, for: .normal)
         let displayCount = count.flatMap { $0 > 0 ? $0 : nil }
         button.contentSpacing = displayCount == nil ? 0 : 4
@@ -310,13 +312,13 @@ final class PostBodyCellNode: ASCellNode {
                     string: countText,
                     attributes: [
                         .font: font,
-                        .foregroundColor: UIColor.secondaryLabel
+                        .foregroundColor: color
                     ]
                 ),
                 for: .normal
             )
             button.style.preferredSize = CGSize(width: Self.actionButtonWidth(for: countText, font: font), height: 32)
-            button.accessibilityLabel = "\(accessibilityLabel) \(countText)"
+            button.accessibilityLabel = "\(accessibilityLabel) \(displayCount)"
         } else {
             button.setAttributedTitle(nil, for: .normal)
             button.style.preferredSize = CGSize(width: 40, height: 32)
@@ -325,12 +327,80 @@ final class PostBodyCellNode: ASCellNode {
     }
 
     private static func reactionCountText(_ count: Int) -> String {
-        "\(max(0, count))"
+        let safeCount = max(0, count)
+        if safeCount < 10_000 {
+            return "\(safeCount)"
+        }
+        if safeCount < 100_000_000 {
+            return compactCountText(safeCount, divisor: 10_000, unit: "万")
+        }
+        return compactCountText(safeCount, divisor: 100_000_000, unit: "亿")
+    }
+
+    private static func compactCountText(_ count: Int, divisor: Int, unit: String) -> String {
+        let integerPart = count / divisor
+        let decimalPart = (count % divisor) * 10 / divisor
+        if integerPart >= 100 || decimalPart == 0 {
+            return "\(integerPart)\(unit)"
+        }
+        return "\(integerPart).\(decimalPart)\(unit)"
     }
 
     private static func actionButtonWidth(for countText: String, font: UIFont) -> CGFloat {
         let textWidth = (countText as NSString).size(withAttributes: [.font: font]).width
-        return max(52, ceil(15 + 4 + textWidth + 16))
+        return max(Layout.stableReactionActionWidth, ceil(15 + 4 + textWidth + 16))
+    }
+
+    private static func favoriteActionColor(isCollected: Bool) -> UIColor {
+        return isCollected ? .systemYellow : UIColor.secondaryLabel.withAlphaComponent(0.72)
+    }
+
+    private func configureFavoriteActionButton(count: Int?, isCollected: Bool) {
+        configureActionButton(
+            favoriteButtonNode,
+            systemImageName: isCollected ? "star.fill" : "star",
+            accessibilityLabel: "收藏",
+            count: count,
+            color: Self.favoriteActionColor(isCollected: isCollected)
+        )
+        favoriteButtonNode.style.preferredSize = CGSize(width: Layout.stableReactionActionWidth, height: 32)
+    }
+
+    private func updateFavoriteActionPresentation(count: Int?, isCollected: Bool) {
+        let color = Self.favoriteActionColor(isCollected: isCollected)
+        let configuration = UIImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+        let image = UIImage(systemName: isCollected ? "star.fill" : "star", withConfiguration: configuration)?
+            .withTintColor(color, renderingMode: .alwaysOriginal)
+        favoriteButtonNode.setImage(image, for: .normal)
+
+        let displayCount = count.flatMap { $0 > 0 ? $0 : nil }
+        if let displayCount {
+            let countText = Self.reactionCountText(displayCount)
+            let font = UIFont.preferredFont(forTextStyle: .caption1)
+            favoriteButtonNode.setAttributedTitle(
+                NSAttributedString(
+                    string: countText,
+                    attributes: [
+                        .font: font,
+                        .foregroundColor: color
+                    ]
+                ),
+                for: .normal
+            )
+            favoriteButtonNode.accessibilityLabel = "收藏 \(displayCount)"
+            favoriteButtonNode.contentSpacing = 4
+        } else {
+            favoriteButtonNode.setAttributedTitle(nil, for: .normal)
+            favoriteButtonNode.accessibilityLabel = "收藏"
+            favoriteButtonNode.contentSpacing = 0
+        }
+    }
+
+    func updateFavoriteReaction(count: Int?, isCollected: Bool) {
+        let nextContent = content.updatingFavoriteReaction(count: count, isCollected: isCollected)
+        guard nextContent != content else { return }
+        content = nextContent
+        updateFavoriteActionPresentation(count: content.favoriteCount, isCollected: content.isFavoriteCollected)
     }
 
     @objc private func authorTapped() {
@@ -377,6 +447,14 @@ final class PostBodyCellNode: ASCellNode {
             opposeButtonNode,
             favoriteButtonNode
         ].map { $0.attributedTitle(for: .normal)?.string }
+    }
+
+    var debugFavoriteActionColor: UIColor {
+        Self.favoriteActionColor(isCollected: content.isFavoriteCollected)
+    }
+
+    var debugFavoriteActionIsSubmitting: Bool {
+        content.isFavoriteSubmitting
     }
 
     func debugTapFavoriteAction() {
