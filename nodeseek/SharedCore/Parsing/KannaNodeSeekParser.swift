@@ -26,14 +26,43 @@ struct KannaNodeSeekParser: NodeSeekParser {
 
     func parseAccount(html: String) throws -> AccountResponse {
         let document = try HTML(html: html, encoding: .utf8)
+        let notification = parseAccountNotification(document)
         if let account = parseAccountFromUserCard(document)
             ?? parseAccountFromTempScript(document)
             ?? parseAccountFromCapturedConfig(document) {
-            return account
+            return account.withNotification(notification)
         }
 
         postAccountParserDebug("parser: account user-card/config missing or decode failed")
-        return AccountResponse(displayName: "游客", isLoggedIn: false)
+        return AccountResponse(displayName: "游客", isLoggedIn: false, notification: notification)
+    }
+
+    private func parseAccountNotification(_ document: HTMLDocument) -> AccountNotification? {
+        guard let link = document.at_xpath(XPathRules.accountNotificationLink),
+              let href = link["href"],
+              let url = URL(string: href, relativeTo: baseURL)?.absoluteURL else {
+            return nil
+        }
+
+        let style = link.at_xpath(XPathRules.accountNotificationIcon)?["style"]
+            ?? link["style"]
+        return AccountNotification(
+            url: url,
+            iconColorCSS: cssColorValue(from: style)
+        )
+    }
+
+    private func cssColorValue(from style: String?) -> String? {
+        guard let style else { return nil }
+        let pattern = #"(?i)(?:^|;)\s*color\s*:\s*([^;]+)"#
+        guard let match = style.range(of: pattern, options: .regularExpression) else {
+            return nil
+        }
+        let matched = String(style[match])
+        guard let separator = matched.firstIndex(of: ":") else { return nil }
+        return String(matched[matched.index(after: separator)...])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmedNonEmpty
     }
 
     private func parseAccountFromUserCard(_ document: HTMLDocument) -> AccountResponse? {
@@ -322,6 +351,10 @@ struct KannaNodeSeekParser: NodeSeekParser {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            likeCount: bodyItem.flatMap { parseReactionCount(in: $0, kind: .like) },
+            chickenLegCount: bodyItem.flatMap { parseReactionCount(in: $0, kind: .chickenLeg) },
+            opposeCount: bodyItem.flatMap { parseReactionCount(in: $0, kind: .oppose) },
+            favoriteCount: bodyItem.flatMap { parseReactionCount(in: $0, kind: .favorite) },
             comments: comments,
             page: page,
             pagination: pagination,
@@ -505,6 +538,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
         case like
         case chickenLeg
         case oppose
+        case favorite
 
         var rootAttributes: [String] {
             switch self {
@@ -514,6 +548,8 @@ struct KannaNodeSeekParser: NodeSeekParser {
                 return ["data-chicken-leg-count", "data-chicken-count", "data-stardust-count", "data-coin-count"]
             case .oppose:
                 return ["data-oppose-count", "data-dislike-count", "data-downvote-count", "data-down-count"]
+            case .favorite:
+                return ["data-favorite-count", "data-favorites", "data-bookmark-count", "data-star-count"]
             }
         }
 
@@ -525,6 +561,8 @@ struct KannaNodeSeekParser: NodeSeekParser {
                 return ["data-chicken-leg-count", "data-chicken-count", "data-stardust-count", "data-coin-count", "data-count", "aria-label", "title"]
             case .oppose:
                 return ["data-oppose-count", "data-dislike-count", "data-downvote-count", "data-down-count", "data-count", "aria-label", "title"]
+            case .favorite:
+                return ["data-favorite-count", "data-favorites", "data-bookmark-count", "data-star-count", "data-count", "aria-label", "title"]
             }
         }
 
@@ -536,6 +574,8 @@ struct KannaNodeSeekParser: NodeSeekParser {
                 return ["chicken", "chicken-leg", "stardust", "coin", "drumstick", "鸡腿", "加鸡腿"]
             case .oppose:
                 return ["oppose", "dislike", "downvote", "thumbsdown", "thumb-down", "vote-down", "点踩", "反对"]
+            case .favorite:
+                return ["favorite", "favourite", "bookmark", "star", "collect", "收藏"]
             }
         }
     }
@@ -622,6 +662,19 @@ struct KannaNodeSeekParser: NodeSeekParser {
         }
 
         return Int(String(path[range]).components(separatedBy: CharacterSet.decimalDigits.inverted).last ?? "") ?? 1
+    }
+}
+
+private extension AccountResponse {
+    func withNotification(_ notification: AccountNotification?) -> AccountResponse {
+        AccountResponse(
+            displayName: displayName,
+            isLoggedIn: isLoggedIn,
+            avatarURL: avatarURL,
+            profileURL: profileURL,
+            stats: stats,
+            notification: notification
+        )
     }
 }
 

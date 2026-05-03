@@ -64,6 +64,15 @@ enum WebRequestFingerprint {
         request.setValue(htmlAccept, forHTTPHeaderField: "Accept")
     }
 
+    nonisolated static func applyJSONHeaders(to request: inout URLRequest, referer: URL? = nil) {
+        applyCommonHeaders(to: &request)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let referer {
+            request.setValue(referer.absoluteString, forHTTPHeaderField: "Referer")
+        }
+    }
+
     nonisolated static func applyImageHeaders(to request: inout URLRequest) {
         applyCommonHeaders(to: &request)
         request.setValue(imageAccept, forHTTPHeaderField: "Accept")

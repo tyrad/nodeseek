@@ -27,6 +27,7 @@ protocol PostDetailPresenterProtocol: AnyObject {
     func didTapLogin()
     func didSelectPage(_ page: Int)
     func didTapSendReply(content: String)
+    func didTapFavorite()
 }
 
 // MARK: - Interactor Input (Presenter -> Interactor)
@@ -34,6 +35,7 @@ protocol PostDetailInteractorInput: AnyObject {
     func loadPostDetail()
     func loadPostDetail(page: Int)
     func submitReply(content: String)
+    func addFavorite()
 }
 
 // MARK: - Interactor Output (Interactor -> Presenter)
@@ -44,6 +46,8 @@ protocol PostDetailInteractorOutput: AnyObject {
     func didCancelLoadPostDetail()
     func didSubmitReply(_ response: PostDetailSubmitReplyResponse)
     func didFailSubmitReply(error: String)
+    func didAddFavorite(_ response: PostCollectionResponse)
+    func didFailAddFavorite(error: String)
 }
 
 // MARK: - Router Protocol (Presenter -> Router)

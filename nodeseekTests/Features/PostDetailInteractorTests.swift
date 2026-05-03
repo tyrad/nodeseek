@@ -164,6 +164,42 @@ struct PostDetailInteractorTests {
         #expect(presenter.submitReplyErrorMessage == "评论内容太短")
     }
 
+    @Test func addFavoriteUsesCollectionSubmitterAndReportsSuccess() async throws {
+        let collectionSubmitter = SpyPostCollectionSubmitting(response: PostCollectionResponse(message: "已收藏"))
+        let presenter = SpyPostDetailInteractorOutput()
+        let post = Self.makePost()
+        let interactor = PostDetailInteractor(
+            post: post,
+            service: Self.makeUnusedService(),
+            collectionSubmitter: collectionSubmitter,
+            sessionStore: NodeSeekSessionStore()
+        )
+        interactor.presenter = presenter
+
+        interactor.addFavorite()
+        await waitForInteractorCallbacks()
+
+        #expect(collectionSubmitter.submittedPostID == post.id)
+        #expect(collectionSubmitter.submittedReferer == post.url)
+        #expect(presenter.addFavoriteResponse == PostCollectionResponse(message: "已收藏"))
+        #expect(presenter.addFavoriteErrorMessage == nil)
+    }
+
+    @Test func addFavoriteReportsMissingPost() {
+        let presenter = SpyPostDetailInteractorOutput()
+        let interactor = PostDetailInteractor(
+            post: nil,
+            service: Self.makeUnusedService(),
+            sessionStore: NodeSeekSessionStore()
+        )
+        interactor.presenter = presenter
+
+        interactor.addFavorite()
+
+        #expect(presenter.addFavoriteResponse == nil)
+        #expect(presenter.addFavoriteErrorMessage == "缺少帖子信息，无法收藏。")
+    }
+
     private static func makePost() -> PostSummary {
         PostSummary(
             id: "703863",
@@ -199,6 +235,8 @@ private final class SpyPostDetailInteractorOutput: PostDetailInteractorOutput {
     var didSubmitReplyCount = 0
     var submitReplyResponse: PostDetailSubmitReplyResponse?
     var submitReplyErrorMessage: String?
+    var addFavoriteResponse: PostCollectionResponse?
+    var addFavoriteErrorMessage: String?
 
     func didLoadPostDetail(_ response: PostDetailResponse) {
         loadedResponse = response
@@ -223,6 +261,14 @@ private final class SpyPostDetailInteractorOutput: PostDetailInteractorOutput {
 
     func didFailSubmitReply(error: String) {
         submitReplyErrorMessage = error
+    }
+
+    func didAddFavorite(_ response: PostCollectionResponse) {
+        addFavoriteResponse = response
+    }
+
+    func didFailAddFavorite(error: String) {
+        addFavoriteErrorMessage = error
     }
 }
 
@@ -271,6 +317,23 @@ private final class SpyCommentSubmissionAutomation: CommentSubmissionAutomating 
     func submitComment(postID: Int, content: String, referer: URL) async throws -> CommentAutomationResponse {
         submittedPostID = postID
         submittedContent = content
+        submittedReferer = referer
+        return response
+    }
+}
+
+@MainActor
+private final class SpyPostCollectionSubmitting: PostCollectionSubmitting {
+    private let response: PostCollectionResponse
+    private(set) var submittedPostID: String?
+    private(set) var submittedReferer: URL?
+
+    init(response: PostCollectionResponse) {
+        self.response = response
+    }
+
+    func addFavorite(postID: String, referer: URL) async throws -> PostCollectionResponse {
+        submittedPostID = postID
         submittedReferer = referer
         return response
     }

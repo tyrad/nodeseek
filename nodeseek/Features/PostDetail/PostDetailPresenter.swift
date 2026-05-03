@@ -18,6 +18,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
     private var loadingPage: Int?
     private var currentDetail: PostDetail?
     private var isSubmittingReply = false
+    private var isSubmittingFavorite = false
     private var isRefreshingAfterReplySubmission = false
     
     // MARK: - Initialization
@@ -73,6 +74,12 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         isSubmittingReply = true
         view?.setReplySubmitting(true)
         interactor.submitReply(content: normalizedContent)
+    }
+
+    func didTapFavorite() {
+        guard isSubmittingFavorite == false else { return }
+        isSubmittingFavorite = true
+        interactor.addFavorite()
     }
 
     private func markDetailVisited(_ detail: PostDetail) {
@@ -154,6 +161,17 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
     func didFailSubmitReply(error: String) {
         isSubmittingReply = false
         view?.setReplySubmitting(false)
+        view?.showError(message: error)
+    }
+
+    func didAddFavorite(_ response: PostCollectionResponse) {
+        isSubmittingFavorite = false
+        let responseMessage = response.message?.trimmingCharacters(in: .whitespacesAndNewlines)
+        view?.showToast(message: responseMessage?.isEmpty == false ? responseMessage! : "已收藏")
+    }
+
+    func didFailAddFavorite(error: String) {
+        isSubmittingFavorite = false
         view?.showError(message: error)
     }
 }

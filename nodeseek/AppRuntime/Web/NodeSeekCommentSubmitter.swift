@@ -127,3 +127,96 @@ final class WebViewCommentSubmissionAutomator: CommentSubmissionAutomating {
         try await client.submitComment(postID: postID, content: content, referer: referer)
     }
 }
+
+struct PostCollectionResponse: Equatable, Sendable {
+    let message: String?
+}
+
+@MainActor
+protocol PostCollectionSubmitting: AnyObject {
+    func addFavorite(postID: String, referer: URL) async throws -> PostCollectionResponse
+}
+
+enum NodeSeekPostCollectionSubmitterError: LocalizedError, Equatable {
+    case invalidPostID
+    case serverMessage(String)
+    case httpStatus(Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidPostID:
+            return "帖子 ID 无效，无法收藏。"
+        case .serverMessage(let message):
+            return message
+        case .httpStatus(let statusCode):
+            return "收藏失败，状态码 \(statusCode)。"
+        }
+    }
+}
+
+@MainActor
+final class NodeSeekPostCollectionSubmitter: PostCollectionSubmitting {
+    private let baseURL: URL
+    private let session: URLSession
+    private let cookieSynchronizer: CookieSynchronizing
+
+    init(
+        baseURL: URL = NodeSeekSite.baseURL,
+        session: URLSession = .shared,
+        cookieSynchronizer: CookieSynchronizing? = nil
+    ) {
+        self.baseURL = baseURL
+        self.session = session
+        self.cookieSynchronizer = cookieSynchronizer ?? CookieBridge()
+    }
+
+    func addFavorite(postID: String, referer: URL) async throws -> PostCollectionResponse {
+        try await submit(postID: postID, action: "add", referer: referer)
+    }
+
+    private func submit(postID: String, action: String, referer: URL) async throws -> PostCollectionResponse {
+        guard let numericPostID = Int(postID) else {
+            throw NodeSeekPostCollectionSubmitterError.invalidPostID
+        }
+
+        await cookieSynchronizer.syncWebViewCookiesToURLSession()
+
+        var request = URLRequest(url: baseURL.appendingPathComponent("api/statistics/collection"))
+        request.httpMethod = "POST"
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        WebRequestFingerprint.applyJSONHeaders(to: &request, referer: referer)
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "postId": numericPostID,
+            "action": action
+        ])
+
+        let (data, response) = try await session.data(for: request)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        let message = Self.message(from: data)
+
+        guard (200..<300).contains(statusCode) else {
+            if let message {
+                throw NodeSeekPostCollectionSubmitterError.serverMessage(message)
+            }
+            throw NodeSeekPostCollectionSubmitterError.httpStatus(statusCode)
+        }
+
+        return PostCollectionResponse(message: message)
+    }
+
+    private static func message(from data: Data) -> String? {
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            for key in ["message", "msg", "error"] {
+                guard let value = json[key] as? String else { continue }
+                let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty == false {
+                    return trimmed
+                }
+            }
+        }
+
+        let text = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}

@@ -7,25 +7,33 @@
 
 import Foundation
 
-struct AccountResponse: Equatable, Sendable {
+nonisolated struct AccountNotification: Equatable, Sendable {
+    let url: URL
+    let iconColorCSS: String?
+}
+
+nonisolated struct AccountResponse: Equatable, Sendable {
     let displayName: String
     let isLoggedIn: Bool
     let avatarURL: URL?
     let profileURL: URL?
     let stats: [String]
+    let notification: AccountNotification?
 
     init(
         displayName: String,
         isLoggedIn: Bool,
         avatarURL: URL? = nil,
         profileURL: URL? = nil,
-        stats: [String] = []
+        stats: [String] = [],
+        notification: AccountNotification? = nil
     ) {
         self.displayName = displayName
         self.isLoggedIn = isLoggedIn
         self.avatarURL = avatarURL
         self.profileURL = profileURL
         self.stats = stats
+        self.notification = notification
     }
 }
 
@@ -95,6 +103,10 @@ struct PostDetail: Equatable, Sendable {
     let authorProfileURL: URL?
     let metadataText: String?
     let contentHTML: String
+    let likeCount: Int?
+    let chickenLegCount: Int?
+    let opposeCount: Int?
+    let favoriteCount: Int?
     let comments: [Comment]
     let page: Int
     let pagination: PostDetailPagination?
@@ -109,6 +121,10 @@ struct PostDetail: Equatable, Sendable {
         authorProfileURL: URL? = nil,
         metadataText: String?,
         contentHTML: String,
+        likeCount: Int? = nil,
+        chickenLegCount: Int? = nil,
+        opposeCount: Int? = nil,
+        favoriteCount: Int? = nil,
         comments: [Comment],
         page: Int = 1,
         pagination: PostDetailPagination? = nil,
@@ -122,6 +138,10 @@ struct PostDetail: Equatable, Sendable {
         self.authorProfileURL = authorProfileURL
         self.metadataText = metadataText
         self.contentHTML = contentHTML
+        self.likeCount = likeCount
+        self.chickenLegCount = chickenLegCount
+        self.opposeCount = opposeCount
+        self.favoriteCount = favoriteCount
         self.comments = comments
         self.page = max(1, page)
         self.pagination = pagination

@@ -29,6 +29,10 @@ struct PostDetailHeaderContent: Equatable {
     let authorProfileURL: URL?
     let metadataText: String?
     let contentHTML: String
+    let likeCount: Int?
+    let chickenLegCount: Int?
+    let opposeCount: Int?
+    let favoriteCount: Int?
 
     nonisolated init(
         postID: String,
@@ -38,7 +42,11 @@ struct PostDetailHeaderContent: Equatable {
         authorProfileURL: URL? = nil,
         metadataText: String?,
         contentHTML: String = "",
-        requiredReadingLevel: Int? = nil
+        requiredReadingLevel: Int? = nil,
+        likeCount: Int? = nil,
+        chickenLegCount: Int? = nil,
+        opposeCount: Int? = nil,
+        favoriteCount: Int? = nil
     ) {
         self.postID = postID
         self.title = title
@@ -48,6 +56,10 @@ struct PostDetailHeaderContent: Equatable {
         self.authorProfileURL = authorProfileURL
         self.metadataText = metadataText
         self.contentHTML = contentHTML
+        self.likeCount = likeCount
+        self.chickenLegCount = chickenLegCount
+        self.opposeCount = opposeCount
+        self.favoriteCount = favoriteCount
     }
 
     nonisolated init(post: PostSummary) {
@@ -77,7 +89,11 @@ struct PostDetailHeaderContent: Equatable {
             authorProfileURL: detail.authorProfileURL,
             metadataText: detail.metadataText,
             contentHTML: detail.contentHTML,
-            requiredReadingLevel: detail.requiredReadingLevel
+            requiredReadingLevel: detail.requiredReadingLevel,
+            likeCount: detail.likeCount,
+            chickenLegCount: detail.chickenLegCount,
+            opposeCount: detail.opposeCount,
+            favoriteCount: detail.favoriteCount
         )
     }
 }

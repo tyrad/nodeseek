@@ -31,6 +31,19 @@ enum FixtureLoader {
 struct KannaNodeSeekParserTests {
     @Test func parsesAccountFromRightPanelUserCard() throws {
         let html = """
+        <header>
+            <div id="nsk-head" class="nsk-container">
+                <ul class="nav-menu">
+                    <li class="right-button-group">
+                        <a href="/notification">
+                            <svg class="iconpark-icon" style="color:rgb(243, 17, 17)">
+                                <use href="#remind"></use>
+                            </svg>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </header>
         <div id="nsk-right-panel-container">
             <div class="user-card">
                 <div class="user-head">
@@ -60,6 +73,38 @@ struct KannaNodeSeekParserTests {
         #expect(account.avatarURL?.absoluteString == "https://www.nodeseek.com/avatar/31037.png")
         #expect(account.profileURL?.absoluteString == "https://www.nodeseek.com/space/31037")
         #expect(account.stats == ["等级 Lv 1", "鸡腿 306", "星辰 2"])
+        #expect(account.notification?.url.absoluteString == "https://www.nodeseek.com/notification")
+        #expect(account.notification?.iconColorCSS == "rgb(243, 17, 17)")
+    }
+
+    @Test func parsesNotificationEntryWithoutUnreadColor() throws {
+        let html = """
+        <header>
+            <div id="nsk-head" class="nsk-container">
+                <ul class="nav-menu">
+                    <li class="right-button-group">
+                        <a href="/notification">
+                            <svg class="iconpark-icon"><use href="#remind"></use></svg>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </header>
+        <script id="nodeseek-captured-config" type="application/json">
+        {
+          "user": {
+            "member_id": 31037,
+            "member_name": "缭雾"
+          }
+        }
+        </script>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let account = try parser.parseAccount(html: html)
+
+        #expect(account.notification?.url.absoluteString == "https://www.nodeseek.com/notification")
+        #expect(account.notification?.iconColorCSS == nil)
     }
 
     @Test func parsesGuestAccountWhenRightPanelHasNoUserCard() throws {
@@ -234,6 +279,52 @@ struct KannaNodeSeekParserTests {
         #expect(comment.likeCount == 0)
         #expect(comment.chickenLegCount == 1)
         #expect(comment.opposeCount == 0)
+    }
+
+    @Test func parsesPostBodyReactionCountsFromDetailMenuDOM() throws {
+        let html = """
+        <div class="nsk-post">
+            <div class="post-title"><h1><a class="post-title-link" href="/post-1-1">测试详情</a></h1></div>
+            <div id="0" data-comment-id="100" class="content-item">
+                <div class="author-info"><a class="author-name" href="/space/1">楼主</a></div>
+                <article class="post-content"><p>正文</p></article>
+                <div data-v-254da704 class="comment-menu">
+                    <div data-v-254da704 title="点赞" class="menu-item">
+                        <svg data-v-254da704 class="iconpark-icon">
+                            <use data-v-254da704 href="#good-one"></use>
+                        </svg>
+                        <span data-v-254da704>2</span>
+                    </div>
+                    <div data-v-254da704 title="加鸡腿" class="menu-item">
+                        <svg data-v-254da704 class="iconpark-icon">
+                            <use data-v-254da704 href="#chicken-leg"></use>
+                        </svg>
+                        <span data-v-254da704>3</span>
+                    </div>
+                    <div data-v-254da704 title="反对" class="menu-item">
+                        <svg data-v-254da704 class="iconpark-icon">
+                            <use data-v-254da704 href="#bad-one"></use>
+                        </svg>
+                        <span data-v-254da704>4</span>
+                    </div>
+                    <div data-v-254da704 title="收藏" class="menu-item">
+                        <svg data-v-254da704 class="iconpark-icon">
+                            <use data-v-254da704 href="#star-6negdgdk"></use>
+                        </svg>
+                        <span data-v-254da704>5</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(html: html, url: URL(string: "https://www.nodeseek.com/post-1-1")!)
+
+        #expect(detail.likeCount == 2)
+        #expect(detail.chickenLegCount == 3)
+        #expect(detail.opposeCount == 4)
+        #expect(detail.favoriteCount == 5)
     }
 
     @Test func parsesMissingPostListAuthorAsEmpty() throws {

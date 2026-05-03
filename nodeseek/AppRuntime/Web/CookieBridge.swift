@@ -16,6 +16,11 @@ protocol WebCookieStore: AnyObject {
 }
 
 @MainActor
+protocol CookieSynchronizing: AnyObject {
+    func syncWebViewCookiesToURLSession() async
+}
+
+@MainActor
 final class WKWebCookieStoreAdapter: WebCookieStore {
     private let store: WKHTTPCookieStore
 
@@ -47,6 +52,8 @@ final class WKWebCookieStoreAdapter: WebCookieStore {
         }
     }
 }
+
+extension CookieBridge: CookieSynchronizing {}
 
 @MainActor
 final class CookieBridge {

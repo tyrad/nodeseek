@@ -25,6 +25,7 @@ final class PostBodyCellNode: ASCellNode {
     private let onImageTapped: ([URL], Int) -> Void
     private let onLinkTapped: (URL) -> Void
     private let onAuthorTapped: (URL) -> Void
+    private let onFavoriteTapped: () -> Void
     private let onTextLayoutInvalidated: () -> Void
     private let avatarLoader = AvatarImageLoader.shared
     private weak var avatarImageView: UIImageView?
@@ -39,8 +40,20 @@ final class PostBodyCellNode: ASCellNode {
     private let titleNode = ASTextNode()
     private let authorButtonNode = ASButtonNode()
     private let metadataNode = ASTextNode()
+    private let likeButtonNode = ASButtonNode()
+    private let chickenLegButtonNode = ASButtonNode()
+    private let opposeButtonNode = ASButtonNode()
+    private let favoriteButtonNode = ASButtonNode()
     private let bodyNodes: [ASDisplayNode]
     private var lastAppliedUserInterfaceStyle: UIUserInterfaceStyle?
+    private var hasFooterActions: Bool {
+        [
+            content.likeCount,
+            content.chickenLegCount,
+            content.opposeCount,
+            content.favoriteCount
+        ].contains { $0 != nil }
+    }
 
     private lazy var avatarNode: ASDisplayNode = {
         let node = ASDisplayNode(viewBlock: { [weak self] in
@@ -69,6 +82,7 @@ final class PostBodyCellNode: ASCellNode {
         onImageTapped: @escaping ([URL], Int) -> Void,
         onLinkTapped: @escaping (URL) -> Void = { _ in },
         onAuthorTapped: @escaping (URL) -> Void = { _ in },
+        onFavoriteTapped: @escaping () -> Void = {},
         onTextLayoutInvalidated: @escaping () -> Void,
         imageSizeProvider: @escaping (URL) -> CGSize? = { _ in nil },
         onImageSizeResolved: @escaping (URL, CGSize) -> Void = { _, _ in }
@@ -77,6 +91,7 @@ final class PostBodyCellNode: ASCellNode {
         self.onImageTapped = onImageTapped
         self.onLinkTapped = onLinkTapped
         self.onAuthorTapped = onAuthorTapped
+        self.onFavoriteTapped = onFavoriteTapped
         self.onTextLayoutInvalidated = onTextLayoutInvalidated
         self.bodyNodes = DetailContentBlockNodeFactory.makeNodes(
             from: renderedContent ?? [],
@@ -151,6 +166,9 @@ final class PostBodyCellNode: ASCellNode {
             contentStack.children = bodyNodes
             stack.children?.append(contentStack)
         }
+        if hasFooterActions {
+            stack.children?.append(makeFooterActionStack())
+        }
 
         return ASInsetLayoutSpec(insets: Layout.contentInset, child: stack)
     }
@@ -179,6 +197,11 @@ final class PostBodyCellNode: ASCellNode {
                 .foregroundColor: UIColor.secondaryLabel
             ]
         )
+
+        configureActionButton(likeButtonNode, systemImageName: "hand.thumbsup", accessibilityLabel: "点赞", count: content.likeCount)
+        configureActionButton(chickenLegButtonNode, systemImageName: "fork.knife", accessibilityLabel: "加鸡腿", count: content.chickenLegCount)
+        configureActionButton(opposeButtonNode, systemImageName: "hand.thumbsdown", accessibilityLabel: "反对", count: content.opposeCount)
+        configureActionButton(favoriteButtonNode, systemImageName: "star", accessibilityLabel: "收藏", count: content.favoriteCount)
     }
 
     private static func titleAttributedText(for content: PostDetailHeaderContent) -> NSAttributedString {
@@ -246,11 +269,77 @@ final class PostBodyCellNode: ASCellNode {
         if hasAuthorProfileLink {
             authorButtonNode.addTarget(self, action: #selector(authorTapped), forControlEvents: .touchUpInside)
         }
+        favoriteButtonNode.addTarget(self, action: #selector(favoriteTapped), forControlEvents: .touchUpInside)
+    }
+
+    private func makeFooterActionStack() -> ASLayoutSpec {
+        let spacer = ASLayoutSpec()
+        spacer.style.flexGrow = 1
+
+        let actionStack = ASStackLayoutSpec.horizontal()
+        actionStack.spacing = 8
+        actionStack.alignItems = .center
+        actionStack.children = [
+            spacer,
+            likeButtonNode,
+            chickenLegButtonNode,
+            opposeButtonNode,
+            favoriteButtonNode
+        ]
+        return actionStack
+    }
+
+    private func configureActionButton(
+        _ button: ASButtonNode,
+        systemImageName: String,
+        accessibilityLabel: String,
+        count: Int? = nil
+    ) {
+        let configuration = UIImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+        let image = UIImage(systemName: systemImageName, withConfiguration: configuration)?
+            .withTintColor(UIColor.secondaryLabel.withAlphaComponent(0.72), renderingMode: .alwaysOriginal)
+        button.setImage(image, for: .normal)
+        let displayCount = count.flatMap { $0 > 0 ? $0 : nil }
+        button.contentSpacing = displayCount == nil ? 0 : 4
+        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+        if let displayCount {
+            let countText = Self.reactionCountText(displayCount)
+            let font = UIFont.preferredFont(forTextStyle: .caption1)
+            button.setAttributedTitle(
+                NSAttributedString(
+                    string: countText,
+                    attributes: [
+                        .font: font,
+                        .foregroundColor: UIColor.secondaryLabel
+                    ]
+                ),
+                for: .normal
+            )
+            button.style.preferredSize = CGSize(width: Self.actionButtonWidth(for: countText, font: font), height: 32)
+            button.accessibilityLabel = "\(accessibilityLabel) \(countText)"
+        } else {
+            button.setAttributedTitle(nil, for: .normal)
+            button.style.preferredSize = CGSize(width: 40, height: 32)
+            button.accessibilityLabel = accessibilityLabel
+        }
+    }
+
+    private static func reactionCountText(_ count: Int) -> String {
+        "\(max(0, count))"
+    }
+
+    private static func actionButtonWidth(for countText: String, font: UIFont) -> CGFloat {
+        let textWidth = (countText as NSString).size(withAttributes: [.font: font]).width
+        return max(52, ceil(15 + 4 + textWidth + 16))
     }
 
     @objc private func authorTapped() {
         guard let authorProfileURL = content.authorProfileURL else { return }
         onAuthorTapped(authorProfileURL)
+    }
+
+    @objc private func favoriteTapped() {
+        onFavoriteTapped()
     }
 
     private func requestAvatarIfNeeded() {
@@ -270,6 +359,28 @@ final class PostBodyCellNode: ASCellNode {
         let metadata = content.metadataText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard metadata.isEmpty == false else { return "" }
         return AuthorDisplayPolicy.isDisplayable(content.authorName) ? "· \(metadata)" : metadata
+    }
+
+    var debugFooterActionAccessibilityLabels: [String] {
+        [
+            likeButtonNode,
+            chickenLegButtonNode,
+            opposeButtonNode,
+            favoriteButtonNode
+        ].map { $0.accessibilityLabel ?? "" }
+    }
+
+    var debugReactionActionTitles: [String?] {
+        [
+            likeButtonNode,
+            chickenLegButtonNode,
+            opposeButtonNode,
+            favoriteButtonNode
+        ].map { $0.attributedTitle(for: .normal)?.string }
+    }
+
+    func debugTapFavoriteAction() {
+        favoriteTapped()
     }
 }
 

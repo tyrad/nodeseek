@@ -678,6 +678,40 @@ struct PostDetailViewControllerTests {
         #expect(title.foregroundColor(for: "1") == .systemRed)
     }
 
+    @Test func postBodyCellShowsReactionAndFavoriteCountsWhenAvailable() {
+        let header = PostDetailHeaderContent(
+            postID: "710379",
+            title: "带操作区的主题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            likeCount: 0,
+            chickenLegCount: 1,
+            opposeCount: 0,
+            favoriteCount: 2
+        )
+        var favoriteTapCount = 0
+        let node = PostBodyCellNode(
+            content: header,
+            renderedContent: [],
+            onImageTapped: { _, _ in },
+            onFavoriteTapped: {
+                favoriteTapCount += 1
+            },
+            onTextLayoutInvalidated: {}
+        )
+        _ = node.layoutThatFits(ASSizeRange(
+            min: .zero,
+            max: CGSize(width: 360, height: CGFloat.greatestFiniteMagnitude)
+        ))
+        node.debugTapFavoriteAction()
+
+        #expect(node.debugReactionActionTitles == [nil, "1", nil, "2"])
+        #expect(node.debugFooterActionAccessibilityLabels == ["点赞", "加鸡腿 1", "反对", "收藏 2"])
+        #expect(favoriteTapCount == 1)
+    }
+
     @Test func commentCellRefreshAppearanceRebuildsAuthorNameText() {
         let comment = Comment(
             id: "1",
@@ -1688,6 +1722,7 @@ private final class SpyPostDetailPresenter: PostDetailPresenterProtocol {
     private(set) var didTapLoginCount = 0
     private(set) var selectedPages: [Int] = []
     private(set) var sentReplyContent: String?
+    private(set) var didTapFavoriteCount = 0
 
     func viewDidLoad() {
         loadCount += 1
@@ -1703,6 +1738,10 @@ private final class SpyPostDetailPresenter: PostDetailPresenterProtocol {
 
     func didTapSendReply(content: String) {
         sentReplyContent = content
+    }
+
+    func didTapFavorite() {
+        didTapFavoriteCount += 1
     }
 }
 

@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor
 class PostDetailInteractor: PostDetailInteractorInput {
     
     // MARK: - Properties
@@ -15,6 +16,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
     private let service: NodeSeekService
     private let initialPage: Int
     private let commentSubmitter: NodeSeekCommentSubmitter
+    private let collectionSubmitter: PostCollectionSubmitting
     private let sessionStore: NodeSeekSessionStore
     
     // MARK: - Initialization
@@ -22,6 +24,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
         post: PostSummary? = nil,
         service: NodeSeekService = NodeSeekService(),
         commentSubmitter: NodeSeekCommentSubmitter = NodeSeekCommentSubmitter(),
+        collectionSubmitter: PostCollectionSubmitting? = nil,
         page: Int = 1,
         sessionStore: NodeSeekSessionStore = .shared
     ) {
@@ -29,6 +32,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
         self.service = service
         self.initialPage = max(1, page)
         self.commentSubmitter = commentSubmitter
+        self.collectionSubmitter = collectionSubmitter ?? NodeSeekPostCollectionSubmitter()
         self.sessionStore = sessionStore
     }
     
@@ -101,6 +105,29 @@ class PostDetailInteractor: PostDetailInteractorInput {
         }
     }
 
+    func addFavorite() {
+        guard let post else {
+            presenter?.didFailAddFavorite(error: PostDetailFavoriteError.missingPost.localizedDescription)
+            return
+        }
+
+        Task {
+            AppLog.info(.postDetail, "开始收藏帖子，postID=\(post.id)")
+            do {
+                let response = try await collectionSubmitter.addFavorite(postID: post.id, referer: post.url)
+                await sessionStore.recordSuccess()
+                await MainActor.run {
+                    presenter?.didAddFavorite(response)
+                }
+            } catch {
+                AppLog.error(.postDetail, "收藏帖子失败: \(error.localizedDescription)")
+                await MainActor.run {
+                    presenter?.didFailAddFavorite(error: error.localizedDescription)
+                }
+            }
+        }
+    }
+
     private func loadDetail(postID: String, page: Int) async throws -> PostDetail? {
         AppLog.info(.postDetail, "详情请求开始，postID=\(postID), page=\(page)")
         let result = try await service.loadPostDetail(postID: postID, page: page)
@@ -154,6 +181,17 @@ private enum PostDetailSubmitError: LocalizedError {
             return message
         case .missingPost:
             return "缺少帖子信息，无法发表评论。"
+        }
+    }
+}
+
+private enum PostDetailFavoriteError: LocalizedError {
+    case missingPost
+
+    var errorDescription: String? {
+        switch self {
+        case .missingPost:
+            return "缺少帖子信息，无法收藏。"
         }
     }
 }

@@ -121,6 +121,9 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                     onAuthorTapped: { url in
                         self?.openUserInfo(profileURL: url)
                     },
+                    onFavoriteTapped: {
+                        self?.presenter.didTapFavorite()
+                    },
                     onTextLayoutInvalidated: {
                         self?.scheduleAttachmentLayoutRefresh()
                     },

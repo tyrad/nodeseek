@@ -196,12 +196,53 @@ struct PostDetailPresenterTests {
         #expect(view.errorMessage == nil)
         #expect(view.toastMessage == "已发布")
     }
+
+    @Test func tappingFavoriteSubmitsCollectionForCurrentPost() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        let view = SpyPostDetailView()
+        presenter.setView(view)
+
+        presenter.didTapFavorite()
+        presenter.didAddFavorite(PostCollectionResponse(message: "已收藏"))
+
+        #expect(interactor.favoriteSubmitCount == 1)
+        #expect(view.toastMessage == "已收藏")
+    }
+
+    @Test func duplicateFavoriteTapWhileSubmittingIsIgnored() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+
+        presenter.didTapFavorite()
+        presenter.didTapFavorite()
+
+        #expect(interactor.favoriteSubmitCount == 1)
+    }
+
+    @Test func favoriteFailureCanRetry() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        let view = SpyPostDetailView()
+        presenter.setView(view)
+
+        presenter.didTapFavorite()
+        presenter.didFailAddFavorite(error: "请先登录")
+        presenter.didTapFavorite()
+
+        #expect(interactor.favoriteSubmitCount == 2)
+        #expect(view.errorMessage == "请先登录")
+    }
 }
 
 private final class SpyPostDetailInteractor: PostDetailInteractorInput {
     private(set) var loadedPages: [Int] = []
     private(set) var loadPostDetailCount = 0
     private(set) var submittedReplyContent: String?
+    private(set) var favoriteSubmitCount = 0
 
     func loadPostDetail() {
         loadPostDetail(page: 1)
@@ -214,6 +255,10 @@ private final class SpyPostDetailInteractor: PostDetailInteractorInput {
 
     func submitReply(content: String) {
         submittedReplyContent = content
+    }
+
+    func addFavorite() {
+        favoriteSubmitCount += 1
     }
 }
 
