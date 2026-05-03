@@ -227,29 +227,11 @@ final class PostBodyCellNode: ASCellNode {
 
         let badgeFont = UIFont.preferredFont(forTextStyle: .subheadline)
         let badgeColor = UIColor.systemRed
-        result.append(NSAttributedString(string: " "))
-
-        if let lockImage = UIImage(
-            systemName: "lock.fill",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: badgeFont.pointSize, weight: .semibold)
-        )?.withTintColor(badgeColor, renderingMode: .alwaysOriginal) {
-            let attachment = NSTextAttachment()
-            attachment.image = lockImage
-            attachment.bounds = CGRect(
-                x: 0,
-                y: (titleFont.capHeight - badgeFont.pointSize) / 2,
-                width: badgeFont.pointSize,
-                height: badgeFont.pointSize
-            )
-            result.append(NSAttributedString(attachment: attachment))
-        }
-
         result.append(NSAttributedString(
-            string: " \(requiredReadingLevel)",
+            string: " 🔒 \(requiredReadingLevel)",
             attributes: [
                 .font: badgeFont,
-                .foregroundColor: badgeColor,
-                .baselineOffset: (titleFont.capHeight - badgeFont.capHeight) / 2
+                .foregroundColor: badgeColor
             ]
         ))
 

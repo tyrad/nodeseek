@@ -714,8 +714,8 @@ struct PostDetailViewControllerTests {
         let title = try #require(node.debugTitleAttributedText)
 
         #expect(title.string.contains("闲置顶级亚太线路 成本价拼车"))
+        #expect(title.string.contains("🔒"))
         #expect(title.string.contains("1"))
-        #expect(title.containsAttachment)
         #expect(title.foregroundColor(for: "1") == .systemRed)
     }
 
