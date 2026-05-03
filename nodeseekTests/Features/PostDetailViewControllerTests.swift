@@ -1214,6 +1214,22 @@ struct PostDetailViewControllerTests {
         #expect(UIPasteboard.general.string == codeBlock.text)
     }
 
+    @Test func richTextNodeMeasureUsesLargerHeightForAttachmentContent() {
+        let resolved = DetailRichTextNode.resolvedMeasuredHeight(
+            dtCoreTextHeight: 80,
+            boundingHeight: 82,
+            hasAttachments: true
+        )
+        #expect(resolved == 82)
+
+        let plainResolved = DetailRichTextNode.resolvedMeasuredHeight(
+            dtCoreTextHeight: 80,
+            boundingHeight: 82,
+            hasAttachments: false
+        )
+        #expect(plainResolved == 80)
+    }
+
     @Test func resolvesNodeSeekPostLinksToNativeDetail() throws {
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
         let url = try #require(URL(string: "/post-704174-2#8", relativeTo: baseURL)?.absoluteURL)
@@ -1763,7 +1779,8 @@ struct PostDetailViewControllerTests {
     @Test func richTextNodePrefersDTCoreTextHeightWhenBoundingHeightIsLarger() {
         let height = DetailRichTextNode.resolvedMeasuredHeight(
             dtCoreTextHeight: 120,
-            boundingHeight: 300
+            boundingHeight: 300,
+            hasAttachments: false
         )
 
         #expect(height == 120)

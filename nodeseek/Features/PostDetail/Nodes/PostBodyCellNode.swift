@@ -721,9 +721,11 @@ final class DetailRichTextNode: ASDisplayNode {
         )
         let boundingHeight = ceil(max(boundingRect.height, 1))
         let dtCoreTextHeight = Self.dtCoreTextHeight(for: measuredText, width: width)
+        let hasAttachments = Self.containsAttachment(in: measuredText)
         let height = Self.resolvedMeasuredHeight(
             dtCoreTextHeight: dtCoreTextHeight,
-            boundingHeight: boundingHeight
+            boundingHeight: boundingHeight,
+            hasAttachments: hasAttachments
         )
         logDiagnostics(
             "measure width=\(Self.numberString(width)) bounding=\(Self.numberString(boundingHeight)) dt=\(dtCoreTextHeight.map(Self.numberString) ?? "nil") result=\(Self.numberString(height)) attachments=\(Self.attachmentDiagnostics(in: measuredText))"
@@ -740,8 +742,16 @@ final class DetailRichTextNode: ASDisplayNode {
 
     nonisolated static func resolvedMeasuredHeight(
         dtCoreTextHeight: CGFloat?,
-        boundingHeight: CGFloat
+        boundingHeight: CGFloat,
+        hasAttachments: Bool
     ) -> CGFloat {
+        if hasAttachments,
+           let dtCoreTextHeight,
+           dtCoreTextHeight.isFinite,
+           dtCoreTextHeight > 0 {
+            return ceil(max(dtCoreTextHeight, boundingHeight))
+        }
+
         if let dtCoreTextHeight,
            dtCoreTextHeight.isFinite,
            dtCoreTextHeight > 0 {
@@ -749,6 +759,20 @@ final class DetailRichTextNode: ASDisplayNode {
         }
 
         return ceil(max(boundingHeight, 1))
+    }
+
+    private static func containsAttachment(in attributedText: NSAttributedString) -> Bool {
+        guard attributedText.length > 0 else { return false }
+        var hasAttachment = false
+        attributedText.enumerateAttribute(
+            .attachment,
+            in: NSRange(location: 0, length: attributedText.length)
+        ) { value, _, stop in
+            guard value is DTTextAttachment else { return }
+            hasAttachment = true
+            stop.pointee = true
+        }
+        return hasAttachment
     }
 
     private static func applyCachedAttachmentSizes(
