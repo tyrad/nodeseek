@@ -44,8 +44,8 @@ enum StickerTokenInsertion {
         let needsLeadingSpace = range.location > 0
             && isWhitespace(source.character(at: range.location - 1)) == false
         let rangeEnd = range.location + range.length
-        let needsTrailingSpace = rangeEnd < source.length
-            && isWhitespace(source.character(at: rangeEnd)) == false
+        let needsTrailingSpace = rangeEnd >= source.length
+            || isWhitespace(source.character(at: rangeEnd)) == false
 
         return "\(needsLeadingSpace ? " " : "")\(token)\(needsTrailingSpace ? " " : "")"
     }

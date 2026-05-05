@@ -78,8 +78,8 @@ struct CommentComposerContentBuilderTests {
             selectedRange: NSRange(location: 5, length: 0)
         )
 
-        #expect(result.text == "hello :yct001:")
-        #expect(result.selectedRange.location == 14)
+        #expect(result.text == "hello :yct001: ")
+        #expect(result.selectedRange.location == 15)
         #expect(result.selectedRange.length == 0)
     }
 
@@ -90,8 +90,20 @@ struct CommentComposerContentBuilderTests {
             selectedRange: NSRange(location: 6, length: 5)
         )
 
-        #expect(result.text == "hello :xhj022:")
-        #expect(result.selectedRange.location == 14)
+        #expect(result.text == "hello :xhj022: ")
+        #expect(result.selectedRange.location == 15)
+        #expect(result.selectedRange.length == 0)
+    }
+
+    @Test func stickerTokenInsertionDoesNotDuplicateExistingTrailingSpace() {
+        let result = StickerTokenInsertion.inserting(
+            token: "xhj022",
+            into: "hello world",
+            selectedRange: NSRange(location: 0, length: 5)
+        )
+
+        #expect(result.text == ":xhj022: world")
+        #expect(result.selectedRange.location == 8)
         #expect(result.selectedRange.length == 0)
     }
 }
