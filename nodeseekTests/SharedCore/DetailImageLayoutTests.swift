@@ -105,6 +105,37 @@ struct DetailImageLayoutTests {
         #expect(DetailImageURLRules.isCheckPlaceReportSVG(unsupportedSchemeURL) == false)
     }
 
+    @Test func imageKindResolutionDoesNotClassifyReportsByURLPath() throws {
+        let reportURL = try #require(URL(string: "https://report.check.place/ip/NPR7IUKQC.svg"))
+
+        #expect(DetailImageKind.resolved(isSticker: false, imageURL: reportURL) == .normal)
+    }
+
+    @Test func reportLikeSVGContentIsRecognizedWithoutPathRule() {
+        let svg = """
+        <svg width="82ch" height="42em" xmlns="http://www.w3.org/2000/svg">
+            <style>* { font-size: 14px; }</style>
+            <text><tspan>Route 1</tspan><tspan>Route 2</tspan></text>
+            <text><tspan>Route 3</tspan><tspan>Route 4</tspan></text>
+            <text><tspan>Route 5</tspan><tspan>Route 6</tspan></text>
+            <text><tspan>Route 7</tspan><tspan>Route 8</tspan></text>
+        </svg>
+        """
+
+        #expect(DetailSVGContentRules.isReportLikeSVG(Data(svg.utf8), mimeType: "image/svg+xml"))
+    }
+
+    @Test func ordinarySVGContentIsNotRecognizedAsReport() {
+        let svg = """
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+            <circle cx="24" cy="24" r="20" fill="red" />
+            <text x="24" y="28">NS</text>
+        </svg>
+        """
+
+        #expect(DetailSVGContentRules.isReportLikeSVG(Data(svg.utf8), mimeType: "image/svg+xml") == false)
+    }
+
     @Test func veryWideScreenshotUsesContainedPresentation() {
         let presentation = DetailImageLayout.presentation(
             for: CGSize(width: 2000, height: 800),

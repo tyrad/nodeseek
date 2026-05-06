@@ -20,6 +20,11 @@ enum DetailOriginalImageError: Error, Equatable {
     case unavailable
 }
 
+struct DetailInlineImageResult {
+    let image: UIImage?
+    let resolvedKind: DetailImageKind?
+}
+
 final class DetailImageLoader {
     private enum ImageLoadSource: String {
         case dataURL
@@ -58,7 +63,7 @@ final class DetailImageLoader {
 
     private typealias PayloadCompletion = (ImagePayload) -> Void
     private typealias ImageDataCompletion = (ImageDataPayload) -> Void
-    private typealias InlineImageCompletion = (UIImage?) -> Void
+    private typealias InlineImageCompletion = (DetailInlineImageResult) -> Void
 
     static let shared = DetailImageLoader()
 
@@ -79,8 +84,8 @@ final class DetailImageLoader {
     private var inFlightCallbacks: [URL: [PayloadCompletion]] = [:]
     private var originalDataCallbacks: [URL: [ImageDataCompletion]] = [:]
     private var thumbnailCallbacks: [URL: [InlineImageCompletion]] = [:]
-    private var thumbnailImageCache: [URL: UIImage] = [:]
-    private var inlineImageCache: [InlineImageCacheKey: UIImage] = [:]
+    private var thumbnailImageCache: [URL: DetailInlineImageResult] = [:]
+    private var inlineImageCache: [InlineImageCacheKey: DetailInlineImageResult] = [:]
     private var inlineImageCallbacks: [InlineImageCacheKey: [InlineImageCompletion]] = [:]
 
     convenience init() {
@@ -147,6 +152,23 @@ final class DetailImageLoader {
         allowsOptimization: Bool = true,
         completion: @escaping (UIImage?) -> Void
     ) {
+        loadImageForInlineResult(
+            imageURL,
+            maxPixelWidth: maxPixelWidth,
+            displayScale: displayScale,
+            allowsOptimization: allowsOptimization
+        ) { result in
+            completion(result.image)
+        }
+    }
+
+    func loadImageForInlineResult(
+        _ imageURL: URL,
+        maxPixelWidth: CGFloat,
+        displayScale: CGFloat,
+        allowsOptimization: Bool = true,
+        completion: @escaping (DetailInlineImageResult) -> Void
+    ) {
         let mode = optimizationModeProvider()
         if allowsOptimization,
            isOptimizableDetailImageURL(imageURL),
@@ -209,7 +231,7 @@ final class DetailImageLoader {
         _ imageURL: URL,
         maxPixelWidth: CGFloat,
         displayScale: CGFloat,
-        completion: @escaping (UIImage?) -> Void
+        completion: @escaping InlineImageCompletion
     ) {
         let pixelWidth = max(1, Int(ceil(maxPixelWidth)))
         let imageScale = max(displayScale, 1)
@@ -222,7 +244,7 @@ final class DetailImageLoader {
 
         if let cachedImage = stateQueue.sync(execute: { inlineImageCache[key] }) {
             logDiagnostics(
-                "inline cache hit url=\(cacheURL.absoluteString) maxPixelWidth=\(pixelWidth) imageSize=\(Self.string(from: cachedImage.size))"
+                "inline cache hit url=\(cacheURL.absoluteString) maxPixelWidth=\(pixelWidth) imageSize=\(Self.string(from: cachedImage.image?.size ?? .zero))"
             )
             completion(cachedImage)
             return
@@ -248,16 +270,20 @@ final class DetailImageLoader {
                 data: payload.data,
                 maxPixelSize: pixelWidth
             ) ?? payload.image
+            let result = DetailInlineImageResult(
+                image: image,
+                resolvedKind: Self.resolvedKind(from: payload.data, mimeType: payload.mimeType)
+            )
             self.logDiagnostics(
                 "inline load payload url=\(imageURL.absoluteString) fallback=\(payload.isFallback) payloadImageSize=\(Self.string(from: payload.image.size)) finalImageSize=\(Self.string(from: image.size))"
             )
             let callbacks = self.stateQueue.sync {
                 if payload.isFallback == false {
-                    self.inlineImageCache[key] = image
+                    self.inlineImageCache[key] = result
                 }
                 return self.inlineImageCallbacks.removeValue(forKey: key) ?? []
             }
-            callbacks.forEach { $0(image) }
+            callbacks.forEach { $0(result) }
         }
     }
 
@@ -266,34 +292,36 @@ final class DetailImageLoader {
         maxPixelSide: CGFloat,
         maxThumbnailBytes: Int,
         mode: DetailImageOptimizationMode,
-        completion: @escaping (UIImage?) -> Void
+        completion: @escaping InlineImageCompletion
     ) {
         let pixelSide = max(1, Int(ceil(maxPixelSide)))
         guard let resolvedURL = resolvedCacheURL(for: imageURL) else {
             AppLog.error(.image, "attachment URL 非法，使用兜底图 url=\(imageURL.absoluteString)")
-            completion(Self.fallbackImage)
+            completion(DetailInlineImageResult(image: Self.fallbackImage, resolvedKind: nil))
             return
         }
 
         if let cachedImage = stateQueue.sync(execute: { thumbnailImageCache[resolvedURL] }) {
             logOptimization(
                 mode: mode,
-                "thumbnail memory hit url=\(resolvedURL.absoluteString) imageSize=\(Self.string(from: cachedImage.size))"
+                "thumbnail memory hit url=\(resolvedURL.absoluteString) imageSize=\(Self.string(from: cachedImage.image?.size ?? .zero))"
             )
             completion(cachedImage)
             return
         }
 
-        if let diskData = try? Data(contentsOf: thumbnailCacheURL(for: resolvedURL)),
+        if shouldInspectOriginalBeforeUsingThumbnailDiskCache(for: resolvedURL) == false,
+           let diskData = try? Data(contentsOf: thumbnailCacheURL(for: resolvedURL)),
            let diskImage = UIImage(data: diskData) {
+            let result = DetailInlineImageResult(image: diskImage, resolvedKind: nil)
             stateQueue.sync {
-                thumbnailImageCache[resolvedURL] = diskImage
+                thumbnailImageCache[resolvedURL] = result
             }
             logOptimization(
                 mode: mode,
                 "thumbnail disk hit url=\(resolvedURL.absoluteString) bytes=\(diskData.count) imageSize=\(Self.string(from: diskImage.size))"
             )
-            completion(diskImage)
+            completion(result)
             return
         }
 
@@ -310,6 +338,21 @@ final class DetailImageLoader {
 
         fetchOriginalData(for: imageURL) { [weak self] payload in
             guard let self else { return }
+            if Self.resolvedKind(from: payload.data, mimeType: payload.mimeType) == .report {
+                let image = self.decodedImage(data: payload.data, mimeType: payload.mimeType) ?? Self.fallbackImage
+                let result = DetailInlineImageResult(image: image, resolvedKind: .report)
+                try? FileManager.default.removeItem(at: self.thumbnailCacheURL(for: resolvedURL))
+                self.logOptimization(
+                    mode: mode,
+                    "report svg inline original url=\(resolvedURL.absoluteString) source=\(payload.source.rawValue) bytes=\(payload.data.count) imageSize=\(Self.string(from: image.size))"
+                )
+                let callbacks = self.stateQueue.sync {
+                    self.thumbnailCallbacks.removeValue(forKey: resolvedURL) ?? []
+                }
+                callbacks.forEach { $0(result) }
+                return
+            }
+
             let downsampled = self.downsampleImage(
                 data: payload.data,
                 maxPixelSize: min(pixelSide, Int(Limits.maxPixelSide))
@@ -318,6 +361,7 @@ final class DetailImageLoader {
                 from: downsampled,
                 maxBytes: maxThumbnailBytes
             )
+            let result = DetailInlineImageResult(image: thumbnail.image, resolvedKind: nil)
             if payload.isFallback == false, let cacheData = thumbnail.cacheData {
                 try? self.writeData(cacheData, to: self.thumbnailCacheURL(for: resolvedURL))
             }
@@ -329,12 +373,20 @@ final class DetailImageLoader {
 
             let callbacks = self.stateQueue.sync {
                 if payload.isFallback == false, thumbnail.cacheData != nil {
-                    self.thumbnailImageCache[resolvedURL] = thumbnail.image
+                    self.thumbnailImageCache[resolvedURL] = result
                 }
                 return self.thumbnailCallbacks.removeValue(forKey: resolvedURL) ?? []
             }
-            callbacks.forEach { $0(thumbnail.image) }
+            callbacks.forEach { $0(result) }
         }
+    }
+
+    private func shouldInspectOriginalBeforeUsingThumbnailDiskCache(for resolvedURL: URL) -> Bool {
+        if resolvedURL.pathExtension.lowercased() == "svg" {
+            return true
+        }
+
+        return resolvedURL.absoluteString.lowercased().hasPrefix("data:image/svg")
     }
 
     private func fetchPayload(for imageURL: URL, completion: @escaping PayloadCompletion) {
@@ -460,10 +512,6 @@ final class DetailImageLoader {
     }
 
     private func isOptimizableDetailImageURL(_ url: URL) -> Bool {
-        if DetailImageURLRules.isCheckPlaceReportSVG(url) {
-            return false
-        }
-
         let absolute = url.absoluteString.lowercased()
         if absolute.contains("sticker") {
             return false
@@ -724,6 +772,10 @@ final class DetailImageLoader {
             return true
         }
         return dataLooksLikeSVG(data)
+    }
+
+    private static func resolvedKind(from data: Data, mimeType: String?) -> DetailImageKind? {
+        DetailSVGContentRules.isReportLikeSVG(data, mimeType: mimeType) ? .report : nil
     }
 
     private func renderSVGImage(data: Data) -> UIImage? {

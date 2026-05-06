@@ -2074,6 +2074,28 @@ struct PostDetailViewControllerTests {
         #expect(didRequestGeneralRelayout == false)
     }
 
+    @Test func imageBlockNodeCanSwitchToReportLayoutAfterSVGContentIsResolved() throws {
+        let imageURL = try #require(URL(string: "https://example.com/report.svg"))
+        var didRequestGeneralRelayout = false
+        let node = DetailImageBlockNode(
+            imageBlock: RenderedImageBlock(url: imageURL, altText: nil),
+            imageURLs: [imageURL],
+            imageIndex: 0,
+            onImageTapped: { _, _ in },
+            onLayoutInvalidated: {
+                didRequestGeneralRelayout = true
+            }
+        )
+
+        _ = node.layoutThatFits(ASSizeRange(
+            min: .zero,
+            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
+        ))
+        node.updateLoadedImageSize(CGSize(width: 300, height: 1000), resolvedKind: .report)
+
+        #expect(didRequestGeneralRelayout)
+    }
+
     @Test func contentBlockFactoryPassesReducedImageHeightCallbackToImageNodes() throws {
         let imageURL = try #require(URL(string: "https://i.111666.best/image/wide.webp"))
         var didRequestRowReload = false

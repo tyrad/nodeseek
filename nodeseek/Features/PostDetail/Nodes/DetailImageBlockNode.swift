@@ -13,7 +13,7 @@ final class DetailImageBlockNode: ASDisplayNode {
     private let onImageHeightReduced: () -> Void
     private let onImageSizeResolved: (URL, CGSize) -> Void
     private let imageURL: URL
-    private let imageKind: DetailImageKind
+    private var imageKind: DetailImageKind
     private var loadedImageSize: CGSize
     private static let heightReductionThreshold: CGFloat = 1
 
@@ -37,8 +37,8 @@ final class DetailImageBlockNode: ASDisplayNode {
         setViewBlock { [weak self] in
             DetailImageBlockView(
                 imageBlock: imageBlock,
-                onImageLoaded: { imageSize in
-                    self?.updateLoadedImageSize(imageSize)
+                onImageLoaded: { imageSize, resolvedKind in
+                    self?.updateLoadedImageSize(imageSize, resolvedKind: resolvedKind)
                 },
                 onImageTapped: {
                     onImageTapped(imageURLs, imageIndex)
@@ -57,15 +57,19 @@ final class DetailImageBlockNode: ASDisplayNode {
         )
     }
 
-    func updateLoadedImageSize(_ imageSize: CGSize) {
+    func updateLoadedImageSize(_ imageSize: CGSize, resolvedKind: DetailImageKind? = nil) {
         guard imageSize.width > 0, imageSize.height > 0 else { return }
         let previousSize = loadedImageSize
+        let previousKind = imageKind
+        if let resolvedKind {
+            imageKind = resolvedKind
+        }
         loadedImageSize = imageSize
         onImageSizeResolved(imageURL, imageSize)
         let previousLayout = DetailImageBlockLayout.presentationSize(
             originalSize: previousSize,
             maxWidth: calculatedSize.width,
-            kind: imageKind
+            kind: previousKind
         )
         let nextLayout = DetailImageBlockLayout.presentationSize(
             originalSize: imageSize,
@@ -85,19 +89,21 @@ final class DetailImageBlockNode: ASDisplayNode {
 
 private final class DetailImageBlockView: UIView {
     private let imageBlock: RenderedImageBlock
-    private let onImageLoaded: (CGSize) -> Void
+    private let onImageLoaded: (CGSize, DetailImageKind?) -> Void
     private let onImageTapped: () -> Void
     private let imageView = UIImageView()
     private var hasStartedLoad = false
+    private var resolvedImageKind: DetailImageKind
 
     init(
         imageBlock: RenderedImageBlock,
-        onImageLoaded: @escaping (CGSize) -> Void,
+        onImageLoaded: @escaping (CGSize, DetailImageKind?) -> Void,
         onImageTapped: @escaping () -> Void
     ) {
         self.imageBlock = imageBlock
         self.onImageLoaded = onImageLoaded
         self.onImageTapped = onImageTapped
+        self.resolvedImageKind = DetailImageKind.resolved(isSticker: false, imageURL: nil)
         super.init(frame: .zero)
         configureView()
     }
@@ -108,16 +114,15 @@ private final class DetailImageBlockView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        let imageKind = DetailImageKind.resolved(isSticker: false, imageURL: imageBlock.url)
         imageView.frame = DetailImageBlockLayout.imageFrame(
             originalSize: imageView.image?.size ?? .zero,
             bounds: bounds,
-            kind: imageKind
+            kind: resolvedImageKind
         )
         imageView.contentMode = DetailImageBlockLayout.contentMode(
             originalSize: imageView.image?.size ?? .zero,
             maxWidth: bounds.width,
-            kind: imageKind
+            kind: resolvedImageKind
         )
         loadImageIfNeeded()
     }
@@ -138,15 +143,18 @@ private final class DetailImageBlockView: UIView {
         hasStartedLoad = true
         let scale = window?.windowScene?.screen.scale ?? traitCollection.displayScale
         let targetPixelWidth = max(bounds.width, DetailImageLayout.maxImageHeight) * max(scale, 1)
-        DetailImageLoader.shared.loadImageForInline(
+        DetailImageLoader.shared.loadImageForInlineResult(
             imageBlock.url,
             maxPixelWidth: targetPixelWidth,
             displayScale: scale
-        ) { [weak self] image in
+        ) { [weak self] result in
             DispatchQueue.main.async {
-                guard let self, let image else { return }
+                guard let self, let image = result.image else { return }
+                if let resolvedKind = result.resolvedKind {
+                    self.resolvedImageKind = resolvedKind
+                }
                 self.imageView.image = image
-                self.onImageLoaded(image.size)
+                self.onImageLoaded(image.size, result.resolvedKind)
                 self.setNeedsLayout()
             }
         }

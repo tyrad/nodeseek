@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CryptoKit
 import Testing
 import UIKit
 @testable import nodeseek
@@ -191,10 +192,65 @@ struct DetailImageLoaderTests {
 
         let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 600)
 
-        #expect(loader.cachedOriginalData(for: url) == nil)
+        #expect(loader.cachedOriginalData(for: url) == sourceData)
         #expect(loader.cachedThumbnailData(for: url) == nil)
         #expect((inlineImage?.size.width ?? 0) > 100)
         #expect((inlineImage?.size.height ?? 0) > 100)
+    }
+
+    @Test func inlineLoadRendersReportLikeSVGWithoutThumbnailCacheRegardlessPath() async throws {
+        let url = try #require(URL(string: "https://report.check.place/net/31G5DHSHP.svg"))
+        let sourceData = Self.makeCheckPlaceReportSVGData(width: "82ch", height: "42em")
+        let cacheDirectory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: cacheDirectory) }
+
+        let protocolType = DetailImageURLProtocol.self
+        protocolType.reset()
+        protocolType.stub(data: sourceData, mimeType: "image/svg+xml", for: url)
+        let session = URLSession(configuration: Self.urlSessionConfiguration(protocolType: protocolType))
+        let loader = DetailImageLoader(
+            session: session,
+            cacheDirectory: cacheDirectory,
+            optimizationModeProvider: {
+                .enabled(maxPixelSide: 900, maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
+            }
+        )
+
+        let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 600)
+
+        #expect(loader.cachedOriginalData(for: url) == sourceData)
+        #expect(loader.cachedThumbnailData(for: url) == nil)
+        #expect((inlineImage?.size.width ?? 0) > 300)
+        #expect((inlineImage?.size.height ?? 0) > 300)
+    }
+
+    @Test func optimizedInlineLoadRefreshesReportSVGWhenOldThumbnailCacheExists() async throws {
+        let url = try #require(URL(string: "https://report.check.place/net/31G5DHSHP.svg"))
+        let sourceData = Self.makeCheckPlaceReportSVGData(width: "82ch", height: "42em")
+        let staleThumbnailData = try Self.makeNoisyJPEGData(width: 80, height: 50, quality: 0.8)
+        let cacheDirectory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: cacheDirectory) }
+        try Self.writeCachedThumbnail(staleThumbnailData, for: url, in: cacheDirectory)
+
+        let protocolType = DetailImageURLProtocol.self
+        protocolType.reset()
+        protocolType.stub(data: sourceData, mimeType: "image/svg+xml", for: url)
+        let session = URLSession(configuration: Self.urlSessionConfiguration(protocolType: protocolType))
+        let loader = DetailImageLoader(
+            session: session,
+            cacheDirectory: cacheDirectory,
+            optimizationModeProvider: {
+                .enabled(maxPixelSide: 900, maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
+            }
+        )
+
+        let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 600)
+
+        #expect(protocolType.totalRequestCount() == 1)
+        #expect(loader.cachedOriginalData(for: url) == sourceData)
+        #expect(loader.cachedThumbnailData(for: url) == nil)
+        #expect((inlineImage?.size.width ?? 0) > 300)
+        #expect((inlineImage?.size.height ?? 0) > 300)
     }
 
     @Test func clearsDetailImageDiskAndMemoryCaches() async throws {
@@ -271,6 +327,20 @@ struct DetailImageLoaderTests {
             .appendingPathComponent("DetailImageLoaderTests-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
+    }
+
+    private static func writeCachedThumbnail(_ data: Data, for url: URL, in cacheDirectory: URL) throws {
+        let key = SHA256.hash(data: Data(url.absoluteString.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+        let thumbnailURL = cacheDirectory
+            .appendingPathComponent("thumbnails", isDirectory: true)
+            .appendingPathComponent("\(key).jpg", isDirectory: false)
+        try FileManager.default.createDirectory(
+            at: thumbnailURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try data.write(to: thumbnailURL, options: [.atomic])
     }
 
     private static func makeNoisyJPEGData(width: Int, height: Int, quality: CGFloat) throws -> Data {
@@ -355,9 +425,9 @@ struct DetailImageLoaderTests {
         """.utf8)
     }
 
-    private static func makeCheckPlaceReportSVGData() -> Data {
+    private static func makeCheckPlaceReportSVGData(width: String = "74ch", height: String = "47em") -> Data {
         Data("""
-        <svg width="74ch" height="47em" xmlns="http://www.w3.org/2000/svg" xml:space="preserve">
+        <svg width="\(width)" height="\(height)" xmlns="http://www.w3.org/2000/svg" xml:space="preserve">
             <style>
                 * {
                     font-family: SimHei, Consolas, DejaVu Sans Mono, SF Mono, monospace;
