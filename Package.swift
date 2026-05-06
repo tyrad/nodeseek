@@ -26,6 +26,11 @@ let package = Package(
                 "NodeSeekCore"
             ],
             path: "nodeseekTests",
+            exclude: [
+                "App",
+                "AppRuntime",
+                "Features"
+            ],
             sources: [
                 "SharedCore"
             ],

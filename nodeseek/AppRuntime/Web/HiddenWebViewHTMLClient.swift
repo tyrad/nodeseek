@@ -48,17 +48,30 @@ private final class WebViewCacheTuner {
 actor HiddenWebViewRequestLock {
     static let shared = HiddenWebViewRequestLock()
 
-    private var isLocked = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private struct Waiter {
+        let id: UUID
+        let continuation: CheckedContinuation<Void, any Error>
+    }
 
-    func acquire() async {
+    private var isLocked = false
+    private var waiters: [Waiter] = []
+
+    func acquire() async throws {
+        try Task.checkCancellation()
         if !isLocked {
             isLocked = true
             return
         }
 
-        await withCheckedContinuation { continuation in
-            waiters.append(continuation)
+        let waiterID = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                waiters.append(Waiter(id: waiterID, continuation: continuation))
+            }
+        } onCancel: {
+            Task {
+                await self.cancelWaiter(id: waiterID)
+            }
         }
     }
 
@@ -69,7 +82,13 @@ actor HiddenWebViewRequestLock {
         }
 
         let next = waiters.removeFirst()
-        next.resume()
+        next.continuation.resume()
+    }
+
+    private func cancelWaiter(id: UUID) {
+        guard let index = waiters.firstIndex(where: { $0.id == id }) else { return }
+        let waiter = waiters.remove(at: index)
+        waiter.continuation.resume(throwing: CancellationError())
     }
 }
 
@@ -132,9 +151,10 @@ struct HiddenWebViewHTMLClient: HTMLClient {
     }
 
     private func load(request: URLRequest) async throws -> HTMLResponse {
-        await requestLock.acquire()
-        AppLog.info(.webView, "准备通过隐藏 WebView 抓取 HTML: \(request.url?.absoluteString ?? "nil")")
+        try await requestLock.acquire()
         do {
+            try Task.checkCancellation()
+            AppLog.info(.webView, "准备通过隐藏 WebView 抓取 HTML: \(request.url?.absoluteString ?? "nil")")
             let loader = await MainActor.run {
                 HiddenWebViewLoader.loader(for: channel)
             }
@@ -399,13 +419,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     }
 
     func submitComment(pageURL: URL, content: String, timeoutInterval: TimeInterval) async throws -> CommentAutomationResponse {
-        var request = URLRequest(url: pageURL)
-        request.httpMethod = "GET"
-        request.timeoutInterval = timeoutInterval
-        request.cachePolicy = WebViewCachePolicy.getRequestPolicy
-        WebRequestFingerprint.applyHTMLHeaders(to: &request)
-
-        let response = try await load(request: request, timeoutInterval: timeoutInterval)
+        let response = try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
         if let challenge = ChallengeDetector().detect(response: response) {
             return CommentAutomationResponse(
                 ok: false,
@@ -426,13 +440,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         action: String,
         timeoutInterval: TimeInterval
     ) async throws -> PostCollectionAutomationResponse {
-        var request = URLRequest(url: pageURL)
-        request.httpMethod = "GET"
-        request.timeoutInterval = timeoutInterval
-        request.cachePolicy = WebViewCachePolicy.getRequestPolicy
-        WebRequestFingerprint.applyHTMLHeaders(to: &request)
-
-        let response = try await load(request: request, timeoutInterval: timeoutInterval)
+        let response = try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
         if let challenge = ChallengeDetector().detect(response: response) {
             return PostCollectionAutomationResponse(
                 ok: false,
@@ -457,13 +465,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         action: String,
         timeoutInterval: TimeInterval
     ) async throws -> CommentUpvoteAutomationResponse {
-        var request = URLRequest(url: pageURL)
-        request.httpMethod = "GET"
-        request.timeoutInterval = timeoutInterval
-        request.cachePolicy = WebViewCachePolicy.getRequestPolicy
-        WebRequestFingerprint.applyHTMLHeaders(to: &request)
-
-        let response = try await load(request: request, timeoutInterval: timeoutInterval)
+        let response = try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
         if let challenge = ChallengeDetector().detect(response: response) {
             return CommentUpvoteAutomationResponse(
                 ok: false,
@@ -488,13 +490,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         action: String,
         timeoutInterval: TimeInterval
     ) async throws -> PostUpvoteAutomationResponse {
-        var request = URLRequest(url: pageURL)
-        request.httpMethod = "GET"
-        request.timeoutInterval = timeoutInterval
-        request.cachePolicy = WebViewCachePolicy.getRequestPolicy
-        WebRequestFingerprint.applyHTMLHeaders(to: &request)
-
-        let response = try await load(request: request, timeoutInterval: timeoutInterval)
+        let response = try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
         if let challenge = ChallengeDetector().detect(response: response) {
             return PostUpvoteAutomationResponse(
                 ok: false,
@@ -519,13 +515,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         action: String,
         timeoutInterval: TimeInterval
     ) async throws -> CommentDislikeAutomationResponse {
-        var request = URLRequest(url: pageURL)
-        request.httpMethod = "GET"
-        request.timeoutInterval = timeoutInterval
-        request.cachePolicy = WebViewCachePolicy.getRequestPolicy
-        WebRequestFingerprint.applyHTMLHeaders(to: &request)
-
-        let response = try await load(request: request, timeoutInterval: timeoutInterval)
+        let response = try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
         if let challenge = ChallengeDetector().detect(response: response) {
             return CommentDislikeAutomationResponse(
                 ok: false,
@@ -550,13 +540,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         action: String,
         timeoutInterval: TimeInterval
     ) async throws -> PostDislikeAutomationResponse {
-        var request = URLRequest(url: pageURL)
-        request.httpMethod = "GET"
-        request.timeoutInterval = timeoutInterval
-        request.cachePolicy = WebViewCachePolicy.getRequestPolicy
-        WebRequestFingerprint.applyHTMLHeaders(to: &request)
-
-        let response = try await load(request: request, timeoutInterval: timeoutInterval)
+        let response = try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
         if let challenge = ChallengeDetector().detect(response: response) {
             return PostDislikeAutomationResponse(
                 ok: false,
@@ -573,6 +557,20 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         )
         await cookieBridge.syncWebViewCookiesToURLSession()
         return result
+    }
+
+    private func loadAutomationPage(pageURL: URL, timeoutInterval: TimeInterval) async throws -> HTMLResponse {
+        let request = makeAutomationPageRequest(pageURL: pageURL, timeoutInterval: timeoutInterval)
+        return try await load(request: request, timeoutInterval: timeoutInterval)
+    }
+
+    private func makeAutomationPageRequest(pageURL: URL, timeoutInterval: TimeInterval) -> URLRequest {
+        var request = URLRequest(url: pageURL)
+        request.httpMethod = "GET"
+        request.timeoutInterval = timeoutInterval
+        request.cachePolicy = WebViewCachePolicy.getRequestPolicy
+        WebRequestFingerprint.applyHTMLHeaders(to: &request)
+        return request
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
