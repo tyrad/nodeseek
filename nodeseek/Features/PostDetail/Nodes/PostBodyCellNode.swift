@@ -773,11 +773,11 @@ final class DetailRichTextNode: ASDisplayNode {
         )
         let boundingHeight = ceil(max(boundingRect.height, 1))
         let dtCoreTextHeight = Self.dtCoreTextHeight(for: measuredText, width: width)
-        let hasAttachments = Self.containsAttachment(in: measuredText)
+        let usesBoundingHeightFallback = Self.requiresBoundingHeightFallback(in: measuredText)
         let height = Self.resolvedMeasuredHeight(
             dtCoreTextHeight: dtCoreTextHeight,
             boundingHeight: boundingHeight,
-            hasAttachments: hasAttachments
+            usesBoundingHeightFallback: usesBoundingHeightFallback
         )
         logDiagnostics(
             "measure width=\(Self.numberString(width)) bounding=\(Self.numberString(boundingHeight)) dt=\(dtCoreTextHeight.map(Self.numberString) ?? "nil") result=\(Self.numberString(height)) attachments=\(Self.attachmentDiagnostics(in: measuredText))"
@@ -795,9 +795,9 @@ final class DetailRichTextNode: ASDisplayNode {
     nonisolated static func resolvedMeasuredHeight(
         dtCoreTextHeight: CGFloat?,
         boundingHeight: CGFloat,
-        hasAttachments: Bool
+        usesBoundingHeightFallback: Bool
     ) -> CGFloat {
-        if hasAttachments,
+        if usesBoundingHeightFallback,
            let dtCoreTextHeight,
            dtCoreTextHeight.isFinite,
            dtCoreTextHeight > 0 {
@@ -813,18 +813,33 @@ final class DetailRichTextNode: ASDisplayNode {
         return ceil(max(boundingHeight, 1))
     }
 
-    private static func containsAttachment(in attributedText: NSAttributedString) -> Bool {
+    private static func requiresBoundingHeightFallback(in attributedText: NSAttributedString) -> Bool {
         guard attributedText.length > 0 else { return false }
-        var hasAttachment = false
+        var requiresFallback = false
         attributedText.enumerateAttribute(
             .attachment,
             in: NSRange(location: 0, length: attributedText.length)
         ) { value, _, stop in
-            guard value is DTTextAttachment else { return }
-            hasAttachment = true
-            stop.pointee = true
+            guard let attachment = value as? DTTextAttachment else { return }
+            if Self.isStickerAttachment(attachment) == false {
+                requiresFallback = true
+                stop.pointee = true
+            }
         }
-        return hasAttachment
+        return requiresFallback
+    }
+
+    private static func isStickerAttachment(_ attachment: DTTextAttachment) -> Bool {
+        if DetailAttachmentAttributes.hasClass("sticker", in: attachment.attributes) {
+            return true
+        }
+        if let contentURL = attachment.contentURL {
+            return DetailImageKind.resolved(
+                isSticker: contentURL.absoluteString.lowercased().contains("sticker"),
+                imageURL: contentURL
+            ) == .sticker
+        }
+        return false
     }
 
     private static func applyCachedAttachmentSizes(
@@ -854,8 +869,7 @@ final class DetailRichTextNode: ASDisplayNode {
                 return
             }
 
-            let isSticker = DetailAttachmentAttributes.hasClass("sticker", in: attachment.attributes)
-                || contentURL.absoluteString.lowercased().contains("sticker")
+            let isSticker = Self.isStickerAttachment(attachment)
             let imageKind = DetailImageKind.resolved(isSticker: isSticker, imageURL: contentURL)
             let displaySize = DetailImageLayout.presentation(
                 for: originalSize,

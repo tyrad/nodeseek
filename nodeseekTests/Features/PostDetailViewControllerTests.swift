@@ -1317,14 +1317,14 @@ struct PostDetailViewControllerTests {
         let resolved = DetailRichTextNode.resolvedMeasuredHeight(
             dtCoreTextHeight: 80,
             boundingHeight: 82,
-            hasAttachments: true
+            usesBoundingHeightFallback: true
         )
         #expect(resolved == 82)
 
         let plainResolved = DetailRichTextNode.resolvedMeasuredHeight(
             dtCoreTextHeight: 80,
             boundingHeight: 82,
-            hasAttachments: false
+            usesBoundingHeightFallback: false
         )
         #expect(plainResolved == 80)
     }
@@ -1649,8 +1649,51 @@ struct PostDetailViewControllerTests {
             min: .zero,
             max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
         ))
+        let layouter = try #require(DTCoreTextLayouter(attributedString: attributedText))
+        let layoutFrame = try #require(layouter.layoutFrame(
+            with: CGRect(x: 0, y: 0, width: 320, height: 16_777_215),
+            range: NSRange(location: 0, length: 0)
+        ))
+        let expectedHeight = ceil(layoutFrame.frame.maxY)
 
-        #expect(layout.size.height > 40)
+        #expect(layout.size.height == expectedHeight)
+    }
+
+    @Test func richTextNodeMeasuresTrailingStickerLine() throws {
+        let blocks = DTCoreTextHTMLContentRenderer().render(
+            fragment: """
+            <p>活动啥时候开始 <img class="sticker" src="/static/image/sticker/xhj/001.png" loading="lazy" alt="xhj001"></p>
+            """,
+            baseURL: URL(string: "https://www.nodeseek.com")!,
+            maxImageWidth: 320
+        )
+        let attributedText = try #require(blocks.compactMap { block -> NSAttributedString? in
+            guard case .text(let text) = block else { return nil }
+            return text
+        }.first)
+        let node = DetailRichTextNode(
+            attributedText: attributedText,
+            onImageTapped: { _, _ in },
+            onLayoutInvalidated: {}
+        )
+        let layout = node.layoutThatFits(ASSizeRange(
+            min: .zero,
+            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
+        ))
+        let boundingHeight = ceil(attributedText.boundingRect(
+            with: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            context: nil
+        ).height)
+        let layouter = try #require(DTCoreTextLayouter(attributedString: attributedText))
+        let layoutFrame = try #require(layouter.layoutFrame(
+            with: CGRect(x: 0, y: 0, width: 320, height: 16_777_215),
+            range: NSRange(location: 0, length: 0)
+        ))
+        let expectedHeight = ceil(layoutFrame.frame.maxY)
+
+        #expect(boundingHeight > expectedHeight)
+        #expect(layout.size.height == expectedHeight)
     }
 
     @Test func richTextViewUsesVideoStickerViewForVideoStickerAttachment() throws {
@@ -1890,7 +1933,7 @@ struct PostDetailViewControllerTests {
         let height = DetailRichTextNode.resolvedMeasuredHeight(
             dtCoreTextHeight: 120,
             boundingHeight: 300,
-            hasAttachments: false
+            usesBoundingHeightFallback: false
         )
 
         #expect(height == 120)
