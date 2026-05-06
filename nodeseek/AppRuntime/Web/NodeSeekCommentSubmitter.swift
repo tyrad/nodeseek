@@ -490,6 +490,45 @@ enum NodeSeekPostDislikeSubmitterError: LocalizedError, Equatable {
     }
 }
 
+private struct ReactionSubmitterErrors {
+    let invalidID: Error
+    let serverMessage: (String) -> Error
+    let httpStatus: (Int) -> Error
+    let fallbackMessage: String
+}
+
+@MainActor
+private func submitReaction(
+    targetID: String,
+    action: String,
+    referer: URL,
+    errors: ReactionSubmitterErrors,
+    automation: (Int, String, URL) async throws -> CommentUpvoteAutomationResponse
+) async throws -> CommentUpvoteResponse {
+    guard let numericTargetID = Int(targetID) else {
+        throw errors.invalidID
+    }
+
+    let automationResponse = try await automation(numericTargetID, action, referer)
+    let response = automationResponse.response
+
+    if let statusCode = automationResponse.statusCode, !(200..<300).contains(statusCode) {
+        if let message = response.message {
+            throw errors.serverMessage(message)
+        }
+        throw errors.httpStatus(statusCode)
+    }
+
+    guard automationResponse.ok, response.success != false else {
+        if let message = response.message {
+            throw errors.serverMessage(message)
+        }
+        throw errors.serverMessage(errors.fallbackMessage)
+    }
+
+    return response
+}
+
 @MainActor
 final class NodeSeekPostCollectionSubmitter: PostCollectionSubmitting {
     private let automation: PostCollectionAutomating
@@ -576,32 +615,19 @@ final class NodeSeekCommentUpvoteSubmitter: CommentUpvoteSubmitting {
     }
 
     private func submit(commentID: String, action: String, referer: URL) async throws -> CommentUpvoteResponse {
-        guard let numericCommentID = Int(commentID) else {
-            throw NodeSeekCommentUpvoteSubmitterError.invalidCommentID
-        }
-
-        let automationResponse = try await automation.submitUpvote(
-            commentID: numericCommentID,
+        try await submitReaction(
+            targetID: commentID,
             action: action,
-            referer: referer
-        )
-        let upvoteResponse = automationResponse.response
-
-        if let statusCode = automationResponse.statusCode, !(200..<300).contains(statusCode) {
-            if let message = upvoteResponse.message {
-                throw NodeSeekCommentUpvoteSubmitterError.serverMessage(message)
-            }
-            throw NodeSeekCommentUpvoteSubmitterError.httpStatus(statusCode)
+            referer: referer,
+            errors: ReactionSubmitterErrors(
+                invalidID: NodeSeekCommentUpvoteSubmitterError.invalidCommentID,
+                serverMessage: NodeSeekCommentUpvoteSubmitterError.serverMessage,
+                httpStatus: NodeSeekCommentUpvoteSubmitterError.httpStatus,
+                fallbackMessage: "点赞失败，请稍后重试。"
+            )
+        ) { [automation] commentID, action, referer in
+            try await automation.submitUpvote(commentID: commentID, action: action, referer: referer)
         }
-
-        guard automationResponse.ok, upvoteResponse.success != false else {
-            if let message = upvoteResponse.message {
-                throw NodeSeekCommentUpvoteSubmitterError.serverMessage(message)
-            }
-            throw NodeSeekCommentUpvoteSubmitterError.serverMessage("点赞失败，请稍后重试。")
-        }
-
-        return upvoteResponse
     }
 }
 
@@ -618,32 +644,19 @@ final class NodeSeekPostUpvoteSubmitter: PostUpvoteSubmitting {
     }
 
     private func submit(postID: String, action: String, referer: URL) async throws -> PostUpvoteResponse {
-        guard let numericPostID = Int(postID) else {
-            throw NodeSeekPostUpvoteSubmitterError.invalidPostID
-        }
-
-        let automationResponse = try await automation.submitUpvote(
-            postID: numericPostID,
+        try await submitReaction(
+            targetID: postID,
             action: action,
-            referer: referer
-        )
-        let upvoteResponse = automationResponse.response
-
-        if let statusCode = automationResponse.statusCode, !(200..<300).contains(statusCode) {
-            if let message = upvoteResponse.message {
-                throw NodeSeekPostUpvoteSubmitterError.serverMessage(message)
-            }
-            throw NodeSeekPostUpvoteSubmitterError.httpStatus(statusCode)
+            referer: referer,
+            errors: ReactionSubmitterErrors(
+                invalidID: NodeSeekPostUpvoteSubmitterError.invalidPostID,
+                serverMessage: NodeSeekPostUpvoteSubmitterError.serverMessage,
+                httpStatus: NodeSeekPostUpvoteSubmitterError.httpStatus,
+                fallbackMessage: "点赞失败，请稍后重试。"
+            )
+        ) { [automation] postID, action, referer in
+            try await automation.submitUpvote(postID: postID, action: action, referer: referer)
         }
-
-        guard automationResponse.ok, upvoteResponse.success != false else {
-            if let message = upvoteResponse.message {
-                throw NodeSeekPostUpvoteSubmitterError.serverMessage(message)
-            }
-            throw NodeSeekPostUpvoteSubmitterError.serverMessage("点赞失败，请稍后重试。")
-        }
-
-        return upvoteResponse
     }
 }
 
@@ -660,32 +673,19 @@ final class NodeSeekCommentChickenLegSubmitter: CommentChickenLegSubmitting {
     }
 
     private func submit(commentID: String, action: String, referer: URL) async throws -> CommentChickenLegResponse {
-        guard let numericCommentID = Int(commentID) else {
-            throw NodeSeekCommentChickenLegSubmitterError.invalidCommentID
-        }
-
-        let automationResponse = try await automation.submitChickenLeg(
-            commentID: numericCommentID,
+        try await submitReaction(
+            targetID: commentID,
             action: action,
-            referer: referer
-        )
-        let response = automationResponse.response
-
-        if let statusCode = automationResponse.statusCode, !(200..<300).contains(statusCode) {
-            if let message = response.message {
-                throw NodeSeekCommentChickenLegSubmitterError.serverMessage(message)
-            }
-            throw NodeSeekCommentChickenLegSubmitterError.httpStatus(statusCode)
+            referer: referer,
+            errors: ReactionSubmitterErrors(
+                invalidID: NodeSeekCommentChickenLegSubmitterError.invalidCommentID,
+                serverMessage: NodeSeekCommentChickenLegSubmitterError.serverMessage,
+                httpStatus: NodeSeekCommentChickenLegSubmitterError.httpStatus,
+                fallbackMessage: "投放鸡腿失败，请稍后重试。"
+            )
+        ) { [automation] commentID, action, referer in
+            try await automation.submitChickenLeg(commentID: commentID, action: action, referer: referer)
         }
-
-        guard automationResponse.ok, response.success != false else {
-            if let message = response.message {
-                throw NodeSeekCommentChickenLegSubmitterError.serverMessage(message)
-            }
-            throw NodeSeekCommentChickenLegSubmitterError.serverMessage("投放鸡腿失败，请稍后重试。")
-        }
-
-        return response
     }
 }
 
@@ -702,32 +702,19 @@ final class NodeSeekPostChickenLegSubmitter: PostChickenLegSubmitting {
     }
 
     private func submit(postID: String, action: String, referer: URL) async throws -> PostChickenLegResponse {
-        guard let numericPostID = Int(postID) else {
-            throw NodeSeekPostChickenLegSubmitterError.invalidPostID
-        }
-
-        let automationResponse = try await automation.submitChickenLeg(
-            postID: numericPostID,
+        try await submitReaction(
+            targetID: postID,
             action: action,
-            referer: referer
-        )
-        let response = automationResponse.response
-
-        if let statusCode = automationResponse.statusCode, !(200..<300).contains(statusCode) {
-            if let message = response.message {
-                throw NodeSeekPostChickenLegSubmitterError.serverMessage(message)
-            }
-            throw NodeSeekPostChickenLegSubmitterError.httpStatus(statusCode)
+            referer: referer,
+            errors: ReactionSubmitterErrors(
+                invalidID: NodeSeekPostChickenLegSubmitterError.invalidPostID,
+                serverMessage: NodeSeekPostChickenLegSubmitterError.serverMessage,
+                httpStatus: NodeSeekPostChickenLegSubmitterError.httpStatus,
+                fallbackMessage: "投放鸡腿失败，请稍后重试。"
+            )
+        ) { [automation] postID, action, referer in
+            try await automation.submitChickenLeg(postID: postID, action: action, referer: referer)
         }
-
-        guard automationResponse.ok, response.success != false else {
-            if let message = response.message {
-                throw NodeSeekPostChickenLegSubmitterError.serverMessage(message)
-            }
-            throw NodeSeekPostChickenLegSubmitterError.serverMessage("投放鸡腿失败，请稍后重试。")
-        }
-
-        return response
     }
 }
 
@@ -744,32 +731,19 @@ final class NodeSeekCommentDislikeSubmitter: CommentDislikeSubmitting {
     }
 
     private func submit(commentID: String, action: String, referer: URL) async throws -> CommentDislikeResponse {
-        guard let numericCommentID = Int(commentID) else {
-            throw NodeSeekCommentDislikeSubmitterError.invalidCommentID
-        }
-
-        let automationResponse = try await automation.submitDislike(
-            commentID: numericCommentID,
+        try await submitReaction(
+            targetID: commentID,
             action: action,
-            referer: referer
-        )
-        let dislikeResponse = automationResponse.response
-
-        if let statusCode = automationResponse.statusCode, !(200..<300).contains(statusCode) {
-            if let message = dislikeResponse.message {
-                throw NodeSeekCommentDislikeSubmitterError.serverMessage(message)
-            }
-            throw NodeSeekCommentDislikeSubmitterError.httpStatus(statusCode)
+            referer: referer,
+            errors: ReactionSubmitterErrors(
+                invalidID: NodeSeekCommentDislikeSubmitterError.invalidCommentID,
+                serverMessage: NodeSeekCommentDislikeSubmitterError.serverMessage,
+                httpStatus: NodeSeekCommentDislikeSubmitterError.httpStatus,
+                fallbackMessage: "反对失败，请稍后重试。"
+            )
+        ) { [automation] commentID, action, referer in
+            try await automation.submitDislike(commentID: commentID, action: action, referer: referer)
         }
-
-        guard automationResponse.ok, dislikeResponse.success != false else {
-            if let message = dislikeResponse.message {
-                throw NodeSeekCommentDislikeSubmitterError.serverMessage(message)
-            }
-            throw NodeSeekCommentDislikeSubmitterError.serverMessage("反对失败，请稍后重试。")
-        }
-
-        return dislikeResponse
     }
 }
 
@@ -786,31 +760,18 @@ final class NodeSeekPostDislikeSubmitter: PostDislikeSubmitting {
     }
 
     private func submit(postID: String, action: String, referer: URL) async throws -> PostDislikeResponse {
-        guard let numericPostID = Int(postID) else {
-            throw NodeSeekPostDislikeSubmitterError.invalidPostID
-        }
-
-        let automationResponse = try await automation.submitDislike(
-            postID: numericPostID,
+        try await submitReaction(
+            targetID: postID,
             action: action,
-            referer: referer
-        )
-        let dislikeResponse = automationResponse.response
-
-        if let statusCode = automationResponse.statusCode, !(200..<300).contains(statusCode) {
-            if let message = dislikeResponse.message {
-                throw NodeSeekPostDislikeSubmitterError.serverMessage(message)
-            }
-            throw NodeSeekPostDislikeSubmitterError.httpStatus(statusCode)
+            referer: referer,
+            errors: ReactionSubmitterErrors(
+                invalidID: NodeSeekPostDislikeSubmitterError.invalidPostID,
+                serverMessage: NodeSeekPostDislikeSubmitterError.serverMessage,
+                httpStatus: NodeSeekPostDislikeSubmitterError.httpStatus,
+                fallbackMessage: "反对失败，请稍后重试。"
+            )
+        ) { [automation] postID, action, referer in
+            try await automation.submitDislike(postID: postID, action: action, referer: referer)
         }
-
-        guard automationResponse.ok, dislikeResponse.success != false else {
-            if let message = dislikeResponse.message {
-                throw NodeSeekPostDislikeSubmitterError.serverMessage(message)
-            }
-            throw NodeSeekPostDislikeSubmitterError.serverMessage("反对失败，请稍后重试。")
-        }
-
-        return dislikeResponse
     }
 }
