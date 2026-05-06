@@ -45,7 +45,8 @@ enum DetailContentBlockNodeFactory {
         onLinkTapped: @escaping (URL) -> Void,
         onTextLayoutInvalidated: @escaping () -> Void,
         imageSizeProvider: @escaping (URL) -> CGSize? = { _ in nil },
-        onImageSizeResolved: @escaping (URL, CGSize) -> Void = { _, _ in }
+        onImageSizeResolved: @escaping (URL, CGSize) -> Void = { _, _ in },
+        onImageHeightReduced: @escaping () -> Void = {}
     ) -> [ASDisplayNode] {
         let imageURLs = blocks.compactMap { block -> URL? in
             guard case .image(let imageBlock) = block else { return nil }
@@ -86,6 +87,7 @@ enum DetailContentBlockNodeFactory {
                     initialImageSize: imageSizeProvider(imageBlock.url) ?? .zero,
                     onImageTapped: onImageTapped,
                     onImageSizeResolved: onImageSizeResolved,
+                    onImageHeightReduced: onImageHeightReduced,
                     onLayoutInvalidated: onTextLayoutInvalidated
                 )
             case .imagePlaceholder(let url):

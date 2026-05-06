@@ -168,6 +168,9 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                     imageSizeProvider: imageSizeProvider,
                     onImageSizeResolved: { url, size in
                         self?.cacheDetailImageSize(size, for: url)
+                    },
+                    onImageHeightReduced: {
+                        self?.scheduleHeaderReload()
                     }
                 )
             }
@@ -221,6 +224,9 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                     imageSizeProvider: imageSizeProvider,
                     onImageSizeResolved: { url, size in
                         self?.cacheDetailImageSize(size, for: url)
+                    },
+                    onImageHeightReduced: {
+                        self?.scheduleCommentReload(commentID: comment.id)
                     }
                 )
             }

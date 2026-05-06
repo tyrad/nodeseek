@@ -10,10 +10,12 @@ import UIKit
 
 final class DetailImageBlockNode: ASDisplayNode {
     private let onLayoutInvalidated: () -> Void
+    private let onImageHeightReduced: () -> Void
     private let onImageSizeResolved: (URL, CGSize) -> Void
     private let imageURL: URL
     private let imageKind: DetailImageKind
     private var loadedImageSize: CGSize
+    private static let heightReductionThreshold: CGFloat = 1
 
     init(
         imageBlock: RenderedImageBlock,
@@ -22,9 +24,11 @@ final class DetailImageBlockNode: ASDisplayNode {
         initialImageSize: CGSize = .zero,
         onImageTapped: @escaping ([URL], Int) -> Void,
         onImageSizeResolved: @escaping (URL, CGSize) -> Void = { _, _ in },
+        onImageHeightReduced: @escaping () -> Void = {},
         onLayoutInvalidated: @escaping () -> Void
     ) {
         self.onLayoutInvalidated = onLayoutInvalidated
+        self.onImageHeightReduced = onImageHeightReduced
         self.onImageSizeResolved = onImageSizeResolved
         self.imageURL = imageBlock.url
         self.imageKind = DetailImageKind.resolved(isSticker: false, imageURL: imageBlock.url)
@@ -53,7 +57,7 @@ final class DetailImageBlockNode: ASDisplayNode {
         )
     }
 
-    private func updateLoadedImageSize(_ imageSize: CGSize) {
+    func updateLoadedImageSize(_ imageSize: CGSize) {
         guard imageSize.width > 0, imageSize.height > 0 else { return }
         let previousSize = loadedImageSize
         loadedImageSize = imageSize
@@ -71,7 +75,11 @@ final class DetailImageBlockNode: ASDisplayNode {
         guard previousLayout != nextLayout else { return }
         invalidateCalculatedLayout()
         setNeedsLayout()
-        onLayoutInvalidated()
+        if nextLayout.height < previousLayout.height - Self.heightReductionThreshold {
+            onImageHeightReduced()
+        } else {
+            onLayoutInvalidated()
+        }
     }
 }
 

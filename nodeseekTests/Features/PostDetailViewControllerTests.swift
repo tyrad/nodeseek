@@ -2047,6 +2047,56 @@ struct PostDetailViewControllerTests {
         #expect(abs(layout.size.height - 214) < 0.01)
     }
 
+    @Test func imageBlockNodeRequestsRowReloadWhenLoadedImageIsShorterThanPlaceholder() throws {
+        let imageURL = try #require(URL(string: "https://i.111666.best/image/wide.webp"))
+        var didRequestRowReload = false
+        var didRequestGeneralRelayout = false
+        let node = DetailImageBlockNode(
+            imageBlock: RenderedImageBlock(url: imageURL, altText: nil),
+            imageURLs: [imageURL],
+            imageIndex: 0,
+            onImageTapped: { _, _ in },
+            onImageHeightReduced: {
+                didRequestRowReload = true
+            },
+            onLayoutInvalidated: {
+                didRequestGeneralRelayout = true
+            }
+        )
+
+        _ = node.layoutThatFits(ASSizeRange(
+            min: .zero,
+            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
+        ))
+        node.updateLoadedImageSize(CGSize(width: 1200, height: 180))
+
+        #expect(didRequestRowReload)
+        #expect(didRequestGeneralRelayout == false)
+    }
+
+    @Test func contentBlockFactoryPassesReducedImageHeightCallbackToImageNodes() throws {
+        let imageURL = try #require(URL(string: "https://i.111666.best/image/wide.webp"))
+        var didRequestRowReload = false
+        let nodes = DetailContentBlockNodeFactory.makeNodes(
+            from: [.image(RenderedImageBlock(url: imageURL, altText: nil))],
+            onImageTapped: { _, _ in },
+            onLinkTapped: { _ in },
+            onTextLayoutInvalidated: {},
+            onImageHeightReduced: {
+                didRequestRowReload = true
+            }
+        )
+        let imageNode = try #require(nodes.first as? DetailImageBlockNode)
+
+        _ = imageNode.layoutThatFits(ASSizeRange(
+            min: .zero,
+            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
+        ))
+        imageNode.updateLoadedImageSize(CGSize(width: 1200, height: 180))
+
+        #expect(didRequestRowReload)
+    }
+
     @Test func imageBlockUsesRealAspectRatioHeightForVeryWideImages() {
         let layout = DetailImageBlockLayout.measure(
             originalSize: CGSize(width: 1200, height: 180),

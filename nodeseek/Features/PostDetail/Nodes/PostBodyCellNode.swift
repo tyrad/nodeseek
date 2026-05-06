@@ -103,7 +103,8 @@ final class PostBodyCellNode: ASCellNode {
         showsReplyActions: Bool = true,
         onTextLayoutInvalidated: @escaping () -> Void,
         imageSizeProvider: @escaping (URL) -> CGSize? = { _ in nil },
-        onImageSizeResolved: @escaping (URL, CGSize) -> Void = { _, _ in }
+        onImageSizeResolved: @escaping (URL, CGSize) -> Void = { _, _ in },
+        onImageHeightReduced: @escaping () -> Void = {}
     ) {
         self.content = content
         self.onImageTapped = onImageTapped
@@ -123,7 +124,8 @@ final class PostBodyCellNode: ASCellNode {
             onLinkTapped: onLinkTapped,
             onTextLayoutInvalidated: onTextLayoutInvalidated,
             imageSizeProvider: imageSizeProvider,
-            onImageSizeResolved: onImageSizeResolved
+            onImageSizeResolved: onImageSizeResolved,
+            onImageHeightReduced: onImageHeightReduced
         )
         super.init()
         automaticallyManagesSubnodes = true
