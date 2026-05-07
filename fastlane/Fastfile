@@ -255,10 +255,7 @@ end
 
 def release_xcodebuild_args
   args = [
-    "CODE_SIGN_STYLE=Manual",
-    "CODE_SIGN_IDENTITY=#{"Apple Distribution".shellescape}",
-    "PRODUCT_BUNDLE_IDENTIFIER=#{APP_IDENTIFIER.shellescape}",
-    "PROVISIONING_PROFILE_SPECIFIER=#{app_store_profile_name.shellescape}"
+    "CODE_SIGN_IDENTITY=#{"Apple Distribution".shellescape}"
   ]
 
   team_id = ENV["APPLE_TEAM_ID"]
