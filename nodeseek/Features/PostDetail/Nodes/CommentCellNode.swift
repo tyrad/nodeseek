@@ -15,6 +15,11 @@ enum PostDetailContentLayout {
     static let avatarSize: CGFloat = 42
     static let avatarCornerRadius: CGFloat = 9
     static let avatarSpacing: CGFloat = 12
+    static let reactionActionHeight: CGFloat = 32
+    static let reactionActionMinWidth: CGFloat = 52
+    static let reactionIconReservedWidth: CGFloat = 18
+    static let reactionTitleSpacing: CGFloat = 4
+    static let reactionHorizontalWidthPadding: CGFloat = 20
 }
 
 final class CommentCellNode: ASCellNode {
@@ -376,7 +381,7 @@ final class CommentCellNode: ASCellNode {
             .withTintColor(color, renderingMode: .alwaysOriginal)
         button.setImage(image, for: .normal)
         let displayCount = count.flatMap { $0 > 0 ? $0 : nil }
-        button.contentSpacing = displayCount == nil ? 0 : 4
+        button.contentSpacing = displayCount == nil ? 0 : PostDetailContentLayout.reactionTitleSpacing
         button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
         if let displayCount {
             let countText = Self.reactionCountText(displayCount)
@@ -391,11 +396,14 @@ final class CommentCellNode: ASCellNode {
                 ),
                 for: .normal
             )
-            button.style.preferredSize = CGSize(width: Self.actionButtonWidth(for: countText, font: font), height: 32)
+            button.style.preferredSize = CGSize(
+                width: Self.actionButtonWidth(for: countText, font: font),
+                height: PostDetailContentLayout.reactionActionHeight
+            )
             button.accessibilityLabel = "\(accessibilityLabel) \(countText)"
         } else {
             button.setAttributedTitle(nil, for: .normal)
-            button.style.preferredSize = CGSize(width: 40, height: 32)
+            button.style.preferredSize = CGSize(width: 40, height: PostDetailContentLayout.reactionActionHeight)
             button.accessibilityLabel = accessibilityLabel
         }
     }
@@ -472,7 +480,15 @@ final class CommentCellNode: ASCellNode {
 
     private static func actionButtonWidth(for countText: String, font: UIFont) -> CGFloat {
         let textWidth = (countText as NSString).size(withAttributes: [.font: font]).width
-        return max(52, ceil(15 + 4 + textWidth + 16))
+        return max(
+            PostDetailContentLayout.reactionActionMinWidth,
+            ceil(
+                PostDetailContentLayout.reactionIconReservedWidth
+                    + PostDetailContentLayout.reactionTitleSpacing
+                    + textWidth
+                    + PostDetailContentLayout.reactionHorizontalWidthPadding
+            )
+        )
     }
 
     @discardableResult

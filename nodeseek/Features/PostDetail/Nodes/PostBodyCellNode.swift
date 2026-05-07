@@ -19,7 +19,6 @@ final class PostBodyCellNode: ASCellNode {
         )
         static let verticalSpacing: CGFloat = 12
         static let bodySpacing: CGFloat = 18
-        static let reactionActionWidth: CGFloat = 52
     }
 
     private var content: PostDetailHeaderContent
@@ -325,7 +324,7 @@ final class PostBodyCellNode: ASCellNode {
             .withTintColor(color, renderingMode: .alwaysOriginal)
         button.setImage(image, for: .normal)
         let displayCount = count.flatMap { $0 > 0 ? $0 : nil }
-        button.contentSpacing = displayCount == nil ? 0 : 4
+        button.contentSpacing = displayCount == nil ? 0 : PostDetailContentLayout.reactionTitleSpacing
         button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
         if let displayCount {
             let countText = Self.reactionCountText(displayCount)
@@ -340,11 +339,14 @@ final class PostBodyCellNode: ASCellNode {
                 ),
                 for: .normal
             )
-            button.style.preferredSize = CGSize(width: Self.actionButtonWidth(for: countText, font: font), height: 32)
+            button.style.preferredSize = CGSize(
+                width: Self.actionButtonWidth(for: countText, font: font),
+                height: PostDetailContentLayout.reactionActionHeight
+            )
             button.accessibilityLabel = "\(accessibilityLabel) \(displayCount)"
         } else {
             button.setAttributedTitle(nil, for: .normal)
-            button.style.preferredSize = CGSize(width: 40, height: 32)
+            button.style.preferredSize = CGSize(width: 40, height: PostDetailContentLayout.reactionActionHeight)
             button.accessibilityLabel = accessibilityLabel
         }
     }
@@ -371,7 +373,15 @@ final class PostBodyCellNode: ASCellNode {
 
     private static func actionButtonWidth(for countText: String, font: UIFont) -> CGFloat {
         let textWidth = (countText as NSString).size(withAttributes: [.font: font]).width
-        return max(Layout.reactionActionWidth, ceil(15 + 4 + textWidth + 16))
+        return max(
+            PostDetailContentLayout.reactionActionMinWidth,
+            ceil(
+                PostDetailContentLayout.reactionIconReservedWidth
+                    + PostDetailContentLayout.reactionTitleSpacing
+                    + textWidth
+                    + PostDetailContentLayout.reactionHorizontalWidthPadding
+            )
+        )
     }
 
     private static func favoriteActionColor(isCollected: Bool) -> UIColor {
@@ -398,7 +408,6 @@ final class PostBodyCellNode: ASCellNode {
             count: count,
             color: Self.likeActionColor(isClicked: isClicked)
         )
-        likeButtonNode.style.preferredSize = CGSize(width: Layout.reactionActionWidth, height: 32)
     }
 
     private func configureOpposeActionButton(count: Int?, isClicked: Bool) {
@@ -409,7 +418,6 @@ final class PostBodyCellNode: ASCellNode {
             count: count,
             color: Self.opposeActionColor(isClicked: isClicked)
         )
-        opposeButtonNode.style.preferredSize = CGSize(width: Layout.reactionActionWidth, height: 32)
     }
 
     private func configureChickenLegActionButton(count: Int?, isClicked: Bool) {
@@ -420,7 +428,6 @@ final class PostBodyCellNode: ASCellNode {
             count: count,
             color: Self.chickenLegActionColor(isClicked: isClicked)
         )
-        chickenLegButtonNode.style.preferredSize = CGSize(width: Layout.reactionActionWidth, height: 32)
     }
 
     private func configureFavoriteActionButton(count: Int?, isCollected: Bool) {
@@ -431,155 +438,38 @@ final class PostBodyCellNode: ASCellNode {
             count: count,
             color: Self.favoriteActionColor(isCollected: isCollected)
         )
-        favoriteButtonNode.style.preferredSize = CGSize(width: Layout.reactionActionWidth, height: 32)
-    }
-
-    private func updateFavoriteActionPresentation(count: Int?, isCollected: Bool) {
-        let color = Self.favoriteActionColor(isCollected: isCollected)
-        let configuration = UIImage.SymbolConfiguration(pointSize: 15, weight: .regular)
-        let image = UIImage(systemName: isCollected ? "star.fill" : "star", withConfiguration: configuration)?
-            .withTintColor(color, renderingMode: .alwaysOriginal)
-        favoriteButtonNode.setImage(image, for: .normal)
-
-        let displayCount = count.flatMap { $0 > 0 ? $0 : nil }
-        if let displayCount {
-            let countText = Self.reactionCountText(displayCount)
-            let font = UIFont.preferredFont(forTextStyle: .caption1)
-            favoriteButtonNode.setAttributedTitle(
-                NSAttributedString(
-                    string: countText,
-                    attributes: [
-                        .font: font,
-                        .foregroundColor: color
-                    ]
-                ),
-                for: .normal
-            )
-            favoriteButtonNode.accessibilityLabel = "收藏 \(displayCount)"
-            favoriteButtonNode.contentSpacing = 4
-        } else {
-            favoriteButtonNode.setAttributedTitle(nil, for: .normal)
-            favoriteButtonNode.accessibilityLabel = "收藏"
-            favoriteButtonNode.contentSpacing = 0
-        }
-    }
-
-    private func updateLikeActionPresentation(count: Int?, isClicked: Bool) {
-        let color = Self.likeActionColor(isClicked: isClicked)
-        let configuration = UIImage.SymbolConfiguration(pointSize: 15, weight: .regular)
-        let image = UIImage(systemName: isClicked ? "hand.thumbsup.fill" : "hand.thumbsup", withConfiguration: configuration)?
-            .withTintColor(color, renderingMode: .alwaysOriginal)
-        likeButtonNode.setImage(image, for: .normal)
-
-        let displayCount = count.flatMap { $0 > 0 ? $0 : nil }
-        if let displayCount {
-            let countText = Self.reactionCountText(displayCount)
-            let font = UIFont.preferredFont(forTextStyle: .caption1)
-            likeButtonNode.setAttributedTitle(
-                NSAttributedString(
-                    string: countText,
-                    attributes: [
-                        .font: font,
-                        .foregroundColor: color
-                    ]
-                ),
-                for: .normal
-            )
-            likeButtonNode.accessibilityLabel = "点赞 \(displayCount)"
-            likeButtonNode.contentSpacing = 4
-        } else {
-            likeButtonNode.setAttributedTitle(nil, for: .normal)
-            likeButtonNode.accessibilityLabel = "点赞"
-            likeButtonNode.contentSpacing = 0
-        }
-    }
-
-    private func updateChickenLegActionPresentation(count: Int?, isClicked: Bool) {
-        let color = Self.chickenLegActionColor(isClicked: isClicked)
-        let configuration = UIImage.SymbolConfiguration(pointSize: 15, weight: .regular)
-        let image = UIImage(systemName: "fork.knife", withConfiguration: configuration)?
-            .withTintColor(color, renderingMode: .alwaysOriginal)
-        chickenLegButtonNode.setImage(image, for: .normal)
-
-        let displayCount = count.flatMap { $0 > 0 ? $0 : nil }
-        if let displayCount {
-            let countText = Self.reactionCountText(displayCount)
-            let font = UIFont.preferredFont(forTextStyle: .caption1)
-            chickenLegButtonNode.setAttributedTitle(
-                NSAttributedString(
-                    string: countText,
-                    attributes: [
-                        .font: font,
-                        .foregroundColor: color
-                    ]
-                ),
-                for: .normal
-            )
-            chickenLegButtonNode.accessibilityLabel = "加鸡腿 \(displayCount)"
-            chickenLegButtonNode.contentSpacing = 4
-        } else {
-            chickenLegButtonNode.setAttributedTitle(nil, for: .normal)
-            chickenLegButtonNode.accessibilityLabel = "加鸡腿"
-            chickenLegButtonNode.contentSpacing = 0
-        }
-    }
-
-    private func updateOpposeActionPresentation(count: Int?, isClicked: Bool) {
-        let color = Self.opposeActionColor(isClicked: isClicked)
-        let configuration = UIImage.SymbolConfiguration(pointSize: 15, weight: .regular)
-        let image = UIImage(systemName: isClicked ? "hand.thumbsdown.fill" : "hand.thumbsdown", withConfiguration: configuration)?
-            .withTintColor(color, renderingMode: .alwaysOriginal)
-        opposeButtonNode.setImage(image, for: .normal)
-
-        let displayCount = count.flatMap { $0 > 0 ? $0 : nil }
-        if let displayCount {
-            let countText = Self.reactionCountText(displayCount)
-            let font = UIFont.preferredFont(forTextStyle: .caption1)
-            opposeButtonNode.setAttributedTitle(
-                NSAttributedString(
-                    string: countText,
-                    attributes: [
-                        .font: font,
-                        .foregroundColor: color
-                    ]
-                ),
-                for: .normal
-            )
-            opposeButtonNode.accessibilityLabel = "反对 \(displayCount)"
-            opposeButtonNode.contentSpacing = 4
-        } else {
-            opposeButtonNode.setAttributedTitle(nil, for: .normal)
-            opposeButtonNode.accessibilityLabel = "反对"
-            opposeButtonNode.contentSpacing = 0
-        }
     }
 
     func updateLikeReaction(count: Int?, isClicked: Bool) {
         let nextContent = content.updatingLikeReaction(count: count, isClicked: isClicked)
         guard nextContent != content else { return }
         content = nextContent
-        updateLikeActionPresentation(count: content.likeCount, isClicked: content.isLikeClicked)
+        configureLikeActionButton(count: content.likeCount, isClicked: content.isLikeClicked)
+        setNeedsLayout()
     }
 
     func updateChickenLegReaction(count: Int?, isClicked: Bool) {
         let nextContent = content.updatingChickenLegReaction(count: count, isClicked: isClicked)
         guard nextContent != content else { return }
         content = nextContent
-        updateChickenLegActionPresentation(count: content.chickenLegCount, isClicked: content.isChickenLegClicked)
+        configureChickenLegActionButton(count: content.chickenLegCount, isClicked: content.isChickenLegClicked)
+        setNeedsLayout()
     }
 
     func updateOpposeReaction(count: Int?, isClicked: Bool) {
         let nextContent = content.updatingOpposeReaction(count: count, isClicked: isClicked)
         guard nextContent != content else { return }
         content = nextContent
-        updateOpposeActionPresentation(count: content.opposeCount, isClicked: content.isOpposeClicked)
+        configureOpposeActionButton(count: content.opposeCount, isClicked: content.isOpposeClicked)
+        setNeedsLayout()
     }
 
     func updateFavoriteReaction(count: Int?, isCollected: Bool) {
         let nextContent = content.updatingFavoriteReaction(count: count, isCollected: isCollected)
         guard nextContent != content else { return }
         content = nextContent
-        updateFavoriteActionPresentation(count: content.favoriteCount, isCollected: content.isFavoriteCollected)
+        configureFavoriteActionButton(count: content.favoriteCount, isCollected: content.isFavoriteCollected)
+        setNeedsLayout()
     }
 
     @objc private func authorTapped() {
@@ -655,6 +545,15 @@ final class PostBodyCellNode: ASCellNode {
             opposeButtonNode,
             favoriteButtonNode
         ].map { $0.attributedTitle(for: .normal)?.string }
+    }
+
+    var debugReactionActionPreferredWidths: [CGFloat] {
+        [
+            likeButtonNode,
+            chickenLegButtonNode,
+            opposeButtonNode,
+            favoriteButtonNode
+        ].map { $0.style.preferredSize.width }
     }
 
     var debugFavoriteActionColor: UIColor {

@@ -301,6 +301,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
     func parsePostDetail(html: String, url: URL) throws -> PostDetail {
         let document = try HTML(html: html, encoding: .utf8)
         let restrictedNotice = postDetailRestrictedNotice(in: document)
+        let reactionConfiguration = parsePostReactionConfiguration(in: document)
 
         let parsedTitle = document.at_xpath(XPathRules.postDetailTitleLink)?.text?.normalizedNonEmpty
             ?? document.at_xpath(XPathRules.postDetailTitleFallback)?.text?.normalizedNonEmpty
@@ -337,10 +338,26 @@ struct KannaNodeSeekParser: NodeSeekParser {
             ?? restrictedNotice.flatMap(Self.firstInteger(in:))
 
         let comments = document.xpath(XPathRules.postDetailComments).compactMap { item -> Comment? in
-            parseComment(item)
+            parseComment(item, reactionConfiguration: reactionConfiguration)
         }
         let page = Self.postPage(from: url) ?? 1
         let pagination = parsePostDetailPagination(in: document, pageURL: url)
+        let bodyReactionConfiguration = bodyItem.flatMap {
+            reactionConfiguration?.commentConfiguration(for: $0)
+        }
+        let bodyLikeCount = bodyItem.flatMap { parseReactionCount(in: $0, kind: .like) }
+            ?? bodyReactionConfiguration?.likeCount
+        let bodyChickenLegCount = bodyItem.flatMap { parseReactionCount(in: $0, kind: .chickenLeg) }
+            ?? bodyReactionConfiguration?.chickenLegCount
+        let bodyOpposeCount = bodyItem.flatMap { parseReactionCount(in: $0, kind: .oppose) }
+            ?? bodyReactionConfiguration?.opposeCount
+        let bodyFavoriteCount = bodyItem.flatMap { parseReactionCount(in: $0, kind: .favorite) }
+            ?? reactionConfiguration?.collectionCount
+        let isFavoriteCollected = bodyItem.map {
+            hasRenderedReactionMenu(in: $0)
+                ? parseReactionClicked(in: $0, kind: .favorite)
+                : reactionConfiguration?.collected ?? false
+        } ?? reactionConfiguration?.collected ?? false
 
         return PostDetail(
             id: Self.postID(from: url) ?? title,
@@ -351,14 +368,14 @@ struct KannaNodeSeekParser: NodeSeekParser {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
-            likeCount: bodyItem.flatMap { parseReactionCount(in: $0, kind: .like) },
+            likeCount: bodyLikeCount,
             isLikeClicked: bodyItem.map { parseReactionClicked(in: $0, kind: .like) } ?? false,
-            chickenLegCount: bodyItem.flatMap { parseReactionCount(in: $0, kind: .chickenLeg) },
+            chickenLegCount: bodyChickenLegCount,
             isChickenLegClicked: bodyItem.map { parseReactionClicked(in: $0, kind: .chickenLeg) } ?? false,
-            opposeCount: bodyItem.flatMap { parseReactionCount(in: $0, kind: .oppose) },
+            opposeCount: bodyOpposeCount,
             isOpposeClicked: bodyItem.map { parseReactionClicked(in: $0, kind: .oppose) } ?? false,
-            favoriteCount: bodyItem.flatMap { parseReactionCount(in: $0, kind: .favorite) },
-            isFavoriteCollected: bodyItem.map { parseReactionClicked(in: $0, kind: .favorite) } ?? false,
+            favoriteCount: bodyFavoriteCount,
+            isFavoriteCollected: isFavoriteCollected,
             comments: comments,
             page: page,
             pagination: pagination,
@@ -486,7 +503,10 @@ struct KannaNodeSeekParser: NodeSeekParser {
         return pagination.hasMultiplePages ? pagination : nil
     }
 
-    private func parseComment(_ item: Kanna.XMLElement) -> Comment? {
+    private func parseComment(
+        _ item: Kanna.XMLElement,
+        reactionConfiguration: PostReactionConfiguration?
+    ) -> Comment? {
         guard let authorName = firstText(in: item, xpaths: [XPathRules.contentAuthor]) else {
             return nil
         }
@@ -500,6 +520,13 @@ struct KannaNodeSeekParser: NodeSeekParser {
             attribute: "src"
         ).flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
         let authorProfileURL = parseUserProfileURL(in: item)
+        let commentReactionConfiguration = reactionConfiguration?.commentConfiguration(for: item)
+        let likeCount = parseReactionCount(in: item, kind: .like)
+            ?? commentReactionConfiguration?.likeCount
+        let chickenLegCount = parseReactionCount(in: item, kind: .chickenLeg)
+            ?? commentReactionConfiguration?.chickenLegCount
+        let opposeCount = parseReactionCount(in: item, kind: .oppose)
+            ?? commentReactionConfiguration?.opposeCount
 
         return Comment(
             id: id,
@@ -518,11 +545,11 @@ struct KannaNodeSeekParser: NodeSeekParser {
             ),
             contentHTML: item.at_xpath(XPathRules.contentArticle)?.innerHTML?.trimmedNonEmpty ?? "",
             isHot: item.at_xpath(XPathRules.contentHotBadge) != nil,
-            likeCount: parseReactionCount(in: item, kind: .like),
+            likeCount: likeCount,
             isLikeClicked: parseReactionClicked(in: item, kind: .like),
-            chickenLegCount: parseReactionCount(in: item, kind: .chickenLeg),
+            chickenLegCount: chickenLegCount,
             isChickenLegClicked: parseReactionClicked(in: item, kind: .chickenLeg),
-            opposeCount: parseReactionCount(in: item, kind: .oppose),
+            opposeCount: opposeCount,
             isOpposeClicked: parseReactionClicked(in: item, kind: .oppose)
         )
     }
@@ -588,6 +615,10 @@ struct KannaNodeSeekParser: NodeSeekParser {
     }
 
     private func parseReactionCount(in item: Kanna.XMLElement, kind: ReactionKind) -> Int? {
+        if let count = parseRenderedReactionMenuCount(in: item, kind: kind) {
+            return count
+        }
+
         if let count = firstInteger(inAttributesOf: item, attributes: kind.rootAttributes) {
             return count
         }
@@ -617,10 +648,156 @@ struct KannaNodeSeekParser: NodeSeekParser {
         return nil
     }
 
+    private func parseRenderedReactionMenuCount(in item: Kanna.XMLElement, kind: ReactionKind) -> Int? {
+        for node in item.xpath(".//*[contains(concat(' ', normalize-space(@class), ' '), ' comment-menu ')]//*[contains(concat(' ', normalize-space(@class), ' '), ' menu-item ')]") where node.matchesReaction(kind) {
+            if let countText = node.at_xpath(".//span[normalize-space()][1]")?.text,
+               let count = Self.firstInteger(in: countText) {
+                return count
+            }
+
+            if let text = node.text, let count = Self.firstInteger(in: text) {
+                return count
+            }
+        }
+
+        return nil
+    }
+
     private func parseReactionClicked(in item: Kanna.XMLElement, kind: ReactionKind) -> Bool {
         item.xpath(".//*").contains { node in
             node.matchesReaction(kind) && node.hasClass("clicked")
         }
+    }
+
+    private func hasRenderedReactionMenu(in item: Kanna.XMLElement) -> Bool {
+        item.at_xpath(".//*[contains(concat(' ', normalize-space(@class), ' '), ' comment-menu ')]") != nil
+    }
+
+    private struct PostReactionConfiguration {
+        let collectionCount: Int?
+        let collected: Bool?
+        let commentsByID: [String: CommentReactionConfiguration]
+        let commentsByFloor: [Int: CommentReactionConfiguration]
+
+        func commentConfiguration(for item: Kanna.XMLElement) -> CommentReactionConfiguration? {
+            if let commentID = item["data-comment-id"]?.trimmedNonEmpty,
+               let configuration = commentsByID[commentID] {
+                return configuration
+            }
+
+            if let floorText = item["id"]?.trimmedNonEmpty,
+               let floorIndex = Int(floorText),
+               let configuration = commentsByFloor[floorIndex] {
+                return configuration
+            }
+
+            return nil
+        }
+    }
+
+    private struct CommentReactionConfiguration {
+        let commentID: String?
+        let floorIndex: Int?
+        let likeCount: Int?
+        let chickenLegCount: Int?
+        let opposeCount: Int?
+    }
+
+    private func parsePostReactionConfiguration(in document: HTMLDocument) -> PostReactionConfiguration? {
+        configRoots(in: document)
+            .lazy
+            .compactMap(parsePostReactionConfiguration(from:))
+            .first
+    }
+
+    private func configRoots(in document: HTMLDocument) -> [[String: Any]] {
+        var roots: [[String: Any]] = []
+
+        if let script = document.at_xpath(XPathRules.accountCapturedConfig),
+           let payload = script.text?.trimmedNonEmpty,
+           let data = payload.data(using: .utf8),
+           let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            roots.append(root)
+        }
+
+        if let script = document.at_xpath(XPathRules.accountTempScript),
+           let payload = script.text?.trimmedNonEmpty,
+           let data = Data(base64Encoded: payload, options: [.ignoreUnknownCharacters]),
+           let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            roots.append(root)
+        }
+
+        return roots
+    }
+
+    private func parsePostReactionConfiguration(from root: [String: Any]) -> PostReactionConfiguration? {
+        guard let postData = root["postData"] as? [String: Any] else {
+            return nil
+        }
+
+        let comments = (postData["comments"] as? [[String: Any]] ?? [])
+            .map(parseCommentReactionConfiguration(from:))
+        var commentsByID: [String: CommentReactionConfiguration] = [:]
+        var commentsByFloor: [Int: CommentReactionConfiguration] = [:]
+
+        for comment in comments {
+            if let commentID = comment.commentID {
+                commentsByID[commentID] = comment
+            }
+            if let floorIndex = comment.floorIndex {
+                commentsByFloor[floorIndex] = comment
+            }
+        }
+
+        let collectionCount = intValue(in: postData, keys: ["collectionCount"])
+        let collected = boolValue(in: postData, keys: ["collected"])
+        guard collectionCount != nil
+            || collected != nil
+            || comments.isEmpty == false else {
+            return nil
+        }
+
+        return PostReactionConfiguration(
+            collectionCount: collectionCount,
+            collected: collected,
+            commentsByID: commentsByID,
+            commentsByFloor: commentsByFloor
+        )
+    }
+
+    private func parseCommentReactionConfiguration(from comment: [String: Any]) -> CommentReactionConfiguration {
+        CommentReactionConfiguration(
+            commentID: stringValue(in: comment, keys: ["commentId", "commentID", "id"])
+                ?? intValue(in: comment, keys: ["commentId", "commentID", "id"]).map(String.init),
+            floorIndex: intValue(in: comment, keys: ["floorIndex", "floor"]),
+            likeCount: intValue(in: comment, keys: ["upvoteCount"]),
+            chickenLegCount: intValue(in: comment, keys: ["likeCount"]),
+            opposeCount: intValue(in: comment, keys: ["dislikeCount"])
+        )
+    }
+
+    private func boolValue(in dictionary: [String: Any], keys: [String]) -> Bool? {
+        for key in keys {
+            switch dictionary[key] {
+            case let value as Bool:
+                return value
+            case let value as Int:
+                return value != 0
+            case let value as Double:
+                return value != 0
+            case let value as String:
+                let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if ["true", "1", "yes"].contains(normalized) {
+                    return true
+                }
+                if ["false", "0", "no"].contains(normalized) {
+                    return false
+                }
+            default:
+                continue
+            }
+        }
+        return nil
     }
 
     private func firstInteger(inAttributesOf node: Kanna.XMLElement, attributes: [String]) -> Int? {

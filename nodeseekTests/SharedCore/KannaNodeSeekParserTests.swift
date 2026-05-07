@@ -332,6 +332,175 @@ struct KannaNodeSeekParserTests {
         #expect(detail.isFavoriteCollected == true)
     }
 
+    @Test func parsesRenderedPostBodyReactionCountsFromCurrentMenuDOM() throws {
+        let html = """
+        <div class="nsk-post">
+            <div class="post-title"><h1><a class="post-title-link" href="/post-1-1">测试详情</a></h1></div>
+            <div id="0" data-comment-id="9908634" class="content-item" style="position: relative;">
+                <div class="author-info"><a href="/space/31037" class="author-name">缭雾</a><span class="is-poster role-tag nsk-badge">楼主</span></div>
+                <article class="post-content"><p>正文</p></article>
+                <div data-v-254da704="" class="comment-menu">
+                    <div data-v-254da704="" title="点赞" class="menu-item">
+                        <svg data-v-254da704="" class="iconpark-icon"><use data-v-254da704="" href="#good-one"></use></svg>
+                        <span data-v-254da704="">2</span>
+                    </div>
+                    <div data-v-254da704="" title="加鸡腿" class="menu-item">
+                        <svg data-v-254da704="" class="iconpark-icon"><use data-v-254da704="" href="#chicken-leg"></use></svg>
+                        <span data-v-254da704="">1</span>
+                    </div>
+                    <div data-v-254da704="" title="反对" class="menu-item">
+                        <svg data-v-254da704="" class="iconpark-icon"><use data-v-254da704="" href="#bad-one"></use></svg>
+                        <span data-v-254da704="">0</span>
+                    </div>
+                    <div data-v-254da704="" title="收藏" class="menu-item">
+                        <svg data-v-254da704="" class="iconpark-icon"><use data-v-254da704="" href="#star-6negdgdk"></use></svg>
+                        <span data-v-254da704="">10</span>
+                    </div>
+                    <div data-v-254da704="" class="menu-item">
+                        <svg data-v-254da704="" class="iconpark-icon"><use data-v-254da704="" href="#quote"></use></svg>
+                        <span data-v-254da704="">引用</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(html: html, url: URL(string: "https://www.nodeseek.com/post-1-1")!)
+
+        #expect(detail.likeCount == 2)
+        #expect(detail.chickenLegCount == 1)
+        #expect(detail.opposeCount == 0)
+        #expect(detail.favoriteCount == 10)
+    }
+
+    @Test func parsesFavoriteCountFromRenderedMenuBeforeGenericStarMatches() throws {
+        let html = """
+        <div class="nsk-post">
+            <div class="post-title"><h1><a class="post-title-link" href="/post-1-1">测试详情</a></h1></div>
+            <div id="0" data-comment-id="9908634" class="content-item">
+                <div class="author-info"><a href="/space/31037" class="author-name">缭雾</a></div>
+                <article class="post-content"><p>正文</p></article>
+                <span data-testid="star-debug" title="star 1"></span>
+                <div data-v-254da704="" class="comment-menu">
+                    <div data-v-254da704="" title="收藏" class="menu-item">
+                        <svg data-v-254da704="" class="iconpark-icon"><use data-v-254da704="" href="#star-6negdgdk"></use></svg>
+                        <span data-v-254da704="">10</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(html: html, url: URL(string: "https://www.nodeseek.com/post-1-1")!)
+
+        #expect(detail.favoriteCount == 10)
+    }
+
+    @Test func prefersRenderedReactionCountsOverStaleCapturedConfiguration() throws {
+        let postJSON = """
+        {
+          "postData": {
+            "collectionCount": 1,
+            "collected": false,
+            "comments": [
+              {
+                "commentId": 9908634,
+                "floorIndex": 0,
+                "likeCount": 1,
+                "dislikeCount": 0,
+                "upvoteCount": 1
+              }
+            ]
+          }
+        }
+        """
+        let html = """
+        <div class="nsk-post">
+            <div class="post-title"><h1><a class="post-title-link" href="/post-1-1">测试详情</a></h1></div>
+            <div id="0" data-comment-id="9908634" class="content-item">
+                <div class="author-info"><a href="/space/31037" class="author-name">缭雾</a><span class="is-poster role-tag nsk-badge">楼主</span></div>
+                <article class="post-content"><p>正文</p></article>
+                <div data-v-254da704="" class="comment-menu">
+                    <div data-v-254da704="" title="点赞" class="menu-item"><span data-v-254da704="">2</span></div>
+                    <div data-v-254da704="" title="加鸡腿" class="menu-item"><span data-v-254da704="">1</span></div>
+                    <div data-v-254da704="" title="反对" class="menu-item"><span data-v-254da704="">0</span></div>
+                    <div data-v-254da704="" title="收藏" class="menu-item"><span data-v-254da704="">10</span></div>
+                </div>
+            </div>
+        </div>
+        <script id="nodeseek-captured-config" type="application/json">\(postJSON)</script>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(html: html, url: URL(string: "https://www.nodeseek.com/post-1-1")!)
+
+        #expect(detail.likeCount == 2)
+        #expect(detail.chickenLegCount == 1)
+        #expect(detail.favoriteCount == 10)
+    }
+
+    @Test func usesCapturedPostConfigurationForReactionCountsBeforeMenuRenders() throws {
+        let postJSON = """
+        {
+          "postData": {
+            "postId": 1,
+            "collectionCount": 17,
+            "collected": true,
+            "comments": [
+              {
+                "commentId": 100,
+                "floorIndex": 0,
+                "likeCount": 12,
+                "dislikeCount": 2,
+                "upvoteCount": 15
+              },
+              {
+                "commentId": 101,
+                "floorIndex": 1,
+                "likeCount": 7,
+                "dislikeCount": 1,
+                "upvoteCount": 9
+              }
+            ]
+          }
+        }
+        """
+        let html = """
+        <div class="nsk-post">
+            <div class="post-title"><h1><a class="post-title-link" href="/post-1-1">测试详情</a></h1></div>
+            <div id="0" data-comment-id="100" class="content-item">
+                <div class="author-info"><a class="author-name" href="/space/1">楼主</a></div>
+                <article class="post-content"><p>正文</p></article>
+                <div class="comment-menu-mount"></div>
+            </div>
+            <ul class="comments">
+                <li id="1" data-comment-id="101" class="content-item">
+                    <div class="author-info"><a class="author-name" href="/space/2">alice</a></div>
+                    <article class="post-content"><p>评论</p></article>
+                    <div class="comment-menu-mount"></div>
+                </li>
+            </ul>
+        </div>
+        <script id="nodeseek-captured-config" type="application/json">\(postJSON)</script>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(html: html, url: URL(string: "https://www.nodeseek.com/post-1-1")!)
+
+        #expect(detail.likeCount == 15)
+        #expect(detail.opposeCount == 2)
+        #expect(detail.chickenLegCount == 12)
+        #expect(detail.favoriteCount == 17)
+        #expect(detail.isFavoriteCollected == true)
+
+        let comment = try #require(detail.comments.first)
+        #expect(comment.likeCount == 9)
+        #expect(comment.opposeCount == 1)
+        #expect(comment.chickenLegCount == 7)
+    }
+
     @Test func parsesMissingPostListAuthorAsEmpty() throws {
         let html = """
         <ul class="post-list">

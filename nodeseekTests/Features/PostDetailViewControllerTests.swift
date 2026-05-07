@@ -942,6 +942,28 @@ struct PostDetailViewControllerTests {
 
         #expect(node.debugReactionActionTitles == ["1.2万", "12.3万", "1亿", "20亿"])
         #expect(node.debugFooterActionAccessibilityLabels == ["点赞 12345", "加鸡腿 123456", "反对 100000000", "收藏 2000000000", "回复楼主", "评论帖子"])
+        #expect(node.debugReactionActionPreferredWidths.allSatisfy { $0 > 52 })
+    }
+
+    @Test func postBodyCellUsesDynamicWidthForTwoDigitFavoriteCount() {
+        let header = PostDetailHeaderContent(
+            postID: "710379",
+            title: "带操作区的主题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            favoriteCount: 10
+        )
+        let node = PostBodyCellNode(
+            content: header,
+            renderedContent: [],
+            onImageTapped: { _, _ in },
+            onTextLayoutInvalidated: {}
+        )
+
+        #expect(node.debugReactionActionTitles[3] == "10")
+        #expect(node.debugReactionActionPreferredWidths[3] > 52)
     }
 
     @Test func postBodyCellKeepsFavoriteIconStyleWhileSubmitting() {
