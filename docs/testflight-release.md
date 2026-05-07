@@ -7,6 +7,7 @@
 在仓库或 `app-store` environment 中配置：
 
 - `APP_STORE_CONNECT_TEAM_ID`
+- `APPLE_TEAM_ID`
 - `APP_STORE_CONNECT_KEY_ID`
 - `APP_STORE_CONNECT_ISSUER_ID`
 - `APP_STORE_CONNECT_KEY_CONTENT`
@@ -23,6 +24,8 @@
 `app-store` environment 可以配置这些 variables：
 
 - `TESTFLIGHT_GROUPS`：外部测试组，默认空。多个组用英文逗号分隔。
+- `APP_IDENTIFIER`：Bundle identifier，默认可由 workflow 设置为维护者自己的 bundle id。
+- `APP_STORE_CONNECT_APP_ID`：App Store Connect app id。
 - `TESTFLIGHT_CHANGELOG`：TestFlight 的 What to Test 文案。
 - `TESTFLIGHT_DISTRIBUTE_EXTERNAL`：是否自动分发到外部测试组，默认 `false`。
 - `TESTFLIGHT_SUBMIT_BETA_REVIEW`：是否自动提交 Beta App Review，默认 `false`。

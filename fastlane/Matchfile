@@ -4,7 +4,7 @@ storage_mode("git")
 
 type("appstore")
 app_identifier([ENV["APP_IDENTIFIER"] || "com.mistj.nodeseek"])
-team_id(ENV["APPLE_TEAM_ID"] || "Z9K94479DQ")
+team_id(ENV["APPLE_TEAM_ID"]) if ENV["APPLE_TEAM_ID"] && !ENV["APPLE_TEAM_ID"].empty?
 readonly(true)
 
 git_basic_authorization(ENV["MATCH_GIT_BASIC_AUTHORIZATION"]) if ENV["MATCH_GIT_BASIC_AUTHORIZATION"]

@@ -10,7 +10,7 @@ ROOT = File.expand_path("..", __dir__)
 PROJECT = File.join(ROOT, "nodeseek.xcodeproj")
 SCHEME = "nodeseek"
 APP_IDENTIFIER = ENV["APP_IDENTIFIER"] || "com.mistj.nodeseek"
-APP_STORE_CONNECT_APP_ID = ENV["APP_STORE_CONNECT_APP_ID"] || "6766863710"
+APP_STORE_CONNECT_APP_ID = ENV["APP_STORE_CONNECT_APP_ID"]
 INFO_PLIST = File.join(ROOT, "nodeseek/Resources/Info.plist")
 BUILD_DIR = File.join(ROOT, "build")
 PROVENANCE_PATH = File.join(BUILD_DIR, "build-provenance.json")
@@ -116,6 +116,7 @@ def testflight_upload_options
   missing = []
   missing << "APPLE_ID" if apple_id.nil? || apple_id.empty?
   missing << "FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD" if app_password.nil? || app_password.empty?
+  missing << "APP_STORE_CONNECT_APP_ID" if APP_STORE_CONNECT_APP_ID.nil? || APP_STORE_CONNECT_APP_ID.empty?
   UI.user_error!("Missing TestFlight upload secrets: #{missing.join(", ")}") unless missing.empty?
 
   options = {
@@ -128,6 +129,12 @@ def testflight_upload_options
   options[:provider_public_id] = provider_public_id if provider_public_id && !provider_public_id.empty?
 
   options
+end
+
+def app_store_connect_app_option
+  return {} if APP_STORE_CONNECT_APP_ID.nil? || APP_STORE_CONNECT_APP_ID.empty?
+
+  { app: APP_STORE_CONNECT_APP_ID }
 end
 
 def env_bool(key, default: false)
@@ -173,6 +180,37 @@ def testflight_distribution_options
   )
 end
 
+def app_store_metadata_auth_options
+  api_key = app_store_api_key_from_env
+  return { api_key: api_key } if api_key
+
+  username = ENV["DELIVER_USERNAME"]
+  username = ENV["FASTLANE_USER"] if username.nil? || username.empty?
+  username = ENV["APPLE_ID"] if username.nil? || username.empty?
+  UI.user_error!("Missing App Store Connect login. Set APP_STORE_CONNECT_KEY_ID/ISSUER_ID/KEY_CONTENT for deliver, or set FASTLANE_USER/APPLE_ID.") if username.nil? || username.empty?
+
+  { username: username }
+end
+
+def app_privacy_auth_options
+  username = ENV["FASTLANE_USER"]
+  username = ENV["APPLE_ID"] if username.nil? || username.empty?
+  UI.user_error!("Missing App Store Connect login for App Privacy upload. Set FASTLANE_USER or APPLE_ID.") if username.nil? || username.empty?
+
+  options = {
+    username: username,
+    app_identifier: APP_IDENTIFIER,
+    json_path: File.join(ROOT, "fastlane/app_privacy_details.json"),
+    skip_publish: env_bool("APP_PRIVACY_SKIP_PUBLISH", default: false)
+  }
+
+  team_id = ENV["FASTLANE_ITC_TEAM_ID"]
+  team_id = ENV["APP_STORE_CONNECT_TEAM_ID"] if team_id.nil? || team_id.empty?
+  options[:team_id] = team_id if team_id && !team_id.empty?
+
+  options
+end
+
 def write_build_provenance
   FileUtils.mkdir_p(BUILD_DIR)
 
@@ -215,6 +253,19 @@ def app_store_profile_name
   "match AppStore #{APP_IDENTIFIER}"
 end
 
+def release_xcodebuild_args
+  args = [
+    "CODE_SIGN_STYLE=Manual",
+    "CODE_SIGN_IDENTITY=#{"Apple Distribution".shellescape}",
+    "PRODUCT_BUNDLE_IDENTIFIER=#{APP_IDENTIFIER.shellescape}",
+    "PROVISIONING_PROFILE_SPECIFIER=#{app_store_profile_name.shellescape}"
+  ]
+
+  team_id = ENV["APPLE_TEAM_ID"]
+  args << "DEVELOPMENT_TEAM=#{team_id.shellescape}" if team_id && !team_id.empty?
+  args.join(" ")
+end
+
 platform :ios do
   desc "Run the CI test subset"
   lane :tests do
@@ -239,6 +290,7 @@ platform :ios do
       output_directory: BUILD_DIR,
       output_name: "nodeseek.ipa",
       include_symbols: true,
+      xcargs: release_xcodebuild_args,
       export_options: {
         provisioningProfiles: {
           APP_IDENTIFIER => app_store_profile_name
@@ -262,6 +314,7 @@ platform :ios do
       output_directory: BUILD_DIR,
       output_name: "nodeseek.ipa",
       include_symbols: true,
+      xcargs: release_xcodebuild_args,
       export_options: {
         provisioningProfiles: {
           APP_IDENTIFIER => app_store_profile_name
@@ -273,5 +326,52 @@ platform :ios do
       **testflight_upload_options,
       **testflight_distribution_options
     )
+  end
+
+  desc "Upload App Store basic metadata without uploading a binary or submitting for review"
+  lane :app_store_metadata do
+    deliver(
+      **app_store_metadata_auth_options,
+      **app_store_connect_app_option,
+      app_identifier: APP_IDENTIFIER,
+      metadata_path: File.join(ROOT, "fastlane/metadata"),
+      skip_binary_upload: true,
+      skip_screenshots: true,
+      force: true,
+      submit_for_review: false,
+      run_precheck_before_submit: false,
+      app_rating_config_path: File.join(ROOT, "fastlane/app_rating_config.json"),
+      submission_information: {
+        export_compliance_uses_encryption: false
+      }
+    )
+  end
+
+  desc "Upload App Privacy answers to App Store Connect"
+  lane :app_privacy do
+    upload_app_privacy_details_to_app_store(**app_privacy_auth_options)
+  end
+
+  desc "Upload App Store screenshots without uploading a binary or submitting for review"
+  lane :app_store_screenshots do
+    deliver(
+      **app_store_metadata_auth_options,
+      **app_store_connect_app_option,
+      app_identifier: APP_IDENTIFIER,
+      metadata_path: File.join(ROOT, "fastlane/metadata"),
+      screenshots_path: File.join(ROOT, "fastlane/screenshots"),
+      skip_binary_upload: true,
+      skip_metadata: true,
+      overwrite_screenshots: true,
+      force: true,
+      submit_for_review: false,
+      run_precheck_before_submit: false
+    )
+  end
+
+  desc "Upload App Store basic metadata and App Privacy answers"
+  lane :app_store_info do
+    app_store_metadata
+    app_privacy
   end
 end

@@ -31,6 +31,11 @@ build/
 # Optional local tooling artifacts
 .worktrees/
 .idea/
+.superpowers/
 fastlane/test_output/
 fastlane/report.xml
 fastlane/Preview.html
+fastlane/app_privacy_details.json
+fastlane/app_rating_config.json
+fastlane/metadata/
+fastlane/screenshots/

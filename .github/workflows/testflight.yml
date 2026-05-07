@@ -91,9 +91,9 @@ jobs:
       - name: Build and upload to TestFlight
         run: bundle exec fastlane beta version:${{ steps.release.outputs.version }} build_number:${{ steps.release.outputs.build_number }}
         env:
-          APP_IDENTIFIER: com.mistj.nodeseek
-          APP_STORE_CONNECT_APP_ID: "6766863710"
-          APPLE_TEAM_ID: Z9K94479DQ
+          APP_IDENTIFIER: ${{ vars.APP_IDENTIFIER || 'com.mistj.nodeseek' }}
+          APP_STORE_CONNECT_APP_ID: ${{ vars.APP_STORE_CONNECT_APP_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
           APP_STORE_CONNECT_PROVIDER_PUBLIC_ID: ${{ secrets.APP_STORE_CONNECT_PROVIDER_PUBLIC_ID }}
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}

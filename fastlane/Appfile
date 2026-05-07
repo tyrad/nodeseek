@@ -1,5 +1,5 @@
 app_identifier(ENV["APP_IDENTIFIER"] || "com.mistj.nodeseek")
 
-team_id(ENV["APPLE_TEAM_ID"] || "Z9K94479DQ")
+team_id(ENV["APPLE_TEAM_ID"]) if ENV["APPLE_TEAM_ID"] && !ENV["APPLE_TEAM_ID"].empty?
 itc_team_id(ENV["APP_STORE_CONNECT_TEAM_ID"]) if ENV["APP_STORE_CONNECT_TEAM_ID"] && !ENV["APP_STORE_CONNECT_TEAM_ID"].empty?
 apple_id(ENV["APPLE_ID"]) if ENV["APPLE_ID"] && !ENV["APPLE_ID"].empty?
