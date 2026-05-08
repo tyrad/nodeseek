@@ -865,7 +865,7 @@ private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
 
 final class NodeImageAuthViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     private let onAPIKey: @MainActor (String) -> Void
-    private let webView = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
+    private let webView = NoBounceWebView(frame: .zero, configuration: WKWebViewConfiguration())
     private var popupWebView: WKWebView?
     private let loadingIndicator = UIActivityIndicatorView(style: .medium)
     private var didComplete = false
@@ -974,7 +974,7 @@ final class NodeImageAuthViewController: UIViewController, WKNavigationDelegate,
     ) -> WKWebView? {
         guard navigationAction.targetFrame == nil else { return nil }
 
-        let popup = WKWebView(frame: .zero, configuration: configuration)
+        let popup = NoBounceWebView(frame: .zero, configuration: configuration)
         popup.customUserAgent = WebRequestFingerprint.userAgent
         popup.navigationDelegate = self
         popup.uiDelegate = self

@@ -34,7 +34,7 @@ final class NodeSeekWebViewContext {
         let webCookieStore = WKWebCookieStoreAdapter(
             store: configuration.websiteDataStore.httpCookieStore
         )
-        self.webView = WKWebView(frame: .zero, configuration: configuration)
+        self.webView = NoBounceWebView(frame: .zero, configuration: configuration)
         self.webCookieStore = webCookieStore
         self.cookieSynchronizer = cookieSynchronizer ?? CookieBridge(webCookieStore: webCookieStore)
     }

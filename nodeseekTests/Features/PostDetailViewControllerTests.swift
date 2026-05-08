@@ -11,6 +11,7 @@ import AsyncDisplayKit
 import DTCoreText
 import Testing
 import UIKit
+import WebKit
 @testable import nodeseek
 
 @Suite(.serialized)
@@ -2526,6 +2527,17 @@ struct PostDetailLoginViewControllerTests {
         ]
 
         #expect(NodeImageAuthorizationMessage.apiKey(from: body) == "nodeimage-status-key")
+    }
+
+    @Test func nodeImageAuthorizationWebViewDisablesScrollBounce() throws {
+        let viewController = NodeImageAuthViewController { _ in }
+
+        viewController.loadViewIfNeeded()
+
+        let webView = try #require(viewController.view.firstSubview(of: WKWebView.self))
+        #expect(webView.scrollView.bounces == false)
+        #expect(webView.scrollView.alwaysBounceVertical == false)
+        #expect(webView.scrollView.alwaysBounceHorizontal == false)
     }
 
     @Test func nodeImageUploadCompressorKeepsLargeImagesUnderOneMegabyte() throws {

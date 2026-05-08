@@ -228,7 +228,7 @@ private final class HiddenWebViewPreloadLoader: NSObject, WKNavigationDelegate {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
 
-        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let webView = NoBounceWebView(frame: .zero, configuration: configuration)
         webView.customUserAgent = WebRequestFingerprint.userAgent
         webView.navigationDelegate = self
         self.webView = webView
@@ -376,7 +376,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         WebViewCacheTuner.tuneIfNeeded()
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
-        self.webView = WKWebView(frame: .zero, configuration: configuration)
+        self.webView = NoBounceWebView(frame: .zero, configuration: configuration)
         self.webView.customUserAgent = WebRequestFingerprint.userAgent
         self.cookieBridge = CookieBridge(
             webCookieStore: WKWebCookieStoreAdapter(
