@@ -187,6 +187,7 @@ class PostDetailViewController: UIViewController {
     var testVisibleAnchorIDs: Set<String>?
     var testPresentedLoadedCommentID: String?
     var testHighlightedAnchorID: String?
+    var testPresentedPreviewUsesCommentCellRendering = false
     #endif
     let skeletonCommentRowCount = 4
     let accountRefresher: any CurrentAccountRefreshing

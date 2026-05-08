@@ -166,11 +166,17 @@ extension PostDetailViewController {
         #if DEBUG
         testPresentedLoadedCommentID = comment.id
         testHighlightedAnchorID = nil
+        testPresentedPreviewUsesCommentCellRendering = true
         #endif
+        let renderedContent = commentRenderedCache[comment.id] ?? Self.makeRenderedContent(
+            html: comment.contentHTML,
+            baseURL: baseURL,
+            maxImageWidth: availableCommentContentWidth
+        )
 
         let previewController = LoadedCommentPreviewViewController(
             comment: comment,
-            renderedContent: commentRenderedCache[comment.id],
+            renderedContent: renderedContent,
             onReveal: { [weak self] in
                 self?.dismiss(animated: true) {
                     self?.scrollToCurrentPageAnchor(anchorID)
@@ -291,6 +297,8 @@ private final class LoadedCommentPreviewViewController: UIViewController {
     private let comment: Comment
     private let renderedContent: [RenderedContentBlock]?
     private let onReveal: () -> Void
+    private let tableNode = ASTableNode(style: .plain)
+    private let revealButton = UIButton(type: .system)
 
     init(
         comment: Comment,
@@ -312,46 +320,19 @@ private final class LoadedCommentPreviewViewController: UIViewController {
         view.backgroundColor = .systemBackground
         view.layer.cornerRadius = 12
         view.layer.cornerCurve = .continuous
+        tableNode.dataSource = self
+        tableNode.delegate = self
         configureContent()
     }
 
     private func configureContent() {
-        let titleLabel = UILabel()
-        titleLabel.font = .preferredFont(forTextStyle: .headline)
-        titleLabel.textColor = .label
-        titleLabel.numberOfLines = 1
-        titleLabel.text = AuthorDisplayPolicy.displayName(from: comment.authorName) ?? comment.authorName
-
-        let metadataLabel = UILabel()
-        metadataLabel.font = .preferredFont(forTextStyle: .footnote)
-        metadataLabel.textColor = .secondaryLabel
-        metadataLabel.numberOfLines = 1
-        metadataLabel.text = [comment.floorText, comment.createdAtText]
-            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { $0.isEmpty == false }
-            .joined(separator: " · ")
-
         let closeButton = UIButton(type: .system)
         closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
         closeButton.tintColor = .secondaryLabel
         closeButton.accessibilityLabel = "关闭"
         closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
 
-        let headerStack = UIStackView(arrangedSubviews: [titleLabel, closeButton])
-        headerStack.axis = .horizontal
-        headerStack.alignment = .center
-        headerStack.spacing = 8
-
-        let bodyStack = UIStackView()
-        bodyStack.axis = .vertical
-        bodyStack.alignment = .fill
-        bodyStack.spacing = 10
-        bodyStack.addArrangedSubview(headerStack)
-        bodyStack.addArrangedSubview(metadataLabel)
-        bodyStack.addArrangedSubview(makeSeparator())
-        addRenderedContent(to: bodyStack)
-
-        let revealButton = UIButton(type: .system)
         var configuration = UIButton.Configuration.filled()
         configuration.title = "查看原楼"
         configuration.baseBackgroundColor = .label
@@ -360,81 +341,32 @@ private final class LoadedCommentPreviewViewController: UIViewController {
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
         revealButton.configuration = configuration
         revealButton.addTarget(self, action: #selector(revealTapped), for: .touchUpInside)
-        bodyStack.addArrangedSubview(revealButton)
+        revealButton.translatesAutoresizingMaskIntoConstraints = false
 
-        let scrollView = UIScrollView()
-        scrollView.alwaysBounceVertical = false
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(scrollView)
-
-        bodyStack.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.addSubview(bodyStack)
+        tableNode.view.backgroundColor = .systemBackground
+        tableNode.view.separatorStyle = .none
+        tableNode.view.alwaysBounceVertical = false
+        tableNode.view.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(tableNode.view)
+        view.addSubview(revealButton)
+        view.addSubview(closeButton)
 
         NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            tableNode.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tableNode.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tableNode.view.topAnchor.constraint(equalTo: view.topAnchor),
+            tableNode.view.bottomAnchor.constraint(equalTo: revealButton.topAnchor, constant: -10),
 
-            bodyStack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 16),
-            bodyStack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -16),
-            bodyStack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 14),
-            bodyStack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -14),
-            bodyStack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -32),
+            revealButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            revealButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            revealButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -14),
+            revealButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 36),
 
+            closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            closeButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
             closeButton.widthAnchor.constraint(equalToConstant: 32),
             closeButton.heightAnchor.constraint(equalToConstant: 32)
         ])
-    }
-
-    private func addRenderedContent(to stackView: UIStackView) {
-        let textBlocks = renderedContent?.compactMap { block -> NSAttributedString? in
-            guard case .text(let text) = block else { return nil }
-            return text
-        } ?? []
-
-        if textBlocks.isEmpty {
-            stackView.addArrangedSubview(makeTextLabel(text: strippedHTML(comment.contentHTML)))
-            return
-        }
-
-        for text in textBlocks {
-            let label = UILabel()
-            label.attributedText = text
-            label.numberOfLines = 0
-            stackView.addArrangedSubview(label)
-        }
-    }
-
-    private func makeTextLabel(text: String) -> UILabel {
-        let label = UILabel()
-        label.font = .preferredFont(forTextStyle: .body)
-        label.textColor = .label
-        label.numberOfLines = 0
-        label.text = text
-        return label
-    }
-
-    private func makeSeparator() -> UIView {
-        let view = UIView()
-        view.backgroundColor = .separator
-        view.translatesAutoresizingMaskIntoConstraints = false
-        view.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale).isActive = true
-        return view
-    }
-
-    private func strippedHTML(_ html: String) -> String {
-        let data = Data(html.utf8)
-        let attributed = try? NSAttributedString(
-            data: data,
-            options: [
-                .documentType: NSAttributedString.DocumentType.html,
-                .characterEncoding: String.Encoding.utf8.rawValue
-            ],
-            documentAttributes: nil
-        )
-        let text = attributed?.string.trimmingCharacters(in: .whitespacesAndNewlines)
-        return text?.isEmpty == false ? text! : html
     }
 
     @objc
@@ -445,5 +377,33 @@ private final class LoadedCommentPreviewViewController: UIViewController {
     @objc
     private func revealTapped() {
         onReveal()
+    }
+}
+
+extension LoadedCommentPreviewViewController: ASTableDataSource, ASTableDelegate {
+    func tableNode(_ tableNode: ASTableNode, numberOfRowsInSection section: Int) -> Int {
+        1
+    }
+
+    func tableNode(_ tableNode: ASTableNode, nodeBlockForRowAt indexPath: IndexPath) -> ASCellNodeBlock {
+        let comment = comment
+        let renderedContent = renderedContent
+        return { [weak self] in
+            CommentCellNode(
+                comment: comment,
+                renderedBody: renderedContent,
+                onImageTapped: { _, _ in },
+                onLinkTapped: { _ in },
+                onAuthorTapped: { _ in },
+                onLikeTapped: { _ in },
+                onChickenLegTapped: { _ in },
+                onOpposeTapped: { _ in },
+                onReplyTapped: { _ in },
+                onQuoteTapped: { _ in },
+                onTextLayoutInvalidated: {
+                    self?.tableNode.relayoutItems()
+                }
+            )
+        }
     }
 }

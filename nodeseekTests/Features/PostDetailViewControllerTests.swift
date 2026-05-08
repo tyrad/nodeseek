@@ -1519,6 +1519,7 @@ struct PostDetailViewControllerTests {
         viewController.handleContentLinkTap(url)
 
         #expect(viewController.testPresentedLoadedCommentID() == "comment-40")
+        #expect(viewController.testPresentedPreviewUsesCommentCellRendering())
         #expect(viewController.testHighlightedAnchorID() == nil)
     }
 
@@ -2838,6 +2839,10 @@ private extension PostDetailViewController {
 
     func testHighlightedAnchorID() -> String? {
         Mirror(reflecting: self).children.first { $0.label == "testHighlightedAnchorID" }?.value as? String
+    }
+
+    func testPresentedPreviewUsesCommentCellRendering() -> Bool {
+        Mirror(reflecting: self).children.first { $0.label == "testPresentedPreviewUsesCommentCellRendering" }?.value as? Bool ?? false
     }
 }
 
