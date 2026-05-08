@@ -15,8 +15,6 @@ nonisolated enum NodeSeekSplashTimeline {
     static let nFinalDuration: CFTimeInterval = nDuration - nLeftDuration - nDiagonalDuration
 
     static let sDuration: CFTimeInterval = 0.58
-    static let lightSweepBegin: CFTimeInterval = 0.35
-    static let lightSweepDuration: CFTimeInterval = 0.72
     static let dotBegin: CFTimeInterval = 1.30
     static let dotDuration: CFTimeInterval = 0.30
 }
@@ -33,7 +31,6 @@ final class NodeSeekSplashAnimator: NSObject {
     private let nFinalStrokeLayer = CAShapeLayer()
     private let sLayer = CAShapeLayer()
     private let dotLayer = CAShapeLayer()
-    private let lightSweepLayer = CAGradientLayer()
     private var completion: (() -> Void)?
 
     init(
@@ -55,7 +52,6 @@ final class NodeSeekSplashAnimator: NSObject {
         view.layer.addSublayer(nFinalStrokeLayer)
         view.layer.addSublayer(sLayer)
         view.layer.addSublayer(dotLayer)
-        view.layer.addSublayer(lightSweepLayer)
     }
 
     func play(completion: @escaping () -> Void) {
@@ -93,7 +89,6 @@ private extension NodeSeekSplashAnimator {
         nFinalStrokeLayer.name = "splash.n.finalStroke"
         sLayer.name = "splash.s"
         dotLayer.name = "splash.dot"
-        lightSweepLayer.name = "splash.lightSweep"
     }
 
     func layoutLayers(in bounds: CGRect) {
@@ -133,7 +128,6 @@ private extension NodeSeekSplashAnimator {
             in: logoFrame
         )
 
-        configureLightSweep(in: logoFrame)
         if let containerView {
             applyColors(for: containerView.traitCollection)
         }
@@ -166,21 +160,6 @@ private extension NodeSeekSplashAnimator {
         dotLayer.contentsScale = UIScreen.main.scale
     }
 
-    func configureLightSweep(in logoFrame: CGRect) {
-        let scale = logoFrame.width / NodeSeekSplashVector.canvasSize.width
-        let bounds = NodeSeekSplashVector.logoBounds
-        lightSweepLayer.frame = CGRect(
-            x: logoFrame.minX + bounds.minX * scale,
-            y: logoFrame.minY + bounds.minY * scale,
-            width: bounds.width * scale,
-            height: bounds.height * scale
-        )
-        lightSweepLayer.locations = [0, 0.5, 1]
-        lightSweepLayer.startPoint = CGPoint(x: 0, y: 0.5)
-        lightSweepLayer.endPoint = CGPoint(x: 1, y: 0.5)
-        lightSweepLayer.opacity = 0
-    }
-
     func applyColors(for traitCollection: UITraitCollection) {
         backgroundLayer.backgroundColor = NodeSeekSplashVector.backgroundColor(for: traitCollection).cgColor
 
@@ -190,13 +169,6 @@ private extension NodeSeekSplashAnimator {
         nFinalStrokeLayer.fillColor = wordmarkColor
         sLayer.fillColor = wordmarkColor
         dotLayer.fillColor = NodeSeekSplashVector.accentColor.cgColor
-
-        let sweepColor = NodeSeekSplashVector.lightSweepColor(for: traitCollection)
-        lightSweepLayer.colors = [
-            sweepColor.withAlphaComponent(0).cgColor,
-            sweepColor.cgColor,
-            sweepColor.withAlphaComponent(0).cgColor
-        ]
     }
 
     func strokeRevealMask(
@@ -237,7 +209,6 @@ private extension NodeSeekSplashAnimator {
 private extension NodeSeekSplashAnimator {
     func startAnimationTimeline() {
         dotLayer.opacity = 0
-        lightSweepLayer.opacity = 1
 
         let timelineBegin = CACurrentMediaTime()
         animateStrokeReveal(
@@ -260,10 +231,6 @@ private extension NodeSeekSplashAnimator {
             beginTime: timelineBegin + NodeSeekSplashTimeline.nDuration,
             duration: NodeSeekSplashTimeline.sDuration
         )
-        animateLightSweep(
-            beginTime: timelineBegin + NodeSeekSplashTimeline.lightSweepBegin,
-            duration: NodeSeekSplashTimeline.lightSweepDuration
-        )
         animateDotPop(
             beginTime: timelineBegin + NodeSeekSplashTimeline.dotBegin,
             duration: NodeSeekSplashTimeline.dotDuration
@@ -282,7 +249,6 @@ private extension NodeSeekSplashAnimator {
         nFinalStrokeLayer.opacity = 1
         sLayer.opacity = 1
         dotLayer.opacity = 1
-        lightSweepLayer.opacity = 0
         revealStrokeMask(nLeftStrokeLayer.mask)
         revealStrokeMask(nDiagonalStrokeLayer.mask)
         revealStrokeMask(nFinalStrokeLayer.mask)
@@ -316,28 +282,6 @@ private extension NodeSeekSplashAnimator {
         mask.strokeEnd = 1
         mask.removeAnimation(forKey: "strokeReveal")
         CATransaction.commit()
-    }
-
-    func animateLightSweep(beginTime: CFTimeInterval, duration: CFTimeInterval) {
-        let travel = lightSweepLayer.bounds.width
-        let animation = CABasicAnimation(keyPath: "transform.translation.x")
-        animation.fromValue = -travel
-        animation.toValue = travel
-        animation.beginTime = beginTime
-        animation.duration = duration
-        animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        animation.fillMode = .backwards
-        animation.isRemovedOnCompletion = true
-        lightSweepLayer.add(animation, forKey: "lightSweep")
-
-        let opacity = CAKeyframeAnimation(keyPath: "opacity")
-        opacity.values = [0, 1, 0]
-        opacity.keyTimes = [0, 0.45, 1]
-        opacity.beginTime = beginTime
-        opacity.duration = duration
-        opacity.fillMode = .forwards
-        opacity.isRemovedOnCompletion = false
-        lightSweepLayer.add(opacity, forKey: "lightSweepOpacity")
     }
 
     func animateDotPop(beginTime: CFTimeInterval, duration: CFTimeInterval) {

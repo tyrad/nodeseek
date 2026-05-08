@@ -22,12 +22,6 @@ enum NodeSeekSplashVector {
         return UIColor(red: 0x1A / 255.0, green: 0x1F / 255.0, blue: 0x24 / 255.0, alpha: 1)
     }
 
-    static func lightSweepColor(for traitCollection: UITraitCollection) -> UIColor {
-        traitCollection.userInterfaceStyle == .dark
-            ? UIColor.black.withAlphaComponent(0.45)
-            : UIColor.white.withAlphaComponent(0.62)
-    }
-
     static func accentPath() -> CGPath {
         let path = CGMutablePath()
         path.move(to: CGPoint(x: 904, y: 665))
