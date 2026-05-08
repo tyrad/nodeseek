@@ -1485,6 +1485,80 @@ struct PostDetailViewControllerTests {
         #expect(viewController.testCurrentPageAnchorRow(for: "1") == 2)
     }
 
+    @Test func loadedOffscreenFloorLinkPresentsCommentPreview() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let comments = (1...40).map { index in
+            Comment(
+                id: "comment-\(index)",
+                anchorID: index == 40 ? nil : "\(index)",
+                authorName: "author-\(index)",
+                avatarURL: nil,
+                floorText: index == 40 ? "#326" : "#\(index)",
+                createdAtText: "\(index)min ago",
+                contentHTML: "<p>第 \(index) 楼内容</p>"
+            )
+        }
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: comments,
+            page: 1,
+            pagination: nil
+        ))
+        await waitForDetailContent(in: viewController)
+
+        let url = try #require(URL(string: "#326", relativeTo: baseURL)?.absoluteURL)
+        viewController.handleContentLinkTap(url)
+
+        #expect(viewController.testPresentedLoadedCommentID() == "comment-40")
+        #expect(viewController.testHighlightedAnchorID() == nil)
+    }
+
+    @Test func loadedVisibleFloorLinkUsesExistingHighlightInsteadOfPreview() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(
+                    id: "visible-comment",
+                    anchorID: nil,
+                    authorName: "a",
+                    avatarURL: nil,
+                    floorText: "#326",
+                    createdAtText: "1min ago",
+                    contentHTML: "<p>可见楼层</p>"
+                )
+            ],
+            page: 1,
+            pagination: nil
+        ))
+        await waitForDetailContent(in: viewController)
+        viewController.testVisibleAnchorIDs = ["326"]
+
+        let url = try #require(URL(string: "#326", relativeTo: baseURL)?.absoluteURL)
+        viewController.handleContentLinkTap(url)
+
+        #expect(viewController.testHighlightedAnchorID() == "326")
+        #expect(viewController.testPresentedLoadedCommentID() == nil)
+    }
+
     @Test func consumesInitialAnchorAfterFirstDetailRender() async throws {
         let presenter = SpyPostDetailPresenter()
         let viewController = PostDetailViewController(presenter: presenter, initialAnchorID: "2")
@@ -2756,6 +2830,14 @@ private extension PostDetailViewController {
 
     func testPendingScrollRow() -> Int? {
         Mirror(reflecting: self).children.first { $0.label == "pendingScrollToRow" }?.value as? Int
+    }
+
+    func testPresentedLoadedCommentID() -> String? {
+        Mirror(reflecting: self).children.first { $0.label == "testPresentedLoadedCommentID" }?.value as? String
+    }
+
+    func testHighlightedAnchorID() -> String? {
+        Mirror(reflecting: self).children.first { $0.label == "testHighlightedAnchorID" }?.value as? String
     }
 }
 
