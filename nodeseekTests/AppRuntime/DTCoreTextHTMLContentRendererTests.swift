@@ -73,6 +73,51 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(after.string.contains("后置说明"))
     }
 
+    @Test func rendersIframeAsLinkBlockBetweenTextBlocks() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: """
+            <p>before</p>
+            <p><iframe src="//player.bilibili.com/player.html?autoplay=0&amp;bvid=BV1GUdgBdESz" frameborder="no"></iframe></p>
+            <p>after</p>
+            """,
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+
+        #expect(blocks.count == 3)
+        guard case .text(let before) = blocks[0],
+              case .iframeLink(let iframe) = blocks[1],
+              case .text(let after) = blocks[2] else {
+            Issue.record("Expected text/iframeLink/text block order")
+            return
+        }
+        #expect(before.string.contains("before"))
+        #expect(iframe.source == "//player.bilibili.com/player.html?autoplay=0&bvid=BV1GUdgBdESz")
+        #expect(iframe.displayDomain == "player.bilibili.com")
+        #expect(iframe.openURL.absoluteString == "https://player.bilibili.com/player.html?autoplay=0&bvid=BV1GUdgBdESz")
+        #expect(after.string.contains("after"))
+    }
+
+    @Test func iframeLinkBlockPreservesRelativeSourceAndResolvesOpenURL() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com/post-1"))
+        let blocks = renderer.render(
+            fragment: #"<iframe src="/embed/example"></iframe>"#,
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+
+        guard case .iframeLink(let iframe) = try #require(blocks.first) else {
+            Issue.record("Expected iframe link block")
+            return
+        }
+        #expect(iframe.source == "/embed/example")
+        #expect(iframe.displayDomain == "www.nodeseek.com")
+        #expect(iframe.openURL.absoluteString == "https://www.nodeseek.com/embed/example")
+    }
+
     @Test func preservesParentTextAroundNestedTable() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))

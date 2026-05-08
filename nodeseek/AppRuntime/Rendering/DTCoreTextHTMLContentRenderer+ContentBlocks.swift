@@ -18,6 +18,7 @@ extension DTCoreTextHTMLContentRenderer {
     ) -> [RenderedContentBlock] {
         let needsStructuredParsing = fragment.range(of: "<table", options: [.caseInsensitive]) != nil
             || fragment.range(of: "<pre", options: [.caseInsensitive]) != nil
+            || fragment.range(of: "<iframe", options: [.caseInsensitive]) != nil
             || fragment.range(of: "<img", options: [.caseInsensitive]) != nil
             || fragment.range(of: Self.unsupportedContentClassName, options: [.caseInsensitive]) != nil
             || containsCheckPlaceReportSVGURL(in: fragment)
@@ -137,7 +138,7 @@ extension DTCoreTextHTMLContentRenderer {
             guard match.range.location >= currentLocation else { continue }
 
             let beforeRange = NSRange(location: currentLocation, length: match.range.location - currentLocation)
-            appendTextBlocks(
+            appendRawIFrameLinkBlocks(
                 fromHTML: source.substring(with: beforeRange),
                 into: &blocks,
                 baseURL: baseURL,
@@ -147,6 +148,13 @@ extension DTCoreTextHTMLContentRenderer {
             let candidateHTML = source.substring(with: match.range)
             if let unsupportedBlock = unsupportedBlock(fromHTML: candidateHTML) {
                 blocks.append(unsupportedBlock)
+            } else if appendMixedIFrameLinkBlocks(
+                fromHTML: candidateHTML,
+                into: &blocks,
+                baseURL: baseURL,
+                maxImageWidth: maxImageWidth
+            ) {
+                // iframe 作为外部嵌入链接块渲染，不交给 DTCoreText 直接吞掉。
             } else if let imageBlocks = standaloneImageBlocks(fromHTML: candidateHTML, baseURL: baseURL) {
                 blocks.append(contentsOf: imageBlocks.map(RenderedContentBlock.image))
             } else if appendMixedNormalImageBlocks(
@@ -168,7 +176,7 @@ extension DTCoreTextHTMLContentRenderer {
         }
 
         let remainingRange = NSRange(location: currentLocation, length: fullRange.length - currentLocation)
-        appendTextBlocks(
+        appendRawIFrameLinkBlocks(
             fromHTML: source.substring(with: remainingRange),
             into: &blocks,
             baseURL: baseURL,
@@ -193,6 +201,128 @@ extension DTCoreTextHTMLContentRenderer {
         }
         blocks.append(contentsOf: renderedBlocks)
         blocks.append(contentsOf: checkPlaceReportImageBlocks(in: plainCodeText(fromHTML: html)).map(RenderedContentBlock.image))
+    }
+
+    func appendRawIFrameLinkBlocks(
+        fromHTML html: String,
+        into blocks: inout [RenderedContentBlock],
+        baseURL: URL,
+        maxImageWidth: CGFloat
+    ) {
+        let source = html as NSString
+        let fullRange = NSRange(location: 0, length: source.length)
+        let matches = Self.iframeTagRegex.matches(in: html, options: [], range: fullRange)
+        guard matches.isEmpty == false else {
+            appendTextBlocks(
+                fromHTML: html,
+                into: &blocks,
+                baseURL: baseURL,
+                maxImageWidth: maxImageWidth
+            )
+            return
+        }
+
+        var currentLocation = 0
+        for match in matches {
+            guard match.range.location >= currentLocation else { continue }
+            let beforeRange = NSRange(location: currentLocation, length: match.range.location - currentLocation)
+            appendTextBlocks(
+                fromHTML: source.substring(with: beforeRange),
+                into: &blocks,
+                baseURL: baseURL,
+                maxImageWidth: maxImageWidth
+            )
+
+            let iframeTag = source.substring(with: match.range)
+            if let iframeBlock = iframeLinkBlock(fromHTML: iframeTag, baseURL: baseURL) {
+                blocks.append(.iframeLink(iframeBlock))
+            }
+            currentLocation = NSMaxRange(match.range)
+        }
+
+        let remainingRange = NSRange(location: currentLocation, length: fullRange.length - currentLocation)
+        appendTextBlocks(
+            fromHTML: source.substring(with: remainingRange),
+            into: &blocks,
+            baseURL: baseURL,
+            maxImageWidth: maxImageWidth
+        )
+    }
+
+    func appendMixedIFrameLinkBlocks(
+        fromHTML html: String,
+        into blocks: inout [RenderedContentBlock],
+        baseURL: URL,
+        maxImageWidth: CGFloat
+    ) -> Bool {
+        guard let shell = containerShell(fromHTML: html) else { return false }
+
+        let source = shell.innerHTML as NSString
+        let fullRange = NSRange(location: 0, length: source.length)
+        let matches = Self.iframeTagRegex.matches(in: shell.innerHTML, options: [], range: fullRange)
+        guard matches.isEmpty == false else { return false }
+
+        var emittedIFrameBlock = false
+        var currentLocation = 0
+        var localBlocks: [RenderedContentBlock] = []
+        for match in matches {
+            guard match.range.location >= currentLocation else { continue }
+            let beforeRange = NSRange(location: currentLocation, length: match.range.location - currentLocation)
+            appendContainerTextBlocks(
+                fromHTML: source.substring(with: beforeRange),
+                shell: shell,
+                into: &localBlocks,
+                baseURL: baseURL,
+                maxImageWidth: maxImageWidth
+            )
+
+            let iframeTag = source.substring(with: match.range)
+            if let iframeBlock = iframeLinkBlock(fromHTML: iframeTag, baseURL: baseURL) {
+                localBlocks.append(.iframeLink(iframeBlock))
+                emittedIFrameBlock = true
+            }
+            currentLocation = NSMaxRange(match.range)
+        }
+
+        guard emittedIFrameBlock else { return false }
+        let remainingRange = NSRange(location: currentLocation, length: fullRange.length - currentLocation)
+        appendContainerTextBlocks(
+            fromHTML: source.substring(with: remainingRange),
+            shell: shell,
+            into: &localBlocks,
+            baseURL: baseURL,
+            maxImageWidth: maxImageWidth
+        )
+        blocks.append(contentsOf: localBlocks)
+        return true
+    }
+
+    func iframeLinkBlock(fromHTML html: String, baseURL: URL) -> RenderedIFrameLinkBlock? {
+        guard let rawSource = attributeValue(Self.srcAttributeRegex, in: html)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              rawSource.isEmpty == false else {
+            return nil
+        }
+
+        let source = decodedHTMLEntities(in: rawSource)
+        guard let openURL = openURL(forIFrameSource: source, baseURL: baseURL),
+              let scheme = openURL.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else {
+            return nil
+        }
+
+        return RenderedIFrameLinkBlock(
+            source: source,
+            displayDomain: openURL.host ?? source,
+            openURL: openURL
+        )
+    }
+
+    func openURL(forIFrameSource source: String, baseURL: URL) -> URL? {
+        if source.hasPrefix("//") {
+            return URL(string: "https:\(source)")
+        }
+        return URL(string: source, relativeTo: baseURL)?.absoluteURL
     }
 
     func unsupportedBlock(fromHTML html: String) -> RenderedContentBlock? {
