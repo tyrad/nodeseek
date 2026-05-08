@@ -7,6 +7,7 @@
 
 import AsyncDisplayKit
 import UIKit
+import Foundation
 
 protocol PostTextureListViewDelegate: AnyObject {
     func postTextureListView(_ textureListView: PostTextureListView, didSelectPostAt index: Int)
@@ -30,7 +31,9 @@ final class PostTextureListView: UIView {
     private var items: [PostListItem] = []
     private let minimumSkeletonRowCount = 8
     private let estimatedSkeletonRowHeight: CGFloat = 84
+    private let leadingScreensForBatching: CGFloat = 2.0
     private var skeletonRowCount: Int = 8
+    private var lastBatchFetchRequestedItemCount: Int?
 
     private let loadMoreIndicator: UIActivityIndicatorView = {
         let indicator = UIActivityIndicatorView(style: .medium)
@@ -103,6 +106,9 @@ final class PostTextureListView: UIView {
 
     func setItems(_ items: [PostListItem]) {
         hideErrorView()
+        if self.items.count != items.count {
+            lastBatchFetchRequestedItemCount = nil
+        }
         if displayMode == .content, self.items == items {
             return
         }
@@ -139,6 +145,7 @@ final class PostTextureListView: UIView {
         hideErrorView()
         guard displayMode != .skeleton else { return }
         displayMode = .skeleton
+        lastBatchFetchRequestedItemCount = nil
         skeletonRowCount = currentSkeletonRowCount()
         hideLoadingMore()
         tableNode.reloadData()
@@ -153,6 +160,7 @@ final class PostTextureListView: UIView {
     func showFirstPageError(message: String) {
         displayMode = .firstPageError
         items = []
+        lastBatchFetchRequestedItemCount = nil
         hideLoadingMore()
         hideRefreshing()
         errorMessageLabel.text = message
@@ -178,6 +186,7 @@ final class PostTextureListView: UIView {
     func hideLoadingMore() {
         loadMoreIndicator.stopAnimating()
         tableNode.view.tableFooterView = UIView(frame: .zero)
+        lastBatchFetchRequestedItemCount = nil
     }
 
     func showRefreshing() {
@@ -196,6 +205,7 @@ final class PostTextureListView: UIView {
     private func setupUI() {
         tableNode.dataSource = self
         tableNode.delegate = self
+        tableNode.leadingScreensForBatching = leadingScreensForBatching
         tableNode.view.separatorStyle = .singleLine
         tableNode.view.showsVerticalScrollIndicator = true
         refreshControl.addTarget(self, action: #selector(handlePullToRefresh), for: .valueChanged)
@@ -295,9 +305,39 @@ extension PostTextureListView: ASTableDelegate {
         delegate?.postTextureListView(self, didSelectPostAt: indexPath.row)
     }
 
-    func tableNode(_ tableNode: ASTableNode, willDisplayRowWith node: ASCellNode) {
-        guard displayMode == .content else { return }
-        guard let indexPath = tableNode.indexPath(for: node) else { return }
-        delegate?.postTextureListView(self, didApproachBottomAt: indexPath.row, totalCount: items.count)
+    func shouldBatchFetch(for tableNode: ASTableNode) -> Bool {
+        canRequestBatchFetch()
+    }
+
+    func tableNode(_ tableNode: ASTableNode, willBeginBatchFetchWith context: ASBatchContext) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                context.completeBatchFetching(true)
+                return
+            }
+
+            guard self.canRequestBatchFetch() else {
+                AppLog.debug(.postList, "忽略 Texture 分页触发: itemCount=\(self.items.count), lastRequested=\(self.lastBatchFetchRequestedItemCount ?? -1)")
+                context.completeBatchFetching(true)
+                return
+            }
+
+            let totalCount = self.items.count
+            self.lastBatchFetchRequestedItemCount = totalCount
+            AppLog.info(.postList, "Texture 提前触发帖子列表分页: itemCount=\(totalCount), leadingScreens=\(self.leadingScreensForBatching)")
+            self.delegate?.postTextureListView(
+                self,
+                didApproachBottomAt: max(totalCount - 1, 0),
+                totalCount: totalCount
+            )
+            context.completeBatchFetching(true)
+        }
+    }
+
+    private func canRequestBatchFetch() -> Bool {
+        guard displayMode == .content else { return false }
+        guard !items.isEmpty else { return false }
+        guard lastBatchFetchRequestedItemCount != items.count else { return false }
+        return true
     }
 }

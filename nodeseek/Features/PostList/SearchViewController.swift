@@ -401,9 +401,9 @@ final class SearchViewController: UIViewController {
         guard hasMorePages else { return }
         guard !isLoadingMore else { return }
         guard !isLoadingFirstPage else { return }
-        guard currentIndex >= max(totalCount - 3, 0) else { return }
         guard let request = activeRequest else { return }
 
+        AppLog.info(.postList, "触发搜索结果加载更多: page=\(nextPage), currentIndex=\(currentIndex), totalCount=\(totalCount)")
         isLoadingMore = true
         listView.showLoadingMore()
         load(page: nextPage, request: request, isLoadMore: true, isRefresh: false)

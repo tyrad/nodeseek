@@ -273,6 +273,31 @@ struct PostListPresenterTests {
         #expect(interactor.loadMoreCategories == [.all])
     }
 
+    @Test func textureBatchFetchTriggersLoadMoreBeforeLastRowsAreDisplayed() {
+        let view = SpyPostListView()
+        let interactor = SpyPostListInteractor()
+        let router = SpyPostListRouter()
+        let presenter = PostListPresenter(interactor: interactor, router: router)
+        presenter.setView(view)
+        let posts = (1...20).map { index in
+            PostSummary(
+                id: "\(index)",
+                title: "标题\(index)",
+                url: URL(string: "https://www.nodeseek.com/post-\(index)")!,
+                authorName: "mist",
+                nodeName: "开发",
+                replyCount: index,
+                lastActivityText: "刚刚"
+            )
+        }
+
+        presenter.didLoadPosts(posts, category: .all)
+        presenter.didApproachBottom(currentIndex: 8, totalCount: posts.count)
+
+        #expect(interactor.loadMorePages == [2])
+        #expect(view.showLoadingMoreCount == 1)
+    }
+
     @Test func loadMoreAppendsUniquePosts() {
         let view = SpyPostListView()
         let interactor = SpyPostListInteractor()

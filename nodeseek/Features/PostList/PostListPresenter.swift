@@ -243,14 +243,29 @@ class PostListPresenter: PostListPresenterProtocol {
 
     func didApproachBottom(currentIndex: Int, totalCount: Int) {
         var state = state(for: currentCategory)
-        guard totalCount > 0 else { return }
-        guard state.hasMorePages else { return }
-        guard !state.isLoadingMore else { return }
-        guard !state.isLoadingFirstPage else { return }
-        guard currentIndex >= max(totalCount - 3, 0) else { return }
+        guard totalCount > 0 else {
+            AppLog.debug(.postList, "忽略帖子列表加载更多: totalCount=0")
+            return
+        }
+        guard state.hasMorePages else {
+            AppLog.debug(.postList, "忽略帖子列表加载更多: 已无更多分页 category=\(currentCategory.rawValue)")
+            return
+        }
+        guard !state.isLoadingMore else {
+            AppLog.debug(.postList, "忽略帖子列表加载更多: 正在加载更多 category=\(currentCategory.rawValue)")
+            return
+        }
+        guard !state.isLoadingFirstPage else {
+            AppLog.debug(.postList, "忽略帖子列表加载更多: 首屏仍在加载 category=\(currentCategory.rawValue)")
+            return
+        }
 
         state.isLoadingMore = true
         categoryStates[currentCategory] = state
+        AppLog.info(
+            .postList,
+            "触发帖子列表加载更多: page=\(state.nextPage), category=\(currentCategory.rawValue), sortMode=\(currentSortMode.rawValue), currentIndex=\(currentIndex), totalCount=\(totalCount)"
+        )
         view?.showLoadingMore()
         interactor.loadMorePosts(page: state.nextPage, category: currentCategory, sortMode: currentSortMode)
     }
@@ -296,6 +311,7 @@ extension PostListPresenter: PostListInteractorOutput {
         guard !posts.isEmpty else {
             state.hasMorePages = false
             categoryStates[category] = state
+            AppLog.info(.postList, "帖子列表加载更多结束: 无更多分页 page=\(page), category=\(category.rawValue)")
             if category == currentCategory {
                 view?.hideLoadingMore()
             }
@@ -312,6 +328,7 @@ extension PostListPresenter: PostListInteractorOutput {
 
         guard category == currentCategory else { return }
         if appended {
+            AppLog.info(.postList, "帖子列表加载更多完成: page=\(page), category=\(category.rawValue), received=\(posts.count), total=\(state.items.count)")
             // 先接上新数据，再收起底部 loading，避免 footer 高度变化带动可见列表跳动。
             view?.render(items: state.items)
         }
@@ -351,6 +368,7 @@ extension PostListPresenter: PostListInteractorOutput {
         var state = state(for: category)
         state.isLoadingMore = false
         categoryStates[category] = state
+        AppLog.warning(.postList, "帖子列表加载更多失败: page=\(page), category=\(category.rawValue), error=\(error)")
 
         guard category == currentCategory else { return }
         view?.hideLoadingMore()
