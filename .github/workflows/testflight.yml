@@ -11,8 +11,8 @@ on:
         required: true
         type: string
       build_number:
-        description: "App Store build number"
-        required: true
+        description: "Optional App Store build number override. Defaults to Asia/Shanghai yyyyMMddHHmm."
+        required: false
         type: string
 
 permissions:
@@ -59,6 +59,8 @@ jobs:
         run: |
           set -euo pipefail
 
+          generated_build_number="$(TZ=Asia/Shanghai date +%Y%m%d%H%M)"
+
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             tag="${GITHUB_REF_NAME}"
             if [[ ! "${tag}" =~ ^ios/v[0-9]+(\.[0-9]+){1,2}$ ]]; then
@@ -73,14 +75,19 @@ jobs:
             fi
 
             version="${tag#ios/v}"
-            build_number="${GITHUB_RUN_NUMBER}"
+            build_number="${generated_build_number}"
           else
             version="${MANUAL_VERSION}"
-            build_number="${MANUAL_BUILD_NUMBER}"
+            build_number="${MANUAL_BUILD_NUMBER:-${generated_build_number}}"
           fi
 
           if [[ -z "${version}" || -z "${build_number}" ]]; then
             echo "version and build_number are required." >&2
+            exit 1
+          fi
+
+          if [[ ! "${build_number}" =~ ^[0-9]+$ ]]; then
+            echo "build_number must be numeric, got: ${build_number}" >&2
             exit 1
           fi
 

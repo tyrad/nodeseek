@@ -53,13 +53,13 @@ git tag ios/v1.0.0
 git push origin ios/v1.0.0
 ```
 
-5. workflow 会校验 tag 指向 `main` 历史中的 commit，版本号从 tag 解析，build number 使用 GitHub run number。
+5. workflow 会校验 tag 指向 `main` 历史中的 commit，版本号从 tag 解析，build number 自动使用北京时间 `yyyyMMddHHmm`，例如 `202605081350`。
 6. workflow 会构建并上传 TestFlight。Simulator 测试不在发布 workflow 中执行，避免公开发布链路等待过久；需要时可本地或单独 CI 执行 `fastlane tests`。
 7. 上传成功后，workflow summary 会生成可复制的 Public Beta 测试信息。
 8. 维护者进入 App Store Connect，选择这个 build，确认测试信息并手动提交 Beta App Review。
 9. 构建会把 GitHub run 信息写入 `Info.plist`，并上传 `build/build-provenance.json` artifact。
 
-手动触发 `TestFlight` workflow 仍然可用，需要输入 version 和 build number，适合补发或调试。
+手动触发 `TestFlight` workflow 仍然可用，需要输入 version；build number 默认同样自动使用北京时间 `yyyyMMddHHmm`。只有补救或调试时才手动覆盖 build number，并且必须保证它大于 App Store Connect 中同版本已有 build。
 
 ## Public Beta 前置条件
 
