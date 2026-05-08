@@ -223,8 +223,10 @@ struct PostDetailViewControllerTests {
 
         let button = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-refresh-comments-at-end-button"))
         #expect(button.isHidden == false)
-        #expect(button.configuration?.title == "加载新评论")
-        #expect(button.configuration?.image != nil)
+        #expect(button.configuration?.title == "点击加载新评论")
+        #expect(button.configuration?.image == nil)
+        let footer = try #require(viewController.tableNode.view.tableFooterView)
+        #expect(footer.subviews.contains { $0.backgroundColor == .separator })
 
         button.sendActions(for: .touchUpInside)
         #expect(presenter.didTapRefreshCommentsAtEndCount == 1)

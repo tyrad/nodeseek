@@ -224,14 +224,10 @@ class PostDetailViewController: UIViewController {
 
     let loadMoreCommentsRefreshButton: UIButton = {
         let button = UIButton(type: .system)
-        var configuration = UIButton.Configuration.filled()
-        configuration.title = "加载新评论"
-        configuration.image = UIImage(systemName: "arrow.clockwise")
-        configuration.imagePadding = 6
-        configuration.baseBackgroundColor = .secondarySystemBackground
+        var configuration = UIButton.Configuration.plain()
+        configuration.title = "点击加载新评论"
         configuration.baseForegroundColor = .secondaryLabel
-        configuration.cornerStyle = .capsule
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
         button.configuration = configuration
         button.isHidden = true
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -241,9 +237,18 @@ class PostDetailViewController: UIViewController {
 
     lazy var loadMoreCommentsContainer: UIView = {
         let container = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 56))
+        let separator = UIView()
+        separator.backgroundColor = .separator
+        separator.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(separator)
         container.addSubview(loadMoreCommentsIndicator)
         container.addSubview(loadMoreCommentsRefreshButton)
+        let separatorHeight = 1.0 / UIScreen.main.scale
         NSLayoutConstraint.activate([
+            separator.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            separator.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            separator.topAnchor.constraint(equalTo: container.topAnchor),
+            separator.heightAnchor.constraint(equalToConstant: separatorHeight),
             loadMoreCommentsIndicator.centerXAnchor.constraint(equalTo: container.centerXAnchor),
             loadMoreCommentsIndicator.centerYAnchor.constraint(equalTo: container.centerYAnchor),
             loadMoreCommentsRefreshButton.centerXAnchor.constraint(equalTo: container.centerXAnchor),
