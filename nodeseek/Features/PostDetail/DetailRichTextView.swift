@@ -22,6 +22,11 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
     private var attachmentLayoutUpdatedHandler: ((URL, CGSize, CGSize) -> Void)?
     private var lastLayoutWidth: CGFloat = 0
     private let diagnosticID = String(UUID().uuidString.prefix(8))
+    private var pendingRelayoutWorkItem: DispatchWorkItem?
+
+    private enum RelayoutDebounce {
+        static let interval: TimeInterval = 0.10
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -38,6 +43,10 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
             guard previousTraitCollection.userInterfaceStyle != view.traitCollection.userInterfaceStyle else { return }
             self.refreshAppearanceForCurrentTraits()
         }
+    }
+
+    deinit {
+        pendingRelayoutWorkItem?.cancel()
     }
 
     required init?(coder: NSCoder) {
@@ -62,6 +71,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         onLayoutInvalidated: (() -> Void)?,
         onAttachmentLayoutUpdated: ((URL, CGSize, CGSize) -> Void)? = nil
     ) {
+        pendingRelayoutWorkItem?.cancel()
         imageTapHandler = onImageTapped
         linkTapHandler = onLinkTapped
         layoutInvalidatedHandler = onLayoutInvalidated
@@ -326,8 +336,12 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
             "imageLoaded updated url=\(url.absoluteString) imageSize=\(Self.string(from: imageSize)) display=\(Self.string(from: displaySize))"
         )
         attachmentLayoutUpdatedHandler?(url, imageSize, displaySize)
+        scheduleDebouncedRelayout(reason: "imageLoaded")
+    }
 
-        DispatchQueue.main.async { [weak self] in
+    private func scheduleDebouncedRelayout(reason: String) {
+        pendingRelayoutWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.removeAllCustomViews()
             self.removeAllCustomViewsForLinks()
@@ -335,11 +349,13 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
             self.relayoutText()
             self.invalidateIntrinsicContentSize()
             self.logDiagnostics(
-                "imageLoaded relayout intrinsic=\(Self.string(from: self.intrinsicContentSize)) bounds=\(Self.string(from: self.bounds.size))"
+                "\(reason) relayout intrinsic=\(Self.string(from: self.intrinsicContentSize)) bounds=\(Self.string(from: self.bounds.size))"
             )
             self.setNeedsLayout()
             self.layoutInvalidatedHandler?()
         }
+        pendingRelayoutWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + RelayoutDebounce.interval, execute: workItem)
     }
 
     private func updateImageAttachments(matching url: URL, originalSize: CGSize) -> CGSize? {
