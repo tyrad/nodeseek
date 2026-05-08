@@ -184,6 +184,9 @@ class PostDetailViewController: UIViewController {
     }
     #if DEBUG
     var pendingScrollToRow: Int?
+    var testVisibleAnchorIDs: Set<String>?
+    var testPresentedLoadedCommentID: String?
+    var testHighlightedAnchorID: String?
     #endif
     let skeletonCommentRowCount = 4
     let accountRefresher: any CurrentAccountRefreshing
