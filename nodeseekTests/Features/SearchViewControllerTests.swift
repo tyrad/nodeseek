@@ -11,6 +11,13 @@ import UIKit
 
 @MainActor
 struct SearchViewControllerTests {
+    @Test func defaultServiceUsesHTTPFirstLoadingStrategy() throws {
+        let service = SearchViewController.makeDefaultService()
+        let htmlClient = try #require(Mirror(reflecting: service).descendant("htmlClient"))
+
+        #expect(String(describing: type(of: htmlClient)).contains("WebViewFallbackHTMLClient"))
+    }
+
     @Test func searchControlsUseSingleRowWithCategoryMenu() throws {
         let viewController = SearchViewController()
         viewController.loadViewIfNeeded()

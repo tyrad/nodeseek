@@ -178,7 +178,7 @@ final class SearchViewController: UIViewController {
     }()
 
     init(
-        service: NodeSeekService = NodeSeekService(),
+        service: NodeSeekService = SearchViewController.makeDefaultService(),
         sessionStore: NodeSeekSessionStore = .shared,
         visitedStore: VisitedPostStoreProtocol? = nil,
         searchHistoryStore: SearchHistoryStore = SearchHistoryStore(),
@@ -190,6 +190,10 @@ final class SearchViewController: UIViewController {
         self.searchHistoryStore = searchHistoryStore
         self.searchPreferenceStore = searchPreferenceStore
         super.init(nibName: nil, bundle: nil)
+    }
+
+    static func makeDefaultService() -> NodeSeekService {
+        NodeSeekService(htmlClient: HTMLLoadingStrategyFactory.makeDefaultClient())
     }
 
     required init?(coder: NSCoder) {
