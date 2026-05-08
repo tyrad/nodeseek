@@ -179,13 +179,11 @@ final class PostTextureListView: UIView {
     }
 
     func showLoadingMore() {
-        tableNode.view.tableFooterView = loadMoreContainer
         loadMoreIndicator.startAnimating()
     }
 
     func hideLoadingMore() {
         loadMoreIndicator.stopAnimating()
-        tableNode.view.tableFooterView = UIView(frame: .zero)
         lastBatchFetchRequestedItemCount = nil
     }
 
@@ -208,6 +206,7 @@ final class PostTextureListView: UIView {
         tableNode.leadingScreensForBatching = leadingScreensForBatching
         tableNode.view.separatorStyle = .singleLine
         tableNode.view.showsVerticalScrollIndicator = true
+        tableNode.view.tableFooterView = loadMoreContainer
         refreshControl.addTarget(self, action: #selector(handlePullToRefresh), for: .valueChanged)
         tableNode.view.refreshControl = refreshControl
         tableNode.view.translatesAutoresizingMaskIntoConstraints = false
