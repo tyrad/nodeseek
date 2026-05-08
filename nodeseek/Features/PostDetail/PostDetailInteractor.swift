@@ -45,7 +45,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
         sessionStore: NodeSeekSessionStore = .shared
     ) {
         self.post = post
-        self.service = service ?? NodeSeekService()
+        self.service = service ?? NodeSeekService(htmlClient: HTMLLoadingStrategyFactory.makeDefaultClient())
         self.initialPage = max(1, page)
         self.commentSubmitter = commentSubmitter ?? NodeSeekCommentSubmitter()
         self.collectionSubmitter = collectionSubmitter ?? NodeSeekPostCollectionSubmitter()

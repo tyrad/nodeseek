@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor
 class PostListInteractor: PostListInteractorInput {
     
     // MARK: - Properties
@@ -16,10 +17,10 @@ class PostListInteractor: PostListInteractorInput {
     
     // MARK: - Initialization
     init(
-        service: NodeSeekService = NodeSeekService(),
+        service: NodeSeekService? = nil,
         sessionStore: NodeSeekSessionStore = .shared
     ) {
-        self.service = service
+        self.service = service ?? NodeSeekService(htmlClient: HTMLLoadingStrategyFactory.makeDefaultClient())
         self.sessionStore = sessionStore
     }
     
