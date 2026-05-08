@@ -145,6 +145,7 @@ class PostDetailViewController: UIViewController {
     var pagination: PostDetailPagination?
     var headerRenderedContent: [RenderedContentBlock]?
     var comments: [Comment] = []
+    var loadedCommentPageRanges: [Int: Range<Int>] = [:]
     var commentRenderedCache: [String: [RenderedContentBlock]] = [:]
     var renderedCommentIDs: Set<String> = []
     var commentRenderInFlight: Set<String> = []
@@ -165,7 +166,8 @@ class PostDetailViewController: UIViewController {
     var replyComposerMode: CommentComposerMode = .plain
     var replyContextBarHeightConstraint: NSLayoutConstraint?
     var replyStickerPickerHeightConstraint: NSLayoutConstraint?
-    var pageLoadingTargetPage: Int?
+    let leadingScreensForBatching: CGFloat = 2.0
+    var lastBatchFetchRequestedCommentCount: Int?
     var chickenLegConfirmationPresenter: ChickenLegConfirmationPresenter = { viewController, context, onConfirm in
         let alert = UIAlertController(
             title: context.title,
@@ -213,6 +215,43 @@ class PostDetailViewController: UIViewController {
         return indicator
     }()
 
+    let loadMoreCommentsIndicator: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .medium)
+        indicator.hidesWhenStopped = true
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        return indicator
+    }()
+
+    let loadMoreCommentsRefreshButton: UIButton = {
+        let button = UIButton(type: .system)
+        var configuration = UIButton.Configuration.filled()
+        configuration.title = "加载新评论"
+        configuration.image = UIImage(systemName: "arrow.clockwise")
+        configuration.imagePadding = 6
+        configuration.baseBackgroundColor = .secondarySystemBackground
+        configuration.baseForegroundColor = .secondaryLabel
+        configuration.cornerStyle = .capsule
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
+        button.configuration = configuration
+        button.isHidden = true
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.accessibilityIdentifier = "post-detail-refresh-comments-at-end-button"
+        return button
+    }()
+
+    lazy var loadMoreCommentsContainer: UIView = {
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 56))
+        container.addSubview(loadMoreCommentsIndicator)
+        container.addSubview(loadMoreCommentsRefreshButton)
+        NSLayoutConstraint.activate([
+            loadMoreCommentsIndicator.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            loadMoreCommentsIndicator.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            loadMoreCommentsRefreshButton.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            loadMoreCommentsRefreshButton.centerYAnchor.constraint(equalTo: container.centerYAnchor)
+        ])
+        return container
+    }()
+
     let loginButton: UIButton = {
         let button = UIButton(type: .system)
         var configuration = UIButton.Configuration.filled()
@@ -228,15 +267,6 @@ class PostDetailViewController: UIViewController {
         button.isHidden = true
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
-    }()
-
-    lazy var pageScrubberView: PageScrubberView = {
-        let view = PageScrubberView()
-        view.onPageSelected = { [weak self] page in
-            self?.pageLoadingTargetPage = page
-            self?.presenter.didSelectPage(page)
-        }
-        return view
     }()
 
     let replyButton: UIButton = {
@@ -533,16 +563,18 @@ class PostDetailViewController: UIViewController {
         view.backgroundColor = .systemBackground
         tableNode.dataSource = self
         tableNode.delegate = self
+        tableNode.leadingScreensForBatching = leadingScreensForBatching
         tableNode.view.backgroundColor = .systemBackground
         tableNode.view.separatorStyle = .none
         tableNode.view.showsVerticalScrollIndicator = true
+        tableNode.view.tableFooterView = loadMoreCommentsContainer
         updateTableContentInsets()
         tableNode.view.translatesAutoresizingMaskIntoConstraints = false
 
         view.addSubview(tableNode.view)
-        view.addSubview(pageScrubberView)
         view.addSubview(loadingIndicator)
         loginButton.addTarget(self, action: #selector(loginButtonTapped), for: .touchUpInside)
+        loadMoreCommentsRefreshButton.addTarget(self, action: #selector(refreshCommentsAtEndTapped), for: .touchUpInside)
         view.addSubview(loginButton)
         toastContainerView.addSubview(toastIconView)
         toastContainerView.addSubview(toastLabel)
@@ -563,10 +595,6 @@ class PostDetailViewController: UIViewController {
             tableNode.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tableNode.view.topAnchor.constraint(equalTo: view.topAnchor),
             tableNode.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-
-            pageScrubberView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: 12),
-            pageScrubberView.topAnchor.constraint(equalTo: view.topAnchor),
-            pageScrubberView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
             loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
@@ -658,8 +686,13 @@ class PostDetailViewController: UIViewController {
         )
 
         reloadTableData()
-        updatePageScrubber(isLoading: false)
         updateReplyButtonVisibility()
+    }
+
+    @objc
+    func refreshCommentsAtEndTapped() {
+        AppLog.info(.postDetail, "点击详情评论到底 footer 更新按钮: currentPage=\(currentPage), totalComments=\(comments.count)")
+        presenter.didTapRefreshCommentsAtEnd()
     }
 
     func configureReplyEditor() {

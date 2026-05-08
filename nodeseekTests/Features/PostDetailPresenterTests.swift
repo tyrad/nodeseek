@@ -53,51 +53,423 @@ struct PostDetailPresenterTests {
         #expect(visitedStore.markedPosts.first?.url.absoluteString == "https://www.nodeseek.com/post-706958-2")
     }
 
-    @Test func selectingOtherPageReloadsThatPage() {
+    @Test func approachingCommentEndLoadsNextPage() {
         let interactor = SpyPostDetailInteractor()
         let router = SpyPostDetailRouter()
         let view = SpyPostDetailView()
         let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
         presenter.setView(view)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: nil, contentHTML: "<p>第一页</p>")
+            ],
+            page: 1,
+            pagination: PostDetailPagination(
+                currentPage: 1,
+                items: [
+                    PostDetailPageItem(page: 1, url: nil, isCurrent: true),
+                    PostDetailPageItem(page: 2, url: nil, isCurrent: false)
+                ],
+                previousPage: nil,
+                nextPage: 2
+            )
+        )))
 
-        presenter.didSelectPage(2)
+        presenter.didApproachCommentEnd()
 
         #expect(interactor.loadedPages == [2])
-        #expect(view.pageLoadingCount == 1)
-        #expect(view.loadingCount == 0)
+        #expect(view.showLoadingMoreCommentsCount == 1)
     }
 
-    @Test func selectingCurrentPageDoesNotReload() {
+    @Test func approachingCommentEndWithoutNextPageDoesNotLoadMore() {
         let interactor = SpyPostDetailInteractor()
         let router = SpyPostDetailRouter()
         let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 2)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [],
+            page: 2,
+            isLastPage: true
+        )))
 
-        presenter.didSelectPage(2)
+        presenter.didApproachCommentEnd()
 
         #expect(interactor.loadedPages.isEmpty)
     }
 
-    @Test func selectingPageInFlightDoesNotDuplicateRequest() {
+    @Test func approachingCommentEndWhileLoadingMoreDoesNotDuplicateRequest() {
         let interactor = SpyPostDetailInteractor()
         let router = SpyPostDetailRouter()
         let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [],
+            page: 1,
+            pagination: PostDetailPagination(
+                currentPage: 1,
+                items: [
+                    PostDetailPageItem(page: 1, url: nil, isCurrent: true),
+                    PostDetailPageItem(page: 2, url: nil, isCurrent: false)
+                ],
+                previousPage: nil,
+                nextPage: 2
+            )
+        )))
 
-        presenter.didSelectPage(2)
-        presenter.didSelectPage(2)
+        presenter.didApproachCommentEnd()
+        presenter.didApproachCommentEnd()
 
         #expect(interactor.loadedPages == [2])
     }
 
-    @Test func selectingFailedPageCanRetry() {
+    @Test func failedCommentPageLoadCanRetry() {
         let interactor = SpyPostDetailInteractor()
         let router = SpyPostDetailRouter()
+        let view = SpyPostDetailView()
         let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        presenter.setView(view)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [],
+            page: 1,
+            pagination: PostDetailPagination(
+                currentPage: 1,
+                items: [
+                    PostDetailPageItem(page: 1, url: nil, isCurrent: true),
+                    PostDetailPageItem(page: 2, url: nil, isCurrent: false)
+                ],
+                previousPage: nil,
+                nextPage: 2
+            )
+        )))
 
-        presenter.didSelectPage(2)
+        presenter.didApproachCommentEnd()
         presenter.didFailLoadPostDetail(error: "网络错误")
-        presenter.didSelectPage(2)
+        presenter.didApproachCommentEnd()
 
         #expect(interactor.loadedPages == [2, 2])
+        #expect(view.hideLoadingMoreCommentsCount == 1)
+    }
+
+    @Test func loadedNextCommentPageAppendsInsteadOfReplacingDetail() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let view = SpyPostDetailView()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        presenter.setView(view)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: nil, contentHTML: "<p>第一页</p>")
+            ],
+            page: 1,
+            pagination: PostDetailPagination(
+                currentPage: 1,
+                items: [
+                    PostDetailPageItem(page: 1, url: nil, isCurrent: true),
+                    PostDetailPageItem(page: 2, url: nil, isCurrent: false)
+                ],
+                previousPage: nil,
+                nextPage: 2
+            )
+        )))
+
+        presenter.didApproachCommentEnd()
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>第二页不应替换正文</p>",
+            comments: [
+                Comment(id: "2", authorName: "b", avatarURL: nil, floorText: "#2", createdAtText: nil, contentHTML: "<p>第二页</p>")
+            ],
+            page: 2,
+            pagination: PostDetailPagination(
+                currentPage: 2,
+                items: [
+                    PostDetailPageItem(page: 1, url: nil, isCurrent: false),
+                    PostDetailPageItem(page: 2, url: nil, isCurrent: true)
+                ],
+                previousPage: 1,
+                nextPage: nil
+            )
+        )))
+
+        #expect(view.renderedDetails.count == 1)
+        #expect(view.appendedCommentPageDetails.map(\.page) == [2])
+        #expect(view.hideLoadingMoreCommentsCount == 1)
+    }
+
+    @Test func refreshingAtCommentEndWithOnlyOneLoadedPageReloadsCurrentPage() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let view = SpyPostDetailView()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        presenter.setView(view)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: nil, contentHTML: "<p>第一页</p>"),
+                Comment(id: "2", authorName: "b", avatarURL: nil, floorText: "#2", createdAtText: nil, contentHTML: "<p>第一页</p>")
+            ],
+            page: 1,
+            pagination: PostDetailPagination(currentPage: 1, items: [PostDetailPageItem(page: 1, url: nil, isCurrent: true)], previousPage: nil, nextPage: nil)
+        )))
+
+        presenter.didTapRefreshCommentsAtEnd()
+
+        #expect(interactor.loadedPages == [1])
+        #expect(view.showLoadingMoreCommentsCount == 1)
+
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: nil, contentHTML: "<p>第一页</p>"),
+                Comment(id: "2", authorName: "b", avatarURL: nil, floorText: "#2", createdAtText: nil, contentHTML: "<p>第一页</p>")
+            ],
+            page: 1,
+            pagination: PostDetailPagination(currentPage: 1, items: [PostDetailPageItem(page: 1, url: nil, isCurrent: true)], previousPage: nil, nextPage: nil)
+        )))
+
+        #expect(view.refreshedCommentPageDetails.map(\.page) == [1])
+        #expect(view.hideLoadingMoreCommentsCount == 1)
+        #expect(view.toastMessage == "暂无新评论")
+    }
+
+    @Test func refreshingAtCommentEndWithShortLastPageReloadsCurrentPage() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let view = SpyPostDetailView()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        presenter.setView(view)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: nil, contentHTML: "<p>第一页</p>"),
+                Comment(id: "2", authorName: "b", avatarURL: nil, floorText: "#2", createdAtText: nil, contentHTML: "<p>第一页</p>")
+            ],
+            page: 1,
+            pagination: PostDetailPagination(
+                currentPage: 1,
+                items: [
+                    PostDetailPageItem(page: 1, url: nil, isCurrent: true),
+                    PostDetailPageItem(page: 2, url: nil, isCurrent: false)
+                ],
+                previousPage: nil,
+                nextPage: 2
+            )
+        )))
+        presenter.didApproachCommentEnd()
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>第二页</p>",
+            comments: [
+                Comment(id: "3", authorName: "c", avatarURL: nil, floorText: "#3", createdAtText: nil, contentHTML: "<p>第二页</p>")
+            ],
+            page: 2,
+            pagination: PostDetailPagination(
+                currentPage: 2,
+                items: [
+                    PostDetailPageItem(page: 1, url: nil, isCurrent: false),
+                    PostDetailPageItem(page: 2, url: nil, isCurrent: true)
+                ],
+                previousPage: 1,
+                nextPage: nil
+            )
+        )))
+
+        presenter.didTapRefreshCommentsAtEnd()
+
+        #expect(interactor.loadedPages == [2, 2])
+        #expect(view.showLoadingMoreCommentsCount == 2)
+    }
+
+    @Test func refreshingAtCommentEndWithFullLastPageRequestsNextPage() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let view = SpyPostDetailView()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        presenter.setView(view)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: nil, contentHTML: "<p>第一页</p>"),
+                Comment(id: "2", authorName: "b", avatarURL: nil, floorText: "#2", createdAtText: nil, contentHTML: "<p>第一页</p>")
+            ],
+            page: 1,
+            pagination: PostDetailPagination(
+                currentPage: 1,
+                items: [
+                    PostDetailPageItem(page: 1, url: nil, isCurrent: true),
+                    PostDetailPageItem(page: 2, url: nil, isCurrent: false)
+                ],
+                previousPage: nil,
+                nextPage: 2
+            )
+        )))
+        presenter.didApproachCommentEnd()
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>第二页</p>",
+            comments: [
+                Comment(id: "3", authorName: "c", avatarURL: nil, floorText: "#3", createdAtText: nil, contentHTML: "<p>第二页</p>"),
+                Comment(id: "4", authorName: "d", avatarURL: nil, floorText: "#4", createdAtText: nil, contentHTML: "<p>第二页</p>")
+            ],
+            page: 2,
+            pagination: PostDetailPagination(
+                currentPage: 2,
+                items: [
+                    PostDetailPageItem(page: 1, url: nil, isCurrent: false),
+                    PostDetailPageItem(page: 2, url: nil, isCurrent: true)
+                ],
+                previousPage: 1,
+                nextPage: nil
+            )
+        )))
+
+        presenter.didTapRefreshCommentsAtEnd()
+
+        #expect(interactor.loadedPages == [2, 3])
+        #expect(view.showLoadingMoreCommentsCount == 2)
+    }
+
+    @Test func refreshingAtCommentEndProbeReturningCurrentPageRefreshesInPlace() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let view = SpyPostDetailView()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        presenter.setView(view)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: nil, contentHTML: "<p>第一页</p>"),
+                Comment(id: "2", authorName: "b", avatarURL: nil, floorText: "#2", createdAtText: nil, contentHTML: "<p>第一页</p>")
+            ],
+            page: 1,
+            pagination: PostDetailPagination(
+                currentPage: 1,
+                items: [
+                    PostDetailPageItem(page: 1, url: nil, isCurrent: true),
+                    PostDetailPageItem(page: 2, url: nil, isCurrent: false)
+                ],
+                previousPage: nil,
+                nextPage: 2
+            )
+        )))
+        presenter.didApproachCommentEnd()
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>第二页</p>",
+            comments: [
+                Comment(id: "3", authorName: "c", avatarURL: nil, floorText: "#3", createdAtText: nil, contentHTML: "<p>第二页</p>"),
+                Comment(id: "4", authorName: "d", avatarURL: nil, floorText: "#4", createdAtText: nil, contentHTML: "<p>第二页</p>")
+            ],
+            page: 2,
+            pagination: PostDetailPagination(
+                currentPage: 2,
+                items: [
+                    PostDetailPageItem(page: 1, url: nil, isCurrent: false),
+                    PostDetailPageItem(page: 2, url: nil, isCurrent: true)
+                ],
+                previousPage: 1,
+                nextPage: nil
+            )
+        )))
+
+        presenter.didTapRefreshCommentsAtEnd()
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>第二页更新</p>",
+            comments: [
+                Comment(id: "3", authorName: "c", avatarURL: nil, floorText: "#3", createdAtText: nil, contentHTML: "<p>第二页更新</p>"),
+                Comment(id: "4", authorName: "d", avatarURL: nil, floorText: "#4", createdAtText: nil, contentHTML: "<p>第二页</p>")
+            ],
+            page: 2,
+            pagination: PostDetailPagination(
+                currentPage: 2,
+                items: [
+                    PostDetailPageItem(page: 1, url: nil, isCurrent: false),
+                    PostDetailPageItem(page: 2, url: nil, isCurrent: true)
+                ],
+                previousPage: 1,
+                nextPage: nil
+            )
+        )))
+
+        #expect(interactor.loadedPages == [2, 3])
+        #expect(view.renderedDetails.count == 1)
+        #expect(view.refreshedCommentPageDetails.map(\.page) == [2])
+        #expect(view.hideLoadingMoreCommentsCount == 2)
+        #expect(view.toastMessage == "暂无新评论")
     }
 
     @Test func replySubmissionSuccessFinishesComposerAndReloadsCurrentPage() async throws {
@@ -133,7 +505,7 @@ struct PostDetailPresenterTests {
         #expect(view.loadingCount == 0)
     }
 
-    @Test func replySubmissionOnEarlierPageRefreshesCurrentPageAfterDelay() async throws {
+    @Test func replySubmissionBeforeLastCommentPageDoesNotRefreshCurrentPage() async throws {
         let interactor = SpyPostDetailInteractor()
         let router = SpyPostDetailRouter()
         let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 2)
@@ -158,7 +530,50 @@ struct PostDetailPresenterTests {
 
         try await Task.sleep(nanoseconds: 350_000_000)
 
-        #expect(interactor.loadedPages == [2])
+        #expect(interactor.loadedPages.isEmpty)
+    }
+
+    @Test func replySubmissionRefreshesLastPageWithPartialCommentUpdate() async throws {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 2)
+        let view = SpyPostDetailView()
+        presenter.setView(view)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: nil, contentHTML: "<p>旧评论</p>")
+            ],
+            page: 2,
+            isLastPage: true
+        )))
+
+        presenter.didTapSendReply(content: "测试回复")
+        presenter.didSubmitReply(PostDetailSubmitReplyResponse(message: "已发布"))
+
+        try await Task.sleep(nanoseconds: 350_000_000)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: nil, contentHTML: "<p>旧评论</p>"),
+                Comment(id: "2", authorName: "b", avatarURL: nil, floorText: "#2", createdAtText: nil, contentHTML: "<p>新评论</p>")
+            ],
+            page: 2,
+            isLastPage: true
+        )))
+
+        #expect(view.renderedDetails.count == 1)
+        #expect(view.refreshedCommentPageDetails.map(\.page) == [2])
     }
 
     @Test func cancelledRefreshAfterReplySubmissionDoesNotShowError() async throws {
@@ -199,12 +614,11 @@ struct PostDetailPresenterTests {
         let view = SpyPostDetailView()
         presenter.setView(view)
 
-        presenter.didSelectPage(2)
+        presenter.didApproachCommentEnd()
         presenter.didCancelLoadPostDetail()
 
         #expect(view.errorMessage == nil)
-        #expect(view.pageLoadingCount == 1)
-        #expect(interactor.loadedPages == [2])
+        #expect(interactor.loadedPages.isEmpty)
     }
 
     @Test func failedRefreshAfterReplySubmissionKeepsPublishedToast() async throws {
@@ -354,7 +768,6 @@ struct PostDetailPresenterTests {
         presenter.didRemoveFavorite(PostCollectionResponse(message: "removed", postCollectionCount: 1))
 
         #expect(interactor.loadedPages == [])
-        #expect(view.pageLoadingCount == 0)
         #expect(view.favoriteSubmittingStates == [true, false])
         #expect(view.updatedPostBodyDetails.last?.favoriteCount == 1)
         #expect(view.updatedPostBodyDetails.last?.isFavoriteCollected == false)
@@ -826,7 +1239,8 @@ private final class SpyPostDetailRouter: PostDetailRouterProtocol {
 
 private final class SpyPostDetailView: PostDetailViewProtocol {
     private(set) var loadingCount = 0
-    private(set) var pageLoadingCount = 0
+    private(set) var showLoadingMoreCommentsCount = 0
+    private(set) var hideLoadingMoreCommentsCount = 0
     var errorMessage: String?
     var toastMessage: String?
     private(set) var replySubmittingStates: [Bool] = []
@@ -834,13 +1248,16 @@ private final class SpyPostDetailView: PostDetailViewProtocol {
     private(set) var finishReplySubmissionCount = 0
     private(set) var hideLoadingCount = 0
     private(set) var renderedDetails: [PostDetail] = []
+    private(set) var refreshedCommentPageDetails: [PostDetail] = []
+    private(set) var appendedCommentPageDetails: [PostDetail] = []
     private(set) var updatedPostBodyDetails: [PostDetail] = []
     private(set) var updatedCommentLikeEvents: [(commentID: String, count: Int?, isClicked: Bool)] = []
     private(set) var updatedCommentChickenLegEvents: [(commentID: String, count: Int?, isClicked: Bool)] = []
     private(set) var updatedCommentOpposeEvents: [(commentID: String, count: Int?, isClicked: Bool)] = []
 
     func showLoading() { loadingCount += 1 }
-    func showPageLoading() { pageLoadingCount += 1 }
+    func showLoadingMoreComments() { showLoadingMoreCommentsCount += 1 }
+    func hideLoadingMoreComments() { hideLoadingMoreCommentsCount += 1 }
     func hideLoading() { hideLoadingCount += 1 }
     func showError(message: String) { errorMessage = message }
     func showToast(message: String) { toastMessage = message }
@@ -853,6 +1270,8 @@ private final class SpyPostDetailView: PostDetailViewProtocol {
     }
     func finishReplySubmission() { finishReplySubmissionCount += 1 }
     func render(detail: PostDetail) { renderedDetails.append(detail) }
+    func refreshCurrentCommentPage(detail: PostDetail) { refreshedCommentPageDetails.append(detail) }
+    func appendCommentPage(detail: PostDetail) { appendedCommentPageDetails.append(detail) }
     func updatePostBody(detail: PostDetail) { updatedPostBodyDetails.append(detail) }
     func updateCommentLike(commentID: String, count: Int?, isClicked: Bool) {
         updatedCommentLikeEvents.append((commentID: commentID, count: count, isClicked: isClicked))

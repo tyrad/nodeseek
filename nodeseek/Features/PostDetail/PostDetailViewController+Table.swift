@@ -30,25 +30,6 @@ extension PostDetailViewController {
         return rows
     }
 
-    func updatePageScrubber(isLoading: Bool, currentPageOverride: Int? = nil) {
-        guard isViewLoaded else { return }
-        guard let pagination = visiblePagination else {
-            pageScrubberView.configure(currentPage: currentPage, totalPages: 1, isLoading: false)
-            return
-        }
-        pageScrubberView.configure(
-            currentPage: currentPageOverride ?? pagination.currentPage,
-            totalPages: totalPageCount(from: pagination),
-            isLoading: isLoading
-        )
-    }
-
-    func totalPageCount(from pagination: PostDetailPagination) -> Int {
-        let itemPages = pagination.items.map(\.page)
-        let candidatePages = itemPages + [pagination.currentPage, pagination.previousPage, pagination.nextPage].compactMap { $0 }
-        return max(candidatePages.max() ?? pagination.currentPage, pagination.currentPage)
-    }
-
     func pageCompletionScrollRow() -> Int {
         let rows = detailRows
         if let commentRow = rows.firstIndex(where: { row in
@@ -257,6 +238,38 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
               case .comment(let commentIndex) = rows[indexPath.row] else { return }
         guard comments.indices.contains(commentIndex) else { return }
         scheduleCommentRenderIfNeeded(for: comments[commentIndex])
+    }
+
+    func shouldBatchFetch(for tableNode: ASTableNode) -> Bool {
+        canRequestCommentBatchFetch()
+    }
+
+    func tableNode(_ tableNode: ASTableNode, willBeginBatchFetchWith context: ASBatchContext) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                context.completeBatchFetching(true)
+                return
+            }
+
+            guard self.canRequestCommentBatchFetch() else {
+                AppLog.debug(.postDetail, "忽略详情评论 Texture 分页触发: comments=\(self.comments.count), lastRequested=\(self.lastBatchFetchRequestedCommentCount ?? -1)")
+                context.completeBatchFetching(true)
+                return
+            }
+
+            self.lastBatchFetchRequestedCommentCount = self.comments.count
+            AppLog.info(.postDetail, "Texture 提前触发详情评论分页: comments=\(self.comments.count), leadingScreens=\(self.leadingScreensForBatching)")
+            self.presenter.didApproachCommentEnd()
+            context.completeBatchFetching(true)
+        }
+    }
+
+    private func canRequestCommentBatchFetch() -> Bool {
+        guard displayMode == .content else { return false }
+        guard pagination?.nextPage != nil else { return false }
+        guard !comments.isEmpty else { return false }
+        guard lastBatchFetchRequestedCommentCount != comments.count else { return false }
+        return true
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {

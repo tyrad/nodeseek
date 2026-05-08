@@ -14,9 +14,29 @@ private struct DetailCommentRenderSnapshot {
 }
 
 extension PostDetailViewController: PostDetailViewProtocol {
+    private func updateLoadMoreCommentsFooter() {
+        // footer 固定高度 56pt：
+        // - 有下一页：保持空白（按钮和 spinner 都隐藏）
+        // - 无下一页：显示“加载新评论”
+        // - 加载中：spinner 显示（showLoadingMoreComments 已处理）
+        guard isViewLoaded else { return }
+        guard displayMode == .content else {
+            loadMoreCommentsRefreshButton.isHidden = true
+            return
+        }
+        guard loadMoreCommentsIndicator.isAnimating == false else { return }
+
+        if pagination?.nextPage == nil, comments.isEmpty == false {
+            loadMoreCommentsRefreshButton.isHidden = false
+        } else {
+            loadMoreCommentsRefreshButton.isHidden = true
+        }
+    }
+
     func showLoading() {
         loginButton.isHidden = true
         replyButton.isHidden = true
+        hideLoadingMoreComments()
         if hasRenderedDetailContent {
             loadingIndicator.startAnimating()
         } else {
@@ -25,16 +45,15 @@ extension PostDetailViewController: PostDetailViewProtocol {
         }
     }
 
-    func showPageLoading() {
-        loginButton.isHidden = true
-        loadingIndicator.stopAnimating()
-        guard hasRenderedDetailContent, currentHeaderContent != nil else {
-            showLoading()
-            return
-        }
-        displayMode = .pageSkeleton
-        updatePageScrubber(isLoading: true, currentPageOverride: pageLoadingTargetPage)
-        reloadTableData()
+    func showLoadingMoreComments() {
+        loadMoreCommentsRefreshButton.isHidden = true
+        loadMoreCommentsIndicator.startAnimating()
+    }
+
+    func hideLoadingMoreComments() {
+        loadMoreCommentsIndicator.stopAnimating()
+        lastBatchFetchRequestedCommentCount = nil
+        updateLoadMoreCommentsFooter()
     }
 
     func hideLoading() {
@@ -46,8 +65,6 @@ extension PostDetailViewController: PostDetailViewProtocol {
         cancelPendingInitialContentReveal()
         hideLoadingSkeleton()
         let alert = UIAlertController(title: "错误", message: message, preferredStyle: .alert)
-        pageLoadingTargetPage = nil
-        updatePageScrubber(isLoading: false)
         alert.addAction(UIAlertAction(title: "确定", style: .default))
         present(alert, animated: true)
     }
@@ -97,7 +114,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
             return
         }
         cancelPendingInitialContentReveal()
-        let shouldScrollToTop = hasRenderedDetailContent && targetPage != currentPage
+        let shouldScrollToTop = false
         let existingHeaderContent = currentHeaderContent
         let existingRenderedContent = headerRenderedContent
         var existingComments: [String: Comment] = [:]
@@ -144,6 +161,121 @@ extension PostDetailViewController: PostDetailViewProtocol {
             shouldScrollToTop: shouldScrollToTop,
             shouldScheduleMissingRender: true
         )
+    }
+
+    func appendCommentPage(detail: PostDetail) {
+        guard hasRenderedDetailContent else {
+            render(detail: detail)
+            return
+        }
+
+        let oldCommentCount = comments.count
+        let hasHeader = currentHeaderContent != nil
+        let commentRowOffset = hasHeader ? 2 : 0
+        currentPage = max(currentPage, detail.page)
+        pagination = detail.pagination
+        comments.append(contentsOf: detail.comments)
+        loadedCommentPageRanges[detail.page] = oldCommentCount..<comments.count
+        var insertedRows: [IndexPath] = []
+        if hasHeader, oldCommentCount == 0, comments.isEmpty == false {
+            // 初次有评论时，需要补上 header 与评论之间的分割行。
+            insertedRows.append(IndexPath(row: 1, section: 0))
+        }
+        insertedRows.append(contentsOf: (oldCommentCount..<comments.count).map { commentIndex in
+            IndexPath(row: commentRowOffset + commentIndex, section: 0)
+        })
+
+        if insertedRows.isEmpty {
+            return
+        }
+
+        tableNode.performBatch(animated: false, updates: { [weak self] in
+            self?.tableNode.insertRows(at: insertedRows, with: .none)
+        })
+        AppLog.debug(.postDetail, "详情评论局部插入完成: inserted=\(insertedRows.count), totalComments=\(comments.count)")
+        preheatCommentRender(for: detail.comments)
+        updateLoadMoreCommentsFooter()
+        updateReplyButtonVisibility()
+    }
+
+    func refreshCurrentCommentPage(detail: PostDetail) {
+        guard hasRenderedDetailContent else {
+            render(detail: detail)
+            return
+        }
+        guard let oldRange = loadedCommentPageRanges[detail.page],
+              oldRange.lowerBound >= 0,
+              oldRange.upperBound <= comments.count else {
+            render(detail: detail)
+            return
+        }
+
+        let oldComments = Array(comments[oldRange])
+        let newComments = detail.comments
+        let commonCount = min(oldComments.count, newComments.count)
+        let hasHeader = currentHeaderContent != nil
+        let oldTotalCount = comments.count
+        let commentRowOffset = hasHeader ? 2 : 0
+        let reloadRows = (0..<commonCount).compactMap { offset -> IndexPath? in
+            let oldComment = oldComments[offset]
+            let newComment = newComments[offset]
+            guard oldComment != newComment else { return nil }
+            comments[oldRange.lowerBound + offset] = newComments[offset]
+            if oldComment.contentHTML != newComment.contentHTML {
+                commentRenderedCache[newComment.id] = nil
+                renderedCommentIDs.remove(newComment.id)
+                commentRenderInFlight.remove(newComment.id)
+            }
+            return IndexPath(row: commentRowOffset + oldRange.lowerBound + offset, section: 0)
+        }
+
+        var deleteRows: [IndexPath] = []
+        var insertRows: [IndexPath] = []
+        if oldComments.count > newComments.count {
+            deleteRows = (newComments.count..<oldComments.count).map { offset in
+                IndexPath(row: commentRowOffset + oldRange.lowerBound + offset, section: 0)
+            }
+            for comment in oldComments[newComments.count..<oldComments.count] {
+                commentRenderedCache[comment.id] = nil
+                renderedCommentIDs.remove(comment.id)
+                commentRenderInFlight.remove(comment.id)
+            }
+            comments.removeSubrange((oldRange.lowerBound + newComments.count)..<oldRange.upperBound)
+        } else if newComments.count > oldComments.count {
+            let inserted = Array(newComments[oldComments.count..<newComments.count])
+            comments.insert(contentsOf: inserted, at: oldRange.upperBound)
+            insertRows = (oldComments.count..<newComments.count).map { offset in
+                IndexPath(row: commentRowOffset + oldRange.lowerBound + offset, section: 0)
+            }
+        }
+
+        loadedCommentPageRanges[detail.page] = oldRange.lowerBound..<(oldRange.lowerBound + newComments.count)
+        shiftLoadedCommentPageRanges(after: detail.page, delta: newComments.count - oldComments.count)
+        pagination = detail.pagination
+        currentPage = max(currentPage, detail.page)
+
+        if hasHeader, oldTotalCount > 0, comments.isEmpty {
+            deleteRows.append(IndexPath(row: 1, section: 0))
+        } else if hasHeader, oldTotalCount == 0, comments.isEmpty == false {
+            insertRows.insert(IndexPath(row: 1, section: 0), at: 0)
+        }
+
+        tableNode.performBatch(animated: false, updates: { [weak self] in
+            guard let self else { return }
+            if deleteRows.isEmpty == false {
+                self.tableNode.deleteRows(at: deleteRows, with: .none)
+            }
+            if insertRows.isEmpty == false {
+                self.tableNode.insertRows(at: insertRows, with: .none)
+            }
+            if reloadRows.isEmpty == false {
+                self.tableNode.reloadRows(at: reloadRows, with: .none)
+            }
+        })
+        AppLog.debug(.postDetail, "详情评论当前页局部刷新完成: page=\(detail.page), reload=\(reloadRows.count), insert=\(insertRows.count), delete=\(deleteRows.count), totalComments=\(comments.count)")
+        preheatCommentRender(for: newComments)
+        updateLoadMoreCommentsFooter()
+        updateReplyButtonVisibility()
     }
 
     func updatePostBody(detail: PostDetail) {
@@ -366,16 +498,15 @@ extension PostDetailViewController: PostDetailViewProtocol {
         shouldScheduleMissingRender: Bool
     ) {
         currentPage = targetPage
-        pageLoadingTargetPage = nil
         hasRenderedDetailContent = true
         displayMode = .content
         configureHeader(headerContent, renderedContent: renderedHeaderContent)
         self.pagination = pagination
         self.comments = comments
+        loadedCommentPageRanges = [targetPage: 0..<comments.count]
         commentRenderedCache = commentRenderSnapshot.cache
         renderedCommentIDs = commentRenderSnapshot.renderedIDs
         commentRenderInFlight.removeAll(keepingCapacity: true)
-        updatePageScrubber(isLoading: false)
         reloadTableData()
         if shouldScrollToTop {
             let targetRow = pageCompletionScrollRow()
@@ -398,6 +529,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
             }
             preheatCommentRender(for: comments)
         }
+        updateLoadMoreCommentsFooter()
         updateReplyButtonVisibility()
         consumeInitialAnchorIfNeeded()
     }
@@ -467,15 +599,25 @@ extension PostDetailViewController: PostDetailViewProtocol {
         commentRenderedCache.removeAll(keepingCapacity: true)
         renderedCommentIDs.removeAll(keepingCapacity: true)
         commentRenderInFlight.removeAll(keepingCapacity: true)
-        updatePageScrubber(isLoading: false)
         reloadTableData()
         scheduleHeaderRender(for: headerContent)
+        updateLoadMoreCommentsFooter()
     }
 
     func finishReplySubmission() {
         replyTextView.text = nil
         replyComposerMode = .plain
         dismissReplyEditor()
+    }
+}
+
+private extension PostDetailViewController {
+    func shiftLoadedCommentPageRanges(after page: Int, delta: Int) {
+        guard delta != 0 else { return }
+        for key in loadedCommentPageRanges.keys where key > page {
+            guard let range = loadedCommentPageRanges[key] else { continue }
+            loadedCommentPageRanges[key] = (range.lowerBound + delta)..<(range.upperBound + delta)
+        }
     }
 }
 

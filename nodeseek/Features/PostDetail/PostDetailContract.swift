@@ -11,7 +11,8 @@ import UIKit
 // MARK: - View Protocol (Presenter -> View)
 protocol PostDetailViewProtocol: AnyObject {
     func showLoading()
-    func showPageLoading()
+    func showLoadingMoreComments()
+    func hideLoadingMoreComments()
     func hideLoading()
     func showError(message: String)
     func showToast(message: String)
@@ -19,6 +20,8 @@ protocol PostDetailViewProtocol: AnyObject {
     func setFavoriteSubmitting(_ isSubmitting: Bool)
     func finishReplySubmission()
     func render(detail: PostDetail)
+    func refreshCurrentCommentPage(detail: PostDetail)
+    func appendCommentPage(detail: PostDetail)
     func updatePostBody(detail: PostDetail)
     func updateCommentLike(commentID: String, count: Int?, isClicked: Bool)
     func updateCommentChickenLeg(commentID: String, count: Int?, isClicked: Bool)
@@ -30,7 +33,8 @@ protocol PostDetailViewProtocol: AnyObject {
 protocol PostDetailPresenterProtocol: AnyObject {
     func viewDidLoad()
     func didTapLogin()
-    func didSelectPage(_ page: Int)
+    func didApproachCommentEnd()
+    func didTapRefreshCommentsAtEnd()
     func didTapSendReply(content: String)
     func didTapFavorite()
     func didTapPostLike()
