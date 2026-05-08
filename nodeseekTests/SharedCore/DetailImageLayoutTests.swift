@@ -9,9 +9,9 @@ import CoreGraphics
 import Foundation
 import Testing
 #if SWIFT_PACKAGE
-@testable import NodeSeekCore
+    @testable import NodeSeekCore
 #else
-@testable import nodeseek
+    @testable import nodeseek
 #endif
 
 struct DetailImageLayoutTests {
@@ -111,6 +111,13 @@ struct DetailImageLayoutTests {
         #expect(DetailImageURLRules.isCheckPlaceReportSVG(hardwareURL))
         #expect(DetailImageURLRules.isCheckPlaceReportSVG(otherURL) == false)
         #expect(DetailImageURLRules.isCheckPlaceReportSVG(unsupportedSchemeURL) == false)
+    }
+
+    @Test func likelyImageURLRecognizesImageEndpointWithoutFileExtension() throws {
+        let url = try #require(URL(string: "https://neonfx.jsnav.de/openapi/image?compact=1"))
+
+        #expect(DetailImageURLRules.isLikelyImageURL(url))
+        #expect(DetailImageURLRules.imageURLs(in: "汇率图：\(url.absoluteString)。") == [url])
     }
 
     @Test func imageKindResolutionDoesNotClassifyReportsByURLPath() throws {

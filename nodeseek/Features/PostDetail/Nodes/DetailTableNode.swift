@@ -48,11 +48,32 @@ enum DetailContentBlockNodeFactory {
         onImageSizeResolved: @escaping (URL, CGSize) -> Void = { _, _ in },
         onImageHeightReduced: @escaping () -> Void = {}
     ) -> [ASDisplayNode] {
-        let imageURLs = blocks.compactMap { block -> URL? in
-            guard case .image(let imageBlock) = block else { return nil }
-            return imageBlock.url
-        }
+        let imageURLs = imageURLs(in: blocks)
         var imageIndex = 0
+        return makeNodes(
+            from: blocks,
+            imageURLs: imageURLs,
+            imageIndex: &imageIndex,
+            onImageTapped: onImageTapped,
+            onLinkTapped: onLinkTapped,
+            onTextLayoutInvalidated: onTextLayoutInvalidated,
+            imageSizeProvider: imageSizeProvider,
+            onImageSizeResolved: onImageSizeResolved,
+            onImageHeightReduced: onImageHeightReduced
+        )
+    }
+
+    private static func makeNodes(
+        from blocks: [RenderedContentBlock],
+        imageURLs: [URL],
+        imageIndex: inout Int,
+        onImageTapped: @escaping ([URL], Int) -> Void,
+        onLinkTapped: @escaping (URL) -> Void,
+        onTextLayoutInvalidated: @escaping () -> Void,
+        imageSizeProvider: @escaping (URL) -> CGSize?,
+        onImageSizeResolved: @escaping (URL, CGSize) -> Void,
+        onImageHeightReduced: @escaping () -> Void
+    ) -> [ASDisplayNode] {
         return blocks.compactMap { block -> ASDisplayNode? in
             switch block {
             case .text(let attributedText):
@@ -99,6 +120,33 @@ enum DetailContentBlockNodeFactory {
                 return plainTextNode(url?.absoluteString ?? "[图片]")
             case .unsupported(let reason):
                 return plainTextNode(reason)
+            case .quote(let quoteBlock):
+                let childNodes = makeNodes(
+                    from: quoteBlock.children,
+                    imageURLs: imageURLs,
+                    imageIndex: &imageIndex,
+                    onImageTapped: onImageTapped,
+                    onLinkTapped: onLinkTapped,
+                    onTextLayoutInvalidated: onTextLayoutInvalidated,
+                    imageSizeProvider: imageSizeProvider,
+                    onImageSizeResolved: onImageSizeResolved,
+                    onImageHeightReduced: onImageHeightReduced
+                )
+                guard childNodes.isEmpty == false else { return nil }
+                return DetailQuoteBlockNode(children: childNodes)
+            }
+        }
+    }
+
+    private static func imageURLs(in blocks: [RenderedContentBlock]) -> [URL] {
+        blocks.flatMap { block -> [URL] in
+            switch block {
+            case .image(let imageBlock):
+                return [imageBlock.url]
+            case .quote(let quoteBlock):
+                return imageURLs(in: quoteBlock.children)
+            case .text, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
+                return []
             }
         }
     }
@@ -117,6 +165,73 @@ enum DetailContentBlockNodeFactory {
             ]
         )
         return node
+    }
+}
+
+final class DetailQuoteBlockNode: ASDisplayNode, ThemeRefreshableNode {
+    private enum Layout {
+        static let borderWidth: CGFloat = 3
+        static let cornerRadius: CGFloat = 4
+        static let contentSpacing: CGFloat = 8
+        static let blockSpacing: CGFloat = 8
+        static let insets = UIEdgeInsets(top: 12, left: 8, bottom: 12, right: 10)
+    }
+
+    private let children: [ASDisplayNode]
+    private let borderNode = ASDisplayNode()
+
+    var debugBorderNode: ASDisplayNode {
+        borderNode
+    }
+
+    init(children: [ASDisplayNode]) {
+        self.children = children
+        super.init()
+        automaticallyManagesSubnodes = true
+        style.flexGrow = 1
+        style.flexShrink = 1
+        applyCurrentTheme()
+    }
+
+    override func didLoad() {
+        super.didLoad()
+        themeTraitObserver.install(on: self)
+        view.layer.cornerRadius = Layout.cornerRadius
+        view.layer.masksToBounds = true
+    }
+
+    private let themeTraitObserver = ThemeTraitObserver()
+
+    func applyCurrentTheme() {
+        backgroundColor = .secondarySystemBackground
+        borderNode.backgroundColor = .separator
+    }
+
+    override func layoutSpecThatFits(_ constrainedSize: ASSizeRange) -> ASLayoutSpec {
+        borderNode.style.width = ASDimension(unit: .points, value: Layout.borderWidth)
+        borderNode.style.flexShrink = 0
+        borderNode.style.alignSelf = .stretch
+
+        let contentStack = ASStackLayoutSpec.vertical()
+        contentStack.spacing = Layout.blockSpacing
+        contentStack.children = children
+        contentStack.style.flexGrow = 1
+        contentStack.style.flexShrink = 1
+        let contentInsets = UIEdgeInsets(
+            top: Layout.insets.top,
+            left: Layout.contentSpacing,
+            bottom: Layout.insets.bottom,
+            right: Layout.insets.right
+        )
+        let paddedContent = ASInsetLayoutSpec(insets: contentInsets, child: contentStack)
+        paddedContent.style.flexGrow = 1
+        paddedContent.style.flexShrink = 1
+
+        let horizontalStack = ASStackLayoutSpec.horizontal()
+        horizontalStack.alignItems = .stretch
+        horizontalStack.children = [borderNode, paddedContent]
+
+        return horizontalStack
     }
 }
 
@@ -303,11 +418,17 @@ private extension String {
 final class DetailCodeBlockNode: ASDisplayNode {
     private let codeBlock: RenderedCodeBlock
 
-    init(codeBlock: RenderedCodeBlock) {
+    init(
+        codeBlock: RenderedCodeBlock,
+        pasteboardStringWriter: @escaping PasteboardStringWriter = { UIPasteboard.general.string = $0 }
+    ) {
         self.codeBlock = codeBlock
         super.init()
-        setViewBlock {
-            DetailCodeBlockView(codeBlock: codeBlock)
+        setViewBlock { [pasteboardStringWriter] in
+            DetailCodeBlockView(
+                codeBlock: codeBlock,
+                pasteboardStringWriter: pasteboardStringWriter
+            )
         }
         style.flexGrow = 1
         style.flexShrink = 1
@@ -320,6 +441,7 @@ final class DetailCodeBlockNode: ASDisplayNode {
 
 final class DetailCodeBlockView: UIView {
     private let codeBlock: RenderedCodeBlock
+    private let pasteboardStringWriter: PasteboardStringWriter
     private let scrollView = UIScrollView()
     private let contentView = UIView()
     private let codeLabel = UILabel()
@@ -328,8 +450,12 @@ final class DetailCodeBlockView: UIView {
     private var contentWidthConstraint: NSLayoutConstraint?
     private var copyResetWorkItem: DispatchWorkItem?
 
-    init(codeBlock: RenderedCodeBlock) {
+    init(
+        codeBlock: RenderedCodeBlock,
+        pasteboardStringWriter: @escaping PasteboardStringWriter = { UIPasteboard.general.string = $0 }
+    ) {
         self.codeBlock = codeBlock
+        self.pasteboardStringWriter = pasteboardStringWriter
         super.init(frame: .zero)
         configureView()
         configureChromeDots()
@@ -460,7 +586,7 @@ final class DetailCodeBlockView: UIView {
 
     @objc
     private func copyCode() {
-        UIPasteboard.general.string = codeBlock.text
+        pasteboardStringWriter(codeBlock.text)
         showCopiedState()
     }
 

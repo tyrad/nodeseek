@@ -112,6 +112,7 @@ final class SettingsViewController: UITableViewController {
         case appVersion
         case buildNumber
         case gitSHA
+        case repository
         case workflow
         case githubURL
     }
@@ -120,12 +121,16 @@ final class SettingsViewController: UITableViewController {
         case fileLogging
         case logFile
         case detailTest
+        #if DEBUG
+        case debugLinks
+        #endif
 
         static var visibleRows: [DebugRow] {
             var rows: [DebugRow] = [.fileLogging, .logFile]
             #if DEBUG
             if NodeSeekDebugConfig.enablePostDetailTestEntry {
                 rows.append(.detailTest)
+                rows.append(.debugLinks)
             }
             #endif
             return rows
@@ -133,6 +138,7 @@ final class SettingsViewController: UITableViewController {
     }
 
     private let cacheManager: SettingsCacheManaging
+    private let repositoryURL = URL(string: "https://github.com/tyrad/nodeseek")!
     private let sessionManager: SettingsSessionManaging
     private let currentAccountStore: CurrentAccountStore
     private let buildInfo: SettingsBuildInfo
@@ -295,12 +301,13 @@ final class SettingsViewController: UITableViewController {
     }
 
     private func buildCell(for indexPath: IndexPath) -> UITableViewCell {
-        let isGitHubURLRow = BuildRow(rawValue: indexPath.row) == .githubURL
-        let cell = UITableViewCell(style: isGitHubURLRow ? .subtitle : .value1, reuseIdentifier: nil)
+        let buildRow = BuildRow(rawValue: indexPath.row)
+        let usesSubtitle = buildRow == .repository || buildRow == .githubURL
+        let cell = UITableViewCell(style: usesSubtitle ? .subtitle : .value1, reuseIdentifier: nil)
         cell.selectionStyle = .none
         cell.detailTextLabel?.textColor = .secondaryLabel
-        cell.detailTextLabel?.numberOfLines = isGitHubURLRow ? 2 : 1
-        switch BuildRow(rawValue: indexPath.row) {
+        cell.detailTextLabel?.numberOfLines = usesSubtitle ? 2 : 1
+        switch buildRow {
         case .appVersion:
             cell.textLabel?.text = "版本"
             cell.detailTextLabel?.text = buildInfo.appVersion
@@ -313,6 +320,12 @@ final class SettingsViewController: UITableViewController {
             cell.textLabel?.text = "Git"
             cell.detailTextLabel?.text = buildInfo.shortGitSHA
             cell.accessibilityIdentifier = "settings-git-sha-cell"
+        case .repository:
+            cell.textLabel?.text = "仓库"
+            cell.detailTextLabel?.text = repositoryURL.absoluteString
+            cell.accessoryType = .disclosureIndicator
+            cell.selectionStyle = .default
+            cell.accessibilityIdentifier = "settings-github-repository-cell"
         case .workflow:
             cell.textLabel?.text = "Workflow"
             cell.detailTextLabel?.text = buildInfo.workflowDisplayText
@@ -350,6 +363,12 @@ final class SettingsViewController: UITableViewController {
             cell.textLabel?.text = "详情测试"
             cell.imageView?.image = UIImage(systemName: "doc.text.magnifyingglass")
             cell.accessibilityIdentifier = "settings-detail-test-cell"
+        #if DEBUG
+        case .debugLinks:
+            cell.textLabel?.text = "调试链接"
+            cell.imageView?.image = UIImage(systemName: "link")
+            cell.accessibilityIdentifier = "settings-debug-links-cell"
+        #endif
         }
         cell.accessoryType = .disclosureIndicator
         return cell
@@ -469,21 +488,25 @@ final class SettingsViewController: UITableViewController {
             onLogFile()
         case .detailTest:
             guard let onDetailTest else { return }
-            if let navigationController {
-                navigationController.popViewController(animated: true)
-                DispatchQueue.main.async { [onDetailTest] in
-                    onDetailTest()
-                }
-                return
-            }
             onDetailTest()
+        #if DEBUG
+        case .debugLinks:
+            guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }
+            navigationController?.pushViewController(PostDetailDebugLinksViewController(), animated: true)
+        #endif
         }
     }
 
     private func handleBuildSelection(at indexPath: IndexPath) {
-        guard BuildRow(rawValue: indexPath.row) == .workflow,
-              let githubRunURL = buildInfo.githubRunURL else { return }
-        UIApplication.shared.open(githubRunURL)
+        switch BuildRow(rawValue: indexPath.row) {
+        case .repository:
+            UIApplication.shared.open(repositoryURL)
+        case .workflow:
+            guard let githubRunURL = buildInfo.githubRunURL else { return }
+            UIApplication.shared.open(githubRunURL)
+        case .appVersion, .buildNumber, .gitSHA, .githubURL, .none:
+            return
+        }
     }
 
     @objc private func fileLoggingSwitchChanged(_ sender: UISwitch) {
@@ -530,3 +553,58 @@ final class SettingsViewController: UITableViewController {
         present(alert, animated: true)
     }
 }
+
+#if DEBUG
+final class PostDetailDebugLinksViewController: UITableViewController {
+    private let links: [PostDetailDebugLink]
+    private let onSelectTarget: @MainActor (PostDetailTestTarget, UIViewController) -> Void
+
+    init(
+        links: [PostDetailDebugLink] = PostDetailDebugLink.allCases,
+        onSelectTarget: (@MainActor (PostDetailTestTarget, UIViewController) -> Void)? = nil
+    ) {
+        self.links = links
+        self.onSelectTarget = onSelectTarget ?? { target, viewController in
+            let detailViewController = PostDetailRouter.createModule(
+                post: target.post,
+                page: target.page,
+                initialAnchorID: target.anchorID
+            )
+            viewController.navigationController?.pushViewController(detailViewController, animated: true)
+        }
+        super.init(style: .insetGrouped)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "调试链接"
+        tableView.accessibilityIdentifier = "post-detail-debug-links-table-view"
+    }
+
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        links.count
+    }
+
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let link = links[indexPath.row]
+        let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+        cell.textLabel?.text = link.title
+        cell.detailTextLabel?.text = link.url.absoluteString
+        cell.detailTextLabel?.textColor = .secondaryLabel
+        cell.detailTextLabel?.numberOfLines = 2
+        cell.accessoryType = .disclosureIndicator
+        cell.accessibilityIdentifier = "post-detail-debug-link-cell-\(indexPath.row)"
+        return cell
+    }
+
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        guard let target = links[indexPath.row].target else { return }
+        onSelectTarget(target, self)
+    }
+}
+#endif

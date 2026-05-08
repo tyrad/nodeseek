@@ -11,7 +11,8 @@ enum DetailSVGContentRules {
     static func isReportLikeSVG(_ data: Data, mimeType: String?) -> Bool {
         guard let svgText = String(data: data, encoding: .utf8),
               looksLikeSVG(svgText, mimeType: mimeType),
-              let openingTag = svgOpeningTag(in: svgText) else {
+              let openingTag = svgOpeningTag(in: svgText)
+        else {
             return false
         }
 
@@ -52,7 +53,8 @@ enum DetailSVGContentRules {
         let source = tag as NSString
         let fullRange = NSRange(location: 0, length: source.length)
         guard let match = regex.firstMatch(in: tag, options: [], range: fullRange),
-              match.numberOfRanges >= 2 else {
+              match.numberOfRanges >= 2
+        else {
             return nil
         }
         return source.substring(with: match.range(at: 1))
@@ -63,27 +65,75 @@ enum DetailSVGContentRules {
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
             return 0
         }
-        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        let range = NSRange(text.startIndex ..< text.endIndex, in: text)
         return regex.numberOfMatches(in: text, options: [], range: range)
     }
 }
 
 enum DetailImageURLRules {
+    static func isLikelyImageURL(_ url: URL) -> Bool {
+        guard ["http", "https"].contains(url.scheme?.lowercased()) else {
+            return false
+        }
+
+        let imageExtensions: Set<String> = [
+            "jpg",
+            "jpeg",
+            "png",
+            "gif",
+            "webp",
+            "svg",
+            "avif",
+            "heic",
+            "heif",
+            "tiff",
+            "bmp",
+        ]
+        if imageExtensions.contains(url.pathExtension.lowercased()) {
+            return true
+        }
+
+        return url.lastPathComponent.lowercased() == "image"
+    }
+
     static func isCheckPlaceReportSVG(_ url: URL) -> Bool {
         guard ["http", "https"].contains(url.scheme?.lowercased()),
               url.pathExtension.lowercased() == "svg",
-              url.host?.lowercased() == "report.check.place" else {
+              url.host?.lowercased() == "report.check.place"
+        else {
             return false
         }
 
         let components = url.pathComponents.filter { $0 != "/" }
         guard components.count == 2,
               ["ip", "hardware"].contains(components[0]),
-              components[1].isEmpty == false else {
+              components[1].isEmpty == false
+        else {
             return false
         }
 
         return true
+    }
+
+    static func containsLikelyImageURL(in text: String) -> Bool {
+        imageURLs(in: text).isEmpty == false
+    }
+
+    static func imageURLs(in text: String) -> [URL] {
+        let source = text as NSString
+        let fullRange = NSRange(location: 0, length: source.length)
+        var seen = Set<String>()
+        var urls: [URL] = []
+
+        for match in httpURLRegex.matches(in: text, options: [], range: fullRange) {
+            let rawURL = trimmingTrailingURLPunctuation(from: source.substring(with: match.range))
+            guard let url = URL(string: rawURL), isLikelyImageURL(url) else { continue }
+            let key = url.absoluteString.lowercased()
+            guard seen.insert(key).inserted else { continue }
+            urls.append(url)
+        }
+
+        return urls
     }
 
     static func containsCheckPlaceReportSVGURL(in text: String) -> Bool {
@@ -108,14 +158,30 @@ enum DetailImageURLRules {
         return urls
     }
 
+    private static func trimmingTrailingURLPunctuation(from rawURL: String) -> String {
+        var trimmedURL = rawURL
+        while let lastScalar = trimmedURL.unicodeScalars.last,
+              trailingURLPunctuation.contains(lastScalar) {
+            trimmedURL.removeLast()
+        }
+        return trimmedURL
+    }
+
     private static let checkPlaceReportSVGURLRegex = try! NSRegularExpression(
         pattern: #"https?://report\.check\.place/(?:ip|hardware)/[A-Za-z0-9_-]+\.svg\b"#,
         options: [.caseInsensitive]
     )
+
+    private static let httpURLRegex = try! NSRegularExpression(
+        pattern: #"https?://[^\s<>"']+"#,
+        options: [.caseInsensitive]
+    )
+
+    private static let trailingURLPunctuation = CharacterSet(charactersIn: ".,;:!?)]}，。；：！？）】》」』")
 }
 
 extension DetailImageKind {
-    static func resolved(isSticker: Bool, imageURL: URL?) -> DetailImageKind {
+    static func resolved(isSticker: Bool, imageURL _: URL?) -> DetailImageKind {
         if isSticker {
             return .sticker
         }

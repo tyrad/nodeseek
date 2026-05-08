@@ -119,6 +119,20 @@ struct PostListViewControllerTests {
         #expect(presenter.didRetryFirstPageCount == 1)
     }
 
+    @Test func detailTestSubmitsProvidedURL() throws {
+        let presenter = SpyPostListPresenter()
+        let viewController = PostListViewController(
+            presenter: presenter,
+            detailTestURLProvider: {
+                "https://www.nodeseek.com/post-717963-6#52"
+            }
+        )
+
+        viewController.openDetailTestURLFromPasteboard()
+
+        #expect(presenter.submittedDetailTestURL == "https://www.nodeseek.com/post-717963-6#52")
+    }
+
     @Test func menuButtonPresentsSideMenuWithAccountHeaderSettingsAndMovesDebugEntriesToSettings() throws {
         let presenter = SpyPostListPresenter()
         let viewController = PostListViewController(presenter: presenter)

@@ -19,7 +19,7 @@ protocol PostListViewProtocol: AnyObject {
     func hideLoadingMore()
     func showError(message: String)
     #if DEBUG
-    func showDetailTestInput()
+    func openDetailTestURLFromPasteboard()
     #endif
     func renderCategories(_ categories: [PostListCategory], selected: PostListCategory)
     func renderSortMode(_ sortMode: PostListSortMode)

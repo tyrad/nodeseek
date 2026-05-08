@@ -681,8 +681,79 @@ struct KannaNodeSeekParserTests {
 
         #expect(detail.id == "704286")
         #expect(detail.title == "受限帖子")
+        #expect(detail.isRestricted)
         #expect(detail.requiredReadingLevel == 2)
         #expect(detail.contentHTML == "查看本帖需要Lv2，您的权限不足😑，请赚取🍗升级您的用户等级")
+        #expect(detail.comments.isEmpty)
+    }
+
+    @Test func parsesPrivatePostNoticeFromBodyLeftFallback() throws {
+        let html = """
+        <html data-server-rendered="true">
+        <head><title>NodeSeek</title></head>
+        <body class="bg1 light-layout">
+            <section id="nsk-frame">
+                <div id="nsk-body" class="nsk-container">
+                    <div id="nsk-body-left">
+                        <div style="min-height:300px;display:flex;align-items:center;justify-content:center;font-size:2rem;">
+                            <div style="line-height: 1.25;">
+                                本帖已经被用户设为私有，您没有阅读权限
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </body>
+        </html>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(
+            html: html,
+            url: URL(string: "https://www.nodeseek.com/post-704286-1")!
+        )
+
+        #expect(detail.id == "704286")
+        #expect(detail.title == "受限帖子")
+        #expect(detail.isRestricted)
+        #expect(detail.contentHTML == "本帖已经被用户设为私有，您没有阅读权限")
+        #expect(detail.comments.isEmpty)
+    }
+
+    @Test func parsesUnknownNodeSeekEmptyStateNoticeFromBodyLeftFallback() throws {
+        let html = """
+        <html data-server-rendered="true">
+        <head><title>NodeSeek</title></head>
+        <body class="bg1 light-layout">
+            <section id="nsk-frame">
+                <div id="nsk-body" class="nsk-container">
+                    <div id="nsk-left-panel-container">
+                        <div class="nsk-panel category-list">所有版块</div>
+                    </div>
+                    <div id="nsk-body-left">
+                        <div style="min-height:300px;display:flex;align-items:center;justify-content:center;font-size:2rem;">
+                            <div style="line-height: 1.25;">帖子暂时无法查看，请稍后再试</div>
+                        </div>
+                    </div>
+                    <div id="nsk-right-panel-container">
+                        <div class="user-card">缭雾</div>
+                    </div>
+                </div>
+            </section>
+        </body>
+        </html>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(
+            html: html,
+            url: URL(string: "https://www.nodeseek.com/post-704286-1")!
+        )
+
+        #expect(detail.id == "704286")
+        #expect(detail.title == "受限帖子")
+        #expect(detail.isRestricted)
+        #expect(detail.contentHTML == "帖子暂时无法查看，请稍后再试")
         #expect(detail.comments.isEmpty)
     }
 

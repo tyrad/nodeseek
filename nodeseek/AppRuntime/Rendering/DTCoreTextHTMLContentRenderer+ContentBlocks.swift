@@ -16,12 +16,21 @@ extension DTCoreTextHTMLContentRenderer {
         baseURL: URL,
         maxImageWidth: CGFloat
     ) -> [RenderedContentBlock] {
+        if containsNestedBlockquote(in: fragment),
+           let quoteAwareBlocks = renderQuoteAwareContentBlocks(
+            fragment: fragment,
+            baseURL: baseURL,
+            maxImageWidth: maxImageWidth
+           ) {
+            return quoteAwareBlocks
+        }
+
         let needsStructuredParsing = fragment.range(of: "<table", options: [.caseInsensitive]) != nil
             || fragment.range(of: "<pre", options: [.caseInsensitive]) != nil
             || fragment.range(of: "<iframe", options: [.caseInsensitive]) != nil
             || fragment.range(of: "<img", options: [.caseInsensitive]) != nil
             || fragment.range(of: Self.unsupportedContentClassName, options: [.caseInsensitive]) != nil
-            || containsCheckPlaceReportSVGURL(in: fragment)
+            || containsPromotableImageURL(in: fragment)
         guard needsStructuredParsing else {
             return renderTextBlocks(fragment: fragment, baseURL: baseURL, maxImageWidth: maxImageWidth)
         }
@@ -51,6 +60,117 @@ extension DTCoreTextHTMLContentRenderer {
         return blocks
     }
 
+    func containsNestedBlockquote(in fragment: String) -> Bool {
+        guard fragment.range(of: "<blockquote", options: [.caseInsensitive]) != nil,
+              let document = try? HTML(
+                html: "<div id=\"__nodeseek_content_root__\">\(fragment)</div>",
+                encoding: .utf8
+              ) else {
+            return false
+        }
+        return document.css("blockquote").contains { quoteNode in
+            quoteNode.xpath(".//blockquote").first != nil
+        }
+    }
+
+    func renderQuoteAwareContentBlocks(
+        fragment: String,
+        baseURL: URL,
+        maxImageWidth: CGFloat
+    ) -> [RenderedContentBlock]? {
+        guard let document = try? HTML(
+            html: "<div id=\"__nodeseek_content_root__\">\(fragment)</div>",
+            encoding: .utf8
+        ), let root = document.at_css("#__nodeseek_content_root__") else {
+            return nil
+        }
+
+        var blocks: [RenderedContentBlock] = []
+        appendQuoteAwareChildren(
+            of: root,
+            into: &blocks,
+            baseURL: baseURL,
+            maxImageWidth: maxImageWidth
+        )
+        return blocks.isEmpty ? nil : blocks
+    }
+
+    func appendQuoteAwareChildren(
+        of node: XMLElement,
+        into blocks: inout [RenderedContentBlock],
+        baseURL: URL,
+        maxImageWidth: CGFloat
+    ) {
+        var pendingHTML = ""
+
+        func flushPending() {
+            flushPendingHTML(
+                &pendingHTML,
+                into: &blocks,
+                baseURL: baseURL,
+                maxImageWidth: maxImageWidth
+            )
+        }
+
+        for child in node.children {
+            let tag = tagName(of: child)
+            if tag == "blockquote" {
+                flushPending()
+                if let quoteBlock = quoteBlock(from: child, baseURL: baseURL, maxImageWidth: maxImageWidth) {
+                    blocks.append(.quote(quoteBlock))
+                }
+                continue
+            }
+
+            if isTransparentQuoteAwareContainer(child) {
+                flushPending()
+                appendQuoteAwareChildren(
+                    of: child,
+                    into: &blocks,
+                    baseURL: baseURL,
+                    maxImageWidth: maxImageWidth
+                )
+                continue
+            }
+
+            if let childHTML = child.toHTML {
+                appendPendingHTMLFragment(childHTML, into: &pendingHTML)
+            }
+        }
+
+        flushPending()
+    }
+
+    func quoteBlock(
+        from node: XMLElement,
+        baseURL: URL,
+        maxImageWidth: CGFloat
+    ) -> RenderedQuoteBlock? {
+        let innerHTML = node.innerHTML ?? node.text ?? ""
+        let children: [RenderedContentBlock]
+        if innerHTML.range(of: "<blockquote", options: [.caseInsensitive]) != nil,
+           let nestedBlocks = renderQuoteAwareContentBlocks(
+            fragment: innerHTML,
+            baseURL: baseURL,
+            maxImageWidth: maxImageWidth
+           ) {
+            children = nestedBlocks
+        } else {
+            children = renderContentBlocks(
+                fragment: innerHTML,
+                baseURL: baseURL,
+                maxImageWidth: maxImageWidth
+            )
+        }
+        return children.isEmpty ? nil : RenderedQuoteBlock(children: children)
+    }
+
+    func isTransparentQuoteAwareContainer(_ node: XMLElement) -> Bool {
+        let tag = tagName(of: node)
+        guard tag == "article" else { return false }
+        return hasClass("post-content", in: node)
+    }
+
     func appendContentBlocks(
         fromHTML html: String,
         pendingHTML: inout String,
@@ -76,7 +196,8 @@ extension DTCoreTextHTMLContentRenderer {
 
             let structuredHTML = source.substring(with: match.range)
             if let document = try? HTML(html: structuredHTML, encoding: .utf8),
-               let node = document.at_css("table") ?? document.at_css("pre") {
+               let node = document.at_css("table") ?? document.at_css("pre")
+            {
                 appendStructuredBlock(from: node, into: &blocks, baseURL: baseURL)
             }
             currentLocation = NSMaxRange(match.range)
@@ -100,7 +221,7 @@ extension DTCoreTextHTMLContentRenderer {
             blocks.append(.table(table))
         } else if isPreElement(node), let codeBlock = codeBlock(from: node) {
             blocks.append(.codeBlock(codeBlock))
-            blocks.append(contentsOf: checkPlaceReportImageBlocks(in: codeBlock.text).map(RenderedContentBlock.image))
+            blocks.append(contentsOf: promotableImageBlocks(in: codeBlock.text).map(RenderedContentBlock.image))
         }
     }
 
@@ -196,11 +317,11 @@ extension DTCoreTextHTMLContentRenderer {
             baseURL: baseURL,
             maxImageWidth: maxImageWidth
         ).filter { block in
-            guard case .text(let text) = block else { return true }
+            guard case let .text(text) = block else { return true }
             return text.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
         }
         blocks.append(contentsOf: renderedBlocks)
-        blocks.append(contentsOf: checkPlaceReportImageBlocks(in: plainCodeText(fromHTML: html)).map(RenderedContentBlock.image))
+        blocks.append(contentsOf: promotableImageBlocks(in: plainCodeText(fromHTML: html)).map(RenderedContentBlock.image))
     }
 
     func appendRawIFrameLinkBlocks(
@@ -300,14 +421,16 @@ extension DTCoreTextHTMLContentRenderer {
     func iframeLinkBlock(fromHTML html: String, baseURL: URL) -> RenderedIFrameLinkBlock? {
         guard let rawSource = attributeValue(Self.srcAttributeRegex, in: html)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
-              rawSource.isEmpty == false else {
+            rawSource.isEmpty == false
+        else {
             return nil
         }
 
         let source = decodedHTMLEntities(in: rawSource)
         guard let openURL = openURL(forIFrameSource: source, baseURL: baseURL),
               let scheme = openURL.scheme?.lowercased(),
-              scheme == "http" || scheme == "https" else {
+              scheme == "http" || scheme == "https"
+        else {
             return nil
         }
 
@@ -330,7 +453,8 @@ extension DTCoreTextHTMLContentRenderer {
             return nil
         }
         guard let document = try? HTML(html: html, encoding: .utf8),
-              let marker = document.at_css(".\(Self.unsupportedContentClassName)") else {
+              let marker = document.at_css(".\(Self.unsupportedContentClassName)")
+        else {
             return nil
         }
         let reason = marker.text?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -373,7 +497,8 @@ extension DTCoreTextHTMLContentRenderer {
         }
 
         guard let text = rawText.map({ normalizedCodeText($0) }),
-              text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+              text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        else {
             return nil
         }
         return RenderedCodeBlock(text: text)
@@ -575,7 +700,8 @@ extension DTCoreTextHTMLContentRenderer {
         let fullRange = NSRange(location: 0, length: source.length)
         guard let match = Self.hrefAttributeRegex.firstMatch(in: tag, options: [], range: fullRange),
               match.numberOfRanges >= 3,
-              match.range(at: 2).location != NSNotFound else {
+              match.range(at: 2).location != NSNotFound
+        else {
             return nil
         }
         let href = decodedHTMLEntities(in: source.substring(with: match.range(at: 2)))
@@ -587,9 +713,10 @@ extension DTCoreTextHTMLContentRenderer {
             of: #"&(?:[A-Za-z][A-Za-z0-9]+|#[0-9]+|#x[0-9A-Fa-f]+);"#,
             options: .regularExpression
         ) != nil,
-              let data = text
+            let data = text
             .replacingOccurrences(of: "\n", with: "__NODESEEK_CELL_LINE_BREAK__")
-            .data(using: .utf8) else {
+            .data(using: .utf8)
+        else {
             return text
         }
 
@@ -597,21 +724,38 @@ extension DTCoreTextHTMLContentRenderer {
             data: data,
             options: [
                 .documentType: NSAttributedString.DocumentType.html,
-                .characterEncoding: String.Encoding.utf8.rawValue
+                .characterEncoding: String.Encoding.utf8.rawValue,
             ],
             documentAttributes: nil
         ).string) ?? text
         return decoded.replacingOccurrences(of: "__NODESEEK_CELL_LINE_BREAK__", with: "\n")
     }
 
-    func containsCheckPlaceReportSVGURL(in text: String) -> Bool {
-        DetailImageURLRules.containsCheckPlaceReportSVGURL(in: text)
+    func containsPromotableImageURL(in text: String) -> Bool {
+        DetailImageURLRules.containsLikelyImageURL(in: decodedHTMLEntities(in: text))
     }
 
     func checkPlaceReportImageBlocks(in text: String) -> [RenderedImageBlock] {
         checkPlaceReportURLs(in: text).map {
             RenderedImageBlock(url: $0, altText: "check.place report")
         }
+    }
+
+    func promotableImageBlocks(in text: String) -> [RenderedImageBlock] {
+        var seen = Set<String>()
+        var blocks: [RenderedImageBlock] = []
+
+        for block in checkPlaceReportImageBlocks(in: text) {
+            guard seen.insert(block.url.absoluteString.lowercased()).inserted else { continue }
+            blocks.append(block)
+        }
+
+        for url in DetailImageURLRules.imageURLs(in: decodedHTMLEntities(in: text)) {
+            guard seen.insert(url.absoluteString.lowercased()).inserted else { continue }
+            blocks.append(RenderedImageBlock(url: url, altText: nil))
+        }
+
+        return blocks
     }
 
     func checkPlaceReportURLs(in text: String) -> [URL] {
@@ -631,7 +775,8 @@ extension DTCoreTextHTMLContentRenderer {
 
     func standaloneImageBlocks(fromHTML html: String, baseURL: URL) -> [RenderedImageBlock]? {
         guard let document = try? HTML(html: html, encoding: .utf8),
-              let node = document.at_css("p") ?? document.at_css("div") ?? document.at_css("section") else {
+              let node = document.at_css("p") ?? document.at_css("div") ?? document.at_css("section")
+        else {
             return nil
         }
         return standaloneImageBlocks(from: node, baseURL: baseURL)
@@ -641,7 +786,8 @@ extension DTCoreTextHTMLContentRenderer {
         guard let source = imageNode["src"],
               let url = AvatarImageLoader.resolveImageURL(source, baseURL: baseURL),
               hasClass("sticker", in: imageNode) == false,
-              isStickerImageURL(url) == false else {
+              isStickerImageURL(url) == false
+        else {
             return nil
         }
         let altText = imageNode["alt"]?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -653,7 +799,8 @@ extension DTCoreTextHTMLContentRenderer {
 
     func imageBlock(fromImageTag tag: String, baseURL: URL) -> RenderedImageBlock? {
         guard let document = try? HTML(html: tag, encoding: .utf8),
-              let imageNode = document.at_css("img") else {
+              let imageNode = document.at_css("img")
+        else {
             return nil
         }
         return imageBlock(from: imageNode, baseURL: baseURL)
@@ -682,7 +829,8 @@ extension DTCoreTextHTMLContentRenderer {
             let beforeHTML = source.substring(with: beforeRange)
             let afterHTML = source.substring(from: NSMaxRange(match.range))
             guard shouldSplitMixedImageTag(imageTag, beforeHTML: beforeHTML, afterHTML: afterHTML),
-                  let imageBlock = imageBlock(fromImageTag: imageTag, baseURL: baseURL) else {
+                  let imageBlock = imageBlock(fromImageTag: imageTag, baseURL: baseURL)
+            else {
                 continue
             }
 
@@ -716,7 +864,8 @@ extension DTCoreTextHTMLContentRenderer {
         let source = html as NSString
         let fullRange = NSRange(location: 0, length: source.length)
         guard let match = Self.containerShellRegex.firstMatch(in: html, options: [], range: fullRange),
-              match.numberOfRanges >= 5 else {
+              match.numberOfRanges >= 5
+        else {
             return nil
         }
 
@@ -725,7 +874,8 @@ extension DTCoreTextHTMLContentRenderer {
         let closingTagRange = match.range(at: 4)
         guard openingTagRange.location != NSNotFound,
               innerRange.location != NSNotFound,
-              closingTagRange.location != NSNotFound else {
+              closingTagRange.location != NSNotFound
+        else {
             return nil
         }
 
@@ -754,7 +904,8 @@ extension DTCoreTextHTMLContentRenderer {
 
     func shouldSplitMixedImageTag(_ tag: String, beforeHTML: String, afterHTML: String) -> Bool {
         guard let source = preferredImageSource(in: tag),
-              source.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().hasPrefix("data:") == false else {
+              source.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().hasPrefix("data:") == false
+        else {
             return false
         }
         return hasBlockBoundaryBeforeImage(beforeHTML) && hasBlockBoundaryAfterImage(afterHTML)

@@ -40,6 +40,22 @@ typealias ChickenLegConfirmationPresenter = @MainActor (
     _ onConfirm: @escaping @MainActor () -> Void
 ) -> Void
 
+typealias PasteboardStringWriter = @MainActor (String) -> Void
+
+enum PostDetailReplySendButtonStyle {
+    static let foregroundColor = UIColor.systemBackground
+    static let backgroundColor = UIColor.label
+    static let font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+    static let titleAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+        var outgoing = incoming
+        outgoing.font = font
+        return outgoing
+    }
+    static let activityIndicatorColorTransformer = UIConfigurationColorTransformer { _ in
+        foregroundColor
+    }
+}
+
 enum PostDetailLinkResolver {
     static func destination(
         for url: URL,
@@ -201,6 +217,7 @@ class PostDetailViewController: UIViewController {
     let accountRefresher: any CurrentAccountRefreshing
     let nodeImageAPIKeyStore: NodeImageAPIKeyStoring
     let nodeImageUploadClient: NodeImageUploading
+    let pasteboardStringWriter: PasteboardStringWriter
     var imageUploadTask: Task<Void, Never>?
     let renderQueue = DispatchQueue(
         label: "com.nodeseek.app.postdetail.render",
@@ -407,12 +424,13 @@ class PostDetailViewController: UIViewController {
         let button = UIButton(type: .system)
         var configuration = UIButton.Configuration.filled()
         configuration.title = "发送"
-        configuration.baseForegroundColor = .systemBackground
-        configuration.background.backgroundColor = .label
+        configuration.baseForegroundColor = PostDetailReplySendButtonStyle.foregroundColor
+        configuration.background.backgroundColor = PostDetailReplySendButtonStyle.backgroundColor
         configuration.background.cornerRadius = 8
+        configuration.titleTextAttributesTransformer = PostDetailReplySendButtonStyle.titleAttributesTransformer
+        configuration.activityIndicatorColorTransformer = PostDetailReplySendButtonStyle.activityIndicatorColorTransformer
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10)
         button.configuration = configuration
-        button.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
         button.titleLabel?.numberOfLines = 1
         button.titleLabel?.adjustsFontSizeToFitWidth = true
         button.titleLabel?.minimumScaleFactor = 0.9
@@ -484,7 +502,8 @@ class PostDetailViewController: UIViewController {
         initialAnchorID: String? = nil,
         accountRefresher: (any CurrentAccountRefreshing)? = nil,
         nodeImageAPIKeyStore: NodeImageAPIKeyStoring = KeychainNodeImageAPIKeyStore(),
-        nodeImageUploadClient: NodeImageUploading = NodeImageUploadClient()
+        nodeImageUploadClient: NodeImageUploading = NodeImageUploadClient(),
+        pasteboardStringWriter: @escaping PasteboardStringWriter = { UIPasteboard.general.string = $0 }
     ) {
         self.presenter = presenter
         self.sourcePostURL = sourcePostURL
@@ -496,6 +515,7 @@ class PostDetailViewController: UIViewController {
         self.accountRefresher = accountRefresher ?? CurrentAccountRefresher.shared
         self.nodeImageAPIKeyStore = nodeImageAPIKeyStore
         self.nodeImageUploadClient = nodeImageUploadClient
+        self.pasteboardStringWriter = pasteboardStringWriter
         super.init(nibName: nil, bundle: nil)
 
         if let initialHeader {

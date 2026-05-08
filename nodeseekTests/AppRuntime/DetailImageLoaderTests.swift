@@ -5,11 +5,11 @@
 //  Created by Codex on 2026/5/1.
 //
 
-import Foundation
 import CryptoKit
+import Foundation
+@testable import nodeseek
 import Testing
 import UIKit
-@testable import nodeseek
 
 @MainActor
 @Suite(.serialized)
@@ -224,6 +224,61 @@ struct DetailImageLoaderTests {
         #expect((inlineImage?.size.height ?? 0) > 300)
     }
 
+    @Test func inlineLoadRendersNeonFXSVGWithRGBAColors() async throws {
+        let url = try #require(URL(string: "https://neonfx.jsnav.de/openapi/image?compact=1"))
+        let sourceData = Self.makeNeonFXSVGData()
+        let cacheDirectory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: cacheDirectory) }
+
+        let protocolType = DetailImageURLProtocol.self
+        protocolType.reset()
+        protocolType.stub(data: sourceData, mimeType: "image/svg+xml", for: url)
+        let session = URLSession(configuration: Self.urlSessionConfiguration(protocolType: protocolType))
+        let loader = DetailImageLoader(
+            session: session,
+            cacheDirectory: cacheDirectory,
+            optimizationModeProvider: {
+                .enabled(maxPixelSide: 900, maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
+            }
+        )
+
+        let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 600)
+
+        #expect(loader.cachedOriginalData(for: url) == sourceData)
+        #expect((inlineImage?.size.width ?? 0) > 500)
+        #expect((inlineImage?.size.height ?? 0) > 100)
+        #expect(Self.distinctSampledPixelCount(in: try #require(inlineImage)) > 8)
+    }
+
+    @Test func optimizedInlineLoadRefreshesNoExtensionSVGEndpointWhenOldThumbnailCacheExists() async throws {
+        let url = try #require(URL(string: "https://neonfx.jsnav.de/openapi/image?compact=1"))
+        let sourceData = Self.makeNeonFXSVGData()
+        let staleThumbnailData = try Self.makeNoisyJPEGData(width: 80, height: 50, quality: 0.8)
+        let cacheDirectory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: cacheDirectory) }
+        try Self.writeCachedThumbnail(staleThumbnailData, for: url, in: cacheDirectory)
+
+        let protocolType = DetailImageURLProtocol.self
+        protocolType.reset()
+        protocolType.stub(data: sourceData, mimeType: "image/svg+xml", for: url)
+        let session = URLSession(configuration: Self.urlSessionConfiguration(protocolType: protocolType))
+        let loader = DetailImageLoader(
+            session: session,
+            cacheDirectory: cacheDirectory,
+            optimizationModeProvider: {
+                .enabled(maxPixelSide: 900, maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
+            }
+        )
+
+        let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 600)
+
+        #expect(protocolType.totalRequestCount() == 1)
+        #expect(loader.cachedOriginalData(for: url) == sourceData)
+        #expect((inlineImage?.size.width ?? 0) > 500)
+        #expect((inlineImage?.size.height ?? 0) > 100)
+        #expect(Self.distinctSampledPixelCount(in: try #require(inlineImage)) > 8)
+    }
+
     @Test func optimizedInlineLoadRefreshesReportSVGWhenOldThumbnailCacheExists() async throws {
         let url = try #require(URL(string: "https://report.check.place/net/31G5DHSHP.svg"))
         let sourceData = Self.makeCheckPlaceReportSVGData(width: "82ch", height: "42em")
@@ -343,10 +398,50 @@ struct DetailImageLoaderTests {
         try data.write(to: thumbnailURL, options: [.atomic])
     }
 
+    private static func distinctSampledPixelCount(in image: UIImage) -> Int {
+        guard let cgImage = image.cgImage else { return 0 }
+        let width = cgImage.width
+        let height = cgImage.height
+        guard width > 0, height > 0 else { return 0 }
+
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return 0
+        }
+
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        var colors = Set<UInt32>()
+        let xStride = max(width / 12, 1)
+        let yStride = max(height / 12, 1)
+        for y in stride(from: 0, to: height, by: yStride) {
+            for x in stride(from: 0, to: width, by: xStride) {
+                let index = y * bytesPerRow + x * bytesPerPixel
+                let red = UInt32(pixels[index])
+                let green = UInt32(pixels[index + 1])
+                let blue = UInt32(pixels[index + 2])
+                let alpha = UInt32(pixels[index + 3])
+                colors.insert(red << 24 | green << 16 | blue << 8 | alpha)
+            }
+        }
+        return colors.count
+    }
+
     private static func makeNoisyJPEGData(width: Int, height: Int, quality: CGFloat) throws -> Data {
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
-        for y in 0..<height {
-            for x in 0..<width {
+        for y in 0 ..< height {
+            for x in 0 ..< width {
                 let index = (y * width + x) * 4
                 bytes[index] = UInt8((x * 13 + y * 7) % 256)
                 bytes[index + 1] = UInt8((x * 5 + y * 17) % 256)
@@ -453,6 +548,37 @@ struct DetailImageLoaderTests {
         </svg>
         """.utf8)
     }
+
+    private static func makeNeonFXSVGData() -> Data {
+        Data("""
+        <?xml version="1.0" encoding="UTF-8"?>
+        <svg xmlns="http://www.w3.org/2000/svg" width="560" height="120" viewBox="0 0 560 120">
+          <defs>
+            <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#060712"/>
+              <stop offset="100%" stop-color="#0a1236"/>
+            </linearGradient>
+            <pattern id="dots" width="18" height="18" patternUnits="userSpaceOnUse">
+              <circle cx="1.2" cy="1.2" r="1.1" fill="rgba(255,255,255,0.06)"/>
+            </pattern>
+            <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="rgba(0,229,255,0.22)"/>
+              <stop offset="100%" stop-color="rgba(0,229,255,0.00)"/>
+            </linearGradient>
+          </defs>
+          <rect width="560" height="120" rx="18" fill="url(#bg)"/>
+          <rect width="560" height="120" rx="18" fill="url(#dots)" opacity="0.95"/>
+          <rect x="8" y="8" width="544" height="104" rx="14"
+                fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.10)"/>
+          <text x="22" y="52" fill="rgba(255,255,255,0.95)"
+                font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+                font-size="22" font-weight="800">USD/CNY 7.18</text>
+          <path d="M 12 94 Q 120 88 240 108 T 548 100" fill="none"
+                stroke="rgba(0,229,255,0.9)" stroke-width="2.2"/>
+          <path d="M 12 116 L 12 94 Q 120 88 240 108 T 548 100 L 548 116 Z" fill="url(#area)"/>
+        </svg>
+        """.utf8)
+    }
 }
 
 private final class DetailImageURLProtocol: URLProtocol, @unchecked Sendable {
@@ -485,7 +611,7 @@ private final class DetailImageURLProtocol: URLProtocol, @unchecked Sendable {
         return count
     }
 
-    override class func canInit(with request: URLRequest) -> Bool {
+    override class func canInit(with _: URLRequest) -> Bool {
         true
     }
 

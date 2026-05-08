@@ -36,4 +36,24 @@ struct PostDetailTestTarget: Equatable {
     }
 
 }
+
+struct PostDetailDebugLink: Equatable {
+    let title: String
+    let url: URL
+
+    var target: PostDetailTestTarget? {
+        PostDetailTestTarget(rawValue: url.absoluteString)
+    }
+
+    static let allCases: [PostDetailDebugLink] = [
+        PostDetailDebugLink(
+            title: "qute嵌套",
+            url: URL(string: "https://www.nodeseek.com/post-720543-1")!
+        ),
+        PostDetailDebugLink(
+            title: "svg兼容问题",
+            url: URL(string: "https://www.nodeseek.com/post-720369-1")!
+        )
+    ]
+}
 #endif

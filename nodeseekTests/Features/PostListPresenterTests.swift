@@ -7,6 +7,7 @@
 
 import Foundation
 import Testing
+import UIKit
 @testable import nodeseek
 
 @MainActor
@@ -169,7 +170,7 @@ struct PostListPresenterTests {
         router.onSettingsDetailTest?()
 
         #expect(router.navigateToLogFileCount == 1)
-        #expect(view.events.contains("showDetailTestInput"))
+        #expect(view.events.contains("openDetailTestURLFromPasteboard"))
     }
 
     @Test func recommendedReadingCategoryRendersLast() {
@@ -269,7 +270,7 @@ struct PostListPresenterTests {
         presenter.didSubmitDetailTestURL("https://example.com/post-705039-1")
 
         #expect(router.selectedPost == nil)
-        #expect(view.lastErrorMessage == "请输入 NodeSeek 帖子详情链接，例如 https://www.nodeseek.com/post-705039-1")
+        #expect(view.lastErrorMessage == "剪贴板里没有可打开的 NodeSeek 帖子详情链接，例如 https://www.nodeseek.com/post-705039-1")
     }
 
     @Test func detailTestTargetAcceptsRelativePostURL() throws {
@@ -739,8 +740,8 @@ private final class SpyPostListView: PostListViewProtocol {
         events.append("hideFirstPageError")
     }
 
-    func showDetailTestInput() {
-        events.append("showDetailTestInput")
+    func openDetailTestURLFromPasteboard() {
+        events.append("openDetailTestURLFromPasteboard")
     }
 
     func renderCategories(_ categories: [PostListCategory], selected: PostListCategory) {

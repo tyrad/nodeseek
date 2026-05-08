@@ -35,8 +35,8 @@ struct SettingsViewControllerTests {
         #expect(tableView.numberOfSections == 5)
         #expect(tableView.numberOfRows(inSection: 0) == 1)
         #expect(tableView.numberOfRows(inSection: 1) == 1)
-        #expect(tableView.numberOfRows(inSection: 2) == 3)
-        #expect(tableView.numberOfRows(inSection: 3) == 5)
+        #expect(tableView.numberOfRows(inSection: 2) == 4)
+        #expect(tableView.numberOfRows(inSection: 3) == 6)
         #expect(tableView.numberOfRows(inSection: 4) == 1)
         #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 1) == "NodeImage")
         #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 2) == "调试")
@@ -62,6 +62,10 @@ struct SettingsViewControllerTests {
             tableView,
             cellForRowAt: IndexPath(row: 2, section: 2)
         ))
+        let debugLinksCell = try #require(tableView.dataSource?.tableView(
+            tableView,
+            cellForRowAt: IndexPath(row: 3, section: 2)
+        ))
         let appVersionCell = try #require(tableView.dataSource?.tableView(
             tableView,
             cellForRowAt: IndexPath(row: 0, section: 3)
@@ -74,13 +78,17 @@ struct SettingsViewControllerTests {
             tableView,
             cellForRowAt: IndexPath(row: 2, section: 3)
         ))
-        let workflowCell = try #require(tableView.dataSource?.tableView(
+        let repositoryCell = try #require(tableView.dataSource?.tableView(
             tableView,
             cellForRowAt: IndexPath(row: 3, section: 3)
         ))
-        let githubCell = try #require(tableView.dataSource?.tableView(
+        let workflowCell = try #require(tableView.dataSource?.tableView(
             tableView,
             cellForRowAt: IndexPath(row: 4, section: 3)
+        ))
+        let githubCell = try #require(tableView.dataSource?.tableView(
+            tableView,
+            cellForRowAt: IndexPath(row: 5, section: 3)
         ))
         let logoutCell = try #require(tableView.dataSource?.tableView(
             tableView,
@@ -96,12 +104,16 @@ struct SettingsViewControllerTests {
         #expect(loggingSwitch.isOn == false)
         #expect(logFileCell.textLabel?.text == "日志文件")
         #expect(detailTestCell.textLabel?.text == "详情测试")
+        #expect(debugLinksCell.textLabel?.text == "调试链接")
         #expect(appVersionCell.textLabel?.text == "版本")
         #expect(appVersionCell.detailTextLabel?.text == "1.0.1")
         #expect(buildNumberCell.textLabel?.text == "Build")
         #expect(buildNumberCell.detailTextLabel?.text == "42")
         #expect(gitCell.textLabel?.text == "Git")
         #expect(gitCell.detailTextLabel?.text == "abcdef1")
+        #expect(repositoryCell.textLabel?.text == "仓库")
+        #expect(repositoryCell.detailTextLabel?.text == "https://github.com/tyrad/nodeseek")
+        #expect(repositoryCell.accessoryType == .disclosureIndicator)
         #expect(workflowCell.textLabel?.text == "Workflow")
         #expect(workflowCell.detailTextLabel?.text == "TestFlight #25443881348")
         #expect(githubCell.textLabel?.text == "GitHub")
@@ -205,6 +217,81 @@ struct SettingsViewControllerTests {
 
         #expect(logFileTapCount == 1)
         #expect(detailTestTapCount == 1)
+    }
+
+    @Test func selectingDetailTestKeepsSettingsOnNavigationStack() throws {
+        var detailTestTapCount = 0
+        let rootViewController = UIViewController()
+        let viewController = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager(),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
+            onDetailTest: {
+                detailTestTapCount += 1
+            }
+        )
+        let navigationController = UINavigationController(rootViewController: rootViewController)
+        navigationController.pushViewController(viewController, animated: false)
+        viewController.loadViewIfNeeded()
+
+        viewController.tableView.delegate?.tableView?(
+            viewController.tableView,
+            didSelectRowAt: IndexPath(row: 2, section: 2)
+        )
+
+        #expect(detailTestTapCount == 1)
+        #expect(navigationController.viewControllers == [rootViewController, viewController])
+    }
+
+    @Test func selectingDebugLinksPushesDebugListFromSettings() throws {
+        let viewController = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager(),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore()
+        )
+        let navigationController = UINavigationController(rootViewController: viewController)
+        viewController.loadViewIfNeeded()
+
+        viewController.tableView.delegate?.tableView?(
+            viewController.tableView,
+            didSelectRowAt: IndexPath(row: 3, section: 2)
+        )
+
+        #expect(navigationController.viewControllers.count == 2)
+        #expect(navigationController.topViewController is PostDetailDebugLinksViewController)
+    }
+
+    @Test func detailDebugLinksListShowsFixedCasesAndReturnsSelectedTarget() throws {
+        var selectedTarget: PostDetailTestTarget?
+        let viewController = PostDetailDebugLinksViewController { target, _ in
+            selectedTarget = target
+        }
+        viewController.loadViewIfNeeded()
+
+        #expect(viewController.title == "调试链接")
+        #expect(viewController.tableView.numberOfRows(inSection: 0) == 2)
+
+        let quoteCell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: IndexPath(row: 0, section: 0)
+        ))
+        let svgCell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: IndexPath(row: 1, section: 0)
+        ))
+
+        #expect(quoteCell.textLabel?.text == "qute嵌套")
+        #expect(quoteCell.detailTextLabel?.text == "https://www.nodeseek.com/post-720543-1")
+        #expect(svgCell.textLabel?.text == "svg兼容问题")
+        #expect(svgCell.detailTextLabel?.text == "https://www.nodeseek.com/post-720369-1")
+
+        viewController.tableView.delegate?.tableView?(
+            viewController.tableView,
+            didSelectRowAt: IndexPath(row: 1, section: 0)
+        )
+
+        #expect(selectedTarget?.post.id == "720369")
+        #expect(selectedTarget?.page == 1)
     }
 
     @Test func togglingFileLoggingSwitchUpdatesRuntimeConfig() throws {

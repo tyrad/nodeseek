@@ -111,6 +111,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
     let isOpposeClicked: Bool
     let favoriteCount: Int?
     let isFavoriteCollected: Bool
+    let isRestricted: Bool
     let comments: [Comment]
     let page: Int
     let pagination: PostDetailPagination?
@@ -133,6 +134,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
         isOpposeClicked: Bool = false,
         favoriteCount: Int? = nil,
         isFavoriteCollected: Bool = false,
+        isRestricted: Bool = false,
         comments: [Comment],
         page: Int = 1,
         pagination: PostDetailPagination? = nil,
@@ -154,6 +156,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
         self.isOpposeClicked = isOpposeClicked
         self.favoriteCount = favoriteCount
         self.isFavoriteCollected = isFavoriteCollected
+        self.isRestricted = isRestricted
         self.comments = comments
         self.page = max(1, page)
         self.pagination = pagination
@@ -178,6 +181,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
             isOpposeClicked: isOpposeClicked,
             favoriteCount: count,
             isFavoriteCollected: isCollected,
+            isRestricted: isRestricted,
             comments: comments,
             page: page,
             pagination: pagination,
@@ -203,6 +207,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
             isOpposeClicked: isOpposeClicked,
             favoriteCount: favoriteCount,
             isFavoriteCollected: isFavoriteCollected,
+            isRestricted: isRestricted,
             comments: comments,
             page: page,
             pagination: pagination,
@@ -234,6 +239,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
             isOpposeClicked: isOpposeClicked,
             favoriteCount: favoriteCount,
             isFavoriteCollected: isFavoriteCollected,
+            isRestricted: isRestricted,
             comments: nextComments,
             page: page,
             pagination: pagination,
@@ -259,6 +265,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
             isOpposeClicked: isOpposeClicked,
             favoriteCount: favoriteCount,
             isFavoriteCollected: isFavoriteCollected,
+            isRestricted: isRestricted,
             comments: comments,
             page: page,
             pagination: pagination,
@@ -290,6 +297,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
             isOpposeClicked: isOpposeClicked,
             favoriteCount: favoriteCount,
             isFavoriteCollected: isFavoriteCollected,
+            isRestricted: isRestricted,
             comments: nextComments,
             page: page,
             pagination: pagination,
@@ -315,6 +323,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
             isOpposeClicked: isClicked,
             favoriteCount: favoriteCount,
             isFavoriteCollected: isFavoriteCollected,
+            isRestricted: isRestricted,
             comments: comments,
             page: page,
             pagination: pagination,
@@ -346,6 +355,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
             isOpposeClicked: isOpposeClicked,
             favoriteCount: favoriteCount,
             isFavoriteCollected: isFavoriteCollected,
+            isRestricted: isRestricted,
             comments: nextComments,
             page: page,
             pagination: pagination,

@@ -55,6 +55,10 @@ struct RenderedIFrameLinkBlock: Equatable {
     let openURL: URL
 }
 
+struct RenderedQuoteBlock {
+    let children: [RenderedContentBlock]
+}
+
 struct HTMLContainerShell: Equatable {
     let openingTag: String
     let innerHTML: String
@@ -69,4 +73,5 @@ enum RenderedContentBlock {
     case iframeLink(RenderedIFrameLinkBlock)
     case imagePlaceholder(URL?)
     case unsupported(reason: String)
+    indirect case quote(RenderedQuoteBlock)
 }

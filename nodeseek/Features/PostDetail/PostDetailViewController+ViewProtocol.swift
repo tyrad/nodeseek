@@ -107,7 +107,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
     func render(detail: PostDetail) {
         title = nil
         loginButton.isHidden = true
-        showsReplyEntry = true
+        showsReplyEntry = detail.isRestricted == false
         let targetPage = max(1, detail.page)
         if shouldPrepareInitialContentReveal {
             prepareInitialContentReveal(for: detail, targetPage: targetPage)
@@ -562,12 +562,15 @@ extension PostDetailViewController: PostDetailViewProtocol {
         configuration.showsActivityIndicator = isSubmitting
         configuration.image = nil
         configuration.title = isSubmitting ? nil : "发送"
-        configuration.baseForegroundColor = .systemBackground
-        configuration.background.backgroundColor = .label
+        configuration.baseForegroundColor = PostDetailReplySendButtonStyle.foregroundColor
+        configuration.background.backgroundColor = PostDetailReplySendButtonStyle.backgroundColor
+        configuration.titleTextAttributesTransformer = PostDetailReplySendButtonStyle.titleAttributesTransformer
+        configuration.activityIndicatorColorTransformer = PostDetailReplySendButtonStyle.activityIndicatorColorTransformer
         inlineReplySendButton.configuration = configuration
         inlineReplySendButton.accessibilityLabel = isSubmitting ? "正在发送评论" : "发送"
         replyTextView.isEditable = !isSubmitting
-        inlineReplySendButton.isEnabled = !isSubmitting
+        inlineReplySendButton.isEnabled = true
+        inlineReplySendButton.isUserInteractionEnabled = !isSubmitting
         replyContextCloseButton.isEnabled = !isSubmitting
         inlineReplySendButton.alpha = 1
     }

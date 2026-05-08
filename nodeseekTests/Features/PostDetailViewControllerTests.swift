@@ -597,6 +597,7 @@ struct PostDetailViewControllerTests {
 
     @Test func copyCurrentPostLinkCopiesResolvedDetailURL() throws {
         let presenter = SpyPostDetailPresenter()
+        var copiedString: String?
         let header = PostDetailHeaderContent(
             postID: "703863",
             title: "详情标题",
@@ -607,18 +608,19 @@ struct PostDetailViewControllerTests {
         let viewController = PostDetailViewController(
             presenter: presenter,
             initialHeader: header,
-            currentPage: 2
+            currentPage: 2,
+            pasteboardStringWriter: { copiedString = $0 }
         )
         viewController.loadViewIfNeeded()
-        UIPasteboard.general.string = nil
 
         viewController.copyCurrentPostLink()
 
-        #expect(UIPasteboard.general.string == "https://www.nodeseek.com/post-703863-2")
+        #expect(copiedString == "https://www.nodeseek.com/post-703863-2")
     }
 
     @Test func copyCurrentPostLinkKeepsInitialPageAfterLoadingMore() async throws {
         let presenter = SpyPostDetailPresenter()
+        var copiedString: String?
         let header = PostDetailHeaderContent(
             postID: "703863",
             title: "详情标题",
@@ -629,7 +631,8 @@ struct PostDetailViewControllerTests {
         let viewController = PostDetailViewController(
             presenter: presenter,
             initialHeader: header,
-            currentPage: 2
+            currentPage: 2,
+            pasteboardStringWriter: { copiedString = $0 }
         )
         viewController.loadViewIfNeeded()
         viewController.render(detail: PostDetail(
@@ -657,11 +660,10 @@ struct PostDetailViewControllerTests {
             ],
             page: 3
         ))
-        UIPasteboard.general.string = nil
 
         viewController.copyCurrentPostLink()
 
-        #expect(UIPasteboard.general.string == "https://www.nodeseek.com/post-703863-2")
+        #expect(copiedString == "https://www.nodeseek.com/post-703863-2")
     }
 
     @Test func openInBrowserKeepsInitialPageAfterLoadingMore() async throws {
@@ -1496,15 +1498,18 @@ struct PostDetailViewControllerTests {
 
     @Test func codeBlockCopyButtonCopiesFullText() throws {
         let codeBlock = RenderedCodeBlock(text: "line 1\nline 2")
-        let view = DetailCodeBlockView(codeBlock: codeBlock)
+        var copiedString: String?
+        let view = DetailCodeBlockView(
+            codeBlock: codeBlock,
+            pasteboardStringWriter: { copiedString = $0 }
+        )
         view.frame = CGRect(x: 0, y: 0, width: 240, height: 120)
         view.layoutIfNeeded()
-        UIPasteboard.general.string = nil
 
         let button = try #require(view.firstButton(accessibilityIdentifier: "detail-code-copy-button"))
         button.sendActions(for: .touchUpInside)
 
-        #expect(UIPasteboard.general.string == codeBlock.text)
+        #expect(copiedString == codeBlock.text)
     }
 
     @Test func richTextNodeMeasureUsesLargerHeightForAttachmentContent() {
@@ -1655,6 +1660,67 @@ struct PostDetailViewControllerTests {
         #expect(viewController.testPresentedPreviewUsesBottomSheet())
         #expect(viewController.testPresentedPreviewShowsFullPostButton() == false)
         #expect(viewController.testHighlightedAnchorID() == nil)
+        await tearDownPostDetailTextureViewController(viewController)
+    }
+
+    @Test func loadedCommentPreviewFollowsDarkInterfaceStyleAndUsesSystemColors() async throws {
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.overrideUserInterfaceStyle = .dark
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let comments = (1...40).map { index in
+            Comment(
+                id: "comment-\(index)",
+                anchorID: index == 40 ? nil : "\(index)",
+                authorName: "author-\(index)",
+                avatarURL: nil,
+                floorText: index == 40 ? "#326" : "#\(index)",
+                createdAtText: "\(index)min ago",
+                contentHTML: "<p>第 \(index) 楼内容</p>"
+            )
+        }
+
+        window.rootViewController = viewController
+        window.makeKeyAndVisible()
+        defer {
+            window.isHidden = true
+        }
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: comments,
+            page: 1,
+            pagination: nil
+        ))
+        await waitForDetailContent(in: viewController)
+        viewController.testVisibleAnchorIDs = []
+
+        let url = try #require(URL(string: "#326", relativeTo: baseURL)?.absoluteURL)
+        viewController.handleContentLinkTap(url)
+
+        let didPresentPreview = await waitUntil {
+            viewController.presentedViewController != nil
+        }
+        #expect(didPresentPreview)
+        let previewController = try #require(viewController.presentedViewController)
+        previewController.loadViewIfNeeded()
+
+        #expect(previewController.overrideUserInterfaceStyle == .dark)
+        #expect(previewController.view.backgroundColor == .systemBackground)
+        #expect(previewController.view.firstSubview(of: UITableView.self)?.backgroundColor == .systemBackground)
+        #expect(previewController.view.allSubviews(of: UIView.self).contains { $0.backgroundColor == .separator })
+        let revealButton = try #require(
+            previewController.view.allSubviews(of: UIButton.self).first { $0.configuration?.title == "查看原楼" }
+        )
+        #expect(revealButton.configuration?.baseBackgroundColor == .secondarySystemBackground)
+        #expect(revealButton.configuration?.baseForegroundColor == .label)
+        await tearDownPostDetailTextureViewController(viewController, window: window)
     }
 
     @Test func fullPostPreviewActionOpensPostFromBeginning() async throws {
@@ -1693,6 +1759,7 @@ struct PostDetailViewControllerTests {
 
         #expect(viewController.testOpenedFullPostPage() == 1)
         #expect(viewController.testOpenedFullPostAnchorWasNil())
+        await tearDownPostDetailTextureViewController(viewController)
     }
 
     @Test func floorPreviewShowsFullPostActionOnlyForInitialAnchorDetail() async throws {
@@ -1734,6 +1801,7 @@ struct PostDetailViewControllerTests {
         viewController.handleContentLinkTap(url)
 
         #expect(viewController.testPresentedPreviewShowsFullPostButton())
+        await tearDownPostDetailTextureViewController(viewController)
     }
 
     @Test func loadedVisibleFloorLinkUsesExistingHighlightInsteadOfPreview() async throws {
@@ -2201,6 +2269,29 @@ struct PostDetailViewControllerTests {
         #expect(richTextView.debugAttributedString !== initialAttributedText)
     }
 
+    @Test func quoteBlockNodeKeepsBorderVertical() throws {
+        let textNode = ASTextNode()
+        textNode.maximumNumberOfLines = 0
+        textNode.attributedText = NSAttributedString(
+            string: "引用内容\n第二行",
+            attributes: [
+                .font: UIFont.preferredFont(forTextStyle: .body),
+                .foregroundColor: UIColor.label
+            ]
+        )
+        let quoteNode = DetailQuoteBlockNode(children: [textNode])
+        let layout = quoteNode.layoutThatFits(ASSizeRange(
+            min: .zero,
+            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
+        ))
+        let borderLayout = try #require(layout.firstLayoutElement(identicalTo: quoteNode.debugBorderNode))
+
+        #expect(borderLayout.position.x == 0)
+        #expect(borderLayout.position.y == 0)
+        #expect(borderLayout.size.width == 3)
+        #expect(borderLayout.size.height > borderLayout.size.width)
+    }
+
     @Test func videoStickerViewKeepsPlayerLayerHiddenUntilTapped() throws {
         let url = try #require(URL(string: "https://www.nodeseek.com/static/image/sticker/emoji/00.mp4"))
         let view = DetailInlineVideoStickerView(
@@ -2547,6 +2638,38 @@ struct PostDetailLoginViewControllerTests {
         #expect(floatingReplyButton.isHidden == false)
     }
 
+    @Test func restrictedDetailHidesReplyEntry() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        let html = """
+        <html data-server-rendered="true">
+        <head><title>NodeSeek</title></head>
+        <body>
+            <section id="nsk-frame">
+                <div id="nsk-body" class="nsk-container">
+                    <div id="nsk-body-left">
+                        <div style="min-height:300px;display:flex;align-items:center;justify-content:center;font-size:2rem;">
+                            <div style="line-height: 1.25;">本帖已经被用户设为私有，您没有阅读权限</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </body>
+        </html>
+        """
+        let detail = try KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!).parsePostDetail(
+            html: html,
+            url: URL(string: "https://www.nodeseek.com/post-704286-1")!
+        )
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: detail)
+        await waitForDetailContent(in: viewController, expectedRowCount: 1)
+
+        let floatingReplyButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-button"))
+        #expect(floatingReplyButton.isHidden)
+    }
+
     @Test func commentComposerAddsNonCancellingDismissKeyboardTapGesture() throws {
         let presenter = SpyPostDetailPresenter()
         let viewController = PostDetailViewController(presenter: presenter)
@@ -2698,6 +2821,32 @@ struct PostDetailLoginViewControllerTests {
         #expect(sendButton.titleLabel?.font.pointSize == 13)
         #expect(sendButton.configuration?.background.backgroundColor == .label)
         #expect(viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-preview-button") == nil)
+    }
+
+    @Test func inlineReplySendButtonKeepsHighContrastLoadingAppearance() throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        viewController.loadViewIfNeeded()
+
+        let sendButton = try #require(
+            viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-send-button")
+        )
+
+        viewController.setReplySubmitting(true)
+
+        #expect(sendButton.isEnabled)
+        #expect(sendButton.isUserInteractionEnabled == false)
+        #expect(sendButton.configuration?.showsActivityIndicator == true)
+        #expect(sendButton.configuration?.title == nil)
+        #expect(sendButton.configuration?.baseForegroundColor == .systemBackground)
+        #expect(sendButton.configuration?.background.backgroundColor == .label)
+
+        viewController.setReplySubmitting(false)
+
+        #expect(sendButton.isEnabled)
+        #expect(sendButton.isUserInteractionEnabled)
+        #expect(sendButton.configuration?.showsActivityIndicator == false)
+        #expect(sendButton.configuration?.title == "发送")
     }
 
     @Test func insertingStickerTokenUpdatesReplyTextAtSelection() throws {
@@ -3144,6 +3293,20 @@ private struct StubPostDetailAccountRefresher: CurrentAccountRefreshing {
     }
 }
 
+private extension ASLayout {
+    func firstLayoutElement(identicalTo target: ASLayoutElement) -> ASLayout? {
+        if (layoutElement as AnyObject) === (target as AnyObject) {
+            return self
+        }
+        for sublayout in sublayouts {
+            if let match = sublayout.firstLayoutElement(identicalTo: target) {
+                return match
+            }
+        }
+        return nil
+    }
+}
+
 @MainActor
 private func waitForDetailContent(
     in viewController: PostDetailViewController,
@@ -3172,4 +3335,17 @@ private func waitUntil(
         try? await Task.sleep(nanoseconds: pollInterval)
     }
     return false
+}
+
+@MainActor
+private func tearDownPostDetailTextureViewController(
+    _ viewController: PostDetailViewController,
+    window: UIWindow? = nil
+) async {
+    viewController.dismiss(animated: false)
+    viewController.presentedViewController?.dismiss(animated: false)
+    viewController.tableNode.view.removeFromSuperview()
+    window?.rootViewController = nil
+    window?.isHidden = true
+    await Task.yield()
 }

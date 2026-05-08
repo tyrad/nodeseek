@@ -11,6 +11,7 @@ class PostListViewController: UIViewController {
     
     // MARK: - Properties
     private let presenter: PostListPresenterProtocol
+    private let detailTestURLProvider: () -> String
     private var categories: [PostListCategory] = []
     private var selectedCategory: PostListCategory = .all
     private var currentSortMode: PostListSortMode = .replyTime
@@ -108,8 +109,14 @@ class PostListViewController: UIViewController {
     private var tabButtons: [PostListCategory: CategoryTabButton] = [:]
     
     // MARK: - Initialization
-    init(presenter: PostListPresenterProtocol) {
+    init(
+        presenter: PostListPresenterProtocol,
+        detailTestURLProvider: @escaping () -> String = {
+            UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string ?? ""
+        }
+    ) {
         self.presenter = presenter
+        self.detailTestURLProvider = detailTestURLProvider
         super.init(nibName: nil, bundle: nil)
     }
     
@@ -445,27 +452,9 @@ extension PostListViewController: PostListViewProtocol {
     }
 
     #if DEBUG
-    func showDetailTestInput() {
+    func openDetailTestURLFromPasteboard() {
         guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }
-        let alert = UIAlertController(
-            title: "详情测试",
-            message: "输入 NodeSeek 帖子详情链接",
-            preferredStyle: .alert
-        )
-        alert.addTextField { textField in
-            textField.placeholder = NodeSeekSite.postURL(id: "705039", page: 1).absoluteString
-            textField.keyboardType = .URL
-            textField.textContentType = .URL
-            textField.autocapitalizationType = .none
-            textField.autocorrectionType = .no
-            textField.clearButtonMode = .whileEditing
-        }
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "打开", style: .default) { [weak self, weak alert] _ in
-            let rawURL = alert?.textFields?.first?.text ?? ""
-            self?.presenter.didSubmitDetailTestURL(rawURL)
-        })
-        present(alert, animated: true)
+        presenter.didSubmitDetailTestURL(detailTestURLProvider())
     }
     #endif
 

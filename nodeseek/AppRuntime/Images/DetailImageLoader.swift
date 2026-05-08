@@ -5,8 +5,8 @@
 //  Created by Codex on 2026/4/28.
 //
 
-import Foundation
 import CryptoKit
+import Foundation
 import ImageIO
 import UIKit
 
@@ -68,8 +68,8 @@ final class DetailImageLoader {
     static let shared = DetailImageLoader()
 
     private enum Limits {
-        static let maxPixelSide: CGFloat = 16_384
-        static let maxSVGPixelSide: CGFloat = 2_048
+        static let maxPixelSide: CGFloat = 16384
+        static let maxSVGPixelSide: CGFloat = 2048
         static let fallbackSize = CGSize(width: 8, height: 8)
         static let thumbnailInitialQuality: CGFloat = 0.82
         static let thumbnailMinimumQuality: CGFloat = 0.55
@@ -172,7 +172,8 @@ final class DetailImageLoader {
         let mode = optimizationModeProvider()
         if allowsOptimization,
            isOptimizableDetailImageURL(imageURL),
-           case .enabled(let maxPixelSide, let maxThumbnailBytes, _) = mode {
+           case let .enabled(maxPixelSide, maxThumbnailBytes, _) = mode
+        {
             loadOptimizedThumbnail(
                 imageURL,
                 maxPixelSide: maxPixelSide,
@@ -312,7 +313,8 @@ final class DetailImageLoader {
 
         if shouldInspectOriginalBeforeUsingThumbnailDiskCache(for: resolvedURL) == false,
            let diskData = try? Data(contentsOf: thumbnailCacheURL(for: resolvedURL)),
-           let diskImage = UIImage(data: diskData) {
+           let diskImage = UIImage(data: diskData)
+        {
             let result = DetailInlineImageResult(image: diskImage, resolvedKind: nil)
             stateQueue.sync {
                 thumbnailImageCache[resolvedURL] = result
@@ -383,6 +385,12 @@ final class DetailImageLoader {
 
     private func shouldInspectOriginalBeforeUsingThumbnailDiskCache(for resolvedURL: URL) -> Bool {
         if resolvedURL.pathExtension.lowercased() == "svg" {
+            return true
+        }
+
+        if resolvedURL.pathExtension.isEmpty,
+           DetailImageURLRules.isLikelyImageURL(resolvedURL)
+        {
             return true
         }
 
@@ -584,7 +592,7 @@ final class DetailImageLoader {
         }
 
         if dataLooksLikeHTML(data) {
-            AppLog.error(.image, "attachment 返回HTML内容，使用兜底图 url=\(resolvedURL.absoluteString), bytes=\(data.count), snippet=\(self.snippet(from: data))")
+            AppLog.error(.image, "attachment 返回HTML内容，使用兜底图 url=\(resolvedURL.absoluteString), bytes=\(data.count), snippet=\(snippet(from: data))")
             return Self.fallbackPayload
         }
 
@@ -601,7 +609,8 @@ final class DetailImageLoader {
               imageSize.width > 0,
               imageSize.height > 0,
               imageSize.width <= Limits.maxPixelSide,
-              imageSize.height <= Limits.maxPixelSide else {
+              imageSize.height <= Limits.maxPixelSide
+        else {
             AppLog.error(.image, "attachment 图片尺寸异常，使用兜底图 url=\(resolvedURL.absoluteString), size=\(NSCoder.string(for: imageSize)), bytes=\(data.count), mime=\(mimeType ?? "unknown")")
             return Self.fallbackPayload
         }
@@ -632,7 +641,7 @@ final class DetailImageLoader {
         }
 
         if dataLooksLikeHTML(data) {
-            AppLog.error(.image, "attachment 返回HTML内容，使用兜底图 url=\(resolvedURL.absoluteString), bytes=\(data.count), snippet=\(self.snippet(from: data))")
+            AppLog.error(.image, "attachment 返回HTML内容，使用兜底图 url=\(resolvedURL.absoluteString), bytes=\(data.count), snippet=\(snippet(from: data))")
             return Self.fallbackDataPayload(source: source)
         }
 
@@ -646,7 +655,8 @@ final class DetailImageLoader {
               imageSize.width > 0,
               imageSize.height > 0,
               imageSize.width <= Limits.maxPixelSide,
-              imageSize.height <= Limits.maxPixelSide else {
+              imageSize.height <= Limits.maxPixelSide
+        else {
             AppLog.error(.image, "attachment 图片尺寸异常，使用兜底图 url=\(resolvedURL.absoluteString), size=\(NSCoder.string(for: imageSize)), bytes=\(data.count), mime=\(mimeType ?? "unknown")")
             return Self.fallbackDataPayload(source: source)
         }
@@ -672,7 +682,7 @@ final class DetailImageLoader {
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
         ] as CFDictionary
 
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, downsampleOptions) else {
@@ -688,7 +698,7 @@ final class DetailImageLoader {
         var lastData = image.jpegData(compressionQuality: Limits.thumbnailMinimumQuality) ?? Self.fallbackPNGData
         var lastQuality = Limits.thumbnailMinimumQuality
 
-        for _ in 0..<8 {
+        for _ in 0 ..< 8 {
             var quality = Limits.thumbnailInitialQuality
             while quality >= Limits.thumbnailMinimumQuality {
                 if let data = workingImage.jpegData(compressionQuality: quality) {
@@ -760,7 +770,8 @@ final class DetailImageLoader {
         guard let source = CGImageSourceCreateWithData(data as CFData, options),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, options) as? [CFString: Any],
               let width = properties[kCGImagePropertyPixelWidth] as? NSNumber,
-              let height = properties[kCGImagePropertyPixelHeight] as? NSNumber else {
+              let height = properties[kCGImagePropertyPixelHeight] as? NSNumber
+        else {
             return nil
         }
 
@@ -796,7 +807,7 @@ final class DetailImageLoader {
         return image.pngData() ?? Data()
     }()
 
-    private static let fallbackImage: UIImage = UIImage(data: fallbackPNGData) ?? UIImage()
+    private static let fallbackImage: UIImage = .init(data: fallbackPNGData) ?? UIImage()
 
     private static let fallbackPayload = ImagePayload(
         data: fallbackPNGData,
@@ -848,7 +859,8 @@ final class DetailImageLoader {
         guard let prefix = String(data: data.prefix(256), encoding: .utf8)?
             .lowercased()
             .replacingOccurrences(of: "\n", with: " ")
-            .replacingOccurrences(of: "\r", with: " ") else {
+            .replacingOccurrences(of: "\r", with: " ")
+        else {
             return false
         }
         return prefix.contains("<html")
@@ -862,7 +874,8 @@ final class DetailImageLoader {
         guard let prefix = String(data: data.prefix(512), encoding: .utf8)?
             .lowercased()
             .replacingOccurrences(of: "\n", with: " ")
-            .replacingOccurrences(of: "\r", with: " ") else {
+            .replacingOccurrences(of: "\r", with: " ")
+        else {
             return false
         }
         return prefix.contains("<svg")
@@ -880,16 +893,18 @@ final class DetailImageLoader {
     private func decodeDataURL(_ url: URL) -> (data: Data, mimeType: String?)? {
         let raw = url.absoluteString
         guard raw.lowercased().hasPrefix("data:"),
-              let commaIndex = raw.firstIndex(of: ",") else {
+              let commaIndex = raw.firstIndex(of: ",")
+        else {
             return nil
         }
 
-        let header = String(raw[raw.startIndex..<commaIndex]).lowercased()
+        let header = String(raw[raw.startIndex ..< commaIndex]).lowercased()
         let payloadStart = raw.index(after: commaIndex)
         let payload = String(raw[payloadStart...])
 
         guard header.contains(";base64"),
-              let data = Data(base64Encoded: payload, options: .ignoreUnknownCharacters) else {
+              let data = Data(base64Encoded: payload, options: .ignoreUnknownCharacters)
+        else {
             return nil
         }
 
@@ -906,7 +921,7 @@ final class DetailImageLoader {
     }
 
     private func logOptimization(mode: DetailImageOptimizationMode, _ message: String) {
-        guard case .enabled(_, _, let loggingEnabled) = mode, loggingEnabled else { return }
+        guard case let .enabled(_, _, loggingEnabled) = mode, loggingEnabled else { return }
         AppLog.info(.image, message)
     }
 

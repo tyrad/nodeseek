@@ -18,6 +18,7 @@ xcuserdata/
 
 # Build artifacts
 DerivedData/
+.derivedData/
 build/
 .build/
 *.xcresult

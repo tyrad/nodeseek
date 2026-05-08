@@ -131,13 +131,13 @@ class PostListPresenter: PostListPresenterProtocol {
     #if DEBUG
     func didTapDetailTest() {
         guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }
-        view?.showDetailTestInput()
+        view?.openDetailTestURLFromPasteboard()
     }
 
     func didSubmitDetailTestURL(_ rawURL: String) {
         guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }
         guard let target = PostDetailTestTarget(rawValue: rawURL) else {
-            view?.showError(message: "请输入 NodeSeek 帖子详情链接，例如 \(NodeSeekSite.postURL(id: "705039", page: 1).absoluteString)")
+            view?.showError(message: "剪贴板里没有可打开的 NodeSeek 帖子详情链接，例如 \(NodeSeekSite.postURL(id: "705039", page: 1).absoluteString)")
             return
         }
 

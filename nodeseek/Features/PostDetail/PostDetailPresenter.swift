@@ -572,6 +572,7 @@ private extension PostDetail {
             isOpposeClicked: isOpposeClicked,
             favoriteCount: favoriteCount,
             isFavoriteCollected: isFavoriteCollected,
+            isRestricted: isRestricted,
             comments: nextComments,
             page: page,
             pagination: pagination,

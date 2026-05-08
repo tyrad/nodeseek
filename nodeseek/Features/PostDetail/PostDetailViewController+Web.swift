@@ -49,7 +49,7 @@ extension PostDetailViewController {
             return
         }
 
-        UIPasteboard.general.string = targetURL.absoluteString
+        pasteboardStringWriter(targetURL.absoluteString)
         showToast(message: "已复制链接")
     }
 
@@ -195,6 +195,7 @@ extension PostDetailViewController {
             renderedContent: renderedContent,
             containerSize: view.bounds.size
         )
+        previewController.overrideUserInterfaceStyle = traitCollection.userInterfaceStyle
         previewController.modalPresentationStyle = .pageSheet
         previewController.preferredContentSize = preferredSize
         #if DEBUG
@@ -445,7 +446,7 @@ private final class LoadedCommentPreviewViewController: UIViewController {
                 switch block {
                 case .text(let attributedText):
                     textHeight += estimatedTextHeight(attributedText.string, width: width, font: bodyFont)
-                case .image, .iframeLink, .imagePlaceholder, .table, .codeBlock, .unsupported:
+                case .image, .iframeLink, .imagePlaceholder, .table, .codeBlock, .unsupported, .quote:
                     extraBlockHeight += Layout.estimatedNonTextBlockHeight
                 }
             }
@@ -479,17 +480,29 @@ private final class LoadedCommentPreviewViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
         view.layer.cornerRadius = 12
         view.layer.cornerCurve = .continuous
         view.clipsToBounds = true
         tableNode.dataSource = self
         tableNode.delegate = self
         configureContent()
+        applyCurrentTheme()
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle else { return }
+        applyCurrentTheme()
+    }
+
+    private func applyCurrentTheme() {
+        view.backgroundColor = .systemBackground
+        headerView.backgroundColor = .systemBackground
+        tableNode.view.backgroundColor = .systemBackground
+        headerSeparator.backgroundColor = .separator
     }
 
     private func configureContent() {
-        headerView.backgroundColor = .systemBackground
         headerView.translatesAutoresizingMaskIntoConstraints = false
 
         let closeButton = UIButton(type: .system)
@@ -499,7 +512,6 @@ private final class LoadedCommentPreviewViewController: UIViewController {
         closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
         closeButton.translatesAutoresizingMaskIntoConstraints = false
 
-        headerSeparator.backgroundColor = .separator
         headerSeparator.translatesAutoresizingMaskIntoConstraints = false
         headerView.addSubview(closeButton)
         headerView.addSubview(headerSeparator)
@@ -516,8 +528,8 @@ private final class LoadedCommentPreviewViewController: UIViewController {
 
         var revealConfiguration = UIButton.Configuration.filled()
         revealConfiguration.title = "查看原楼"
-        revealConfiguration.baseBackgroundColor = .label
-        revealConfiguration.baseForegroundColor = .systemBackground
+        revealConfiguration.baseBackgroundColor = .secondarySystemBackground
+        revealConfiguration.baseForegroundColor = .label
         revealConfiguration.cornerStyle = .medium
         revealConfiguration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 10, bottom: 8, trailing: 10)
         revealButton.configuration = revealConfiguration
@@ -535,7 +547,6 @@ private final class LoadedCommentPreviewViewController: UIViewController {
         }
         footerStack.addArrangedSubview(revealButton)
 
-        tableNode.view.backgroundColor = .systemBackground
         tableNode.view.separatorStyle = .none
         tableNode.view.alwaysBounceVertical = false
         tableNode.contentInset = UIEdgeInsets(top: 12, left: 0, bottom: 14, right: 0)

@@ -5,11 +5,11 @@
 //  Created by Codex on 2026/4/28.
 //
 
-import Foundation
 import DTCoreText
+import Foundation
+@testable import nodeseek
 import Testing
 import UIKit
-@testable import nodeseek
 
 struct DTCoreTextHTMLContentRendererTests {
     @Test func rendersTableAsSeparateBlockBetweenTextBlocks() throws {
@@ -30,13 +30,13 @@ struct DTCoreTextHTMLContentRendererTests {
 
         #expect(blocks.count == 3)
 
-        guard case .text(let beforeText) = blocks[0] else {
+        guard case let .text(beforeText) = blocks[0] else {
             Issue.record("Expected leading text block")
             return
         }
         #expect(beforeText.string.contains("before"))
 
-        guard case .table(let table) = blocks[1] else {
+        guard case let .table(table) = blocks[1] else {
             Issue.record("Expected table block")
             return
         }
@@ -45,7 +45,7 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(table.rows[0].cells.map(\.text) == ["Plan", "Price"])
         #expect(table.rows[1].cells.map(\.text) == ["Starter", "$5"])
 
-        guard case .text(let afterText) = blocks[2] else {
+        guard case let .text(afterText) = blocks[2] else {
             Issue.record("Expected trailing text block")
             return
         }
@@ -62,9 +62,10 @@ struct DTCoreTextHTMLContentRendererTests {
         )
 
         #expect(blocks.count == 3)
-        guard case .text(let before) = blocks[0],
-              case .codeBlock(let codeBlock) = blocks[1],
-              case .text(let after) = blocks[2] else {
+        guard case let .text(before) = blocks[0],
+              case let .codeBlock(codeBlock) = blocks[1],
+              case let .text(after) = blocks[2]
+        else {
             Issue.record("Expected text/codeBlock/text block order")
             return
         }
@@ -87,9 +88,10 @@ struct DTCoreTextHTMLContentRendererTests {
         )
 
         #expect(blocks.count == 3)
-        guard case .text(let before) = blocks[0],
-              case .iframeLink(let iframe) = blocks[1],
-              case .text(let after) = blocks[2] else {
+        guard case let .text(before) = blocks[0],
+              case let .iframeLink(iframe) = blocks[1],
+              case let .text(after) = blocks[2]
+        else {
             Issue.record("Expected text/iframeLink/text block order")
             return
         }
@@ -109,7 +111,7 @@ struct DTCoreTextHTMLContentRendererTests {
             maxImageWidth: 320
         )
 
-        guard case .iframeLink(let iframe) = try #require(blocks.first) else {
+        guard case let .iframeLink(iframe) = try #require(blocks.first) else {
             Issue.record("Expected iframe link block")
             return
         }
@@ -130,9 +132,10 @@ struct DTCoreTextHTMLContentRendererTests {
         )
 
         #expect(blocks.count == 3)
-        guard case .text(let before) = blocks[0],
-              case .table(let table) = blocks[1],
-              case .text(let after) = blocks[2] else {
+        guard case let .text(before) = blocks[0],
+              case let .table(table) = blocks[1],
+              case let .text(after) = blocks[2]
+        else {
             Issue.record("Expected text/table/text block order")
             return
         }
@@ -161,7 +164,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
 
         let table = try #require(blocks.compactMap { block -> RenderedTableBlock? in
-            guard case .table(let table) = block else { return nil }
+            guard case let .table(table) = block else { return nil }
             return table
         }.first)
 
@@ -188,7 +191,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
 
         let table = try #require(blocks.compactMap { block -> RenderedTableBlock? in
-            guard case .table(let table) = block else { return nil }
+            guard case let .table(table) = block else { return nil }
             return table
         }.first)
 
@@ -211,7 +214,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
 
         let table = try #require(blocks.compactMap { block -> RenderedTableBlock? in
-            guard case .table(let table) = block else { return nil }
+            guard case let .table(table) = block else { return nil }
             return table
         }.first)
         let cell = try #require(table.rows.first?.cells.first)
@@ -239,7 +242,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
 
         let table = try #require(blocks.compactMap { block -> RenderedTableBlock? in
-            guard case .table(let table) = block else { return nil }
+            guard case let .table(table) = block else { return nil }
             return table
         }.first)
         let cell = try #require(table.rows.first?.cells.first)
@@ -262,7 +265,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -283,7 +286,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -308,7 +311,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -333,7 +336,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -369,7 +372,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -408,7 +411,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first { $0.string.contains("依旧连不上主控") }
         )
@@ -446,7 +449,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -482,7 +485,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -520,7 +523,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -534,6 +537,29 @@ struct DTCoreTextHTMLContentRendererTests {
         ) as? UIColor)
         let resolvedLightColor = color.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
         #expect(resolvedLightColor.isClose(to: .label))
+    }
+
+    @Test func rendersNestedBlockquoteWithDarkModeSafeBackgrounds() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: """
+            <article class="post-content"><blockquote><p><a href="/member?t=ps3chinamj">@ps3chinamj</a> <a href="/post-720543-1#7">#7</a> 发布于2026/5/8 20:17:21<br>
+            <a href="/member?t=sky789">@sky789</a> <a href="/post-720543-1#6">#6</a></p>
+            <blockquote><p><a href="/member?t=ps3chinamj">@ps3chinamj</a> <a href="/post-720543-1#1">#1</a> 发布于2026/5/8 20:12:08<br>
+            自己给自己号码发不就行了</p>
+            </blockquote><p>自己发自己啊</p>
+            </blockquote><p>自己发自己也能收到啊，我还以为发不出去呢</p>
+            </article>
+            """,
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributed = try #require(attributedText(in: blocks, matching: "自己给自己号码发不就行了"))
+        let range = (attributed.string as NSString).range(of: "自己给自己号码发不就行了")
+        #expect(range.location != NSNotFound)
+        #expect(maxQuoteDepth(in: blocks) >= 2)
+        #expect(combinedText(in: blocks).contains("自己发自己也能收到啊，我还以为发不出去呢"))
     }
 
     @Test func rendersSemanticHTMLWithDistinctTypography() throws {
@@ -601,7 +627,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
 
         #expect(imageURLs(in: blocks).map(\.absoluteString) == [
-            "https://img.vortexfast.com/images/2026/04/28/image.png"
+            "https://img.vortexfast.com/images/2026/04/28/image.png",
         ])
     }
 
@@ -618,7 +644,7 @@ struct DTCoreTextHTMLContentRendererTests {
             maxImageWidth: 320
         )
 
-        guard case .image(let imageBlock) = blocks.first else {
+        guard case let .image(imageBlock) = blocks.first else {
             Issue.record("Expected leading normal image to be split into an image block")
             return
         }
@@ -658,7 +684,7 @@ struct DTCoreTextHTMLContentRendererTests {
 
         #expect(imageBlocks(in: blocks).map(\.url.absoluteString) == [
             "https://i.postimg.cc/ThvRYXRT/mmexport1777790113919.png",
-            "https://i.postimg.cc/xjwHbJ8c/IMG-20260503-143611.png"
+            "https://i.postimg.cc/xjwHbJ8c/IMG-20260503-143611.png",
         ])
         let text = combinedText(in: blocks)
         #expect(text.contains("ssh能用密钥就尽量用密钥，用密码一定要改端口"))
@@ -674,7 +700,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -702,7 +728,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -731,7 +757,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -760,7 +786,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -789,7 +815,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -822,7 +848,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -857,7 +883,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -889,7 +915,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -905,7 +931,7 @@ struct DTCoreTextHTMLContentRendererTests {
 
         #expect(attachments.map { $0.displaySize } == [
             CGSize(width: 65, height: 65),
-            CGSize(width: 65, height: 65)
+            CGSize(width: 65, height: 65),
         ])
         #expect(attachments.last?.contentURL?.absoluteString == "https://www.nodeseek.com/static/image/yct/015.gif")
     }
@@ -924,7 +950,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -956,7 +982,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -1007,7 +1033,7 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(renderedText.contains("📍回程路由"))
         #expect(imageURLs(in: blocks).map(\.absoluteString) == [
             "https://i.111666.best/image/network.webp",
-            "https://i.111666.best/image/route.webp"
+            "https://i.111666.best/image/route.webp",
         ])
     }
 
@@ -1063,11 +1089,11 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(renderedText.contains("hidden helper") == false)
         #expect(unsupportedReasons == [
             DTCoreTextHTMLContentRenderer.unsupportedXtermContentNotice,
-            DTCoreTextHTMLContentRenderer.unsupportedXtermContentNotice
+            DTCoreTextHTMLContentRenderer.unsupportedXtermContentNotice,
         ])
         #expect(imageURLs(in: blocks).map(\.absoluteString) == [
             "https://i.111666.best/image/network.webp",
-            "https://i.111666.best/image/route.webp"
+            "https://i.111666.best/image/route.webp",
         ])
     }
 
@@ -1104,7 +1130,7 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(renderedText.contains("[0m") == false)
         #expect(imageURLs(in: blocks).map(\.absoluteString) == [
             "https://Report.Check.Place/ip/demo.svg",
-            "https://i.111666.best/image/network.webp"
+            "https://i.111666.best/image/network.webp",
         ])
     }
 
@@ -1119,7 +1145,22 @@ struct DTCoreTextHTMLContentRendererTests {
 
         #expect(combinedText(in: blocks).contains("https://report.check.place/ip/NPR7IUKQC.svg"))
         #expect(imageURLs(in: blocks).map(\.absoluteString) == [
-            "https://report.check.place/ip/NPR7IUKQC.svg"
+            "https://report.check.place/ip/NPR7IUKQC.svg",
+        ])
+    }
+
+    @Test func promotesLikelyImageEndpointLinksToImageBlocks() throws {
+        let renderer = DTCoreTextHTMLContentRenderer()
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: "<p>汇率图：https://neonfx.jsnav.de/openapi/image?compact=1</p>",
+            baseURL: baseURL,
+            maxImageWidth: 240
+        )
+
+        #expect(combinedText(in: blocks).contains("https://neonfx.jsnav.de/openapi/image?compact=1"))
+        #expect(imageBlocks(in: blocks).map(\.url.absoluteString) == [
+            "https://neonfx.jsnav.de/openapi/image?compact=1",
         ])
     }
 
@@ -1153,7 +1194,7 @@ struct DTCoreTextHTMLContentRendererTests {
             "https://Report.Check.Place/hardware/3RZVJ2JUX.svg",
             "https://Report.Check.Place/ip/1TZZHW387.svg",
             "https://i.111666.best/image/G9D5ncG5qndySgQtNwvFq4.webp",
-            "https://i.111666.best/image/noEhdCSyuAeuREqqSWgdY5.webp"
+            "https://i.111666.best/image/noEhdCSyuAeuREqqSWgdY5.webp",
         ])
         #expect(images.count == 4)
     }
@@ -1173,9 +1214,10 @@ struct DTCoreTextHTMLContentRendererTests {
         )
 
         #expect(blocks.count == 3)
-        guard case .image(let firstImage) = blocks[0],
-              case .image(let secondImage) = blocks[1],
-              case .text(let text) = blocks[2] else {
+        guard case let .image(firstImage) = blocks[0],
+              case let .image(secondImage) = blocks[1],
+              case let .text(text) = blocks[2]
+        else {
             Issue.record("Expected image/image/text block order")
             return
         }
@@ -1217,7 +1259,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
 
         let codeBlock = try #require(blocks.compactMap { block -> RenderedCodeBlock? in
-            guard case .codeBlock(let codeBlock) = block else { return nil }
+            guard case let .codeBlock(codeBlock) = block else { return nil }
             return codeBlock
         }.first)
 
@@ -1247,7 +1289,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
 
         let codeBlock = try #require(blocks.compactMap { block -> RenderedCodeBlock? in
-            guard case .codeBlock(let codeBlock) = block else { return nil }
+            guard case let .codeBlock(codeBlock) = block else { return nil }
             return codeBlock
         }.first)
 
@@ -1273,7 +1315,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
 
         let codeBlock = try #require(blocks.compactMap { block -> RenderedCodeBlock? in
-            guard case .codeBlock(let codeBlock) = block else { return nil }
+            guard case let .codeBlock(codeBlock) = block else { return nil }
             return codeBlock
         }.first)
 
@@ -1290,9 +1332,10 @@ struct DTCoreTextHTMLContentRendererTests {
         )
 
         #expect(blocks.count == 3)
-        guard case .text(let before) = blocks[0],
-              case .codeBlock(let codeBlock) = blocks[1],
-              case .text(let after) = blocks[2] else {
+        guard case let .text(before) = blocks[0],
+              case let .codeBlock(codeBlock) = blocks[1],
+              case let .text(after) = blocks[2]
+        else {
             Issue.record("Expected text/codeBlock/text block order")
             return
         }
@@ -1314,7 +1357,7 @@ struct DTCoreTextHTMLContentRendererTests {
         )
         let attributed = try #require(
             blocks.compactMap { block -> NSAttributedString? in
-                guard case .text(let text) = block else { return nil }
+                guard case let .text(text) = block else { return nil }
                 return text
             }.first
         )
@@ -1333,32 +1376,47 @@ struct DTCoreTextHTMLContentRendererTests {
 
     private func font(in blocks: [RenderedContentBlock], matching text: String) -> UIFont? {
         for block in blocks {
-            guard case .text(let attributed) = block,
-                  let font = font(in: attributed, matching: text) else {
+            switch block {
+            case .text(let attributed):
+                if let font = font(in: attributed, matching: text) {
+                    return font
+                }
+            case .quote(let quoteBlock):
+                if let font = font(in: quoteBlock.children, matching: text) {
+                    return font
+                }
+            case .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
                 continue
             }
-            return font
         }
         return nil
     }
 
     private func attributedText(in blocks: [RenderedContentBlock], matching text: String) -> NSAttributedString? {
-        blocks.compactMap { block -> NSAttributedString? in
-            guard case .text(let attributed) = block,
-                  attributed.string.contains(text) else {
-                return nil
+        for block in blocks {
+            switch block {
+            case .text(let attributed) where attributed.string.contains(text):
+                return attributed
+            case .quote(let quoteBlock):
+                if let attributed = attributedText(in: quoteBlock.children, matching: text) {
+                    return attributed
+                }
+            case .text, .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
+                continue
             }
-            return attributed
-        }.first
+        }
+        return nil
     }
 
     private func combinedText(in blocks: [RenderedContentBlock]) -> String {
         blocks.compactMap { block -> String? in
             switch block {
-            case .text(let text):
+            case let .text(text):
                 return text.string
-            case .codeBlock(let codeBlock):
+            case let .codeBlock(codeBlock):
                 return codeBlock.text
+            case .quote(let quoteBlock):
+                return combinedText(in: quoteBlock.children)
             default:
                 return nil
             }
@@ -1366,42 +1424,69 @@ struct DTCoreTextHTMLContentRendererTests {
     }
 
     private func codeBlocks(in blocks: [RenderedContentBlock]) -> [RenderedCodeBlock] {
-        blocks.compactMap { block in
-            guard case .codeBlock(let codeBlock) = block else { return nil }
-            return codeBlock
+        blocks.flatMap { block -> [RenderedCodeBlock] in
+            switch block {
+            case .codeBlock(let codeBlock):
+                return [codeBlock]
+            case .quote(let quoteBlock):
+                return codeBlocks(in: quoteBlock.children)
+            case .text, .table, .image, .iframeLink, .imagePlaceholder, .unsupported:
+                return []
+            }
         }
     }
 
     private func unsupportedReasons(in blocks: [RenderedContentBlock]) -> [String] {
         blocks.compactMap { block in
-            guard case .unsupported(let reason) = block else { return nil }
+            guard case let .unsupported(reason) = block else { return nil }
             return reason
         }
     }
 
     private func imageBlocks(in blocks: [RenderedContentBlock]) -> [RenderedImageBlock] {
-        blocks.compactMap { block in
-            guard case .image(let imageBlock) = block else { return nil }
-            return imageBlock
+        blocks.flatMap { block -> [RenderedImageBlock] in
+            switch block {
+            case .image(let imageBlock):
+                return [imageBlock]
+            case .quote(let quoteBlock):
+                return imageBlocks(in: quoteBlock.children)
+            case .text, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
+                return []
+            }
         }
     }
 
     private func imageURLs(in blocks: [RenderedContentBlock]) -> [URL] {
-        var urls = imageBlocks(in: blocks).map(\.url)
+        var urls: [URL] = []
         for block in blocks {
-            guard case .text(let attributed) = block else { continue }
-            attributed.enumerateAttribute(
-                .attachment,
-                in: NSRange(location: 0, length: attributed.length)
-            ) { value, _, _ in
-                guard let attachment = value as? DTTextAttachment,
-                      let contentURL = attachment.contentURL else {
-                    return
+            switch block {
+            case .image(let imageBlock):
+                urls.append(imageBlock.url)
+            case .quote(let quoteBlock):
+                urls.append(contentsOf: imageURLs(in: quoteBlock.children))
+            case .text(let attributed):
+                attributed.enumerateAttribute(
+                    .attachment,
+                    in: NSRange(location: 0, length: attributed.length)
+                ) { value, _, _ in
+                    guard let attachment = value as? DTTextAttachment,
+                          let contentURL = attachment.contentURL else {
+                        return
+                    }
+                    urls.append(contentURL)
                 }
-                urls.append(contentURL)
+            case .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
+                continue
             }
         }
         return urls
+    }
+
+    private func maxQuoteDepth(in blocks: [RenderedContentBlock]) -> Int {
+        blocks.map { block -> Int in
+            guard case .quote(let quoteBlock) = block else { return 0 }
+            return 1 + maxQuoteDepth(in: quoteBlock.children)
+        }.max() ?? 0
     }
 }
 
@@ -1416,7 +1501,8 @@ private extension UIColor {
         var otherBlue: CGFloat = 0
         var otherAlpha: CGFloat = 0
         guard getRed(&red, green: &green, blue: &blue, alpha: &alpha),
-              other.getRed(&otherRed, green: &otherGreen, blue: &otherBlue, alpha: &otherAlpha) else {
+              other.getRed(&otherRed, green: &otherGreen, blue: &otherBlue, alpha: &otherAlpha)
+        else {
             return false
         }
         let tolerance: CGFloat = 0.01

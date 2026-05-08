@@ -376,6 +376,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
             isOpposeClicked: bodyItem.map { parseReactionClicked(in: $0, kind: .oppose) } ?? false,
             favoriteCount: bodyFavoriteCount,
             isFavoriteCollected: isFavoriteCollected,
+            isRestricted: restrictedNotice != nil,
             comments: comments,
             page: page,
             pagination: pagination,
@@ -396,7 +397,32 @@ struct KannaNodeSeekParser: NodeSeekParser {
     }
 
     private func postDetailRestrictedNotice(in document: HTMLDocument) -> String? {
-        document.at_xpath(XPathRules.postDetailRestrictedNotice)?.text?.normalizedNonEmpty
+        if let explicitNotice = document.at_xpath(XPathRules.postDetailRestrictedNotice)?.text?.normalizedNonEmpty {
+            return explicitNotice
+        }
+
+        return postDetailEmptyStateNotice(in: document)
+    }
+
+    private func postDetailEmptyStateNotice(in document: HTMLDocument) -> String? {
+        guard document.at_xpath("//*[@id='nsk-body']") != nil else { return nil }
+        guard document.at_xpath(XPathRules.postDetailBodyItem) == nil else { return nil }
+        guard document.at_xpath(XPathRules.postDetailComments) == nil else { return nil }
+        guard let bodyLeft = document.at_xpath(XPathRules.postDetailBodyLeft) else { return nil }
+
+        let candidates = bodyLeft
+            .xpath(".//*[not(*) and not(self::script) and not(self::style) and not(self::svg)]")
+            .compactMap { $0.text?.normalizedNonEmpty }
+            .filter(Self.isLikelyPostDetailEmptyStateText)
+
+        return candidates.max { $0.count < $1.count }
+    }
+
+    nonisolated private static func isLikelyPostDetailEmptyStateText(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 4 else { return false }
+        guard trimmed.rangeOfCharacter(from: .letters) != nil else { return false }
+        return true
     }
 
     func parseCheckInState(html: String, pageURL: URL) throws -> CheckInState {
