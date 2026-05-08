@@ -1502,6 +1502,7 @@ struct PostDetailViewControllerTests {
         }
 
         viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         viewController.render(detail: PostDetail(
             id: "703863",
             title: "详情标题",
@@ -1520,6 +1521,8 @@ struct PostDetailViewControllerTests {
 
         #expect(viewController.testPresentedLoadedCommentID() == "comment-40")
         #expect(viewController.testPresentedPreviewUsesCommentCellRendering())
+        #expect((viewController.testPresentedPreviewPreferredHeight() ?? 0) < viewController.view.bounds.height)
+        #expect(viewController.testPresentedPreviewKeepsCloseButtonOutsideContent())
         #expect(viewController.testHighlightedAnchorID() == nil)
     }
 
@@ -2843,6 +2846,14 @@ private extension PostDetailViewController {
 
     func testPresentedPreviewUsesCommentCellRendering() -> Bool {
         Mirror(reflecting: self).children.first { $0.label == "testPresentedPreviewUsesCommentCellRendering" }?.value as? Bool ?? false
+    }
+
+    func testPresentedPreviewPreferredHeight() -> CGFloat? {
+        Mirror(reflecting: self).children.first { $0.label == "testPresentedPreviewPreferredHeight" }?.value as? CGFloat
+    }
+
+    func testPresentedPreviewKeepsCloseButtonOutsideContent() -> Bool {
+        Mirror(reflecting: self).children.first { $0.label == "testPresentedPreviewKeepsCloseButtonOutsideContent" }?.value as? Bool ?? false
     }
 }
 

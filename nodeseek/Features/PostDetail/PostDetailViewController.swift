@@ -188,6 +188,8 @@ class PostDetailViewController: UIViewController {
     var testPresentedLoadedCommentID: String?
     var testHighlightedAnchorID: String?
     var testPresentedPreviewUsesCommentCellRendering = false
+    var testPresentedPreviewPreferredHeight: CGFloat?
+    var testPresentedPreviewKeepsCloseButtonOutsideContent = false
     #endif
     let skeletonCommentRowCount = 4
     let accountRefresher: any CurrentAccountRefreshing
