@@ -23,8 +23,7 @@ protocol ThemeRefreshableNode: AnyObject {
 extension ThemeRefreshableNode where Self: ASDisplayNode {
     /// 统一的刷新入口：重新应用主题，并触发布局/绘制刷新。
     ///
-    /// 返回值用于单元测试或调用方做进一步去重；默认实现始终返回 true，
-    /// 去重由 `ThemeTraitObserver` 负责。
+    /// 返回值用于单元测试或调用方做进一步判断；默认实现始终返回 true。
     @discardableResult
     func refreshAppearanceForCurrentTraits() -> Bool {
         applyCurrentTheme()
@@ -34,9 +33,8 @@ extension ThemeRefreshableNode where Self: ASDisplayNode {
     }
 }
 
-/// 监听 view 的 trait 切换并触发 Node 刷新，内部做 style 去重，避免重复刷新。
+/// 监听 view 的 trait 切换并触发 Node 刷新。
 final class ThemeTraitObserver {
-    private var lastAppliedUserInterfaceStyle: UIUserInterfaceStyle?
     private var isInstalled = false
 
     func install<Node>(on node: Node) where Node: ASDisplayNode, Node: ThemeRefreshableNode {
@@ -45,16 +43,11 @@ final class ThemeTraitObserver {
         isInstalled = true
 
         let view = node.view
-        lastAppliedUserInterfaceStyle = view.traitCollection.userInterfaceStyle
         node.refreshAppearanceForCurrentTraits()
 
-        view.registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak self, weak node] (view: UIView, previousTraitCollection: UITraitCollection) in
-            guard let self, let node else { return }
+        view.registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak node] (view: UIView, previousTraitCollection: UITraitCollection) in
+            guard let node else { return }
             guard previousTraitCollection.userInterfaceStyle != view.traitCollection.userInterfaceStyle else { return }
-
-            let currentStyle = view.traitCollection.userInterfaceStyle
-            guard self.lastAppliedUserInterfaceStyle != currentStyle else { return }
-            self.lastAppliedUserInterfaceStyle = currentStyle
 
             node.refreshAppearanceForCurrentTraits()
         }

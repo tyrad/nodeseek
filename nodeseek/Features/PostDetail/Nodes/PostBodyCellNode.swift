@@ -830,7 +830,7 @@ final class DetailRichTextNode: ASDisplayNode {
             let imageKind = DetailImageKind.resolved(isSticker: isSticker, imageURL: contentURL)
             let displaySize = DetailImageLayout.presentation(
                 for: originalSize,
-                maxWidth: imageKind == .sticker ? min(maxWidth, DetailImageLayout.fixedStickerWidth) : maxWidth,
+                maxWidth: maxWidth,
                 kind: imageKind
             ).size
             guard displaySize.width > 0, displaySize.height > 0 else { return }

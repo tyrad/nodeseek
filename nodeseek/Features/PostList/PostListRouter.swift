@@ -79,12 +79,10 @@ class PostListRouter: PostListRouterProtocol {
         let recentViewController = RecentVisitedPostsViewController(visitedStore: visitedStore)
         recentViewController.onSelectRecord = { [weak self, weak recentViewController] record in
             let post = Self.postSummary(from: record)
-            let page = Self.page(from: record.url)
-            let route = NodeSeekPostRouteResolver.route(for: record.url, baseURL: NodeSeekSite.baseURL)
             let detailViewController = PostDetailRouter.createModule(
                 post: post,
-                page: route?.page ?? page,
-                initialAnchorID: route?.anchorID
+                page: 1,
+                initialAnchorID: nil
             )
             if let navigationController = recentViewController?.navigationController {
                 navigationController.pushViewController(detailViewController, animated: true)
@@ -133,16 +131,6 @@ class PostListRouter: PostListRouterProtocol {
             lastActivityText: nil,
             avatarURL: record.avatarURL
         )
-    }
-
-    private static func page(from url: URL) -> Int {
-        let components = url.lastPathComponent.split(separator: "-")
-        guard components.count >= 3,
-              components.first == "post",
-              let page = Int(components[2]) else {
-            return 1
-        }
-        return max(page, 1)
     }
 
 }

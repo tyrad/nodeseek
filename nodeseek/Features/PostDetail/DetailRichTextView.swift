@@ -387,7 +387,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
                 let hasValidDisplaySize = currentDisplaySize.width > 0 && currentDisplaySize.height > 0
                 if hasValidDisplaySize == false {
                     let fixedSize = DetailImageLayout.fixedNormalImageSize(
-                        maxWidth: maxImageWidth(kind: .normal)
+                        maxWidth: maxImageWidth()
                     )
                     attachment.displaySize = fixedSize
                     updatedDisplaySize = fixedSize
@@ -400,7 +400,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
             }
             let presentation = DetailImageLayout.presentation(
                 for: originalSize,
-                maxWidth: maxImageWidth(kind: imageKind),
+                maxWidth: maxImageWidth(),
                 kind: imageKind
             )
             let displaySize = presentation.size
@@ -456,15 +456,16 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         return urls
     }
 
-    private func maxImageWidth(kind: DetailImageKind) -> CGFloat {
-        let width = bounds.width > 0 ? bounds.width : 320
-        return kind == .sticker ? min(width, DetailImageLayout.fixedStickerWidth) : width
+    private func maxImageWidth() -> CGFloat {
+        bounds.width > 0 ? bounds.width : 320
     }
 
     private func targetImagePointSide(originalSize: CGSize, kind: DetailImageKind) -> CGFloat {
-        let maxWidth = maxImageWidth(kind: kind)
+        let maxWidth = maxImageWidth()
         guard originalSize.width > 0, originalSize.height > 0 else {
-            return kind == .sticker ? maxWidth : max(maxWidth, DetailImageLayout.maxImageHeight)
+            return kind == .sticker
+                ? DetailImageLayout.presentation(for: .zero, maxWidth: maxWidth, kind: .sticker).targetPointSide
+                : max(maxWidth, DetailImageLayout.maxImageHeight)
         }
 
         return DetailImageLayout.presentation(
@@ -478,7 +479,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         guard kind == .sticker || (originalSize.width > 0 && originalSize.height > 0) else { return false }
         return DetailImageLayout.allowsInlineAnimation(
             for: originalSize,
-            maxWidth: maxImageWidth(kind: kind),
+            maxWidth: maxImageWidth(),
             kind: kind
         )
     }
@@ -486,7 +487,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
     private func contentMode(originalSize: CGSize, kind: DetailImageKind) -> UIView.ContentMode {
         let mode = DetailImageLayout.presentation(
             for: originalSize,
-            maxWidth: maxImageWidth(kind: kind),
+            maxWidth: maxImageWidth(),
             kind: kind
         ).mode
 

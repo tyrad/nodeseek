@@ -15,13 +15,23 @@ import Testing
 #endif
 
 struct DetailImageLayoutTests {
-    @Test func placeholderUsesFixedStickerSquare() {
+    @Test func placeholderUsesFixedStickerHeight() {
         let size = DetailImageLayout.placeholderSize(
             maxWidth: 320,
             kind: .sticker
         )
 
         #expect(size.width == 65)
+        #expect(size.height == 65)
+    }
+
+    @Test func stickerPlaceholderKeepsFixedHeightWhenWidthIsConstrained() {
+        let size = DetailImageLayout.placeholderSize(
+            maxWidth: 32,
+            kind: .sticker
+        )
+
+        #expect(size.width == 32)
         #expect(size.height == 65)
     }
 
@@ -176,5 +186,27 @@ struct DetailImageLayoutTests {
             maxWidth: 320,
             kind: .sticker
         ))
+    }
+
+    @Test func stickerPresentationFixesHeightAndPreservesOriginalAspectRatio() {
+        let presentation = DetailImageLayout.presentation(
+            for: CGSize(width: 800, height: 1600),
+            maxWidth: 320,
+            kind: .sticker
+        )
+
+        #expect(presentation.size == CGSize(width: 32.5, height: 65))
+        #expect(presentation.mode == .aspectFit)
+    }
+
+    @Test func wideStickerPresentationKeepsFlexibleWidth() {
+        let presentation = DetailImageLayout.presentation(
+            for: CGSize(width: 260, height: 65),
+            maxWidth: 320,
+            kind: .sticker
+        )
+
+        #expect(presentation.size == CGSize(width: 260, height: 65))
+        #expect(presentation.mode == .aspectFit)
     }
 }

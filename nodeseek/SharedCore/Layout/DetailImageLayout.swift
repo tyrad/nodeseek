@@ -28,7 +28,7 @@ nonisolated struct DetailImagePresentation: Equatable, Sendable {
 }
 
 nonisolated enum DetailImageLayout {
-    static let fixedStickerWidth: CGFloat = 65
+    static let fixedStickerHeight: CGFloat = 65
     static let maxImageHeight: CGFloat = 420
     private static let extremeAspectRatio: CGFloat = 1.8
     private static let reportPlaceholderAspectRatio: CGFloat = 74 * 0.6 / 47
@@ -69,8 +69,10 @@ nonisolated enum DetailImageLayout {
         guard maxWidth > 0 else { return .zero }
 
         if kind == .sticker {
-            let side = min(maxWidth, fixedStickerWidth)
-            return CGSize(width: max(1, side), height: max(1, side))
+            return CGSize(
+                width: max(1, min(maxWidth, fixedStickerHeight)),
+                height: fixedStickerHeight
+            )
         }
 
         if kind == .report {
@@ -102,10 +104,10 @@ nonisolated enum DetailImageLayout {
     private static func stickerPresentation(for originalSize: CGSize, maxWidth: CGFloat) -> DetailImagePresentation {
         let size: CGSize
         if originalSize.width > 0, originalSize.height > 0 {
-            size = scaledSize(
-                for: originalSize,
-                maxWidth: min(maxWidth, fixedStickerWidth),
-                maxHeight: nil
+            let scaledWidth = originalSize.width * fixedStickerHeight / originalSize.height
+            size = CGSize(
+                width: max(1, min(maxWidth, scaledWidth)),
+                height: fixedStickerHeight
             )
         } else {
             size = placeholderSize(maxWidth: maxWidth, kind: .sticker)

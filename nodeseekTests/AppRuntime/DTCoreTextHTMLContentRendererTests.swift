@@ -750,7 +750,7 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(displaySize == CGSize(width: 320, height: 160))
     }
 
-    @Test func keepsStickerImageAttachmentsLimitedByFixedWidthOnly() throws {
+    @Test func keepsStickerImageAttachmentsAtFixedHeight() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
         let blocks = renderer.render(
@@ -776,8 +776,7 @@ struct DTCoreTextHTMLContentRendererTests {
         }
 
         let displaySize = try #require(attachment?.displaySize)
-        #expect(displaySize.width == 65)
-        #expect(displaySize.height == 130)
+        #expect(displaySize == CGSize(width: 32.5, height: 65))
     }
 
     @Test func treatsStickerClassAsStickerEvenWhenURLDoesNotContainSticker() throws {
