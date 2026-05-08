@@ -10,15 +10,111 @@ import Foundation
 class PostDetailPresenter: PostDetailPresenterProtocol {
     private static let replyRefreshDelayNanoseconds: UInt64 = 300_000_000
 
-    private struct CommentEndRefreshExpectation {
-        enum Kind {
-            case refreshCurrent
-            case probeNext
+    private enum CommentPageRequest {
+        case append(page: Int)
+        case refreshCurrent(page: Int, oldCount: Int, showNoNewToast: Bool)
+        case probeNext(requestedPage: Int, currentPage: Int, oldCount: Int)
+        case replyRefresh(page: Int)
+
+        var requestedPage: Int {
+            switch self {
+            case .append(let page),
+                 .refreshCurrent(let page, _, _),
+                 .replyRefresh(let page):
+                return page
+            case .probeNext(let requestedPage, _, _):
+                return requestedPage
+            }
         }
 
-        let kind: Kind
-        let page: Int
-        let oldCount: Int
+        var showsFooterLoading: Bool {
+            switch self {
+            case .append, .refreshCurrent, .probeNext:
+                return true
+            case .replyRefresh:
+                return false
+            }
+        }
+    }
+
+    private struct CommentPageTracker {
+        private var historicalPageCounts: [Int: Int] = [:]
+        private var loadedPageCounts: [Int: Int] = [:]
+
+        var pageSizeHint: Int? {
+            guard historicalPageCounts.keys.count > 1 else { return nil }
+            return historicalPageCounts.values.max()
+        }
+
+        func loadedCount(for page: Int) -> Int? {
+            loadedPageCounts[page]
+        }
+
+        mutating func recordLoadedPage(page: Int, count: Int, replacesLoadedPages: Bool) {
+            let normalizedPage = max(1, page)
+            if replacesLoadedPages {
+                loadedPageCounts = [normalizedPage: count]
+            } else {
+                loadedPageCounts[normalizedPage] = count
+            }
+            historicalPageCounts[normalizedPage] = max(historicalPageCounts[normalizedPage] ?? 0, count)
+        }
+
+        mutating func reset() {
+            historicalPageCounts.removeAll(keepingCapacity: true)
+            loadedPageCounts.removeAll(keepingCapacity: true)
+        }
+
+        func replacingCommentPage(
+            in currentDetail: PostDetail?,
+            with pageDetail: PostDetail,
+            page: Int
+        ) -> PostDetail? {
+            guard var currentDetail else { return nil }
+            guard currentDetail.id == pageDetail.id else { return nil }
+
+            let normalizedPage = max(1, page)
+            guard let oldCount = loadedPageCounts[normalizedPage] else { return nil }
+
+            if normalizedPage > 1 {
+                for p in 1..<normalizedPage where loadedPageCounts[p] == nil {
+                    return nil
+                }
+            }
+
+            let prefixCount = (1..<normalizedPage).reduce(0) { partialResult, page in
+                partialResult + (loadedPageCounts[page] ?? 0)
+            }
+            let lowerBound = prefixCount
+            let upperBound = prefixCount + oldCount
+            guard lowerBound >= 0,
+                  upperBound >= lowerBound,
+                  upperBound <= currentDetail.comments.count else {
+                return nil
+            }
+
+            var nextComments = currentDetail.comments
+            nextComments.replaceSubrange(lowerBound..<upperBound, with: pageDetail.comments)
+            currentDetail = currentDetail.replacingComments(
+                nextComments,
+                page: max(currentDetail.page, pageDetail.page),
+                pagination: pageDetail.pagination
+            )
+            return currentDetail
+        }
+    }
+
+    private struct CommentPageResponseHandling {
+        let renderedDetail: PostDetail
+        let shouldReplaceLoadedPages: Bool
+        let shouldHideFooterLoading: Bool
+        let shouldToastNoNewComments: Bool
+        let logReason: String?
+    }
+
+    private struct CommentPageReplaceResult {
+        let detail: PostDetail
+        let usedFallback: Bool
     }
 
     private enum ReactionKind {
@@ -67,7 +163,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
             "该评论\(alreadyActionSuffix)"
         }
     }
-    
+
     // MARK: - Properties
     private weak var view: PostDetailViewProtocol?
     private let interactor: PostDetailInteractorInput
@@ -75,11 +171,8 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
     private let visitedStore: VisitedPostStoreProtocol
     private var currentPage: Int
     private var nextCommentPage: Int?
-    private var loadingMoreCommentPage: Int?
-    private var refreshingCommentEndPage: Int?
-    private var commentPageCounts: [Int: Int] = [:]
-    private var loadedCommentPageCounts: [Int: Int] = [:]
-    private var pendingCommentEndRefreshExpectation: CommentEndRefreshExpectation?
+    private var activeCommentPageRequest: CommentPageRequest?
+    private var commentPageTracker = CommentPageTracker()
     private var currentDetail: PostDetail?
     private var fallbackFavoriteCollectedState = false
     private var isSubmittingReply = false
@@ -92,7 +185,6 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
     private var submittingCommentOpposeIDs = Set<String>()
     private var favoriteRollbackDetail: PostDetail?
     private var favoriteRollbackCollectedState: Bool?
-    private var isRefreshingAfterReplySubmission = false
     
     // MARK: - Initialization
     init(
@@ -113,8 +205,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
     }
 
     private var commentPageSizeHint: Int? {
-        guard commentPageCounts.keys.count > 1 else { return nil }
-        return commentPageCounts.values.max()
+        commentPageTracker.pageSizeHint
     }
     
     // MARK: - Methods
@@ -136,8 +227,8 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
             AppLog.debug(.postDetail, "忽略详情评论加载更多: 已无下一页")
             return
         }
-        guard loadingMoreCommentPage == nil else {
-            AppLog.debug(.postDetail, "忽略详情评论加载更多: 正在加载 page=\(loadingMoreCommentPage ?? -1)")
+        guard activeCommentPageRequest == nil else {
+            AppLog.debug(.postDetail, "忽略详情评论加载更多: 正在加载 page=\(activeCommentPageRequest?.requestedPage ?? -1)")
             return
         }
         guard currentDetail != nil else {
@@ -145,15 +236,15 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
             return
         }
 
-        loadingMoreCommentPage = page
+        activeCommentPageRequest = .append(page: page)
         AppLog.info(.postDetail, "触发详情评论加载更多: page=\(page)")
         view?.showLoadingMoreComments()
         interactor.loadPostDetail(page: page)
     }
 
     func didTapRefreshCommentsAtEnd() {
-        guard loadingMoreCommentPage == nil, refreshingCommentEndPage == nil else {
-            AppLog.debug(.postDetail, "忽略详情评论到底更新: 正在加载 page=\(loadingMoreCommentPage ?? refreshingCommentEndPage ?? -1)")
+        guard activeCommentPageRequest == nil else {
+            AppLog.debug(.postDetail, "忽略详情评论到底更新: 正在加载 page=\(activeCommentPageRequest?.requestedPage ?? -1)")
             return
         }
         guard currentDetail != nil else {
@@ -161,27 +252,25 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
             return
         }
 
-        let lastPageCount = commentPageCounts[currentPage] ?? currentDetail?.comments.count ?? 0
+        let lastPageCount = commentPageTracker.loadedCount(for: currentPage) ?? currentDetail?.comments.count ?? 0
         let hint = commentPageSizeHint
         let pageToLoad: Int
         let action: String
         if let hint, lastPageCount >= hint {
             pageToLoad = currentPage + 1
             action = "requestNext"
-            loadingMoreCommentPage = pageToLoad
-            pendingCommentEndRefreshExpectation = CommentEndRefreshExpectation(
-                kind: .probeNext,
-                page: currentPage,
-                oldCount: loadedCommentPageCounts[currentPage] ?? lastPageCount
+            activeCommentPageRequest = .probeNext(
+                requestedPage: pageToLoad,
+                currentPage: currentPage,
+                oldCount: lastPageCount
             )
         } else {
             pageToLoad = currentPage
             action = "refreshCurrent"
-            refreshingCommentEndPage = pageToLoad
-            pendingCommentEndRefreshExpectation = CommentEndRefreshExpectation(
-                kind: .refreshCurrent,
-                page: currentPage,
-                oldCount: loadedCommentPageCounts[currentPage] ?? lastPageCount
+            activeCommentPageRequest = .refreshCurrent(
+                page: pageToLoad,
+                oldCount: lastPageCount,
+                showNoNewToast: true
             )
         }
 
@@ -441,6 +530,18 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
 
 private extension PostDetail {
     func appendingCommentPage(_ pageDetail: PostDetail) -> PostDetail {
+        replacingComments(
+            comments + pageDetail.comments,
+            page: max(page, pageDetail.page),
+            pagination: pageDetail.pagination
+        )
+    }
+
+    func replacingComments(
+        _ nextComments: [Comment],
+        page: Int,
+        pagination: PostDetailPagination?
+    ) -> PostDetail {
         PostDetail(
             id: id,
             title: title,
@@ -458,10 +559,10 @@ private extension PostDetail {
             isOpposeClicked: isOpposeClicked,
             favoriteCount: favoriteCount,
             isFavoriteCollected: isFavoriteCollected,
-            comments: comments + pageDetail.comments,
-            page: max(page, pageDetail.page),
-            pagination: pageDetail.pagination,
-            isLastPage: pageDetail.pagination?.nextPage == nil
+            comments: nextComments,
+            page: page,
+            pagination: pagination,
+            isLastPage: pagination?.nextPage == nil
         )
     }
 }
@@ -472,127 +573,171 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
     func didLoadPostDetail(_ response: PostDetailResponse) {
         favoriteRollbackDetail = nil
         favoriteRollbackCollectedState = nil
-        let requestedLoadingMorePage = loadingMoreCommentPage
-        let requestedRefreshingEndPage = refreshingCommentEndPage
-        let commentEndRefreshExpectation = pendingCommentEndRefreshExpectation
-        pendingCommentEndRefreshExpectation = nil
+        let commentRequest = activeCommentPageRequest
+        activeCommentPageRequest = nil
         let loadedPage = max(1, response.detail.page)
-        let isAppendingCommentPage = requestedLoadingMorePage == loadedPage
-        let isRefreshingCommentEnd = requestedRefreshingEndPage == loadedPage
-        let isReplyRefresh = isRefreshingAfterReplySubmission && loadedPage == currentPage && currentDetail != nil
-        let shouldFallbackToRefreshCurrentPage = requestedLoadingMorePage != nil
-            && isAppendingCommentPage == false
-            && loadedPage == currentPage
-            && currentDetail != nil
-        isRefreshingAfterReplySubmission = false
-        loadingMoreCommentPage = nil
-        refreshingCommentEndPage = nil
 
-        let renderedDetail: PostDetail
-        if isAppendingCommentPage, let currentDetail {
-            renderedDetail = currentDetail.appendingCommentPage(response.detail)
-            view?.appendCommentPage(detail: response.detail)
-            view?.hideLoadingMoreComments()
-            AppLog.info(.postDetail, "详情评论加载更多完成: page=\(loadedPage), appended=\(response.detail.comments.count), total=\(renderedDetail.comments.count)")
-        } else if isRefreshingCommentEnd || isReplyRefresh || shouldFallbackToRefreshCurrentPage {
-            let reason: String
-            if isReplyRefresh {
-                reason = "reply"
-            } else if isRefreshingCommentEnd {
-                reason = "endFooter"
-            } else {
-                reason = "probeFallback"
-            }
-            renderedDetail = mergedDetailReplacingCommentPage(
-                currentDetail: currentDetail,
-                pageDetail: response.detail,
-                page: loadedPage
-            ) ?? response.detail
-            view?.refreshCurrentCommentPage(detail: response.detail)
-            if isRefreshingCommentEnd || shouldFallbackToRefreshCurrentPage {
-                view?.hideLoadingMoreComments()
-            }
-            AppLog.info(.postDetail, "详情评论当前页刷新完成: page=\(loadedPage), count=\(response.detail.comments.count), reason=\(reason)")
-        } else {
-            renderedDetail = response.detail
-            view?.render(detail: response.detail)
-        }
+        let handling = handleCommentPageResponse(
+            response.detail,
+            loadedPage: loadedPage,
+            request: commentRequest
+        )
+        commentPageTracker.recordLoadedPage(
+            page: loadedPage,
+            count: response.detail.comments.count,
+            replacesLoadedPages: handling.shouldReplaceLoadedPages
+        )
 
-        // 统计“单页评论数”的最大值：只有历史加载过 >=2 个不同页码时才算 pageSizeHint。
-        let existingCount = commentPageCounts[loadedPage] ?? 0
-        commentPageCounts[loadedPage] = max(existingCount, response.detail.comments.count)
-        loadedCommentPageCounts[loadedPage] = response.detail.comments.count
-
-        currentPage = isAppendingCommentPage ? max(currentPage, loadedPage) : loadedPage
-        currentDetail = renderedDetail
-        nextCommentPage = renderedDetail.pagination?.nextPage
-        fallbackFavoriteCollectedState = renderedDetail.isFavoriteCollected
-        markDetailVisited(renderedDetail)
+        currentPage = handling.renderedDetail.page
+        currentDetail = handling.renderedDetail
+        nextCommentPage = handling.renderedDetail.pagination?.nextPage
+        fallbackFavoriteCollectedState = handling.renderedDetail.isFavoriteCollected
+        markDetailVisited(handling.renderedDetail)
         view?.hideLoading()
 
-        if isRefreshingCommentEnd {
-            AppLog.debug(.postDetail, "详情评论到底更新完成: page=\(loadedPage), pageSizeHint=\(commentPageSizeHint ?? -1)")
+        if handling.shouldHideFooterLoading {
+            view?.hideLoadingMoreComments()
         }
-        if shouldFallbackToRefreshCurrentPage {
-            AppLog.debug(.postDetail, "详情评论探测下一页回落刷新当前页: requested=\(requestedLoadingMorePage ?? -1), loaded=\(loadedPage)")
+        if let logReason = handling.logReason {
+            AppLog.debug(.postDetail, "详情评论页请求完成: reason=\(logReason), page=\(loadedPage), pageSizeHint=\(commentPageSizeHint ?? -1)")
         }
-
-        if let expectation = commentEndRefreshExpectation {
-            let newCount = response.detail.comments.count
-            let shouldToastNoNew: Bool
-            switch expectation.kind {
-            case .refreshCurrent:
-                shouldToastNoNew = isRefreshingCommentEnd && loadedPage == expectation.page && newCount <= expectation.oldCount
-            case .probeNext:
-                shouldToastNoNew = shouldFallbackToRefreshCurrentPage && loadedPage == expectation.page && newCount <= expectation.oldCount
-            }
-            if shouldToastNoNew {
-                AppLog.info(.postDetail, "详情评论到底更新无新评论: kind=\(expectation.kind), page=\(expectation.page), old=\(expectation.oldCount), new=\(newCount)")
-                view?.showToast(message: "暂无新评论")
-            }
+        if handling.shouldToastNoNewComments {
+            AppLog.info(.postDetail, "详情评论到底更新无新评论: page=\(loadedPage), count=\(response.detail.comments.count)")
+            view?.showToast(message: "暂无新评论")
         }
     }
 
+    private func handleCommentPageResponse(
+        _ detail: PostDetail,
+        loadedPage: Int,
+        request: CommentPageRequest?
+    ) -> CommentPageResponseHandling {
+        guard let request else {
+            view?.render(detail: detail)
+            return CommentPageResponseHandling(
+                renderedDetail: detail,
+                shouldReplaceLoadedPages: true,
+                shouldHideFooterLoading: false,
+                shouldToastNoNewComments: false,
+                logReason: nil
+            )
+        }
+
+        switch request {
+        case .append(let page) where page == loadedPage:
+            let renderedDetail = currentDetail?.appendingCommentPage(detail) ?? detail
+            view?.appendCommentPage(detail: detail)
+            AppLog.info(.postDetail, "详情评论加载更多完成: page=\(loadedPage), appended=\(detail.comments.count), total=\(renderedDetail.comments.count)")
+            return CommentPageResponseHandling(
+                renderedDetail: renderedDetail,
+                shouldReplaceLoadedPages: false,
+                shouldHideFooterLoading: true,
+                shouldToastNoNewComments: false,
+                logReason: "append"
+            )
+
+        case .refreshCurrent(let page, let oldCount, let showNoNewToast) where page == loadedPage:
+            let replaceResult = replacingCurrentCommentPage(with: detail, page: loadedPage)
+            view?.refreshCurrentCommentPage(detail: detail)
+            AppLog.info(.postDetail, "详情评论当前页刷新完成: page=\(loadedPage), count=\(detail.comments.count), reason=endFooter")
+            return CommentPageResponseHandling(
+                renderedDetail: replaceResult.detail,
+                shouldReplaceLoadedPages: replaceResult.usedFallback,
+                shouldHideFooterLoading: true,
+                shouldToastNoNewComments: showNoNewToast && detail.comments.count <= oldCount,
+                logReason: "endFooter"
+            )
+
+        case .probeNext(let requestedPage, _, _) where requestedPage == loadedPage:
+            let renderedDetail = currentDetail?.appendingCommentPage(detail) ?? detail
+            view?.appendCommentPage(detail: detail)
+            AppLog.info(.postDetail, "详情评论探测下一页加载完成: page=\(loadedPage), appended=\(detail.comments.count), total=\(renderedDetail.comments.count)")
+            return CommentPageResponseHandling(
+                renderedDetail: renderedDetail,
+                shouldReplaceLoadedPages: false,
+                shouldHideFooterLoading: true,
+                shouldToastNoNewComments: false,
+                logReason: "probeNext"
+            )
+
+        case .probeNext(let requestedPage, let currentPage, let oldCount) where currentPage == loadedPage:
+            let replaceResult = replacingCurrentCommentPage(with: detail, page: loadedPage)
+            view?.refreshCurrentCommentPage(detail: detail)
+            AppLog.info(.postDetail, "详情评论探测下一页回落刷新当前页: requested=\(requestedPage), loaded=\(loadedPage), count=\(detail.comments.count)")
+            return CommentPageResponseHandling(
+                renderedDetail: replaceResult.detail,
+                shouldReplaceLoadedPages: replaceResult.usedFallback,
+                shouldHideFooterLoading: true,
+                shouldToastNoNewComments: detail.comments.count <= oldCount,
+                logReason: "probeFallback"
+            )
+
+        case .replyRefresh(let page) where page == loadedPage:
+            let replaceResult = replacingCurrentCommentPage(with: detail, page: loadedPage)
+            view?.refreshCurrentCommentPage(detail: detail)
+            AppLog.info(.postDetail, "回复后详情评论当前页刷新完成: page=\(loadedPage), count=\(detail.comments.count)")
+            return CommentPageResponseHandling(
+                renderedDetail: replaceResult.detail,
+                shouldReplaceLoadedPages: replaceResult.usedFallback,
+                shouldHideFooterLoading: false,
+                shouldToastNoNewComments: false,
+                logReason: "reply"
+            )
+
+        default:
+            AppLog.warning(.postDetail, "详情评论页请求返回非预期页: requested=\(request.requestedPage), loaded=\(loadedPage)")
+            view?.render(detail: detail)
+            return CommentPageResponseHandling(
+                renderedDetail: detail,
+                shouldReplaceLoadedPages: true,
+                shouldHideFooterLoading: request.showsFooterLoading,
+                shouldToastNoNewComments: false,
+                logReason: "unexpectedPage"
+            )
+        }
+    }
+
+    private func replacingCurrentCommentPage(with detail: PostDetail, page: Int) -> CommentPageReplaceResult {
+        if let merged = commentPageTracker.replacingCommentPage(
+            in: currentDetail,
+            with: detail,
+            page: page
+        ) {
+            return CommentPageReplaceResult(detail: merged, usedFallback: false)
+        }
+        return CommentPageReplaceResult(detail: detail, usedFallback: true)
+    }
+
     func didRequireLogin(message: String) {
-        loadingMoreCommentPage = nil
-        refreshingCommentEndPage = nil
+        activeCommentPageRequest = nil
         nextCommentPage = nil
-        isRefreshingAfterReplySubmission = false
-        pendingCommentEndRefreshExpectation = nil
-        loadedCommentPageCounts.removeAll(keepingCapacity: true)
+        commentPageTracker.reset()
         view?.hideLoadingMoreComments()
         view?.hideLoading()
         view?.renderLoginRequired(message: message)
     }
     
     func didFailLoadPostDetail(error: String) {
-        let isReplyRefresh = isRefreshingAfterReplySubmission
-        let isLoadingMore = loadingMoreCommentPage != nil
-        let isRefreshingCommentEnd = refreshingCommentEndPage != nil
-        loadingMoreCommentPage = nil
-        refreshingCommentEndPage = nil
-        isRefreshingAfterReplySubmission = false
-        pendingCommentEndRefreshExpectation = nil
-        if isLoadingMore || isRefreshingCommentEnd {
+        let failedRequest = activeCommentPageRequest
+        activeCommentPageRequest = nil
+        if failedRequest?.showsFooterLoading == true {
             AppLog.warning(.postDetail, "详情评论加载更多失败: \(error)")
             view?.hideLoadingMoreComments()
             view?.showToast(message: "更多评论加载失败")
             return
         }
         view?.hideLoading()
-        if isReplyRefresh == false {
+        if case .replyRefresh = failedRequest {
+            return
+        } else {
             view?.showError(message: error)
         }
     }
 
     func didCancelLoadPostDetail() {
-        let isLoadingMore = loadingMoreCommentPage != nil
-        let isRefreshingCommentEnd = refreshingCommentEndPage != nil
-        loadingMoreCommentPage = nil
-        refreshingCommentEndPage = nil
-        isRefreshingAfterReplySubmission = false
-        pendingCommentEndRefreshExpectation = nil
-        if isLoadingMore || isRefreshingCommentEnd {
+        let cancelledRequest = activeCommentPageRequest
+        activeCommentPageRequest = nil
+        if cancelledRequest?.showsFooterLoading == true {
             view?.hideLoadingMoreComments()
             return
         }
@@ -630,7 +775,11 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: Self.replyRefreshDelayNanoseconds)
             guard let self else { return }
-            self.isRefreshingAfterReplySubmission = true
+            guard self.activeCommentPageRequest == nil else {
+                AppLog.debug(.postDetail, "忽略回复后评论刷新: 正在加载 page=\(self.activeCommentPageRequest?.requestedPage ?? -1)")
+                return
+            }
+            self.activeCommentPageRequest = .replyRefresh(page: page)
             self.interactor.loadPostDetail(page: page)
         }
     }
@@ -729,64 +878,5 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
     func didFailAddCommentOppose(commentID: String, error: String) {
         submittingCommentOpposeIDs.remove(commentID)
         handleReactionFailure(error: error, kind: .oppose)
-    }
-}
-
-private extension PostDetailPresenter {
-    func mergedDetailReplacingCommentPage(
-        currentDetail: PostDetail?,
-        pageDetail: PostDetail,
-        page: Int
-    ) -> PostDetail? {
-        guard var currentDetail else { return nil }
-        guard currentDetail.id == pageDetail.id else { return nil }
-
-        let oldCount = loadedCommentPageCounts[page]
-        guard let oldCount else { return nil }
-
-        // 只支持“从 1 开始顺序加载”的页替换：page 之前的每一页都要有记录，否则无法安全计算偏移。
-        if page > 1 {
-            for p in 1..<(page) where loadedCommentPageCounts[p] == nil {
-                return nil
-            }
-        }
-
-        let prefixCount = (1..<page).reduce(0) { partialResult, p in
-            partialResult + (loadedCommentPageCounts[p] ?? 0)
-        }
-        let lowerBound = prefixCount
-        let upperBound = prefixCount + oldCount
-        guard lowerBound >= 0,
-              upperBound >= lowerBound,
-              upperBound <= currentDetail.comments.count else {
-            return nil
-        }
-
-        var nextComments = currentDetail.comments
-        nextComments.replaceSubrange(lowerBound..<upperBound, with: pageDetail.comments)
-
-        currentDetail = PostDetail(
-            id: currentDetail.id,
-            title: currentDetail.title,
-            requiredReadingLevel: currentDetail.requiredReadingLevel,
-            authorName: currentDetail.authorName,
-            avatarURL: currentDetail.avatarURL,
-            authorProfileURL: currentDetail.authorProfileURL,
-            metadataText: currentDetail.metadataText,
-            contentHTML: currentDetail.contentHTML,
-            likeCount: currentDetail.likeCount,
-            isLikeClicked: currentDetail.isLikeClicked,
-            chickenLegCount: currentDetail.chickenLegCount,
-            isChickenLegClicked: currentDetail.isChickenLegClicked,
-            opposeCount: currentDetail.opposeCount,
-            isOpposeClicked: currentDetail.isOpposeClicked,
-            favoriteCount: currentDetail.favoriteCount,
-            isFavoriteCollected: currentDetail.isFavoriteCollected,
-            comments: nextComments,
-            page: max(currentDetail.page, pageDetail.page),
-            pagination: pageDetail.pagination,
-            isLastPage: pageDetail.pagination?.nextPage == nil
-        )
-        return currentDetail
     }
 }
