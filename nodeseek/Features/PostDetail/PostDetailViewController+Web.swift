@@ -215,9 +215,8 @@ extension PostDetailViewController {
         present(previewController, animated: true)
     }
 
-    private func openFullPostFromFloorPreview() {
+    private func openFullPostFromBeginning() {
         guard let header = currentHeaderContent else { return }
-        guard wasOpenedFromInitialAnchor else { return }
         let page = 1
         #if DEBUG
         testOpenedFullPostPage = page
@@ -245,6 +244,20 @@ extension PostDetailViewController {
         } else {
             showDetailDestination(viewController)
         }
+    }
+
+    private func openFullPostFromFloorPreview() {
+        guard wasOpenedFromInitialAnchor else { return }
+        openFullPostFromBeginning()
+    }
+
+    var shouldShowInitialPageHint: Bool {
+        initialPage > 1
+    }
+
+    func openFullPostFromEntryHint() {
+        guard shouldShowInitialPageHint else { return }
+        openFullPostFromBeginning()
     }
 
     func openUserInfo(profileURL: URL) {
@@ -317,7 +330,7 @@ extension PostDetailViewController {
 
     func resolvedDetailURL() -> URL? {
         if let postID = currentHeaderContent?.postID, postID.isEmpty == false {
-            return NodeSeekSite.postURL(id: postID, page: currentPage)
+            return NodeSeekSite.postURL(id: postID, page: initialPage)
         }
 
         return sourcePostURL

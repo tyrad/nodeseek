@@ -8,7 +8,7 @@
 import AsyncDisplayKit
 import UIKit
 
-final class PostSummaryCellNode: ASCellNode {
+final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
 
     private enum Layout {
         static let horizontalSpacing: CGFloat = 12
@@ -42,7 +42,7 @@ final class PostSummaryCellNode: ASCellNode {
     private let titleNode = ASTextNode()
     private let metadataNode = ASTextNode()
     private weak var avatarImageView: UIImageView?
-    private var lastAppliedUserInterfaceStyle: UIUserInterfaceStyle?
+    private let themeTraitObserver = ThemeTraitObserver()
 
     convenience init(post: PostSummary) {
         self.init(post: post, isVisited: false)
@@ -59,17 +59,12 @@ final class PostSummaryCellNode: ASCellNode {
         automaticallyManagesSubnodes = true
         selectionStyle = .none
         backgroundColor = .clear
-        configureText()
+        applyCurrentTheme()
     }
 
     override func didLoad() {
         super.didLoad()
-        lastAppliedUserInterfaceStyle = view.traitCollection.userInterfaceStyle
-        view.registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak self] (view: UIView, previousTraitCollection: UITraitCollection) in
-            guard let self else { return }
-            guard previousTraitCollection.userInterfaceStyle != view.traitCollection.userInterfaceStyle else { return }
-            self.refreshAppearanceForCurrentTraits()
-        }
+        themeTraitObserver.install(on: self)
         requestAvatarIfNeeded()
     }
 
@@ -106,6 +101,10 @@ final class PostSummaryCellNode: ASCellNode {
         return ASInsetLayoutSpec(insets: Layout.contentInset, child: contentStack)
     }
 
+    func applyCurrentTheme() {
+        configureText()
+    }
+
     private func configureText() {
         titleNode.maximumNumberOfLines = PostSummaryCellStyle.titleMaximumNumberOfLines
         titleNode.truncationMode = .byTruncatingTail
@@ -114,15 +113,6 @@ final class PostSummaryCellNode: ASCellNode {
         metadataNode.maximumNumberOfLines = PostSummaryCellStyle.metadataMaximumNumberOfLines
         metadataNode.truncationMode = .byTruncatingTail
         metadataNode.attributedText = Self.metadataAttributedText(for: post)
-    }
-
-    func refreshAppearanceForCurrentTraits() {
-        let currentStyle = isNodeLoaded ? view.traitCollection.userInterfaceStyle : UITraitCollection.current.userInterfaceStyle
-        guard lastAppliedUserInterfaceStyle != currentStyle else { return }
-        lastAppliedUserInterfaceStyle = currentStyle
-        configureText()
-        setNeedsLayout()
-        setNeedsDisplay()
     }
 
     var debugTitleAttributedText: NSAttributedString? {

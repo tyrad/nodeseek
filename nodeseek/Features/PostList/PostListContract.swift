@@ -70,6 +70,7 @@ protocol PostListInteractorOutput: AnyObject {
 protocol PostListRouterProtocol: AnyObject {
     func navigateToPostDetail(post: PostSummary)
     func navigateToPostDetail(post: PostSummary, page: Int)
+    func navigateToPostDetail(post: PostSummary, page: Int, initialAnchorID: String?)
     func navigateToLogin(onClose: @escaping @MainActor () -> Void)
     func navigateToUserProfile(profileURL: URL)
     func navigateToNewDiscussion()

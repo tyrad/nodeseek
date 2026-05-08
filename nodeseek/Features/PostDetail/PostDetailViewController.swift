@@ -141,6 +141,7 @@ class PostDetailViewController: UIViewController {
     let presenter: PostDetailPresenterProtocol
     let baseURL = NodeSeekSite.baseURL
     var currentPage: Int
+    let initialPage: Int
     let wasOpenedFromInitialAnchor: Bool
     var currentHeaderContent: PostDetailHeaderContent?
     var pagination: PostDetailPagination?
@@ -214,6 +215,7 @@ class PostDetailViewController: UIViewController {
 
     enum DetailRow {
         case header
+        case entryHint
         case postRepliesDivider
         case comment(Int)
         case skeletonComment(Int)
@@ -486,7 +488,9 @@ class PostDetailViewController: UIViewController {
     ) {
         self.presenter = presenter
         self.sourcePostURL = sourcePostURL
-        self.currentPage = max(currentPage, 1)
+        let normalizedInitialPage = max(currentPage, 1)
+        self.currentPage = normalizedInitialPage
+        self.initialPage = normalizedInitialPage
         self.pendingInitialAnchorID = initialAnchorID
         self.wasOpenedFromInitialAnchor = initialAnchorID?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
         self.accountRefresher = accountRefresher ?? CurrentAccountRefresher.shared
@@ -872,7 +876,7 @@ class PostDetailViewController: UIViewController {
 
     @objc
     func refreshTapped() {
-        presenter.viewDidLoad()
+        presenter.refreshInitialPage()
     }
 
     @objc

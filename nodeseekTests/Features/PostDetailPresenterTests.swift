@@ -24,6 +24,53 @@ struct PostDetailPresenterTests {
         #expect(interactor.loadedPages == [3])
     }
 
+    @Test func refreshInitialPageReloadsInitialPageAfterPaginationAdvanced() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let view = SpyPostDetailView()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        presenter.setView(view)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: nil, contentHTML: "<p>第一页</p>")
+            ],
+            page: 1,
+            pagination: PostDetailPagination(
+                currentPage: 1,
+                items: [
+                    PostDetailPageItem(page: 1, url: nil, isCurrent: true),
+                    PostDetailPageItem(page: 2, url: nil, isCurrent: false)
+                ],
+                previousPage: nil,
+                nextPage: 2
+            )
+        )))
+        presenter.didApproachCommentEnd()
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "2", authorName: "b", avatarURL: nil, floorText: "#2", createdAtText: nil, contentHTML: "<p>第二页</p>")
+            ],
+            page: 2
+        )))
+
+        presenter.refreshInitialPage()
+
+        #expect(interactor.loadedPages == [2, 1])
+        #expect(view.loadingCount == 1)
+    }
+
     @Test func loadingDetailMarksPostAsVisited() {
         let interactor = SpyPostDetailInteractor()
         let router = SpyPostDetailRouter()

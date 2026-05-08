@@ -200,6 +200,12 @@ final class PostTextureListView: UIView {
         tableNode.setContentOffset(.zero, animated: animated)
     }
 
+    func refreshVisibleAppearanceForCurrentTraits() {
+        tableNode.visibleNodes.forEach { node in
+            (node as? ThemeRefreshableNode)?.refreshAppearanceForCurrentTraits()
+        }
+    }
+
     private func setupUI() {
         tableNode.dataSource = self
         tableNode.delegate = self

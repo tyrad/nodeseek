@@ -127,6 +127,7 @@ class PostListViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
+        refreshAppearanceForCurrentTraits()
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -320,7 +321,18 @@ class PostListViewController: UIViewController {
         configuration.titleLineBreakMode = .byTruncatingTail
         configuration.titleTextAttributesTransformer = expanded ? SortToggleLayout.titleAttributesTransformer : nil
         sortToggleButton.configuration = configuration
+        sortToggleButton.backgroundColor = .label
+        sortToggleButton.tintColor = .systemBackground
+        sortToggleButton.layer.borderColor = UIColor.separator.cgColor
         sortToggleButton.accessibilityLabel = currentSortMode.accessibilityTitle
+    }
+
+    private func refreshAppearanceForCurrentTraits() {
+        view.backgroundColor = .systemBackground
+        compactTopButton.tintColor = .label
+        applySelectedCategory(selectedCategory, syncPage: false, pageAnimated: false)
+        applySortTogglePresentation(expanded: isSortToggleExpanded)
+        pageContainerView.refreshVisibleAppearanceForCurrentTraits()
     }
 
     private func applySortToggleAlpha(expanded: Bool) {

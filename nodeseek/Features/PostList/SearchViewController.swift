@@ -539,7 +539,12 @@ extension SearchViewController: PostTextureListViewDelegate {
             listView.updateVisitedState(at: index, isVisited: true)
         }
 
-        let detailViewController = PostDetailRouter.createModule(post: item.post, page: 1)
+        let route = NodeSeekPostRouteResolver.route(for: item.post.url, baseURL: NodeSeekSite.baseURL)
+        let detailViewController = PostDetailRouter.createModule(
+            post: item.post,
+            page: route?.page ?? 1,
+            initialAnchorID: route?.anchorID
+        )
         navigationController?.pushViewController(detailViewController, animated: true)
     }
 

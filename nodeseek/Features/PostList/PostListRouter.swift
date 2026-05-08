@@ -38,7 +38,15 @@ class PostListRouter: PostListRouterProtocol {
     }
 
     func navigateToPostDetail(post: PostSummary, page: Int) {
-        let detailViewController = PostDetailRouter.createModule(post: post, page: page)
+        navigateToPostDetail(post: post, page: page, initialAnchorID: nil)
+    }
+
+    func navigateToPostDetail(post: PostSummary, page: Int, initialAnchorID: String?) {
+        let detailViewController = PostDetailRouter.createModule(
+            post: post,
+            page: page,
+            initialAnchorID: initialAnchorID
+        )
         viewController?.navigationController?.pushViewController(detailViewController, animated: true)
     }
 
@@ -72,7 +80,12 @@ class PostListRouter: PostListRouterProtocol {
         recentViewController.onSelectRecord = { [weak self, weak recentViewController] record in
             let post = Self.postSummary(from: record)
             let page = Self.page(from: record.url)
-            let detailViewController = PostDetailRouter.createModule(post: post, page: page)
+            let route = NodeSeekPostRouteResolver.route(for: record.url, baseURL: NodeSeekSite.baseURL)
+            let detailViewController = PostDetailRouter.createModule(
+                post: post,
+                page: route?.page ?? page,
+                initialAnchorID: route?.anchorID
+            )
             if let navigationController = recentViewController?.navigationController {
                 navigationController.pushViewController(detailViewController, animated: true)
                 return

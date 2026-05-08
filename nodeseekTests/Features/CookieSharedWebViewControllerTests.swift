@@ -19,4 +19,15 @@ struct CookieSharedWebViewControllerTests {
         let moreButton = try #require(viewController.navigationItem.rightBarButtonItem)
         _ = try #require(moreButton.menu?.children.first { $0.title == "刷新" } as? UIAction)
     }
+
+    @Test func classifiesPostLinkAsNativeRoute() throws {
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com/post-1-1"))
+        let url = try #require(URL(string: "/post-717963-6#52", relativeTo: baseURL))
+
+        let route = try #require(CookieSharedWebViewController.nativePostRoute(for: url, baseURL: baseURL))
+
+        #expect(route.postID == "717963")
+        #expect(route.page == 6)
+        #expect(route.anchorID == "52")
+    }
 }

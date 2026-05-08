@@ -141,6 +141,10 @@ final class PostTexturePageContainerView: UIView {
         hostViewControllers[category]?.hideRefreshing()
     }
 
+    func refreshVisibleAppearanceForCurrentTraits() {
+        hostViewControllers.values.forEach { $0.refreshVisibleAppearanceForCurrentTraits() }
+    }
+
     private func showInitialPageIfNeeded() {
         guard let category = currentCategory ?? categories.first else { return }
         setCurrentCategory(category, animated: false, notifyDelegate: false)
@@ -385,6 +389,11 @@ final class PostTextureListHostViewController: UIViewController {
     func scrollToTop(animated: Bool) {
         loadViewIfNeeded()
         listView.scrollToTop(animated: animated)
+    }
+
+    func refreshVisibleAppearanceForCurrentTraits() {
+        guard isViewLoaded else { return }
+        listView.refreshVisibleAppearanceForCurrentTraits()
     }
 }
 

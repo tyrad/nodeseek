@@ -9,55 +9,29 @@ import Foundation
 
 #if DEBUG
 struct PostDetailTestTarget: Equatable {
-    private static let postPathRegex = try! NSRegularExpression(
-        pattern: "^/post-([0-9]+)(?:-([0-9]+))?/?$",
-        options: []
-    )
-
     let post: PostSummary
     let page: Int
+    let anchorID: String?
 
     init?(rawValue: String) {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false,
               let url = URL(string: trimmed, relativeTo: NodeSeekSite.baseURL)?.absoluteURL,
               NodeSeekSite.isNodeSeekHost(url),
-              let match = Self.postMatch(in: url.path) else {
+              let route = NodeSeekPostRouteResolver.route(for: url, baseURL: NodeSeekSite.baseURL) else {
             return nil
         }
 
-        let normalizedPage = max(match.page, 1)
-        self.page = normalizedPage
+        self.page = route.page
+        self.anchorID = route.anchorID
         self.post = PostSummary(
-            id: match.postID,
-            title: "详情测试 #\(match.postID)",
+            id: route.postID,
+            title: "详情测试 #\(route.postID)",
             url: url,
             authorName: "详情测试",
             nodeName: nil,
             replyCount: 0,
             lastActivityText: nil
-        )
-    }
-
-    private static func postMatch(in path: String) -> (postID: String, page: Int)? {
-        let range = NSRange(path.startIndex..<path.endIndex, in: path)
-        guard let match = postPathRegex.firstMatch(in: path, options: [], range: range),
-              match.numberOfRanges >= 3,
-              let postIDRange = Range(match.range(at: 1), in: path) else {
-            return nil
-        }
-
-        let page: Int
-        if match.range(at: 2).location != NSNotFound,
-           let pageRange = Range(match.range(at: 2), in: path) {
-            page = Int(path[pageRange]) ?? 1
-        } else {
-            page = 1
-        }
-
-        return (
-            postID: String(path[postIDRange]),
-            page: page
         )
     }
 

@@ -221,6 +221,44 @@ struct PostListPresenterTests {
         #expect(view.lastErrorMessage == nil)
     }
 
+    @Test func submittingDetailTestURLPreservesAnchor() throws {
+        let view = SpyPostListView()
+        let interactor = SpyPostListInteractor()
+        let router = SpyPostListRouter()
+        let presenter = PostListPresenter(interactor: interactor, router: router)
+        presenter.setView(view)
+
+        presenter.didSubmitDetailTestURL("https://www.nodeseek.com/post-717963-6#52")
+
+        #expect(router.selectedPost?.id == "717963")
+        #expect(router.selectedPage == 6)
+        #expect(router.selectedAnchorID == "52")
+    }
+
+    @Test func selectingPostUsesPageAndAnchorFromPostURL() {
+        let view = SpyPostListView()
+        let interactor = SpyPostListInteractor()
+        let router = SpyPostListRouter()
+        let presenter = PostListPresenter(interactor: interactor, router: router)
+        presenter.setView(view)
+        let post = PostSummary(
+            id: "717963",
+            title: "标题",
+            url: URL(string: "https://www.nodeseek.com/post-717963-6#52")!,
+            authorName: "mist",
+            nodeName: "开发",
+            replyCount: 52,
+            lastActivityText: "刚刚"
+        )
+
+        presenter.didLoadPosts([post], category: .all)
+        presenter.didSelectPost(at: 0)
+
+        #expect(router.selectedPost?.id == "717963")
+        #expect(router.selectedPage == 6)
+        #expect(router.selectedAnchorID == "52")
+    }
+
     @Test func submittingInvalidDetailTestURLShowsError() {
         let view = SpyPostListView()
         let interactor = SpyPostListInteractor()
@@ -792,6 +830,7 @@ private final class SpyPostListInteractor: PostListInteractorInput {
 private final class SpyPostListRouter: PostListRouterProtocol {
     var selectedPost: PostSummary?
     var selectedPage: Int?
+    var selectedAnchorID: String?
     var recentVisitedStore: VisitedPostStoreProtocol?
     var userProfileURL: URL?
     var notificationURL: URL?
@@ -813,6 +852,12 @@ private final class SpyPostListRouter: PostListRouterProtocol {
     func navigateToPostDetail(post: PostSummary, page: Int) {
         selectedPost = post
         selectedPage = page
+    }
+
+    func navigateToPostDetail(post: PostSummary, page: Int, initialAnchorID: String?) {
+        selectedPost = post
+        selectedPage = page
+        selectedAnchorID = initialAnchorID
     }
 
     func navigateToLogin(onClose: @escaping @MainActor () -> Void) {

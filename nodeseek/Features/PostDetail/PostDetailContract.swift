@@ -32,6 +32,7 @@ protocol PostDetailViewProtocol: AnyObject {
 // MARK: - Presenter Protocol (View -> Presenter)
 protocol PostDetailPresenterProtocol: AnyObject {
     func viewDidLoad()
+    func refreshInitialPage()
     func didTapLogin()
     func didApproachCommentEnd()
     func didTapRefreshCommentsAtEnd()

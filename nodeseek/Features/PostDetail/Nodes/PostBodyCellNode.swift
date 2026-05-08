@@ -9,7 +9,7 @@ import AsyncDisplayKit
 import DTCoreText
 import UIKit
 
-final class PostBodyCellNode: ASCellNode {
+final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
     private enum Layout {
         static let contentInset = UIEdgeInsets(
             top: 18,
@@ -53,7 +53,7 @@ final class PostBodyCellNode: ASCellNode {
     private let replyButtonNode = ASButtonNode()
     private let commentButtonNode = ASButtonNode()
     private let bodyNodes: [ASDisplayNode]
-    private var lastAppliedUserInterfaceStyle: UIUserInterfaceStyle?
+    private let themeTraitObserver = ThemeTraitObserver()
     private var hasReactionActions: Bool {
         [
             content.likeCount,
@@ -129,19 +129,13 @@ final class PostBodyCellNode: ASCellNode {
         super.init()
         automaticallyManagesSubnodes = true
         selectionStyle = .none
-        backgroundColor = .systemBackground
-        configureText()
+        applyCurrentTheme()
         configureActions()
     }
 
     override func didLoad() {
         super.didLoad()
-        lastAppliedUserInterfaceStyle = view.traitCollection.userInterfaceStyle
-        view.registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak self] (view: UIView, previousTraitCollection: UITraitCollection) in
-            guard let self else { return }
-            guard previousTraitCollection.userInterfaceStyle != view.traitCollection.userInterfaceStyle else { return }
-            self.refreshAppearanceForCurrentTraits()
-        }
+        themeTraitObserver.install(on: self)
         requestAvatarIfNeeded()
     }
 
@@ -196,6 +190,11 @@ final class PostBodyCellNode: ASCellNode {
         }
 
         return ASInsetLayoutSpec(insets: Layout.contentInset, child: stack)
+    }
+
+    func applyCurrentTheme() {
+        backgroundColor = .systemBackground
+        configureText()
     }
 
     private func configureText() {
@@ -256,17 +255,6 @@ final class PostBodyCellNode: ASCellNode {
         ))
 
         return result
-    }
-
-    @discardableResult
-    func refreshAppearanceForCurrentTraits() -> Bool {
-        let currentStyle = isNodeLoaded ? view.traitCollection.userInterfaceStyle : UITraitCollection.current.userInterfaceStyle
-        guard lastAppliedUserInterfaceStyle != currentStyle else { return false }
-        lastAppliedUserInterfaceStyle = currentStyle
-        configureText()
-        setNeedsLayout()
-        setNeedsDisplay()
-        return true
     }
 
     var debugTitleAttributedText: NSAttributedString? {

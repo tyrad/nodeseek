@@ -169,6 +169,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
     private let interactor: PostDetailInteractorInput
     private let router: PostDetailRouterProtocol
     private let visitedStore: VisitedPostStoreProtocol
+    private let initialPage: Int
     private var currentPage: Int
     private var nextCommentPage: Int?
     private var activeCommentPageRequest: CommentPageRequest?
@@ -196,7 +197,8 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         self.interactor = interactor
         self.router = router
         self.visitedStore = visitedStore
-        self.currentPage = max(1, initialPage)
+        self.initialPage = max(1, initialPage)
+        self.currentPage = self.initialPage
     }
     
     // MARK: - Setup
@@ -211,6 +213,17 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
     // MARK: - Methods
     func viewDidLoad() {
         view?.showLoading()
+        interactor.loadPostDetail(page: currentPage)
+    }
+
+    func refreshInitialPage() {
+        // currentPage 会随着加载更多变化；右上角刷新要回到进入详情时的页码。
+        view?.showLoading()
+        activeCommentPageRequest = nil
+        nextCommentPage = nil
+        commentPageTracker.reset()
+        currentDetail = nil
+        currentPage = initialPage
         interactor.loadPostDetail(page: currentPage)
     }
 

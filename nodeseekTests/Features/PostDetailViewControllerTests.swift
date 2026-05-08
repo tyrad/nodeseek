@@ -617,6 +617,134 @@ struct PostDetailViewControllerTests {
         #expect(UIPasteboard.general.string == "https://www.nodeseek.com/post-703863-2")
     }
 
+    @Test func copyCurrentPostLinkKeepsInitialPageAfterLoadingMore() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let header = PostDetailHeaderContent(
+            postID: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚"
+        )
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            initialHeader: header,
+            currentPage: 2
+        )
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: nil, contentHTML: "<p>第二页</p>")
+            ],
+            page: 2
+        ))
+        await waitForDetailContent(in: viewController, expectedRowCount: 4)
+        viewController.appendCommentPage(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "2", authorName: "b", avatarURL: nil, floorText: "#2", createdAtText: nil, contentHTML: "<p>第三页</p>")
+            ],
+            page: 3
+        ))
+        UIPasteboard.general.string = nil
+
+        viewController.copyCurrentPostLink()
+
+        #expect(UIPasteboard.general.string == "https://www.nodeseek.com/post-703863-2")
+    }
+
+    @Test func openInBrowserKeepsInitialPageAfterLoadingMore() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let header = PostDetailHeaderContent(
+            postID: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚"
+        )
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            initialHeader: header,
+            currentPage: 2
+        )
+        let navigationController = UINavigationController(rootViewController: viewController)
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: nil, contentHTML: "<p>第二页</p>")
+            ],
+            page: 2
+        ))
+        await waitForDetailContent(in: viewController, expectedRowCount: 4)
+        viewController.appendCommentPage(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "2", authorName: "b", avatarURL: nil, floorText: "#2", createdAtText: nil, contentHTML: "<p>第三页</p>")
+            ],
+            page: 3
+        ))
+
+        viewController.openInBrowserTapped()
+
+        let webViewController = try #require(navigationController.topViewController as? CookieSharedWebViewController)
+        #expect(webViewController.testInitialURL.absoluteString == "https://www.nodeseek.com/post-703863-2")
+    }
+
+    @Test func enteringNonFirstPageShowsEntryHintRow() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter, currentPage: 6)
+        viewController.loadViewIfNeeded()
+
+        viewController.render(detail: PostDetail(
+            id: "717963",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: nil, contentHTML: "<p>第六页</p>")
+            ],
+            page: 6
+        ))
+        await waitForDetailContent(in: viewController)
+
+        // 预期：header + entryHint + divider + 1 comment
+        #expect(viewController.testRowCount() == 4)
+        #expect(viewController.testDetailRowKinds() == ["header", "entryHint", "postRepliesDivider", "comment"])
+    }
+
+    @Test func entryHintCellRefreshesAppearanceWhenThemeChanges() {
+        let node = PostDetailEntryHintCellNode(page: 6, onOpenFullPost: {})
+        node.layoutIfNeeded()
+
+        let didRefresh = node.refreshAppearanceForCurrentTraits()
+
+        #expect(didRefresh)
+    }
+
     @Test func detailTextureCellsCanBeConstructedOffMainThread() async throws {
         let header = PostDetailHeaderContent(
             postID: "703863",
@@ -2112,7 +2240,7 @@ struct PostDetailViewControllerTests {
         #expect(options[AVURLAssetHTTPUserAgentKey] as? String == WebRequestFingerprint.userAgent)
     }
 
-    @Test func imageBlockUpdatesToRealAspectRatioHeightForNormalImages() {
+    @Test func imageBlockCapsLargeNormalImagesAtHalfWidthHeight() {
         let initialLayout = DetailImageBlockLayout.measure(
             originalSize: .zero,
             constrainedSize: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
@@ -2125,7 +2253,7 @@ struct PostDetailViewControllerTests {
         #expect(initialLayout.width == 320)
         #expect(initialLayout.height == 160)
         #expect(loadedLayout.width == 320)
-        #expect(abs(loadedLayout.height - 214) < 0.01)
+        #expect(loadedLayout.height == 160)
     }
 
     @Test func imageBlockUsesFullWidthPlaceholderForReportImages() {
@@ -2156,7 +2284,7 @@ struct PostDetailViewControllerTests {
         ))
 
         #expect(layout.size.width == 320)
-        #expect(abs(layout.size.height - 214) < 0.01)
+        #expect(layout.size.height == 160)
     }
 
     @Test func imageBlockNodeRequestsRowReloadWhenLoadedImageIsShorterThanPlaceholder() throws {
@@ -2700,6 +2828,10 @@ private final class SpyPostDetailPresenter: PostDetailPresenterProtocol {
         loadCount += 1
     }
 
+    func refreshInitialPage() {
+        loadCount += 1
+    }
+
     func didTapLogin() {
         didTapLoginCount += 1
     }
@@ -2952,6 +3084,18 @@ private extension PostDetailViewController {
 
     func testOpenedFullPostAnchorWasNil() -> Bool {
         Mirror(reflecting: self).children.first { $0.label == "testOpenedFullPostAnchorWasNil" }?.value as? Bool ?? false
+    }
+
+    func testDetailRowKinds() -> [String] {
+        detailRows.map { row in
+            let text = String(describing: row)
+            if text.hasPrefix("header") { return "header" }
+            if text.hasPrefix("postRepliesDivider") { return "postRepliesDivider" }
+            if text.hasPrefix("entryHint") { return "entryHint" }
+            if text.hasPrefix("comment") { return "comment" }
+            if text.hasPrefix("skeletonComment") { return "skeletonComment" }
+            return text
+        }
     }
 }
 

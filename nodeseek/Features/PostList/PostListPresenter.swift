@@ -141,7 +141,11 @@ class PostListPresenter: PostListPresenterProtocol {
             return
         }
 
-        router.navigateToPostDetail(post: target.post, page: target.page)
+        router.navigateToPostDetail(
+            post: target.post,
+            page: target.page,
+            initialAnchorID: target.anchorID
+        )
     }
     #endif
 
@@ -238,7 +242,15 @@ class PostListPresenter: PostListPresenterProtocol {
             view?.renderVisitedState(at: index, isVisited: true)
         }
 
-        router.navigateToPostDetail(post: item.post)
+        if let route = NodeSeekPostRouteResolver.route(for: item.post.url, baseURL: NodeSeekSite.baseURL) {
+            router.navigateToPostDetail(
+                post: item.post,
+                page: route.page,
+                initialAnchorID: route.anchorID
+            )
+        } else {
+            router.navigateToPostDetail(post: item.post)
+        }
     }
 
     func didApproachBottom(currentIndex: Int, totalCount: Int) {

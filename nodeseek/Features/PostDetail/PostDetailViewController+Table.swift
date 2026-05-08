@@ -18,6 +18,9 @@ extension PostDetailViewController {
         var rows: [DetailRow] = []
         if currentHeaderContent != nil {
             rows.append(.header)
+            if shouldShowInitialPageHint {
+                rows.append(.entryHint)
+            }
             if displayMode == .pageSkeleton || comments.isEmpty == false {
                 rows.append(.postRepliesDivider)
             }
@@ -154,6 +157,13 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                         self?.scheduleHeaderReload()
                     }
                 )
+            }
+        case .entryHint:
+            let page = initialPage
+            return { [weak self] in
+                PostDetailEntryHintCellNode(page: page) {
+                    self?.openFullPostFromEntryHint()
+                }
             }
         case .postRepliesDivider:
             return {

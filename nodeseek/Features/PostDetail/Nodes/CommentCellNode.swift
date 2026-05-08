@@ -22,7 +22,7 @@ enum PostDetailContentLayout {
     static let reactionHorizontalWidthPadding: CGFloat = 20
 }
 
-final class CommentCellNode: ASCellNode {
+final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
     private enum Layout {
         static let headerSpacing: CGFloat = 5
         static let bodySpacing: CGFloat = 10
@@ -72,7 +72,7 @@ final class CommentCellNode: ASCellNode {
     private let bodyNodes: [ASDisplayNode]
     private(set) var debugActionsAreDisplayedBelowBody = false
     private(set) var debugHeaderTimeIsOnSecondLine = false
-    private var lastAppliedUserInterfaceStyle: UIUserInterfaceStyle?
+    private let themeTraitObserver = ThemeTraitObserver()
 
     private lazy var avatarNode: ASDisplayNode = {
         let node = ASDisplayNode(viewBlock: { [weak self] in
@@ -134,20 +134,13 @@ final class CommentCellNode: ASCellNode {
         super.init()
         automaticallyManagesSubnodes = true
         selectionStyle = .none
-        backgroundColor = .systemBackground
-        separatorNode.backgroundColor = .separator
-        configureText()
+        applyCurrentTheme()
         configureActions()
     }
 
     override func didLoad() {
         super.didLoad()
-        lastAppliedUserInterfaceStyle = view.traitCollection.userInterfaceStyle
-        view.registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak self] (view: UIView, previousTraitCollection: UITraitCollection) in
-            guard let self else { return }
-            guard previousTraitCollection.userInterfaceStyle != view.traitCollection.userInterfaceStyle else { return }
-            self.refreshAppearanceForCurrentTraits()
-        }
+        themeTraitObserver.install(on: self)
         requestAvatarIfNeeded()
     }
 
@@ -259,6 +252,12 @@ final class CommentCellNode: ASCellNode {
         let stack = ASStackLayoutSpec.vertical()
         stack.children = [rowContent, separatorNode]
         return stack
+    }
+
+    func applyCurrentTheme() {
+        backgroundColor = .systemBackground
+        separatorNode.backgroundColor = .separator
+        configureText()
     }
 
     private func configureText() {
@@ -489,17 +488,6 @@ final class CommentCellNode: ASCellNode {
                     + PostDetailContentLayout.reactionHorizontalWidthPadding
             )
         )
-    }
-
-    @discardableResult
-    func refreshAppearanceForCurrentTraits() -> Bool {
-        let currentStyle = isNodeLoaded ? view.traitCollection.userInterfaceStyle : UITraitCollection.current.userInterfaceStyle
-        guard lastAppliedUserInterfaceStyle != currentStyle else { return false }
-        lastAppliedUserInterfaceStyle = currentStyle
-        configureText()
-        setNeedsLayout()
-        setNeedsDisplay()
-        return true
     }
 
     var debugAuthorAttributedTitle: NSAttributedString? {
