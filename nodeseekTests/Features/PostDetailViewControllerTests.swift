@@ -1515,6 +1515,7 @@ struct PostDetailViewControllerTests {
             pagination: nil
         ))
         await waitForDetailContent(in: viewController)
+        viewController.testVisibleAnchorIDs = []
 
         let url = try #require(URL(string: "#326", relativeTo: baseURL)?.absoluteURL)
         viewController.handleContentLinkTap(url)
@@ -1523,7 +1524,88 @@ struct PostDetailViewControllerTests {
         #expect(viewController.testPresentedPreviewUsesCommentCellRendering())
         #expect((viewController.testPresentedPreviewPreferredHeight() ?? 0) < viewController.view.bounds.height)
         #expect(viewController.testPresentedPreviewKeepsCloseButtonOutsideContent())
+        #expect(viewController.testPresentedPreviewUsesBottomSheet())
+        #expect(viewController.testPresentedPreviewShowsFullPostButton() == false)
         #expect(viewController.testHighlightedAnchorID() == nil)
+    }
+
+    @Test func fullPostPreviewActionOpensPostFromBeginning() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            currentPage: 3,
+            initialAnchorID: "326"
+        )
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(
+                    id: "target-comment",
+                    anchorID: "326",
+                    authorName: "a",
+                    avatarURL: nil,
+                    floorText: "#326",
+                    createdAtText: "1min ago",
+                    contentHTML: "<p>目标楼层</p>"
+                )
+            ],
+            page: 3,
+            pagination: nil
+        ))
+        await waitForDetailContent(in: viewController)
+
+        viewController.testOpenFullPostFromFloorPreview()
+
+        #expect(viewController.testOpenedFullPostPage() == 1)
+        #expect(viewController.testOpenedFullPostAnchorWasNil())
+    }
+
+    @Test func floorPreviewShowsFullPostActionOnlyForInitialAnchorDetail() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            currentPage: 3,
+            initialAnchorID: "326"
+        )
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(
+                    id: "target-comment",
+                    anchorID: "326",
+                    authorName: "a",
+                    avatarURL: nil,
+                    floorText: "#326",
+                    createdAtText: "1min ago",
+                    contentHTML: "<p>目标楼层</p>"
+                )
+            ],
+            page: 3,
+            pagination: nil
+        ))
+        await waitForDetailContent(in: viewController)
+        viewController.testVisibleAnchorIDs = []
+
+        let url = try #require(URL(string: "#326", relativeTo: baseURL)?.absoluteURL)
+        viewController.handleContentLinkTap(url)
+
+        #expect(viewController.testPresentedPreviewShowsFullPostButton())
     }
 
     @Test func loadedVisibleFloorLinkUsesExistingHighlightInsteadOfPreview() async throws {
@@ -2854,6 +2936,22 @@ private extension PostDetailViewController {
 
     func testPresentedPreviewKeepsCloseButtonOutsideContent() -> Bool {
         Mirror(reflecting: self).children.first { $0.label == "testPresentedPreviewKeepsCloseButtonOutsideContent" }?.value as? Bool ?? false
+    }
+
+    func testPresentedPreviewUsesBottomSheet() -> Bool {
+        Mirror(reflecting: self).children.first { $0.label == "testPresentedPreviewUsesBottomSheet" }?.value as? Bool ?? false
+    }
+
+    func testPresentedPreviewShowsFullPostButton() -> Bool {
+        Mirror(reflecting: self).children.first { $0.label == "testPresentedPreviewShowsFullPostButton" }?.value as? Bool ?? false
+    }
+
+    func testOpenedFullPostPage() -> Int? {
+        Mirror(reflecting: self).children.first { $0.label == "testOpenedFullPostPage" }?.value as? Int
+    }
+
+    func testOpenedFullPostAnchorWasNil() -> Bool {
+        Mirror(reflecting: self).children.first { $0.label == "testOpenedFullPostAnchorWasNil" }?.value as? Bool ?? false
     }
 }
 

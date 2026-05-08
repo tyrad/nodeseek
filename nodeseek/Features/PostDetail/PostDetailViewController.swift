@@ -141,6 +141,7 @@ class PostDetailViewController: UIViewController {
     let presenter: PostDetailPresenterProtocol
     let baseURL = NodeSeekSite.baseURL
     var currentPage: Int
+    let wasOpenedFromInitialAnchor: Bool
     var currentHeaderContent: PostDetailHeaderContent?
     var pagination: PostDetailPagination?
     var headerRenderedContent: [RenderedContentBlock]?
@@ -190,6 +191,10 @@ class PostDetailViewController: UIViewController {
     var testPresentedPreviewUsesCommentCellRendering = false
     var testPresentedPreviewPreferredHeight: CGFloat?
     var testPresentedPreviewKeepsCloseButtonOutsideContent = false
+    var testPresentedPreviewUsesBottomSheet = false
+    var testPresentedPreviewShowsFullPostButton = false
+    var testOpenedFullPostPage: Int?
+    var testOpenedFullPostAnchorWasNil = false
     #endif
     let skeletonCommentRowCount = 4
     let accountRefresher: any CurrentAccountRefreshing
@@ -483,6 +488,7 @@ class PostDetailViewController: UIViewController {
         self.sourcePostURL = sourcePostURL
         self.currentPage = max(currentPage, 1)
         self.pendingInitialAnchorID = initialAnchorID
+        self.wasOpenedFromInitialAnchor = initialAnchorID?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
         self.accountRefresher = accountRefresher ?? CurrentAccountRefresher.shared
         self.nodeImageAPIKeyStore = nodeImageAPIKeyStore
         self.nodeImageUploadClient = nodeImageUploadClient

@@ -168,6 +168,8 @@ extension PostDetailViewController {
         testHighlightedAnchorID = nil
         testPresentedPreviewUsesCommentCellRendering = true
         testPresentedPreviewKeepsCloseButtonOutsideContent = true
+        testPresentedPreviewUsesBottomSheet = true
+        testPresentedPreviewShowsFullPostButton = wasOpenedFromInitialAnchor
         #endif
         let renderedContent = commentRenderedCache[comment.id] ?? Self.makeRenderedContent(
             html: comment.contentHTML,
@@ -178,6 +180,10 @@ extension PostDetailViewController {
         let previewController = LoadedCommentPreviewViewController(
             comment: comment,
             renderedContent: renderedContent,
+            showsFullPostButton: wasOpenedFromInitialAnchor,
+            onOpenFullPost: { [weak self] in
+                self?.openFullPostFromFloorPreview()
+            },
             onReveal: { [weak self] in
                 self?.dismiss(animated: true) {
                     self?.scrollToCurrentPageAnchor(anchorID)
@@ -189,18 +195,56 @@ extension PostDetailViewController {
             renderedContent: renderedContent,
             containerSize: view.bounds.size
         )
-        previewController.modalPresentationStyle = .popover
+        previewController.modalPresentationStyle = .pageSheet
         previewController.preferredContentSize = preferredSize
         #if DEBUG
         testPresentedPreviewPreferredHeight = preferredSize.height
         #endif
-        if let popover = previewController.popoverPresentationController {
-            popover.delegate = previewController
-            popover.sourceView = view
-            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
-            popover.permittedArrowDirections = []
+        if let sheet = previewController.sheetPresentationController {
+            let detentID = UISheetPresentationController.Detent.Identifier("floor-preview")
+            sheet.detents = [
+                .custom(identifier: detentID) { _ in
+                    preferredSize.height
+                }
+            ]
+            sheet.selectedDetentIdentifier = detentID
+            sheet.prefersGrabberVisible = true
+            sheet.prefersScrollingExpandsWhenScrolledToEdge = false
+            sheet.preferredCornerRadius = 18
         }
         present(previewController, animated: true)
+    }
+
+    private func openFullPostFromFloorPreview() {
+        guard let header = currentHeaderContent else { return }
+        guard wasOpenedFromInitialAnchor else { return }
+        let page = 1
+        #if DEBUG
+        testOpenedFullPostPage = page
+        testOpenedFullPostAnchorWasNil = true
+        #endif
+        let post = PostSummary(
+            id: header.postID,
+            title: header.title,
+            url: NodeSeekSite.postURL(id: header.postID, page: page),
+            authorName: header.authorName,
+            nodeName: nil,
+            replyCount: 0,
+            lastActivityText: header.metadataText,
+            avatarURL: header.avatarURL
+        )
+        let viewController = PostDetailRouter.createModule(
+            post: post,
+            page: page,
+            initialAnchorID: nil
+        )
+        if presentedViewController != nil {
+            dismiss(animated: true) { [weak self] in
+                self?.showDetailDestination(viewController)
+            }
+        } else {
+            showDetailDestination(viewController)
+        }
     }
 
     func openUserInfo(profileURL: URL) {
@@ -283,6 +327,12 @@ extension PostDetailViewController {
         NodeSeekSite.isNodeSeekHost(url)
     }
 
+    #if DEBUG
+    func testOpenFullPostFromFloorPreview() {
+        openFullPostFromFloorPreview()
+    }
+    #endif
+
     private func normalizedAnchorID(from url: URL) -> String? {
         guard let fragment = url.fragment?.removingPercentEncoding else { return nil }
         return normalizedAnchorText(fragment)
@@ -305,30 +355,38 @@ private final class LoadedCommentPreviewViewController: UIViewController {
         static let minimumWidth: CGFloat = 320
         static let maximumWidth: CGFloat = 420
         static let minimumHeight: CGFloat = 220
-        static let maximumHeightRatio: CGFloat = 0.68
+        static let maximumHeightRatio: CGFloat = 0.72
         static let fallbackContainerWidth: CGFloat = 390
         static let fallbackContainerHeight: CGFloat = 844
-        static let headerHeight: CGFloat = 48
-        static let footerHeight: CGFloat = 64
-        static let verticalChrome: CGFloat = 34
+        static let headerHeight: CGFloat = 56
+        static let footerHeight: CGFloat = 86
+        static let verticalChrome: CGFloat = 54
         static let estimatedNonTextBlockHeight: CGFloat = 120
     }
 
     private let comment: Comment
     private let renderedContent: [RenderedContentBlock]?
+    private let showsFullPostButton: Bool
+    private let onOpenFullPost: () -> Void
     private let onReveal: () -> Void
     private let tableNode = ASTableNode(style: .plain)
     private let headerView = UIView()
     private let headerSeparator = UIView()
+    private let footerStack = UIStackView()
+    private let fullPostButton = UIButton(type: .system)
     private let revealButton = UIButton(type: .system)
 
     init(
         comment: Comment,
         renderedContent: [RenderedContentBlock]?,
+        showsFullPostButton: Bool,
+        onOpenFullPost: @escaping () -> Void,
         onReveal: @escaping () -> Void
     ) {
         self.comment = comment
         self.renderedContent = renderedContent
+        self.showsFullPostButton = showsFullPostButton
+        self.onOpenFullPost = onOpenFullPost
         self.onReveal = onReveal
         super.init(nibName: nil, bundle: nil)
     }
@@ -433,23 +491,46 @@ private final class LoadedCommentPreviewViewController: UIViewController {
         headerView.addSubview(closeButton)
         headerView.addSubview(headerSeparator)
 
-        var configuration = UIButton.Configuration.filled()
-        configuration.title = "查看原楼"
-        configuration.baseBackgroundColor = .label
-        configuration.baseForegroundColor = .systemBackground
-        configuration.cornerStyle = .medium
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
-        revealButton.configuration = configuration
+        var fullPostConfiguration = UIButton.Configuration.bordered()
+        fullPostConfiguration.title = "查看完整帖子"
+        fullPostConfiguration.baseForegroundColor = .label
+        fullPostConfiguration.cornerStyle = .medium
+        fullPostConfiguration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 10, bottom: 8, trailing: 10)
+        fullPostButton.configuration = fullPostConfiguration
+        fullPostButton.addTarget(self, action: #selector(fullPostTapped), for: .touchUpInside)
+        fullPostButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        fullPostButton.titleLabel?.minimumScaleFactor = 0.85
+
+        var revealConfiguration = UIButton.Configuration.filled()
+        revealConfiguration.title = "查看原楼"
+        revealConfiguration.baseBackgroundColor = .label
+        revealConfiguration.baseForegroundColor = .systemBackground
+        revealConfiguration.cornerStyle = .medium
+        revealConfiguration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 10, bottom: 8, trailing: 10)
+        revealButton.configuration = revealConfiguration
         revealButton.addTarget(self, action: #selector(revealTapped), for: .touchUpInside)
-        revealButton.translatesAutoresizingMaskIntoConstraints = false
+        revealButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        revealButton.titleLabel?.minimumScaleFactor = 0.85
+
+        footerStack.axis = .horizontal
+        footerStack.alignment = .fill
+        footerStack.distribution = .fillEqually
+        footerStack.spacing = 10
+        footerStack.translatesAutoresizingMaskIntoConstraints = false
+        if showsFullPostButton {
+            footerStack.addArrangedSubview(fullPostButton)
+        }
+        footerStack.addArrangedSubview(revealButton)
 
         tableNode.view.backgroundColor = .systemBackground
         tableNode.view.separatorStyle = .none
         tableNode.view.alwaysBounceVertical = false
+        tableNode.contentInset = UIEdgeInsets(top: 12, left: 0, bottom: 14, right: 0)
+        tableNode.view.verticalScrollIndicatorInsets = tableNode.contentInset
         tableNode.view.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(tableNode.view)
         view.addSubview(headerView)
-        view.addSubview(revealButton)
+        view.addSubview(footerStack)
 
         NSLayoutConstraint.activate([
             headerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -465,12 +546,12 @@ private final class LoadedCommentPreviewViewController: UIViewController {
             tableNode.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableNode.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tableNode.view.topAnchor.constraint(equalTo: headerView.bottomAnchor),
-            tableNode.view.bottomAnchor.constraint(equalTo: revealButton.topAnchor, constant: -10),
+            tableNode.view.bottomAnchor.constraint(equalTo: footerStack.topAnchor, constant: -12),
 
-            revealButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            revealButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            revealButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -14),
-            revealButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 36),
+            footerStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            footerStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            footerStack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            footerStack.heightAnchor.constraint(greaterThanOrEqualToConstant: 40),
 
             closeButton.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
             closeButton.trailingAnchor.constraint(equalTo: headerView.trailingAnchor, constant: -8),
@@ -482,6 +563,11 @@ private final class LoadedCommentPreviewViewController: UIViewController {
     @objc
     private func closeTapped() {
         dismiss(animated: true)
+    }
+
+    @objc
+    private func fullPostTapped() {
+        onOpenFullPost()
     }
 
     @objc
@@ -515,11 +601,5 @@ extension LoadedCommentPreviewViewController: ASTableDataSource, ASTableDelegate
                 }
             )
         }
-    }
-}
-
-extension LoadedCommentPreviewViewController: UIPopoverPresentationControllerDelegate {
-    func adaptivePresentationStyle(for controller: UIPresentationController) -> UIModalPresentationStyle {
-        .none
     }
 }
