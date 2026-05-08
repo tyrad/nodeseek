@@ -64,7 +64,6 @@ nonisolated enum DetailImageLayout {
 
     static func placeholderSize(
         maxWidth: CGFloat,
-        maxHeight: CGFloat?,
         kind: DetailImageKind
     ) -> CGSize {
         guard maxWidth > 0 else { return .zero }
@@ -90,33 +89,59 @@ nonisolated enum DetailImageLayout {
             return DetailImagePresentation(size: .zero, mode: .aspectFit)
         }
 
-        if kind == .sticker {
-            let size: CGSize
-            if originalSize.width > 0, originalSize.height > 0 {
-                size = scaledSize(
-                    for: originalSize,
-                    maxWidth: min(maxWidth, fixedStickerWidth),
-                    maxHeight: nil
-                )
-            } else {
-                size = placeholderSize(maxWidth: maxWidth, maxHeight: nil, kind: .sticker)
-            }
-            return DetailImagePresentation(size: size, mode: .aspectFit)
+        switch kind {
+        case .sticker:
+            return stickerPresentation(for: originalSize, maxWidth: maxWidth)
+        case .normal:
+            return normalPresentation(for: originalSize, maxWidth: maxWidth)
+        case .report:
+            return reportPresentation(for: originalSize, maxWidth: maxWidth)
         }
+    }
 
+    private static func stickerPresentation(for originalSize: CGSize, maxWidth: CGFloat) -> DetailImagePresentation {
+        let size: CGSize
+        if originalSize.width > 0, originalSize.height > 0 {
+            size = scaledSize(
+                for: originalSize,
+                maxWidth: min(maxWidth, fixedStickerWidth),
+                maxHeight: nil
+            )
+        } else {
+            size = placeholderSize(maxWidth: maxWidth, kind: .sticker)
+        }
+        return DetailImagePresentation(size: size, mode: .aspectFit)
+    }
+
+    private static func normalPresentation(for originalSize: CGSize, maxWidth: CGFloat) -> DetailImagePresentation {
         guard originalSize.width > 0, originalSize.height > 0 else {
-            if kind == .report {
-                return DetailImagePresentation(size: reportPlaceholderSize(maxWidth: maxWidth), mode: .aspectFit)
-            }
             return DetailImagePresentation(size: fixedNormalImageSize(maxWidth: maxWidth), mode: .thumbnailCrop)
         }
 
-        let aspectRatio = originalSize.width / originalSize.height
-        let maxHeight = kind != .report && aspectRatio <= 1 / extremeAspectRatio ? maxImageHeight : nil
+        let maxPreviewHeight = normalPreviewMaxHeight(maxWidth: maxWidth)
+        let aspectFitSize = scaledSize(for: originalSize, maxWidth: maxWidth, maxHeight: nil)
+        guard maxPreviewHeight > 0, aspectFitSize.height > maxPreviewHeight else {
+            return DetailImagePresentation(size: aspectFitSize, mode: .aspectFit)
+        }
+
         return DetailImagePresentation(
-            size: scaledSize(for: originalSize, maxWidth: maxWidth, maxHeight: maxHeight),
+            size: CGSize(width: maxWidth, height: maxPreviewHeight),
+            mode: .thumbnailCrop
+        )
+    }
+
+    private static func reportPresentation(for originalSize: CGSize, maxWidth: CGFloat) -> DetailImagePresentation {
+        guard originalSize.width > 0, originalSize.height > 0 else {
+            return DetailImagePresentation(size: reportPlaceholderSize(maxWidth: maxWidth), mode: .aspectFit)
+        }
+        return DetailImagePresentation(
+            size: scaledSize(for: originalSize, maxWidth: maxWidth, maxHeight: nil),
             mode: .aspectFit
         )
+    }
+
+    private static func normalPreviewMaxHeight(maxWidth: CGFloat) -> CGFloat {
+        floor(maxWidth / 2)
     }
 
     static func allowsInlineAnimation(

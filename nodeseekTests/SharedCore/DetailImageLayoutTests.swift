@@ -18,7 +18,6 @@ struct DetailImageLayoutTests {
     @Test func placeholderUsesFixedStickerSquare() {
         let size = DetailImageLayout.placeholderSize(
             maxWidth: 320,
-            maxHeight: nil,
             kind: .sticker
         )
 
@@ -29,7 +28,6 @@ struct DetailImageLayoutTests {
     @Test func placeholderUsesHalfWidthSquareForNormalImage() {
         let size = DetailImageLayout.placeholderSize(
             maxWidth: 320,
-            maxHeight: 420,
             kind: .normal
         )
 
@@ -56,7 +54,7 @@ struct DetailImageLayoutTests {
         #expect(size.height == 187)
     }
 
-    @Test func normalPhotoUsesAspectFitPresentation() {
+    @Test func normalPhotoUsesHalfWidthThumbnailPreview() {
         let presentation = DetailImageLayout.presentation(
             for: CGSize(width: 1200, height: 800),
             maxWidth: 320,
@@ -64,21 +62,21 @@ struct DetailImageLayoutTests {
         )
 
         #expect(presentation.size.width == 320)
-        #expect(abs(presentation.size.height - 213.333) < 0.01)
-        #expect(presentation.mode == .aspectFit)
+        #expect(presentation.size.height == 160)
+        #expect(presentation.mode == .thumbnailCrop)
         #expect(presentation.targetPointSide == 320)
     }
 
-    @Test func tallScreenshotUsesContainedPresentation() {
+    @Test func tallImageUsesHalfWidthThumbnailPreview() {
         let presentation = DetailImageLayout.presentation(
             for: CGSize(width: 800, height: 2000),
             maxWidth: 320,
             kind: .normal
         )
 
-        #expect(presentation.size == CGSize(width: 168, height: 420))
-        #expect(presentation.mode == .aspectFit)
-        #expect(presentation.targetPointSide == 420)
+        #expect(presentation.size == CGSize(width: 320, height: 160))
+        #expect(presentation.mode == .thumbnailCrop)
+        #expect(presentation.targetPointSide == 320)
     }
 
     @Test func tallReportImageKeepsFullWidthInsteadOfHeightConstrainedThumbnail() {
