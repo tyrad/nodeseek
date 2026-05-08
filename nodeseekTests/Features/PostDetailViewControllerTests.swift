@@ -2231,6 +2231,37 @@ struct PostDetailViewControllerTests {
         #expect(didRequestRowReload)
     }
 
+    @Test func contentBlockFactoryCreatesFullWidthIframeLinkNode() throws {
+        let openURL = try #require(URL(string: "https://player.bilibili.com/player.html?bvid=BV1GUdgBdESz"))
+        let nodes = DetailContentBlockNodeFactory.makeNodes(
+            from: [
+                .iframeLink(RenderedIFrameLinkBlock(
+                    source: "//player.bilibili.com/player.html?bvid=BV1GUdgBdESz",
+                    displayDomain: "player.bilibili.com",
+                    openURL: openURL
+                ))
+            ],
+            onImageTapped: { _, _ in },
+            onLinkTapped: { _ in },
+            onTextLayoutInvalidated: {}
+        )
+        let node = try #require(nodes.first)
+        #expect(String(describing: type(of: node)).contains("DetailIFrameLinkNode"))
+
+        let layout = node.layoutThatFits(ASSizeRange(
+            min: .zero,
+            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
+        ))
+        #expect(layout.size.width == 320)
+        #expect(layout.size.height > 0)
+    }
+
+    @Test func iframeLinkTitleIncludesClickToViewHint() {
+        let title = DetailIFrameLinkLayout.titleText(displayDomain: "player.bilibili.com")
+
+        #expect(title == "嵌入内容 · player.bilibili.com · 点击查看")
+    }
+
     @Test func imageBlockUsesRealAspectRatioHeightForVeryWideImages() {
         let layout = DetailImageBlockLayout.measure(
             originalSize: CGSize(width: 1200, height: 180),

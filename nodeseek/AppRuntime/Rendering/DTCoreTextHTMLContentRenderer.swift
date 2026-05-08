@@ -33,6 +33,10 @@ struct DTCoreTextHTMLContentRenderer {
         pattern: "<img\\b[^>]*>",
         options: [.caseInsensitive]
     )
+    static let iframeTagRegex = try! NSRegularExpression(
+        pattern: "(?is)<iframe\\b[^>]*(>.*?</iframe\\s*>|\\s*/>|>)",
+        options: []
+    )
     static let videoTagRegex = try! NSRegularExpression(
         pattern: "<video\\b[\\s\\S]*?</video>",
         options: [.caseInsensitive]

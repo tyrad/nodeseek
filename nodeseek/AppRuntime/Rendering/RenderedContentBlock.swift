@@ -49,6 +49,12 @@ struct RenderedImageBlock: Equatable {
     let altText: String?
 }
 
+struct RenderedIFrameLinkBlock: Equatable {
+    let source: String
+    let displayDomain: String
+    let openURL: URL
+}
+
 struct HTMLContainerShell: Equatable {
     let openingTag: String
     let innerHTML: String
@@ -60,6 +66,7 @@ enum RenderedContentBlock {
     case table(RenderedTableBlock)
     case codeBlock(RenderedCodeBlock)
     case image(RenderedImageBlock)
+    case iframeLink(RenderedIFrameLinkBlock)
     case imagePlaceholder(URL?)
     case unsupported(reason: String)
 }
