@@ -203,12 +203,17 @@ extension PostDetailViewController {
         #endif
         if let sheet = previewController.sheetPresentationController {
             let detentID = UISheetPresentationController.Detent.Identifier("floor-preview")
-            sheet.detents = [
-                .custom(identifier: detentID) { _ in
-                    preferredSize.height
-                }
-            ]
-            sheet.selectedDetentIdentifier = detentID
+            if #available(iOS 16.0, *) {
+                sheet.detents = [
+                    .custom(identifier: detentID) { _ in
+                        preferredSize.height
+                    }
+                ]
+                sheet.selectedDetentIdentifier = detentID
+            } else {
+                sheet.detents = [.medium(), .large()]
+                sheet.selectedDetentIdentifier = .medium
+            }
             sheet.prefersGrabberVisible = true
             sheet.prefersScrollingExpandsWhenScrolledToEdge = false
             sheet.preferredCornerRadius = 18

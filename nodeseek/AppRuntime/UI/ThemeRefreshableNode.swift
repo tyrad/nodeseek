@@ -36,6 +36,7 @@ extension ThemeRefreshableNode where Self: ASDisplayNode {
 /// 监听 view 的 trait 切换并触发 Node 刷新。
 final class ThemeTraitObserver {
     private var isInstalled = false
+    private weak var fallbackObserverView: ThemeTraitObserverView?
 
     func install<Node>(on node: Node) where Node: ASDisplayNode, Node: ThemeRefreshableNode {
         guard isInstalled == false else { return }
@@ -45,11 +46,44 @@ final class ThemeTraitObserver {
         let view = node.view
         node.refreshAppearanceForCurrentTraits()
 
-        view.registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak node] (view: UIView, previousTraitCollection: UITraitCollection) in
-            guard let node else { return }
-            guard previousTraitCollection.userInterfaceStyle != view.traitCollection.userInterfaceStyle else { return }
+        if #available(iOS 17.0, *) {
+            view.registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak node] (view: UIView, previousTraitCollection: UITraitCollection) in
+                guard let node else { return }
+                guard previousTraitCollection.userInterfaceStyle != view.traitCollection.userInterfaceStyle else { return }
 
-            node.refreshAppearanceForCurrentTraits()
+                node.refreshAppearanceForCurrentTraits()
+            }
+        } else {
+            let observerView = ThemeTraitObserverView { [weak node] previousTraitCollection, currentTraitCollection in
+                guard let node else { return }
+                guard previousTraitCollection?.userInterfaceStyle != currentTraitCollection.userInterfaceStyle else { return }
+
+                node.refreshAppearanceForCurrentTraits()
+            }
+            view.addSubview(observerView)
+            fallbackObserverView = observerView
         }
+    }
+}
+
+private final class ThemeTraitObserverView: UIView {
+    private let onTraitCollectionDidChange: (UITraitCollection?, UITraitCollection) -> Void
+
+    init(onTraitCollectionDidChange: @escaping (UITraitCollection?, UITraitCollection) -> Void) {
+        self.onTraitCollectionDidChange = onTraitCollectionDidChange
+        super.init(frame: .zero)
+        isUserInteractionEnabled = false
+        backgroundColor = .clear
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("ThemeTraitObserverView does not support storyboard initialization")
+    }
+
+    @available(iOS, introduced: 2.0, deprecated: 17.0)
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        onTraitCollectionDidChange(previousTraitCollection, traitCollection)
     }
 }

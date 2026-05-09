@@ -23,9 +23,11 @@ enum DetailVideoAssetRequest {
         for url: URL,
         cookieStorage: HTTPCookieStorage = .shared
     ) -> [String: Any] {
-        var options: [String: Any] = [
-            AVURLAssetHTTPUserAgentKey: WebRequestFingerprint.userAgent
-        ]
+        var options: [String: Any] = [:]
+
+        if #available(iOS 16.0, *) {
+            options[AVURLAssetHTTPUserAgentKey] = WebRequestFingerprint.userAgent
+        }
 
         if let cookies = cookieStorage.cookies(for: url), cookies.isEmpty == false {
             options[AVURLAssetHTTPCookiesKey] = cookies

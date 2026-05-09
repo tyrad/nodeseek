@@ -38,10 +38,12 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         layoutFrameHeightIsConstrainedByBounds = false
         isUserInteractionEnabled = true
         setContentCompressionResistancePriority(.required, for: .vertical)
-        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak self] (view: Self, previousTraitCollection: UITraitCollection) in
-            guard let self else { return }
-            guard previousTraitCollection.userInterfaceStyle != view.traitCollection.userInterfaceStyle else { return }
-            self.refreshAppearanceForCurrentTraits()
+        if #available(iOS 17.0, *) {
+            registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak self] (view: Self, previousTraitCollection: UITraitCollection) in
+                guard let self else { return }
+                guard previousTraitCollection.userInterfaceStyle != view.traitCollection.userInterfaceStyle else { return }
+                self.refreshAppearanceForCurrentTraits()
+            }
         }
     }
 
@@ -51,6 +53,19 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    @available(iOS, introduced: 2.0, deprecated: 17.0)
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+
+        if #available(iOS 17.0, *) {
+            return
+        }
+        guard previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle else {
+            return
+        }
+        refreshAppearanceForCurrentTraits()
     }
 
     override func draw(_ layer: CALayer, in context: CGContext) {

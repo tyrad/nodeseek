@@ -115,7 +115,7 @@ final class DetailInlineVideoStickerView: UIView {
             generator.appliesPreferredTrackTransform = true
             generator.maximumSize = CGSize(width: 180, height: 180)
             self.thumbnailGenerator = generator
-            generator.generateCGImageAsynchronously(for: .zero) { [weak self] cgImage, _, _ in
+            generator.generateCGImagesAsynchronously(forTimes: [NSValue(time: .zero)]) { [weak self] _, cgImage, _, _, _ in
                 DispatchQueue.main.async {
                     guard let self, self.thumbnailToken == token else { return }
                     self.thumbnailTask = nil
