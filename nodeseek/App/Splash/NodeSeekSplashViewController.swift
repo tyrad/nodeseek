@@ -34,10 +34,6 @@ final class NodeSeekSplashViewController: UIViewController {
         applyColors()
         animator.install(in: view)
         startPrewarmIfNeeded()
-        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (controller: NodeSeekSplashViewController, _) in
-            controller.applyColors()
-            controller.animator.updateColors(for: controller.traitCollection)
-        }
     }
 
     override func viewDidLayoutSubviews() {

@@ -2328,7 +2328,9 @@ struct PostDetailViewControllerTests {
         let cookies = try #require(options[AVURLAssetHTTPCookiesKey] as? [HTTPCookie])
 
         #expect(cookies.contains { $0.name == "video_asset_test_cookie" && $0.value == "token" })
-        #expect(options[AVURLAssetHTTPUserAgentKey] as? String == WebRequestFingerprint.userAgent)
+        if #available(iOS 16.0, *) {
+            #expect(options[AVURLAssetHTTPUserAgentKey] as? String == WebRequestFingerprint.userAgent)
+        }
     }
 
     @Test func imageBlockCapsLargeNormalImagesAtHalfWidthHeight() {
