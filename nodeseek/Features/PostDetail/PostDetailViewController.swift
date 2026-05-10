@@ -14,6 +14,7 @@ enum PostDetailLinkDestination {
     case userProfile(URL)
     case web(URL)
     case safari(URL)
+    case externalApp(URL)
 }
 
 enum ChickenLegConfirmationContext: Equatable {
@@ -68,7 +69,7 @@ enum PostDetailLinkResolver {
         }
 
         guard isNodeSeekHost(resolvedURL) else {
-            return .safari(resolvedURL)
+            return isHTTPURL(resolvedURL) ? .safari(resolvedURL) : .externalApp(resolvedURL)
         }
 
         if let redirectTargetURL = decodedHTTPRedirectTarget(from: resolvedURL) {

@@ -91,6 +91,13 @@ extension PostDetailViewController {
             showDetailDestination(webViewController)
         case .safari(let url):
             present(SFSafariViewController(url: url), animated: true)
+        case .externalApp(let url):
+            UIApplication.shared.open(url, options: [:]) { [weak self] success in
+                guard success == false else { return }
+                DispatchQueue.main.async {
+                    self?.showError(message: "无法打开这个链接。")
+                }
+            }
         }
     }
 
