@@ -361,29 +361,6 @@ class PostDetailViewController: UIViewController {
         return view
     }()
 
-    let replyContextLabel: UILabel = {
-        let label = UILabel()
-        label.font = .preferredFont(forTextStyle: .footnote)
-        label.textColor = .secondaryLabel
-        label.numberOfLines = 1
-        label.lineBreakMode = .byTruncatingTail
-        label.accessibilityIdentifier = "post-detail-reply-context-label"
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-
-    let replyContextCloseButton: UIButton = {
-        let button = UIButton(type: .system)
-        var configuration = UIButton.Configuration.plain()
-        configuration.image = UIImage(systemName: "xmark")
-        configuration.baseForegroundColor = .tertiaryLabel
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4)
-        button.configuration = configuration
-        button.accessibilityLabel = "取消引用"
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
-    }()
-
     let replyContextStackView: UIStackView = {
         let stackView = UIStackView()
         stackView.axis = .vertical

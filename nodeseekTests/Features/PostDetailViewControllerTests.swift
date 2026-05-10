@@ -2755,6 +2755,32 @@ struct PostDetailLoginViewControllerTests {
         #expect(secondContextLabel.text == "引用 alice #11")
     }
 
+    @Test func replyButtonShowsEditorWithoutWaitingForFreshAccountWhenCachedLoginExists() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let accountRefresher = DelayedPostDetailAccountRefresher(isLoggedIn: true)
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            accountRefresher: accountRefresher
+        )
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [],
+        ))
+        await waitForDetailContent(in: viewController, expectedRowCount: 1)
+
+        viewController.replyButtonTapped()
+        await Task.yield()
+
+        #expect(viewController.replyEditorContainer.isHidden == false)
+    }
+
     @Test func replyAndQuoteActionsUpdateComposerState() async throws {
         let presenter = SpyPostDetailPresenter()
         let viewController = PostDetailViewController(
@@ -3642,8 +3668,39 @@ private extension PostDetailViewController {
 private struct StubPostDetailAccountRefresher: CurrentAccountRefreshing {
     let isLoggedIn: Bool
 
+    func cachedAccount() async -> AccountResponse? {
+        account
+    }
+
     func refreshIfNeeded(force: Bool, maxAge: TimeInterval) async -> AccountResponse? {
+        account
+    }
+
+    private var account: AccountResponse {
         AccountResponse(
+            displayName: isLoggedIn ? "mist" : "",
+            isLoggedIn: isLoggedIn,
+            avatarURL: nil,
+            profileURL: nil,
+            stats: []
+        )
+    }
+}
+
+private struct DelayedPostDetailAccountRefresher: CurrentAccountRefreshing {
+    let isLoggedIn: Bool
+
+    func cachedAccount() async -> AccountResponse? {
+        account
+    }
+
+    func refreshIfNeeded(force: Bool, maxAge: TimeInterval) async -> AccountResponse? {
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
+        return account
+    }
+
+    private var account: AccountResponse {
+        return AccountResponse(
             displayName: isLoggedIn ? "mist" : "",
             isLoggedIn: isLoggedIn,
             avatarURL: nil,

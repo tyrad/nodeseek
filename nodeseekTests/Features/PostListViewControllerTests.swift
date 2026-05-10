@@ -400,6 +400,10 @@ private func makePostListViewController(
 }
 
 private final class StubCurrentAccountRefresher: CurrentAccountRefreshing, @unchecked Sendable {
+    func cachedAccount() async -> AccountResponse? {
+        nil
+    }
+
     func refreshIfNeeded(force: Bool, maxAge: TimeInterval) async -> AccountResponse? {
         nil
     }

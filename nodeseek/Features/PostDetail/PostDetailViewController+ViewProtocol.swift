@@ -571,7 +571,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
         replyTextView.isEditable = !isSubmitting
         inlineReplySendButton.isEnabled = true
         inlineReplySendButton.isUserInteractionEnabled = !isSubmitting
-        replyContextCloseButton.isEnabled = !isSubmitting
+        setReplyContextControlsEnabled(!isSubmitting)
         inlineReplySendButton.alpha = 1
     }
 

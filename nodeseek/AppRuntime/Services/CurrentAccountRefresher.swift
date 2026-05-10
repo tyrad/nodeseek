@@ -8,6 +8,8 @@
 import Foundation
 
 protocol CurrentAccountRefreshing: Sendable {
+    func cachedAccount() async -> AccountResponse?
+
     @discardableResult
     func refreshIfNeeded(force: Bool, maxAge: TimeInterval) async -> AccountResponse?
 }
@@ -26,6 +28,10 @@ actor CurrentAccountRefresher: CurrentAccountRefreshing {
     init(service: NodeSeekService, store: CurrentAccountStore = .shared) {
         self.service = service
         self.store = store
+    }
+
+    func cachedAccount() async -> AccountResponse? {
+        await store.snapshot()?.account
     }
 
     @discardableResult

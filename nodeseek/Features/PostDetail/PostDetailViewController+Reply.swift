@@ -10,7 +10,7 @@ import UIKit
 extension PostDetailViewController {
     @objc
     func replyButtonTapped() {
-        ensureNodeSeekLoggedIn { [weak self] in
+        ensureNodeSeekLoggedIn(allowCachedLogin: true) { [weak self] in
             self?.presentCommentEditor()
         }
     }
@@ -38,7 +38,7 @@ extension PostDetailViewController {
     }
 
     func handleReply(to comment: Comment) {
-        ensureNodeSeekLoggedIn { [weak self] in
+        ensureNodeSeekLoggedIn(allowCachedLogin: true) { [weak self] in
             self?.presentReplyEditor(action: "回复", for: comment)
         }
     }
@@ -55,13 +55,13 @@ extension PostDetailViewController {
             createdAtText: header.metadataText,
             contentHTML: header.contentHTML
         )
-        ensureNodeSeekLoggedIn { [weak self] in
+        ensureNodeSeekLoggedIn(allowCachedLogin: true) { [weak self] in
             self?.presentReplyEditor(action: "回复", for: comment)
         }
     }
 
     func handleQuote(_ comment: Comment) {
-        ensureNodeSeekLoggedIn { [weak self] in
+        ensureNodeSeekLoggedIn(allowCachedLogin: true) { [weak self] in
             self?.presentReplyEditor(action: "引用", for: comment)
         }
     }
@@ -95,9 +95,20 @@ extension PostDetailViewController {
         presentReplyEditor(mode: replyComposerMode)
     }
 
-    func ensureNodeSeekLoggedIn(_ action: @escaping @MainActor () -> Void) {
+    func ensureNodeSeekLoggedIn(
+        allowCachedLogin: Bool = false,
+        _ action: @escaping @MainActor () -> Void
+    ) {
         Task { @MainActor [weak self] in
             guard let self else { return }
+            if allowCachedLogin,
+               let cachedAccount = await accountRefresher.cachedAccount(),
+               cachedAccount.isLoggedIn {
+                action()
+                refreshCachedAccountInBackground()
+                return
+            }
+
             let account = await accountRefresher.refreshIfNeeded(force: false, maxAge: 60)
             if account?.isLoggedIn == true {
                 action()
@@ -119,6 +130,13 @@ extension PostDetailViewController {
         }
     }
 
+    func refreshCachedAccountInBackground() {
+        let accountRefresher = accountRefresher
+        Task {
+            _ = await accountRefresher.refreshIfNeeded(force: false, maxAge: 60)
+        }
+    }
+
     func presentNodeSeekLogin(onClose: @escaping @MainActor () -> Void) {
         let loginViewController = LoginWebViewController(onClose: onClose)
         if let navigationController {
@@ -134,62 +152,26 @@ extension PostDetailViewController {
     }
 
     func updateReplyContext(for mode: CommentComposerMode) {
-        let rows: [String]
-        switch mode {
-        case .plain:
-            rows = []
-        case .reply(let comments):
-            rows = replyContextRows(action: "回复", comments: comments)
-        case .quote(let comments):
-            rows = replyContextRows(action: "引用", comments: comments)
-        case .combined(let replies, let quotes):
-            rows = replyContextRows(action: "回复", comments: replies)
-                + replyContextRows(action: "引用", comments: quotes)
-        }
-
+        let rows = replyContextRows(for: mode)
         rebuildReplyContextRows(rows)
         if rows.isEmpty == false {
             replyContextBar.isHidden = false
             replyContextBarHeightConstraint?.constant = replyContextBarHeight(rowCount: rows.count)
         } else {
-            replyContextLabel.text = nil
             replyContextBar.isHidden = true
             replyContextBarHeightConstraint?.constant = 0
         }
     }
 
     func mergedReplyComposerMode(with incomingMode: CommentComposerMode) -> CommentComposerMode {
-        switch (replyComposerMode, incomingMode) {
-        case (.reply(let existing), .reply(let incoming)):
-            return .reply(commentsByAppendingUnique(existing: existing, incoming: incoming))
-        case (.quote(let existing), .quote(let incoming)):
-            return .quote(commentsByAppendingUnique(existing: existing, incoming: incoming))
-        case (.reply(let existingReplies), .quote(let incomingQuotes)):
-            return .combined(replies: existingReplies, quotes: incomingQuotes)
-        case (.quote(let existingQuotes), .reply(let incomingReplies)):
-            return .combined(replies: incomingReplies, quotes: existingQuotes)
-        case (.combined(let replies, let quotes), .reply(let incomingReplies)):
-            return .combined(
-                replies: commentsByAppendingUnique(existing: replies, incoming: incomingReplies),
-                quotes: quotes
-            )
-        case (.combined(let replies, let quotes), .quote(let incomingQuotes)):
-            return .combined(
-                replies: replies,
-                quotes: commentsByAppendingUnique(existing: quotes, incoming: incomingQuotes)
-            )
-        default:
-            return incomingMode
-        }
+        replyComposerMode
+            .appendingReplies(incomingMode.replies)
+            .appendingQuotes(incomingMode.quotes)
     }
 
-    func commentsByAppendingUnique(existing: [Comment], incoming: [Comment]) -> [Comment] {
-        var seenIDs = Set(existing.map(\.id))
-        var comments = existing
-        for comment in incoming where seenIDs.insert(comment.id).inserted {
-            comments.append(comment)
-        }
-        return comments
+    func replyContextRows(for mode: CommentComposerMode) -> [String] {
+        replyContextRows(action: "回复", comments: mode.replies)
+            + replyContextRows(action: "引用", comments: mode.quotes)
     }
 
     func replyContextRows(action: String, comments: [Comment]) -> [String] {
@@ -280,57 +262,16 @@ extension PostDetailViewController {
 
     @objc
     func removeReplyContextTarget(_ sender: UIButton) {
-        let index = sender.tag
-        switch replyComposerMode {
-        case .plain:
-            return
-        case .reply(let comments):
-            replyComposerMode = modeByRemovingTarget(at: index, from: comments, makeMode: CommentComposerMode.reply)
-        case .quote(let comments):
-            replyComposerMode = modeByRemovingTarget(at: index, from: comments, makeMode: CommentComposerMode.quote)
-        case .combined(let replies, let quotes):
-            replyComposerMode = combinedModeByRemovingTarget(at: index, replies: replies, quotes: quotes)
-        }
+        replyComposerMode = replyComposerMode.removingTarget(at: sender.tag)
         updateReplyContext(for: replyComposerMode)
     }
 
-    func modeByRemovingTarget(
-        at index: Int,
-        from comments: [Comment],
-        makeMode: ([Comment]) -> CommentComposerMode
-    ) -> CommentComposerMode {
-        guard comments.indices.contains(index) else { return makeMode(comments) }
-        var nextComments = comments
-        nextComments.remove(at: index)
-        return nextComments.isEmpty ? .plain : makeMode(nextComments)
-    }
-
-    func combinedModeByRemovingTarget(at index: Int, replies: [Comment], quotes: [Comment]) -> CommentComposerMode {
-        if replies.indices.contains(index) {
-            var nextReplies = replies
-            nextReplies.remove(at: index)
-            return modeFor(replies: nextReplies, quotes: quotes)
-        }
-
-        let quoteIndex = index - replies.count
-        guard quotes.indices.contains(quoteIndex) else {
-            return modeFor(replies: replies, quotes: quotes)
-        }
-        var nextQuotes = quotes
-        nextQuotes.remove(at: quoteIndex)
-        return modeFor(replies: replies, quotes: nextQuotes)
-    }
-
-    func modeFor(replies: [Comment], quotes: [Comment]) -> CommentComposerMode {
-        switch (replies.isEmpty, quotes.isEmpty) {
-        case (true, true):
-            return .plain
-        case (false, true):
-            return .reply(replies)
-        case (true, false):
-            return .quote(quotes)
-        case (false, false):
-            return .combined(replies: replies, quotes: quotes)
+    func setReplyContextControlsEnabled(_ isEnabled: Bool) {
+        for row in replyContextStackView.arrangedSubviews {
+            let buttons = (row as? UIStackView)?.arrangedSubviews.compactMap { $0 as? UIButton } ?? []
+            for button in buttons {
+                button.isEnabled = isEnabled
+            }
         }
     }
 
