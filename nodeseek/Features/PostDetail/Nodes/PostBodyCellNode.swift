@@ -494,7 +494,9 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         guard !hasRequestedAvatar else { return }
         guard let avatarImageView else { return }
         hasRequestedAvatar = true
-        avatarLoader.loadAvatar(into: avatarImageView, postID: content.postID, avatarURL: content.avatarURL)
+        ImageLoad.url(content.avatarURL)
+            .toAvatar(requestID: content.postID)
+            .into(avatarImageView)
     }
 
     private func cancelAvatarLoad() {
@@ -792,7 +794,7 @@ final class DetailRichTextNode: ASDisplayNode {
         }
         if let contentURL = attachment.contentURL {
             return DetailImageKind.resolved(
-                isSticker: contentURL.absoluteString.lowercased().contains("sticker"),
+                isSticker: StickerImageRules.isStickerURL(contentURL),
                 imageURL: contentURL
             ) == .sticker
         }

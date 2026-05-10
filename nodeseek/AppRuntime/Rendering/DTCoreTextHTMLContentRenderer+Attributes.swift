@@ -296,17 +296,17 @@ extension DTCoreTextHTMLContentRenderer {
 
     func attachmentSourceURL(from attachment: DTTextAttachment, baseURL: URL) -> URL? {
         if let source = DetailAttachmentAttributes.value(named: "src", in: attachment.attributes),
-           let resolved = AvatarImageLoader.resolveImageURL(source, baseURL: baseURL) {
+           let resolved = ImageURLResolver.resolve(source, baseURL: baseURL) {
             return resolved
         }
         if let source = DetailAttachmentAttributes.value(named: "data-src", in: attachment.attributes)
             ?? DetailAttachmentAttributes.value(named: "data-original", in: attachment.attributes),
-           let resolved = AvatarImageLoader.resolveImageURL(source, baseURL: baseURL) {
+           let resolved = ImageURLResolver.resolve(source, baseURL: baseURL) {
             return resolved
         }
         if let srcset = DetailAttachmentAttributes.value(named: "srcset", in: attachment.attributes),
            let source = preferredSourceFromSrcset(srcset) {
-            return AvatarImageLoader.resolveImageURL(source, baseURL: baseURL)
+            return ImageURLResolver.resolve(source, baseURL: baseURL)
         }
         return nil
     }

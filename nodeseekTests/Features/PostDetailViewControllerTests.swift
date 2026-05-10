@@ -710,7 +710,7 @@ struct PostDetailViewControllerTests {
 
         viewController.openInBrowserTapped()
 
-        let webViewController = try #require(navigationController.topViewController as? CookieSharedWebViewController)
+        let webViewController = try #require(navigationController.topViewController as? NodeSeekWebViewController)
         #expect(webViewController.testInitialURL.absoluteString == "https://www.nodeseek.com/post-703863-2")
     }
 

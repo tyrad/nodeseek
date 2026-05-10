@@ -16,11 +16,6 @@ protocol WebCookieStore: AnyObject {
 }
 
 @MainActor
-protocol CookieSynchronizing: AnyObject {
-    func syncWebViewCookiesToURLSession() async
-}
-
-@MainActor
 final class WKWebCookieStoreAdapter: WebCookieStore {
     private let store: WKHTTPCookieStore
 
@@ -53,8 +48,7 @@ final class WKWebCookieStoreAdapter: WebCookieStore {
     }
 }
 
-extension CookieBridge: CookieSynchronizing {}
-
+// 本质上是在包 WebKit 的 Cookie API
 @MainActor
 final class CookieBridge {
     private var webCookieStore: WebCookieStore?
@@ -66,9 +60,10 @@ final class CookieBridge {
         webCookieStore: WebCookieStore? = nil,
         urlCookieStorage: HTTPCookieStorage = .shared,
         allowedDomains: [String] = NodeSeekSite.allowedCookieDomains,
+        // 延迟创建
         makeDefaultWebCookieStore: @escaping @MainActor () -> WebCookieStore = {
             WKWebCookieStoreAdapter(
-                store: WKWebsiteDataStore.default().httpCookieStore
+                store: WKWebsiteDataStore.default().httpCookieStore // Cookie源。 WKHTTPCookieStore 本身提供 setC / getC / getAllC 等
             )
         }
     ) {

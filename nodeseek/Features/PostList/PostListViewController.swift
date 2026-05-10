@@ -10,17 +10,17 @@ import UIKit
 class PostListViewController: UIViewController {
     
     // MARK: - Properties
-    private let presenter: PostListPresenterProtocol
-    private let detailTestURLProvider: () -> String
-    private var categories: [PostListCategory] = []
-    private var selectedCategory: PostListCategory = .all
-    private var currentSortMode: PostListSortMode = .replyTime
-    private var sortToggleWidthConstraint: NSLayoutConstraint?
+    let presenter: PostListPresenterProtocol
+    let detailTestURLProvider: () -> String
+    var categories: [PostListCategory] = []
+    var selectedCategory: PostListCategory = .all
+    var currentSortMode: PostListSortMode = .replyTime
+    var sortToggleWidthConstraint: NSLayoutConstraint?
     private var sortToggleTrailingConstraint: NSLayoutConstraint?
     private var sortToggleCollapseWorkItem: DispatchWorkItem?
-    private var isSortToggleExpanded = false
-    private let sideMenuViewController = PostListSideMenuViewController()
-    private let menuButtonFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
+    var isSortToggleExpanded = false
+    let sideMenuViewController = PostListSideMenuViewController()
+    let menuButtonFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
     private let categoryReselectFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
     
     var hasCompactTopButton: Bool {
@@ -28,7 +28,7 @@ class PostListViewController: UIViewController {
     }
     
     // MARK: - UI Components
-    private let pageContainerView = PostTexturePageContainerView()
+    let pageContainerViewController: PostPageContainerViewController
     private let compactTopButton: UIButton = {
         let button = UIButton(type: .system)
         let symbolConfig = UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
@@ -54,41 +54,7 @@ class PostListViewController: UIViewController {
         return button
     }()
 
-    private let sortToggleButton: UIButton = {
-        let button = UIButton(type: .system)
-        var configuration = UIButton.Configuration.plain()
-        configuration.baseForegroundColor = .systemBackground
-        configuration.imagePadding = 0
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
-        configuration.titleLineBreakMode = .byTruncatingTail
-        button.configuration = configuration
-        button.accessibilityIdentifier = "post-list-sort-toggle"
-        button.tintColor = .systemBackground
-        button.setTitleColor(.systemBackground, for: .normal)
-        button.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
-        button.titleLabel?.numberOfLines = 1
-        button.titleLabel?.lineBreakMode = .byTruncatingTail
-        button.titleLabel?.adjustsFontSizeToFitWidth = true
-        button.titleLabel?.minimumScaleFactor = 0.9
-        button.backgroundColor = .label
-        button.layer.cornerRadius = SortToggleLayout.cornerRadius
-        button.layer.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
-        button.layer.borderWidth = 0.5
-        button.layer.borderColor = UIColor.separator.cgColor
-        button.layer.shadowColor = UIColor.black.cgColor
-        button.layer.shadowOpacity = 0.18
-        button.layer.shadowRadius = 12
-        button.layer.shadowOffset = CGSize(width: 0, height: 5)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
-    }()
-    
-    private let loadingIndicator: UIActivityIndicatorView = {
-        let indicator = UIActivityIndicatorView(style: .medium)
-        indicator.hidesWhenStopped = true
-        indicator.translatesAutoresizingMaskIntoConstraints = false
-        return indicator
-    }()
+    let sortToggleButton = PostListSortToggleButton()
     
     private let tabScrollView: UIScrollView = {
         let scrollView = UIScrollView()
@@ -111,12 +77,16 @@ class PostListViewController: UIViewController {
     // MARK: - Initialization
     init(
         presenter: PostListPresenterProtocol,
+        visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore(),
         detailTestURLProvider: @escaping () -> String = {
             UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string ?? ""
         }
     ) {
         self.presenter = presenter
         self.detailTestURLProvider = detailTestURLProvider
+        self.pageContainerViewController = PostPageContainerViewController(
+            visitedStore: visitedStore
+        )
         super.init(nibName: nil, bundle: nil)
     }
     
@@ -148,9 +118,10 @@ class PostListViewController: UIViewController {
         navigationItem.leftBarButtonItem = nil
         
         view.backgroundColor = .systemBackground
+        pageContainerViewController.eventDelegate = self
+        addChild(pageContainerViewController)
+        let pageContainerView = pageContainerViewController.view!
         pageContainerView.translatesAutoresizingMaskIntoConstraints = false
-        pageContainerView.delegate = self
-        pageContainerView.attach(to: self)
         compactTopButton.addTarget(self, action: #selector(leftButtonTapped), for: .touchUpInside)
         compactTopButton.addTarget(self, action: #selector(prepareMenuButtonFeedback), for: .touchDown)
         sortToggleButton.addTarget(self, action: #selector(sortToggleButtonTapped), for: .touchUpInside)
@@ -158,15 +129,14 @@ class PostListViewController: UIViewController {
         view.addSubview(compactTopButton)
         view.addSubview(sortToggleButton)
         view.addSubview(tabScrollView)
-        view.addSubview(loadingIndicator)
         tabScrollView.addSubview(tabStackView)
 
         let sortToggleTrailingConstraint = sortToggleButton.trailingAnchor.constraint(
             equalTo: view.safeAreaLayoutGuide.trailingAnchor,
-            constant: SortToggleLayout.collapsedTrailing
+            constant: PostListSortToggleButton.collapsedTrailing
         )
         let sortToggleWidthConstraint = sortToggleButton.widthAnchor.constraint(
-            equalToConstant: SortToggleLayout.collapsedWidth
+            equalToConstant: PostListSortToggleButton.collapsedWidth
         )
         self.sortToggleTrailingConstraint = sortToggleTrailingConstraint
         self.sortToggleWidthConstraint = sortToggleWidthConstraint
@@ -185,7 +155,7 @@ class PostListViewController: UIViewController {
             sortToggleTrailingConstraint,
             sortToggleButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -56),
             sortToggleWidthConstraint,
-            sortToggleButton.heightAnchor.constraint(equalToConstant: SortToggleLayout.height),
+            sortToggleButton.heightAnchor.constraint(equalToConstant: PostListSortToggleButton.height),
 
             tabScrollView.leadingAnchor.constraint(equalTo: compactTopButton.trailingAnchor, constant: 8),
             tabScrollView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8),
@@ -196,15 +166,13 @@ class PostListViewController: UIViewController {
             tabStackView.trailingAnchor.constraint(equalTo: tabScrollView.contentLayoutGuide.trailingAnchor),
             tabStackView.topAnchor.constraint(equalTo: tabScrollView.contentLayoutGuide.topAnchor),
             tabStackView.bottomAnchor.constraint(equalTo: tabScrollView.contentLayoutGuide.bottomAnchor),
-            tabStackView.heightAnchor.constraint(equalTo: tabScrollView.frameLayoutGuide.heightAnchor),
-            
-            loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+            tabStackView.heightAnchor.constraint(equalTo: tabScrollView.frameLayoutGuide.heightAnchor)
         ])
+        pageContainerViewController.didMove(toParent: self)
 
         installSideMenuController()
-        applySortTogglePresentation(expanded: false)
-        applySortToggleAlpha(expanded: false)
+        sortToggleButton.apply(sortMode: currentSortMode, expanded: false)
+        sortToggleButton.applyAlpha(expanded: false)
     }
     
     // MARK: - Actions
@@ -219,8 +187,9 @@ class PostListViewController: UIViewController {
 
     @objc private func sortToggleButtonTapped() {
         setSortToggleExpanded(true, animated: true)
-        presenter.didToggleSortMode()
-        pageContainerView.scrollToTop(for: selectedCategory, animated: false)
+        let sortMode = pageContainerViewController.toggleSortMode(for: selectedCategory)
+        renderSortMode(sortMode)
+        pageContainerViewController.scrollToTop(for: selectedCategory, animated: false)
         scheduleSortToggleCollapse()
     }
 
@@ -228,16 +197,17 @@ class PostListViewController: UIViewController {
         guard let category = sender.category else { return }
         guard category != selectedCategory else {
             categoryReselectFeedbackGenerator.impactOccurred()
-            pageContainerView.scrollToTop(for: selectedCategory, animated: false)
+            pageContainerViewController.scrollToTop(for: selectedCategory, animated: false)
             presenter.didReselectCategory(category)
             return
         }
         selectedCategory = category
         applySelectedCategory(category, syncPage: true, pageAnimated: true)
+        renderSortMode(pageContainerViewController.sortMode(for: category))
         presenter.didSelectCategory(category)
     }
 
-    private func rebuildCategoryButtons() {
+    func rebuildCategoryButtons() {
         tabButtons = [:]
         tabStackView.arrangedSubviews.forEach { subview in
             tabStackView.removeArrangedSubview(subview)
@@ -254,7 +224,7 @@ class PostListViewController: UIViewController {
         }
     }
 
-    private func applySelectedCategory(_ selected: PostListCategory, syncPage: Bool, pageAnimated: Bool) {
+    func applySelectedCategory(_ selected: PostListCategory, syncPage: Bool, pageAnimated: Bool) {
         for (category, button) in tabButtons {
             button.applySelectedStyle(isSelected: category == selected)
         }
@@ -265,8 +235,9 @@ class PostListViewController: UIViewController {
         }
 
         if syncPage {
-            pageContainerView.setCurrentCategory(selected, animated: pageAnimated)
+            pageContainerViewController.setCurrentCategory(selected, animated: pageAnimated)
         }
+        renderSortMode(pageContainerViewController.sortMode(for: selected))
     }
 
     private func scheduleSortToggleCollapse() {
@@ -282,92 +253,39 @@ class PostListViewController: UIViewController {
         sortToggleCollapseWorkItem?.cancel()
         sortToggleCollapseWorkItem = nil
         isSortToggleExpanded = expanded
-        applySortTogglePresentation(expanded: expanded)
+        sortToggleButton.apply(sortMode: currentSortMode, expanded: expanded)
         sortToggleWidthConstraint?.constant = expanded
-            ? SortToggleLayout.expandedWidth(for: currentSortMode.accessibilityTitle)
-            : SortToggleLayout.collapsedWidth
-        sortToggleTrailingConstraint?.constant = expanded ? SortToggleLayout.expandedTrailing : SortToggleLayout.collapsedTrailing
+            ? PostListSortToggleButton.expandedWidth(for: currentSortMode.accessibilityTitle)
+            : PostListSortToggleButton.collapsedWidth
+        sortToggleTrailingConstraint?.constant = expanded
+            ? PostListSortToggleButton.expandedTrailing
+            : PostListSortToggleButton.collapsedTrailing
 
         let animations: () -> Void = { [weak self] in
-            self?.applySortToggleAlpha(expanded: expanded)
+            self?.sortToggleButton.applyAlpha(expanded: expanded)
             self?.view.layoutIfNeeded()
         }
         guard animated else {
             animations()
             return
         }
-        applySortToggleJellyAnimation(expanded: expanded)
+        sortToggleButton.applyJellyAnimation(expanded: expanded)
         UIView.animate(
-            withDuration: SortToggleLayout.transitionDuration,
+            withDuration: PostListSortToggleButton.transitionDuration,
             delay: 0,
-            usingSpringWithDamping: SortToggleLayout.transitionDamping,
-            initialSpringVelocity: SortToggleLayout.transitionVelocity,
+            usingSpringWithDamping: PostListSortToggleButton.transitionDamping,
+            initialSpringVelocity: PostListSortToggleButton.transitionVelocity,
             options: [.allowUserInteraction, .beginFromCurrentState],
             animations: animations
         )
-    }
-
-    private func applySortTogglePresentation(expanded: Bool) {
-        let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
-        let image = UIImage(systemName: currentSortMode.symbolName, withConfiguration: symbolConfiguration)
-        let title = currentSortMode.accessibilityTitle
-        sortToggleButton.setImage(image, for: .normal)
-        sortToggleButton.setTitle(expanded ? title : nil, for: .normal)
-        sortToggleButton.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
-        sortToggleButton.titleLabel?.numberOfLines = 1
-        sortToggleButton.titleLabel?.lineBreakMode = .byTruncatingTail
-        sortToggleButton.titleLabel?.adjustsFontSizeToFitWidth = true
-        sortToggleButton.titleLabel?.minimumScaleFactor = 0.9
-
-        var configuration = sortToggleButton.configuration ?? UIButton.Configuration.plain()
-        configuration.baseForegroundColor = .systemBackground
-        configuration.image = image
-        configuration.title = expanded ? title : nil
-        configuration.imagePadding = expanded ? SortToggleLayout.expandedImagePadding : 0
-        configuration.contentInsets = expanded ? SortToggleLayout.expandedInsets : SortToggleLayout.collapsedInsets
-        configuration.titleLineBreakMode = .byTruncatingTail
-        configuration.titleTextAttributesTransformer = expanded ? SortToggleLayout.titleAttributesTransformer : nil
-        sortToggleButton.configuration = configuration
-        sortToggleButton.backgroundColor = .label
-        sortToggleButton.tintColor = .systemBackground
-        sortToggleButton.layer.borderColor = UIColor.separator.cgColor
-        sortToggleButton.accessibilityLabel = currentSortMode.accessibilityTitle
     }
 
     private func refreshAppearanceForCurrentTraits() {
         view.backgroundColor = .systemBackground
         compactTopButton.tintColor = .label
         applySelectedCategory(selectedCategory, syncPage: false, pageAnimated: false)
-        applySortTogglePresentation(expanded: isSortToggleExpanded)
-        pageContainerView.refreshVisibleAppearanceForCurrentTraits()
-    }
-
-    private func applySortToggleAlpha(expanded: Bool) {
-        sortToggleButton.alpha = expanded ? SortToggleLayout.expandedAlpha : SortToggleLayout.collapsedAlpha
-    }
-
-    private func applySortToggleJellyAnimation(expanded: Bool) {
-        sortToggleButton.layer.removeAnimation(forKey: SortToggleLayout.jellyAnimationKey)
-
-        let scaleX = CAKeyframeAnimation(keyPath: "transform.scale.x")
-        scaleX.values = expanded
-            ? [1, 1.08, 0.98, 1.02, 1]
-            : [1, 0.94, 1.04, 0.99, 1]
-        scaleX.keyTimes = SortToggleLayout.jellyKeyTimes
-        scaleX.timingFunctions = SortToggleLayout.jellyTimingFunctions
-
-        let scaleY = CAKeyframeAnimation(keyPath: "transform.scale.y")
-        scaleY.values = expanded
-            ? [1, 0.96, 1.03, 0.99, 1]
-            : [1, 1.04, 0.97, 1.01, 1]
-        scaleY.keyTimes = SortToggleLayout.jellyKeyTimes
-        scaleY.timingFunctions = SortToggleLayout.jellyTimingFunctions
-
-        let animationGroup = CAAnimationGroup()
-        animationGroup.animations = [scaleX, scaleY]
-        animationGroup.duration = SortToggleLayout.jellyDuration
-        animationGroup.isRemovedOnCompletion = true
-        sortToggleButton.layer.add(animationGroup, forKey: SortToggleLayout.jellyAnimationKey)
+        sortToggleButton.apply(sortMode: currentSortMode, expanded: isSortToggleExpanded)
+        pageContainerViewController.refreshVisibleAppearanceForCurrentTraits()
     }
 
     private func installSideMenuController() {
@@ -405,201 +323,5 @@ class PostListViewController: UIViewController {
             sideMenuViewController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         sideMenuViewController.didMove(toParent: self)
-    }
-}
-
-// MARK: - View Protocol
-extension PostListViewController: PostListViewProtocol {
-    
-    func showLoading() {
-        pageContainerView.showLoadingSkeleton(for: selectedCategory)
-        loadingIndicator.stopAnimating()
-    }
-    
-    func hideLoading() {
-        pageContainerView.hideLoadingSkeleton(for: selectedCategory)
-        loadingIndicator.stopAnimating()
-    }
-
-    func showFirstPageError(message: String) {
-        pageContainerView.showFirstPageError(message: message, for: selectedCategory)
-    }
-
-    func hideFirstPageError() {
-        pageContainerView.hideFirstPageError(for: selectedCategory)
-    }
-
-    func showRefreshing() {
-        pageContainerView.showRefreshing(for: selectedCategory)
-    }
-
-    func hideRefreshing() {
-        pageContainerView.hideRefreshing(for: selectedCategory)
-    }
-
-    func showLoadingMore() {
-        pageContainerView.showLoadingMore(for: selectedCategory)
-    }
-
-    func hideLoadingMore() {
-        pageContainerView.hideLoadingMore(for: selectedCategory)
-    }
-    
-    func showError(message: String) {
-        let alert = UIAlertController(title: "错误", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "确定", style: .default))
-        present(alert, animated: true)
-    }
-
-    #if DEBUG
-    func openDetailTestURLFromPasteboard() {
-        guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }
-        presenter.didSubmitDetailTestURL(detailTestURLProvider())
-    }
-    #endif
-
-    func renderCategories(_ categories: [PostListCategory], selected: PostListCategory) {
-        let categoriesChanged = categories != self.categories
-        if categoriesChanged {
-            self.categories = categories
-            rebuildCategoryButtons()
-            pageContainerView.configure(categories: categories)
-        }
-        selectedCategory = selected
-        applySelectedCategory(selected, syncPage: categoriesChanged, pageAnimated: false)
-    }
-
-    func renderSortMode(_ sortMode: PostListSortMode) {
-        currentSortMode = sortMode
-        applySortTogglePresentation(expanded: isSortToggleExpanded)
-        if isSortToggleExpanded {
-            sortToggleWidthConstraint?.constant = SortToggleLayout.expandedWidth(for: sortMode.accessibilityTitle)
-        }
-    }
-    func render(items: [PostListItem]) {
-        pageContainerView.setItems(items, for: selectedCategory)
-    }
-
-    func renderVisitedState(at index: Int, isVisited: Bool) {
-        pageContainerView.updateVisitedState(at: index, isVisited: isVisited, for: selectedCategory)
-    }
-}
-
-private enum SortToggleLayout {
-    static let collapsedWidth: CGFloat = 58
-    static let minimumExpandedWidth: CGFloat = 168
-    static let height: CGFloat = 42
-    static let cornerRadius: CGFloat = 14
-    static let collapsedAlpha: CGFloat = 0.62
-    static let expandedAlpha: CGFloat = 1
-    static let collapsedTrailing: CGFloat = 12
-    static let expandedTrailing: CGFloat = 0
-    static let transitionDuration: TimeInterval = 0.34
-    static let transitionDamping: CGFloat = 0.68
-    static let transitionVelocity: CGFloat = 0.6
-    static let jellyAnimationKey = "sortToggleJelly"
-    static let jellyDuration: TimeInterval = 0.42
-    static let jellyKeyTimes: [NSNumber] = [0, 0.28, 0.58, 0.82, 1]
-    static let jellyTimingFunctions = [
-        CAMediaTimingFunction(name: .easeOut),
-        CAMediaTimingFunction(name: .easeInEaseOut),
-        CAMediaTimingFunction(name: .easeInEaseOut),
-        CAMediaTimingFunction(name: .easeOut)
-    ]
-    static let expandedImagePadding: CGFloat = 6
-    static let expandedInsets = NSDirectionalEdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 16)
-    static let collapsedInsets = NSDirectionalEdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
-    static let titleFont = UIFont.systemFont(ofSize: 13, weight: .semibold)
-    static let titleAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
-        var outgoing = incoming
-        outgoing.font = titleFont
-        return outgoing
-    }
-
-    static func expandedWidth(for title: String) -> CGFloat {
-        let titleWidth = ceil((title as NSString).size(withAttributes: [.font: titleFont]).width)
-        let imageWidth: CGFloat = 18
-        let measuredWidth = expandedInsets.leading
-            + imageWidth
-            + expandedImagePadding
-            + titleWidth
-            + expandedInsets.trailing
-        return max(minimumExpandedWidth, ceil(measuredWidth))
-    }
-}
-
-private extension PostListSortMode {
-    var symbolName: String {
-        switch self {
-        case .postTime:
-            return "line.3.horizontal.decrease.circle.fill"
-        case .replyTime:
-            return "arrow.up.arrow.down.circle.fill"
-        }
-    }
-}
-
-extension PostListViewController: PostTexturePageContainerViewDelegate {
-    func postTexturePageContainerView(
-        _ containerView: PostTexturePageContainerView,
-        didSelectPostAt index: Int,
-        category: PostListCategory
-    ) {
-        if category != selectedCategory {
-            selectedCategory = category
-            applySelectedCategory(category, syncPage: false, pageAnimated: false)
-            presenter.didSelectCategory(category)
-        }
-        presenter.didSelectPost(at: index)
-    }
-
-    func postTexturePageContainerView(
-        _ containerView: PostTexturePageContainerView,
-        didApproachBottomAt index: Int,
-        totalCount: Int,
-        category: PostListCategory
-    ) {
-        if category != selectedCategory {
-            selectedCategory = category
-            applySelectedCategory(category, syncPage: false, pageAnimated: false)
-            presenter.didSelectCategory(category)
-        }
-        presenter.didApproachBottom(currentIndex: index, totalCount: totalCount)
-    }
-
-    func postTexturePageContainerViewDidRequestRefresh(
-        _ containerView: PostTexturePageContainerView,
-        category: PostListCategory
-    ) {
-        if category != selectedCategory {
-            selectedCategory = category
-            applySelectedCategory(category, syncPage: false, pageAnimated: false)
-            presenter.didSelectCategory(category)
-        }
-        presenter.didPullToRefresh()
-    }
-
-    func postTexturePageContainerViewDidRequestFirstPageRetry(
-        _ containerView: PostTexturePageContainerView,
-        category: PostListCategory
-    ) {
-        if category != selectedCategory {
-            selectedCategory = category
-            applySelectedCategory(category, syncPage: false, pageAnimated: false)
-            presenter.didSelectCategory(category)
-        }
-        presenter.didRetryFirstPage()
-    }
-
-    func postTexturePageContainerView(_ containerView: PostTexturePageContainerView, didScrollTo category: PostListCategory) {
-        guard category != selectedCategory else { return }
-        selectedCategory = category
-        applySelectedCategory(category, syncPage: false, pageAnimated: false)
-        presenter.didSelectCategory(category)
-    }
-
-    func postTexturePageContainerViewDidRequestLeadingSideMenu(_ containerView: PostTexturePageContainerView) {
-        menuButtonFeedbackGenerator.impactOccurred()
-        sideMenuViewController.show(animated: true)
     }
 }

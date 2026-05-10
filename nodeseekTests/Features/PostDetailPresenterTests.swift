@@ -546,7 +546,7 @@ struct PostDetailPresenterTests {
         #expect(view.toastMessage == "已发布")
         #expect(interactor.loadedPages.isEmpty)
 
-        try await Task.sleep(nanoseconds: 350_000_000)
+        try await waitForReplyRefresh(in: interactor, page: 2)
 
         #expect(interactor.loadedPages == [2])
         #expect(view.loadingCount == 0)
@@ -603,7 +603,7 @@ struct PostDetailPresenterTests {
         presenter.didTapSendReply(content: "测试回复")
         presenter.didSubmitReply(PostDetailSubmitReplyResponse(message: "已发布"))
 
-        try await Task.sleep(nanoseconds: 350_000_000)
+        try await waitForReplyRefresh(in: interactor, page: 2)
         presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
             id: "706958",
             title: "标题",
@@ -644,7 +644,7 @@ struct PostDetailPresenterTests {
         presenter.didTapSendReply(content: "测试回复")
         presenter.didSubmitReply(PostDetailSubmitReplyResponse(message: "已发布"))
 
-        try await Task.sleep(nanoseconds: 350_000_000)
+        try await waitForReplyRefresh(in: interactor, page: 2)
 
         presenter.didCancelLoadPostDetail()
 
@@ -689,7 +689,7 @@ struct PostDetailPresenterTests {
         presenter.didTapSendReply(content: "测试回复")
         presenter.didSubmitReply(PostDetailSubmitReplyResponse(message: "已发布"))
 
-        try await Task.sleep(nanoseconds: 350_000_000)
+        try await waitForReplyRefresh(in: interactor, page: 2)
 
         presenter.didFailLoadPostDetail(error: "网络错误")
 
@@ -1271,6 +1271,22 @@ private final class SpyPostDetailInteractor: PostDetailInteractorInput {
 
     func addCommentOppose(commentID: String) {
         submittedCommentOpposeIDs.append(commentID)
+    }
+}
+
+@MainActor
+private func waitForReplyRefresh(
+    in interactor: SpyPostDetailInteractor,
+    page: Int,
+    timeoutNanoseconds: UInt64 = 2_000_000_000
+) async throws {
+    let start = DispatchTime.now().uptimeNanoseconds
+    while interactor.loadedPages != [page] {
+        if DispatchTime.now().uptimeNanoseconds - start >= timeoutNanoseconds {
+            Issue.record("等待回复后刷新超时，loadedPages=\(interactor.loadedPages)")
+            return
+        }
+        try await Task.sleep(nanoseconds: 10_000_000)
     }
 }
 

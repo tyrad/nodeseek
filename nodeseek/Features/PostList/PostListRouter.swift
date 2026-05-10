@@ -15,16 +15,15 @@ class PostListRouter: PostListRouterProtocol {
     // MARK: - Static Methods
     static func createModule() -> UIViewController {
         let router = PostListRouter()
-        let interactor = PostListInteractor()
         let presenter = PostListPresenter(
-            interactor: interactor,
             router: router,
             visitedStore: VisitedPostStore.shared
         )
         
-        interactor.presenter = presenter
-        
-        let view = PostListViewController(presenter: presenter)
+        let view = PostListViewController(
+            presenter: presenter,
+            visitedStore: VisitedPostStore.shared
+        )
         
         presenter.setView(view)
         router.viewController = view

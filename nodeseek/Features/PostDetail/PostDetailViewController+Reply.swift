@@ -206,7 +206,7 @@ extension PostDetailViewController {
             replyTextView.resignFirstResponder()
             Task { [weak self] in
                 guard let self else { return }
-                await stickerCookieBridge.syncWebViewCookiesToURLSession()
+                await stickerCookieSession.prepareMediaRequest()
                 setStickerPickerVisible(true, animated: true)
             }
             return

@@ -180,7 +180,7 @@ class PostDetailViewController: UIViewController {
     var displayMode: DisplayMode = .skeleton
     var hasRenderedDetailContent = false
     var showsReplyEntry = false
-    let stickerCookieBridge = CookieBridge()
+    let stickerCookieSession = NodeSeekCookieSession()
     var replyComposerMode: CommentComposerMode = .plain
     var replyContextBarHeightConstraint: NSLayoutConstraint?
     var replyStickerPickerHeightConstraint: NSLayoutConstraint?
@@ -813,7 +813,7 @@ class PostDetailViewController: UIViewController {
     }
 
     func cachedDetailImageSize(for url: URL) -> CGSize? {
-        guard let resolvedURL = AvatarImageLoader.resolveImageURL(url),
+        guard let resolvedURL = ImageURLResolver.resolve(url),
               let size = detailImageSizeCache[resolvedURL],
               size.width > 0,
               size.height > 0 else {
@@ -825,7 +825,7 @@ class PostDetailViewController: UIViewController {
     func cacheDetailImageSize(_ size: CGSize, for url: URL) {
         guard size.width > 0,
               size.height > 0,
-              let resolvedURL = AvatarImageLoader.resolveImageURL(url) else {
+              let resolvedURL = ImageURLResolver.resolve(url) else {
             return
         }
         detailImageSizeCache[resolvedURL] = size

@@ -18,7 +18,7 @@ extension PostDetailViewController {
         }
 
         if isNodeSeekHost(targetURL) {
-            let webViewController = CookieSharedWebViewController(url: targetURL)
+            let webViewController = NodeSeekWebViewController(url: targetURL)
             if let navigationController {
                 navigationController.pushViewController(webViewController, animated: true)
             } else {
@@ -87,7 +87,7 @@ extension PostDetailViewController {
         case .userProfile(let url):
             openUserInfo(profileURL: url)
         case .web(let url):
-            let webViewController = CookieSharedWebViewController(url: url)
+            let webViewController = NodeSeekWebViewController(url: url)
             showDetailDestination(webViewController)
         case .safari(let url):
             present(SFSafariViewController(url: url), animated: true)

@@ -126,6 +126,20 @@ struct DetailImageLayoutTests {
         #expect(DetailImageKind.resolved(isSticker: false, imageURL: reportURL) == .normal)
     }
 
+    @Test func stickerURLRulesUsePathNotQueryText() throws {
+        let stickerURL = try #require(URL(string: "https://www.nodeseek.com/static/image/sticker/xhj/003.png"))
+        let normalURL = try #require(URL(string: "https://www.nodeseek.com/avatar/user.png?label=sticker"))
+
+        #expect(StickerImageRules.isStickerURL(stickerURL))
+        #expect(StickerImageRules.isStickerURL(normalURL) == false)
+    }
+
+    #if !SWIFT_PACKAGE
+    @Test func stickerClassStillClassifiesAttachment() {
+        #expect(DetailAttachmentAttributes.hasClass("sticker", in: ["class": "foo sticker bar"]))
+    }
+    #endif
+
     @Test func reportLikeSVGContentIsRecognizedWithoutPathRule() {
         let svg = """
         <svg width="82ch" height="42em" xmlns="http://www.w3.org/2000/svg">

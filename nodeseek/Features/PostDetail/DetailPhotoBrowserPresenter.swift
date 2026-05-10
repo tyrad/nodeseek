@@ -57,7 +57,7 @@ final class DetailPhotoBrowserPresenter: NSObject, JXPhotoBrowserDelegate {
         let requestKey = imageURL.absoluteString
         photoCell.imageView.image = nil
         photoCell.imageView.accessibilityIdentifier = requestKey
-        DetailImageLoader.shared.loadImageForPreview(imageURL) { [weak photoCell] image in
+        ImageLoad.url(imageURL).toDetailPreview().load { [weak photoCell] image in
             DispatchQueue.main.async {
                 guard let photoCell else { return }
                 guard photoCell.imageView.accessibilityIdentifier == requestKey else { return }
@@ -101,7 +101,7 @@ final class DetailPhotoBrowserPresenter: NSObject, JXPhotoBrowserDelegate {
         }
 
         let imageURL = imageURLs[browser.pageIndex]
-        DetailImageLoader.shared.loadOriginalImagePayload(for: imageURL) { [weak self, weak browser, weak sourceView] result in
+        ImageLoad.url(imageURL).toOriginalPayload().load { [weak self, weak browser, weak sourceView] result in
             DispatchQueue.main.async {
                 guard let self, let browser, let sourceView else { return }
                 switch result {
@@ -129,7 +129,7 @@ final class DetailPhotoBrowserPresenter: NSObject, JXPhotoBrowserDelegate {
         }
 
         let imageURL = imageURLs[browser.pageIndex]
-        DetailImageLoader.shared.loadOriginalImagePayload(for: imageURL) { [weak self, weak browser] result in
+        ImageLoad.url(imageURL).toOriginalPayload().load { [weak self, weak browser] result in
             DispatchQueue.main.async {
                 guard let self, let browser else { return }
                 switch result {
@@ -142,7 +142,7 @@ final class DetailPhotoBrowserPresenter: NSObject, JXPhotoBrowserDelegate {
         }
     }
 
-    private static func writeTemporaryShareFile(payload: DetailOriginalImagePayload, index: Int) throws -> URL {
+    private static func writeTemporaryShareFile(payload: DetailOriginalFilePayload, index: Int) throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("NodeSeekSharedImages", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -151,7 +151,7 @@ final class DetailPhotoBrowserPresenter: NSObject, JXPhotoBrowserDelegate {
         return fileURL
     }
 
-    private func saveToPhotoLibrary(payload: DetailOriginalImagePayload, browser: JXPhotoBrowserViewController) {
+    private func saveToPhotoLibrary(payload: DetailOriginalFilePayload, browser: JXPhotoBrowserViewController) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { [weak self, weak browser] status in
             guard let self, let browser else { return }
             guard status == .authorized || status == .limited else {
