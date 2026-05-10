@@ -24,7 +24,10 @@ final class CategoryTabButton: UIButton {
     override init(frame: CGRect) {
         super.init(frame: frame)
         translatesAutoresizingMaskIntoConstraints = false
-        titleLabel?.font = .systemFont(ofSize: 17, weight: .regular)
+        titleLabel?.font = .systemFont(
+            ofSize: PostListTopBarStyle.Tab.pointSize,
+            weight: PostListTopBarStyle.Tab.normalWeight
+        )
         setTitleColor(.secondaryLabel, for: .normal)
         applySelectedStyle(isSelected: false)
         addSubview(indicatorView)
@@ -49,7 +52,10 @@ final class CategoryTabButton: UIButton {
     }
 
     func applySelectedStyle(isSelected: Bool) {
-        titleLabel?.font = isSelected ? .systemFont(ofSize: 17, weight: .semibold) : .systemFont(ofSize: 17, weight: .regular)
+        titleLabel?.font = .systemFont(
+            ofSize: PostListTopBarStyle.Tab.pointSize,
+            weight: isSelected ? PostListTopBarStyle.Tab.selectedWeight : PostListTopBarStyle.Tab.normalWeight
+        )
         setTitleColor(isSelected ? .label : .secondaryLabel, for: .normal)
         invalidateIntrinsicContentSize()
         indicatorView.isHidden = !isSelected

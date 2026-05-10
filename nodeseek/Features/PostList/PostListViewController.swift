@@ -7,8 +7,26 @@
 
 import UIKit
 
+enum PostListTopBarStyle {
+    enum Menu {
+        static let symbolPointSize: CGFloat = 16
+        static let symbolWeight = UIImage.SymbolWeight.regular
+    }
+
+    enum Tab {
+        static let pointSize: CGFloat = 17
+        static let selectedWeight = UIFont.Weight.medium
+        static let normalWeight = UIFont.Weight.regular
+    }
+}
+
 class PostListViewController: UIViewController {
-    
+    private enum TopBarLayout {
+        static let topOffset: CGFloat = -4
+        static let contentSpacing: CGFloat = 2
+        static let controlSize: CGFloat = 40
+    }
+
     // MARK: - Properties
     let presenter: PostListPresenterProtocol
     let detailTestURLProvider: () -> String
@@ -31,7 +49,10 @@ class PostListViewController: UIViewController {
     let pageContainerViewController: PostPageContainerViewController
     private let compactTopButton: UIButton = {
         let button = UIButton(type: .system)
-        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
+        let symbolConfig = UIImage.SymbolConfiguration(
+            pointSize: PostListTopBarStyle.Menu.symbolPointSize,
+            weight: PostListTopBarStyle.Menu.symbolWeight
+        )
         let image = UIImage(systemName: "list.bullet", withConfiguration: symbolConfig)
             ?? UIImage(systemName: "line.3.horizontal", withConfiguration: symbolConfig)
         var configuration = UIButton.Configuration.plain()
@@ -144,13 +165,13 @@ class PostListViewController: UIViewController {
         NSLayoutConstraint.activate([
             pageContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             pageContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            pageContainerView.topAnchor.constraint(equalTo: tabScrollView.bottomAnchor, constant: 6),
+            pageContainerView.topAnchor.constraint(equalTo: tabScrollView.bottomAnchor, constant: TopBarLayout.contentSpacing),
             pageContainerView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
             compactTopButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
-            compactTopButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
-            compactTopButton.widthAnchor.constraint(equalToConstant: 40),
-            compactTopButton.heightAnchor.constraint(equalToConstant: 40),
+            compactTopButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: TopBarLayout.topOffset),
+            compactTopButton.widthAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
+            compactTopButton.heightAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
 
             sortToggleTrailingConstraint,
             sortToggleButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -56),
@@ -159,8 +180,8 @@ class PostListViewController: UIViewController {
 
             tabScrollView.leadingAnchor.constraint(equalTo: compactTopButton.trailingAnchor, constant: 8),
             tabScrollView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8),
-            tabScrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
-            tabScrollView.heightAnchor.constraint(equalToConstant: 40),
+            tabScrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: TopBarLayout.topOffset),
+            tabScrollView.heightAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
 
             tabStackView.leadingAnchor.constraint(equalTo: tabScrollView.contentLayoutGuide.leadingAnchor),
             tabStackView.trailingAnchor.constraint(equalTo: tabScrollView.contentLayoutGuide.trailingAnchor),

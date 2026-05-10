@@ -75,8 +75,12 @@ struct PostListViewControllerTests {
 
         let selectedTab = try #require(viewController.view.firstButton(title: "全部"))
         let unselectedTab = try #require(viewController.view.firstButton(title: "日常"))
+        #expect(PostListTopBarStyle.Menu.symbolPointSize == 16)
+        #expect(PostListTopBarStyle.Menu.symbolWeight == .regular)
+        #expect(PostListTopBarStyle.Tab.selectedWeight == .medium)
+        #expect(PostListTopBarStyle.Tab.normalWeight == .regular)
         #expect(selectedTab.titleLabel?.font.pointSize == 17)
-        #expect(selectedTab.titleLabel?.font.fontDescriptor.symbolicTraits.contains(.traitBold) == true)
+        #expect(selectedTab.titleLabel?.font.fontDescriptor.symbolicTraits.contains(.traitBold) == false)
         #expect(unselectedTab.titleLabel?.font.pointSize == 17)
         #expect(unselectedTab.titleColor(for: .normal) == .secondaryLabel)
         let selectedTitleWidth = try #require(selectedTab.titleLabel?.intrinsicContentSize.width)
@@ -87,6 +91,8 @@ struct PostListViewControllerTests {
         let menuButtonFrame = menuButton.convert(menuButton.bounds, to: viewController.view)
         #expect(abs(selectedTabFrame.minY - menuButtonFrame.minY) < 1)
         #expect(abs(selectedTabFrame.height - menuButtonFrame.height) < 1)
+        #expect(abs(menuButtonFrame.minY - (viewController.view.safeAreaInsets.top - 4)) < 1)
+        #expect(abs(viewController.pageContainerViewController.view.frame.minY - selectedTabFrame.maxY - 2) < 1)
     }
 
     @Test func tappingSelectedCategoryRequestsFirstPageReload() throws {
