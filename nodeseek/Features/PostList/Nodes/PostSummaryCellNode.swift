@@ -11,10 +11,13 @@ import UIKit
 final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
 
     private enum Layout {
-        static let horizontalSpacing: CGFloat = 12
         static let verticalSpacing: CGFloat = 5
-        static let avatarSize: CGFloat = 58
-        static let contentInset = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 12)
+        static let contentInset = UIEdgeInsets(
+            top: PostListCellStyle.Layout.verticalContentInset,
+            left: 16,
+            bottom: PostListCellStyle.Layout.verticalContentInset,
+            right: 12
+        )
     }
 
     private let post: PostSummary
@@ -29,13 +32,16 @@ final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
         let node = ASDisplayNode(viewBlock: { [weak self] in
             let imageView = UIImageView()
             imageView.contentMode = .scaleAspectFill
-            imageView.layer.cornerRadius = 12
+            imageView.layer.cornerRadius = PostListCellStyle.Avatar.cornerRadius
             imageView.layer.masksToBounds = true
             imageView.backgroundColor = .systemGray5
             self?.avatarImageView = imageView
             return imageView
         })
-        node.style.preferredSize = CGSize(width: Layout.avatarSize, height: Layout.avatarSize)
+        node.style.preferredSize = CGSize(
+            width: PostListCellStyle.Avatar.size,
+            height: PostListCellStyle.Avatar.size
+        )
         return node
     }()
 
@@ -94,7 +100,7 @@ final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
         textStack.style.flexShrink = 1
 
         let contentStack = ASStackLayoutSpec.horizontal()
-        contentStack.spacing = Layout.horizontalSpacing
+        contentStack.spacing = PostListCellStyle.Layout.horizontalSpacing
         contentStack.alignItems = .start
         contentStack.children = hasDisplayableAuthor ? [avatarNode, textStack] : [textStack]
 
@@ -106,11 +112,11 @@ final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
     }
 
     private func configureText() {
-        titleNode.maximumNumberOfLines = PostSummaryCellStyle.titleMaximumNumberOfLines
+        titleNode.maximumNumberOfLines = PostListCellStyle.Typography.titleMaximumNumberOfLines
         titleNode.truncationMode = .byTruncatingTail
         titleNode.attributedText = Self.titleAttributedText(for: post, isVisited: isVisited)
 
-        metadataNode.maximumNumberOfLines = PostSummaryCellStyle.metadataMaximumNumberOfLines
+        metadataNode.maximumNumberOfLines = PostListCellStyle.Typography.metadataMaximumNumberOfLines
         metadataNode.truncationMode = .byTruncatingTail
         metadataNode.attributedText = Self.metadataAttributedText(for: post)
     }
@@ -139,7 +145,7 @@ final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
     }
 
     static func metadataAttributedText(for post: PostSummary) -> NSAttributedString {
-        let font = PostSummaryCellStyle.metadataFont
+        let font = PostListCellStyle.Typography.metadataFont
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: UIColor.secondaryLabel
@@ -181,7 +187,7 @@ final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
     }
 
     static func titleAttributedText(for post: PostSummary, isVisited: Bool = false) -> NSAttributedString {
-        let font = PostSummaryCellStyle.titleFont
+        let font = PostListCellStyle.Typography.titleFont
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: isVisited ? UIColor.secondaryLabel : UIColor.label
@@ -298,9 +304,34 @@ final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
     }
 }
 
-enum PostSummaryCellStyle {
-    static let titleMaximumNumberOfLines: UInt = 2
-    static let metadataMaximumNumberOfLines: UInt = 1
-    static let titleFont = UIFont.systemFont(ofSize: 19, weight: .semibold)
-    static let metadataFont = UIFont.systemFont(ofSize: 14, weight: .regular)
+enum PostListCellStyle {
+    enum Typography {
+        static let titleMaximumNumberOfLines: UInt = 0
+        static let metadataMaximumNumberOfLines: UInt = 1
+        static let titlePointSize: CGFloat = 17
+        static let metadataPointSize: CGFloat = 13
+        static let titleWeight = UIFont.Weight.medium
+        static let metadataWeight = UIFont.Weight.regular
+
+        static var titleFont: UIFont {
+            UIFont.systemFont(ofSize: titlePointSize, weight: titleWeight)
+        }
+
+        static var metadataFont: UIFont {
+            UIFont.systemFont(ofSize: metadataPointSize, weight: metadataWeight)
+        }
+    }
+
+    enum Avatar {
+        static let size: CGFloat = 48
+        static let cornerRadius: CGFloat = 9
+        static let skeletonSize: CGFloat = 48
+    }
+
+    enum Layout {
+        static let horizontalSpacing: CGFloat = 10
+        static let verticalContentInset: CGFloat = 8
+    }
 }
+
+typealias PostSummaryCellStyle = PostListCellStyle

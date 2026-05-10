@@ -11,12 +11,15 @@ import UIKit
 final class PostSummarySkeletonCellNode: ASCellNode {
 
     private enum Layout {
-        static let horizontalSpacing: CGFloat = 12
         static let verticalSpacing: CGFloat = 8
-        static let avatarSize: CGFloat = 56
         static let titleHeight: CGFloat = 18
         static let metaHeight: CGFloat = 13
-        static let contentInset = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 12)
+        static let contentInset = UIEdgeInsets(
+            top: PostListCellStyle.Layout.verticalContentInset,
+            left: 16,
+            bottom: PostListCellStyle.Layout.verticalContentInset,
+            right: 12
+        )
     }
 
     private let avatarPlaceholder = ASDisplayNode()
@@ -71,7 +74,7 @@ final class PostSummarySkeletonCellNode: ASCellNode {
         textStack.style.flexShrink = 1
 
         let contentStack = ASStackLayoutSpec.horizontal()
-        contentStack.spacing = Layout.horizontalSpacing
+        contentStack.spacing = PostListCellStyle.Layout.horizontalSpacing
         contentStack.alignItems = .center
         contentStack.children = [avatarPlaceholder, textStack]
 
@@ -79,8 +82,11 @@ final class PostSummarySkeletonCellNode: ASCellNode {
     }
 
     private func configurePlaceholders() {
-        avatarPlaceholder.style.preferredSize = CGSize(width: Layout.avatarSize, height: Layout.avatarSize)
-        avatarPlaceholder.cornerRadius = 10
+        avatarPlaceholder.style.preferredSize = CGSize(
+            width: PostListCellStyle.Avatar.skeletonSize,
+            height: PostListCellStyle.Avatar.skeletonSize
+        )
+        avatarPlaceholder.cornerRadius = PostListCellStyle.Avatar.cornerRadius
 
         titlePlaceholder.style.height = ASDimension(unit: .points, value: Layout.titleHeight)
         titlePlaceholder.style.width = ASDimension(unit: .fraction, value: 0.78)

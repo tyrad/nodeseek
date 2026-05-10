@@ -68,16 +68,28 @@ struct PostSummaryCellNodeTests {
         let titleText = PostSummaryCellNode.titleAttributedText(for: post)
         let metadataText = PostSummaryCellNode.metadataAttributedText(for: post)
 
-        #expect(PostSummaryCellStyle.titleMaximumNumberOfLines == 2)
+        #expect(PostListCellStyle.Typography.titleMaximumNumberOfLines == 0)
         #expect(titleText.string == post.title)
         #expect(titleText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor == .label)
-        #expect((titleText.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize == 19)
-        #expect(PostSummaryCellStyle.metadataMaximumNumberOfLines == 1)
-        #expect((metadataText.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize == 14)
+        #expect((titleText.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize == 17)
+        #expect(PostListCellStyle.Typography.titleWeight == .medium)
+        #expect(PostListCellStyle.Typography.metadataMaximumNumberOfLines == 1)
+        #expect((metadataText.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize == 13)
         #expect(metadataText.string.contains("shuai"))
         #expect(metadataText.string.contains("475454"))
         #expect(metadataText.string.contains("961"))
         #expect(metadataText.string.contains("6h 30min ago"))
+    }
+
+    @Test func postSummaryCellUsesCompactAvatarMetrics() {
+        #expect(PostListCellStyle.Avatar.size == 48)
+        #expect(PostListCellStyle.Avatar.cornerRadius == 9)
+        #expect(PostListCellStyle.Avatar.skeletonSize == 48)
+        #expect(PostListCellStyle.Layout.horizontalSpacing == 10)
+    }
+
+    @Test func postSummaryCellUsesCompactVerticalInsets() {
+        #expect(PostListCellStyle.Layout.verticalContentInset == 8)
     }
 
     @Test func visitedPostTitleUsesSecondaryColor() {
