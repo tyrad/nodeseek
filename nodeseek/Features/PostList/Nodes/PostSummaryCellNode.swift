@@ -128,7 +128,9 @@ final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
         guard !hasRequestedAvatar else { return }
         guard let avatarImageView else { return }
         hasRequestedAvatar = true
-        avatarLoader.loadAvatar(into: avatarImageView, postID: post.id, avatarURL: post.avatarURL)
+        ImageLoad.url(post.avatarURL)
+            .toAvatar(requestID: post.id)
+            .into(avatarImageView)
     }
 
     private func cancelAvatarLoad() {

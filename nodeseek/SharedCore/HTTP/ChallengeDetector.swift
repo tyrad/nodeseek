@@ -46,10 +46,7 @@ struct ChallengeDetector: Sendable {
     }
 
     static func containsCloudflareChallengeHTML(_ html: String) -> Bool {
-        html.contains("Just a moment...")
-            || html.contains("window._cf_chl_opt")
-            || html.contains("/cdn-cgi/challenge-platform/")
-            || html.contains("Enable JavaScript and cookies to continue")
+        HTMLPayloadInspector.containsCloudflareChallenge(html)
     }
 
     static func containsLoginRequiredHTML(_ html: String) -> Bool {

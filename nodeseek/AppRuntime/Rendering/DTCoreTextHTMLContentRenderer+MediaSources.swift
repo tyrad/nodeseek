@@ -20,7 +20,7 @@ extension DTCoreTextHTMLContentRenderer {
         for match in matches.reversed() {
             let tag = source.substring(with: match.range)
             guard let rawSource = preferredImageSource(in: tag),
-                  let resolved = AvatarImageLoader.resolveImageURL(rawSource, baseURL: baseURL) else { continue }
+                  let resolved = ImageURLResolver.resolve(rawSource, baseURL: baseURL) else { continue }
 
             if let srcMatch = firstMatch(Self.srcAttributeRegex, in: tag), srcMatch.numberOfRanges >= 3 {
                 let localRange = srcMatch.range(at: 2)
@@ -53,7 +53,7 @@ extension DTCoreTextHTMLContentRenderer {
             let startTag = (tag as NSString).substring(with: startTagMatch.range)
             guard hasStickerClass(in: startTag),
                   let rawSource = preferredVideoSource(in: tag),
-                  let resolved = AvatarImageLoader.resolveImageURL(rawSource, baseURL: baseURL) else { continue }
+                  let resolved = ImageURLResolver.resolve(rawSource, baseURL: baseURL) else { continue }
 
             let replacementStartTag = replacingOrAddingSource(
                 in: startTag,
@@ -156,7 +156,6 @@ extension DTCoreTextHTMLContentRenderer {
     }
 
     func isStickerImageURL(_ url: URL?) -> Bool {
-        guard let absolute = url?.absoluteString.lowercased() else { return false }
-        return absolute.contains("sticker")
+        StickerImageRules.isStickerURL(url)
     }
 }

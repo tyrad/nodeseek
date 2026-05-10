@@ -7,6 +7,7 @@
 
 import Foundation
 import Testing
+import UIKit
 @testable import nodeseek
 
 @MainActor
@@ -81,6 +82,34 @@ struct CookieBridgeTests {
         let cookies = urlStorage.cookies(for: URL(string: "https://www.nodeseek.com/")!) ?? []
         #expect(cookies.contains { $0.name == "cf_clearance" && $0.value == "token" })
         deleteTestCookies(from: urlStorage)
+    }
+
+    @Test func cookieSessionPreparesHTTPLoadFromWebViewCookies() async throws {
+        let webStore = InMemoryWebCookieStore(cookies: [
+            try makeCookie(name: "cf_clearance", value: "token", domain: ".nodeseek.com")
+        ])
+        let urlStorage = try #require(URLSessionConfiguration.ephemeral.httpCookieStorage)
+        let bridge = CookieBridge(webCookieStore: webStore, urlCookieStorage: urlStorage)
+        let session = NodeSeekCookieSession(bridge: bridge, webCookieStore: webStore)
+
+        await session.prepareHTTPLoad()
+
+        let cookies = urlStorage.cookies(for: URL(string: "https://www.nodeseek.com/")!) ?? []
+        #expect(cookies.contains { $0.name == "cf_clearance" && $0.value == "token" })
+    }
+
+    @Test func cookieSessionPreparesWebViewLoadFromURLSessionCookiesAndTheme() async throws {
+        let webStore = InMemoryWebCookieStore()
+        let urlStorage = try #require(URLSessionConfiguration.ephemeral.httpCookieStorage)
+        let cookie = try makeCookie(name: "session", value: "abc", domain: ".nodeseek.com")
+        urlStorage.setCookie(cookie)
+        let bridge = CookieBridge(webCookieStore: webStore, urlCookieStorage: urlStorage)
+        let session = NodeSeekCookieSession(bridge: bridge, webCookieStore: webStore)
+
+        await session.prepareWebViewLoad(userInterfaceStyle: .dark)
+
+        #expect(webStore.cookies.contains { $0.name == "session" && $0.value == "abc" })
+        #expect(webStore.cookies.contains { $0.name == "colorscheme" && $0.value == "dark" })
     }
 
     private func makeCookie(name: String, value: String, domain: String) throws -> HTTPCookie {

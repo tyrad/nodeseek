@@ -784,7 +784,7 @@ extension DTCoreTextHTMLContentRenderer {
 
     func imageBlock(from imageNode: XMLElement, baseURL: URL) -> RenderedImageBlock? {
         guard let source = imageNode["src"],
-              let url = AvatarImageLoader.resolveImageURL(source, baseURL: baseURL),
+              let url = ImageURLResolver.resolve(source, baseURL: baseURL),
               hasClass("sticker", in: imageNode) == false,
               isStickerImageURL(url) == false
         else {
@@ -984,7 +984,7 @@ extension DTCoreTextHTMLContentRenderer {
 
     func imageURL(from node: XMLElement, baseURL: URL) -> URL? {
         guard let source = node.at_css("img")?["src"] else { return nil }
-        return AvatarImageLoader.resolveImageURL(source, baseURL: baseURL)
+        return ImageURLResolver.resolve(source, baseURL: baseURL)
     }
 
     func isTableElement(_ node: XMLElement) -> Bool {

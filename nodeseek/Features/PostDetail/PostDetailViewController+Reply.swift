@@ -211,7 +211,7 @@ extension PostDetailViewController {
             replyTextView.resignFirstResponder()
             Task { [weak self] in
                 guard let self else { return }
-                await stickerCookieBridge.syncWebViewCookiesToURLSession()
+                await stickerCookieSession.prepareMediaRequest()
                 setStickerPickerVisible(true, animated: true)
             }
             return
@@ -537,6 +537,7 @@ nonisolated enum NodeImageUploadImageCompressor {
             return nil
         }
 
+        // 在解码阶段直接生成目标尺寸缩略图，避免先把大图完整解码进内存再压缩上传。
         let downsampleOptions = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,

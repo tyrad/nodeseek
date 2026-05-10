@@ -13,7 +13,7 @@ import UIKit
 struct PostListViewControllerTests {
     @Test func sortToggleButtonPeeksFromRightAndExpandsOnTap() throws {
         let presenter = SpyPostListPresenter()
-        let viewController = PostListViewController(presenter: presenter)
+        let viewController = makePostListViewController(presenter: presenter)
         viewController.loadViewIfNeeded()
         viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
 
@@ -43,7 +43,6 @@ struct PostListViewControllerTests {
         viewController.view.layoutIfNeeded()
         UIView.setAnimationsEnabled(animationsWereEnabled)
 
-        #expect(presenter.toggleSortCount == 1)
         #expect(button.title(for: .normal) == "回复时间优先")
         #expect(button.alpha == 1)
         #expect(button.bounds.width >= 168)
@@ -59,7 +58,7 @@ struct PostListViewControllerTests {
 
     @Test func topNavigationUsesDenseReadingTabStyle() throws {
         let presenter = SpyPostListPresenter()
-        let viewController = PostListViewController(presenter: presenter)
+        let viewController = makePostListViewController(presenter: presenter)
         viewController.loadViewIfNeeded()
         viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         viewController.renderCategories([.all, .daily, .tech, .info], selected: .all)
@@ -92,9 +91,9 @@ struct PostListViewControllerTests {
 
     @Test func tappingSelectedCategoryRequestsFirstPageReload() throws {
         let presenter = SpyPostListPresenter()
-        let viewController = PostListViewController(presenter: presenter)
+        let viewController = makePostListViewController(presenter: presenter)
         viewController.loadViewIfNeeded()
-        viewController.renderCategories([.all, .daily], selected: .all)
+        viewController.renderCategories([.all], selected: .all)
 
         let selectedTab = try #require(viewController.view.firstButton(title: "全部"))
         selectedTab.sendActions(for: .touchUpInside)
@@ -103,25 +102,9 @@ struct PostListViewControllerTests {
         #expect(presenter.selectedCategories.isEmpty)
     }
 
-    @Test func firstPageErrorRetryButtonRequestsFirstPageRetry() throws {
-        let presenter = SpyPostListPresenter()
-        let viewController = PostListViewController(presenter: presenter)
-        viewController.loadViewIfNeeded()
-        viewController.renderCategories([.all, .daily], selected: .all)
-
-        viewController.showFirstPageError(message: "网络超时")
-
-        _ = try #require(viewController.view.firstView(accessibilityIdentifier: "post-list-first-page-error"))
-        _ = try #require(viewController.view.firstLabel(text: "网络超时"))
-        let retryButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-first-page-retry-button"))
-        retryButton.sendActions(for: .touchUpInside)
-
-        #expect(presenter.didRetryFirstPageCount == 1)
-    }
-
     @Test func detailTestSubmitsProvidedURL() throws {
         let presenter = SpyPostListPresenter()
-        let viewController = PostListViewController(
+        let viewController = makePostListViewController(
             presenter: presenter,
             detailTestURLProvider: {
                 "https://www.nodeseek.com/post-717963-6#52"
@@ -135,7 +118,7 @@ struct PostListViewControllerTests {
 
     @Test func menuButtonPresentsSideMenuWithAccountHeaderSettingsAndMovesDebugEntriesToSettings() throws {
         let presenter = SpyPostListPresenter()
-        let viewController = PostListViewController(presenter: presenter)
+        let viewController = makePostListViewController(presenter: presenter)
         viewController.loadViewIfNeeded()
         viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         viewController.view.layoutIfNeeded()
@@ -398,6 +381,18 @@ struct PostListViewControllerTests {
     }
 }
 
+private func makePostListViewController(
+    presenter: SpyPostListPresenter,
+    detailTestURLProvider: @escaping () -> String = {
+        UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string ?? ""
+    }
+) -> PostListViewController {
+    PostListViewController(
+        presenter: presenter,
+        detailTestURLProvider: detailTestURLProvider
+    )
+}
+
 private final class StubCurrentAccountRefresher: CurrentAccountRefreshing, @unchecked Sendable {
     func refreshIfNeeded(force: Bool, maxAge: TimeInterval) async -> AccountResponse? {
         nil
@@ -406,7 +401,6 @@ private final class StubCurrentAccountRefresher: CurrentAccountRefreshing, @unch
 
 private final class SpyPostListPresenter: PostListPresenterProtocol {
     private(set) var viewDidLoadCount = 0
-    private(set) var toggleSortCount = 0
     private(set) var didTapLoginCount = 0
     private(set) var didTapRecentVisitedCount = 0
     private(set) var didTapSearchCount = 0
@@ -420,7 +414,6 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
     private(set) var submittedDetailTestURL: String?
     private(set) var selectedCategories: [PostListCategory] = []
     private(set) var reselectedCategories: [PostListCategory] = []
-    private(set) var didRetryFirstPageCount = 0
 
     func viewDidLoad() {
         viewDidLoadCount += 1
@@ -432,10 +425,6 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
 
     func didReselectCategory(_ category: PostListCategory) {
         reselectedCategories.append(category)
-    }
-
-    func didToggleSortMode() {
-        toggleSortCount += 1
     }
 
     func didTapLogin() {
@@ -482,15 +471,7 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
         submittedDetailTestURL = rawURL
     }
 
-    func didPullToRefresh() {}
-
-    func didRetryFirstPage() {
-        didRetryFirstPageCount += 1
-    }
-
-    func didSelectPost(at index: Int) {}
-
-    func didApproachBottom(currentIndex: Int, totalCount: Int) {}
+    func didSelectPost(_ post: PostSummary) {}
 }
 
 private extension UIView {
@@ -564,19 +545,6 @@ private extension UIView {
         return nil
     }
 
-    func firstLabel(text: String) -> UILabel? {
-        if let label = self as? UILabel, label.text == text {
-            return label
-        }
-
-        for subview in subviews {
-            if let matched = subview.firstLabel(text: text) {
-                return matched
-            }
-        }
-
-        return nil
-    }
 }
 
 private extension UIColor {

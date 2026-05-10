@@ -39,21 +39,26 @@ enum DetailVideoAssetRequest {
 final class DetailVideoAssetProvider {
     static let shared = DetailVideoAssetProvider()
 
-    private let cookieBridge: CookieBridge
+    private let cookieSession: NodeSeekCookieSessionManaging
     private let cookieStorage: HTTPCookieStorage
 
     init(cookieStorage: HTTPCookieStorage = .shared) {
-        self.cookieBridge = CookieBridge()
+        self.cookieSession = NodeSeekCookieSession()
         self.cookieStorage = cookieStorage
     }
 
     init(cookieBridge: CookieBridge, cookieStorage: HTTPCookieStorage = .shared) {
-        self.cookieBridge = cookieBridge
+        self.cookieSession = NodeSeekCookieSession(bridge: cookieBridge)
+        self.cookieStorage = cookieStorage
+    }
+
+    init(cookieSession: NodeSeekCookieSessionManaging, cookieStorage: HTTPCookieStorage = .shared) {
+        self.cookieSession = cookieSession
         self.cookieStorage = cookieStorage
     }
 
     func makeAsset(for url: URL) async -> AVURLAsset {
-        await cookieBridge.syncWebViewCookiesToURLSession()
+        await cookieSession.prepareMediaRequest()
         return DetailVideoAssetRequest.makeAsset(for: url, cookieStorage: cookieStorage)
     }
 }

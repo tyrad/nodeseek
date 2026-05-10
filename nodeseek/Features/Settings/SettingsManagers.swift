@@ -21,13 +21,14 @@ protocol SettingsSessionManaging: AnyObject {
 final class DefaultSettingsCacheManager: SettingsCacheManaging {
     func cacheByteSize() async -> UInt64 {
         let detailSize = UInt64(max(DetailImageLoader.shared.detailImageCacheByteSize(), 0))
+        let rawImageSize = UInt64(max(ImageDataLoader.shared.cacheByteSize(), 0))
         let kingfisherSize = (try? await ImageCache.default.diskStorageSize) ?? 0
-        return detailSize + UInt64(kingfisherSize)
+        return detailSize + rawImageSize + UInt64(kingfisherSize)
     }
 
     func clearPreservingCookies() async throws {
         try DetailImageLoader.shared.clearDetailImageCache()
-        AvatarImageLoader.shared.clearMemoryCaches()
+        try ImageDataLoader.shared.clearCache()
         ImageCache.default.clearMemoryCache()
         await ImageCache.default.clearDiskCache()
         URLCache.shared.removeAllCachedResponses()
@@ -47,22 +48,23 @@ final class DefaultSettingsCacheManager: SettingsCacheManaging {
 }
 
 final class DefaultSettingsSessionManager: SettingsSessionManaging {
-    private let cookieBridge: CookieBridge
+    private let cookieSession: NodeSeekCookieSessionManaging
     private let currentAccountStore: CurrentAccountStore
     private let nodeImageAPIKeyStore: NodeImageAPIKeyStoring
 
     init(
         cookieBridge: CookieBridge? = nil,
+        cookieSession: NodeSeekCookieSessionManaging? = nil,
         currentAccountStore: CurrentAccountStore = .shared,
         nodeImageAPIKeyStore: NodeImageAPIKeyStoring = KeychainNodeImageAPIKeyStore()
     ) {
-        self.cookieBridge = cookieBridge ?? CookieBridge()
+        self.cookieSession = cookieSession ?? NodeSeekCookieSession(bridge: cookieBridge ?? CookieBridge())
         self.currentAccountStore = currentAccountStore
         self.nodeImageAPIKeyStore = nodeImageAPIKeyStore
     }
 
     func logout() async {
-        await cookieBridge.clearSession()
+        await cookieSession.clearLoginSession()
         await currentAccountStore.clear()
         nodeImageAPIKeyStore.clear()
         NotificationCenter.default.post(name: .nodeSeekLoginSessionDidClose, object: nil)

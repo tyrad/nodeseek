@@ -5,6 +5,7 @@
 
 import Foundation
 import Testing
+import UIKit
 @testable import nodeseek
 
 @MainActor
@@ -45,14 +46,14 @@ struct HTMLLoadingStrategyClientTests {
         let client = WebViewFallbackHTMLClient(
             primaryClient: primary,
             fallbackClient: fallback,
-            cookieSynchronizer: StrategySpyCookieSynchronizer(events: events)
+            cookieSession: StrategySpyCookieSession(events: events)
         )
 
         let response = try await client.get(url)
 
         #expect(response.statusCode == 200)
         #expect(response.html.contains("测试帖子"))
-        #expect(await events.recordedEvents() == ["sync", "primary.get"])
+        #expect(await events.recordedEvents() == ["prepare-http", "primary.get"])
     }
 
     @Test func httpWithFallbackUsesWebViewAndRetriesHTTPOnceWhenHTTPHitsCloudflare() async throws {
@@ -91,17 +92,17 @@ struct HTMLLoadingStrategyClientTests {
         let client = WebViewFallbackHTMLClient(
             primaryClient: primary,
             fallbackClient: fallback,
-            cookieSynchronizer: StrategySpyCookieSynchronizer(events: events)
+            cookieSession: StrategySpyCookieSession(events: events)
         )
 
         let response = try await client.get(url)
 
         #expect(response.statusCode == 200)
         #expect(await events.recordedEvents() == [
-            "sync",
+            "prepare-http",
             "primary.get",
             "fallback.get",
-            "sync",
+            "prepare-http",
             "primary.get"
         ])
     }
@@ -131,13 +132,13 @@ struct HTMLLoadingStrategyClientTests {
         let client = WebViewFallbackHTMLClient(
             primaryClient: primary,
             fallbackClient: fallback,
-            cookieSynchronizer: StrategySpyCookieSynchronizer(events: events)
+            cookieSession: StrategySpyCookieSession(events: events)
         )
 
         let response = try await client.get(url)
 
         #expect(ChallengeDetector().detect(response: response) == .loginRequired(url))
-        #expect(await events.recordedEvents() == ["sync", "primary.get"])
+        #expect(await events.recordedEvents() == ["prepare-http", "primary.get"])
     }
 
     @Test func httpWithFallbackReturnsOriginalChallengeWhenWebViewFallbackThrows() async throws {
@@ -158,14 +159,14 @@ struct HTMLLoadingStrategyClientTests {
         let client = WebViewFallbackHTMLClient(
             primaryClient: primary,
             fallbackClient: fallback,
-            cookieSynchronizer: StrategySpyCookieSynchronizer(events: events)
+            cookieSession: StrategySpyCookieSession(events: events)
         )
 
         let response = try await client.get(url)
 
         #expect(response.statusCode == 403)
         #expect(ChallengeDetector().detect(response: response) == .cloudflare(url))
-        #expect(await events.recordedEvents() == ["sync", "primary.get", "fallback.get"])
+        #expect(await events.recordedEvents() == ["prepare-http", "primary.get", "fallback.get"])
     }
 
     @Test func httpWithFallbackReturnsWebViewResponseWhenRetryThrowsAfterUsableFallback() async throws {
@@ -187,7 +188,7 @@ struct HTMLLoadingStrategyClientTests {
         let client = WebViewFallbackHTMLClient(
             primaryClient: primary,
             fallbackClient: fallback,
-            cookieSynchronizer: StrategySpyCookieSynchronizer(events: events)
+            cookieSession: StrategySpyCookieSession(events: events)
         )
 
         let response = try await client.get(url)
@@ -195,10 +196,10 @@ struct HTMLLoadingStrategyClientTests {
         #expect(response.statusCode == 200)
         #expect(ChallengeDetector().detect(response: response) == nil)
         #expect(await events.recordedEvents() == [
-            "sync",
+            "prepare-http",
             "primary.get",
             "fallback.get",
-            "sync",
+            "prepare-http",
             "primary.get"
         ])
     }
@@ -217,16 +218,24 @@ private actor StrategyEventRecorder {
 }
 
 @MainActor
-private final class StrategySpyCookieSynchronizer: CookieSynchronizing {
+private final class StrategySpyCookieSession: NodeSeekCookieSessionManaging {
     private let events: StrategyEventRecorder
 
     init(events: StrategyEventRecorder) {
         self.events = events
     }
 
-    func syncWebViewCookiesToURLSession() async {
-        await events.record("sync")
+    func prepareWebViewLoad(userInterfaceStyle: UIUserInterfaceStyle?) async {}
+
+    func captureWebViewSession() async {}
+
+    func prepareHTTPLoad() async {
+        await events.record("prepare-http")
     }
+
+    func prepareMediaRequest() async {}
+
+    func clearLoginSession() async {}
 }
 
 private actor QueueHTMLClient: HTMLClient {

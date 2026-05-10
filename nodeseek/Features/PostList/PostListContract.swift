@@ -9,22 +9,13 @@ import Foundation
 
 // MARK: - View Protocol (Presenter -> View)
 protocol PostListViewProtocol: AnyObject {
-    func showLoading()
-    func hideLoading()
-    func showFirstPageError(message: String)
-    func hideFirstPageError()
-    func showRefreshing()
-    func hideRefreshing()
-    func showLoadingMore()
-    func hideLoadingMore()
     func showError(message: String)
     #if DEBUG
     func openDetailTestURLFromPasteboard()
     #endif
     func renderCategories(_ categories: [PostListCategory], selected: PostListCategory)
     func renderSortMode(_ sortMode: PostListSortMode)
-    func render(items: [PostListItem])
-    func renderVisitedState(at index: Int, isVisited: Bool)
+    func reloadSelectedCategory()
 }
 
 // MARK: - Presenter Protocol (View -> Presenter)
@@ -32,7 +23,6 @@ protocol PostListPresenterProtocol: AnyObject {
     func viewDidLoad()
     func didSelectCategory(_ category: PostListCategory)
     func didReselectCategory(_ category: PostListCategory)
-    func didToggleSortMode()
     func didTapLogin()
     func didTapAccountProfile(profileURL: URL)
     func didTapNewDiscussion()
@@ -46,24 +36,7 @@ protocol PostListPresenterProtocol: AnyObject {
     func didTapDetailTest()
     func didSubmitDetailTestURL(_ rawURL: String)
     #endif
-    func didPullToRefresh()
-    func didRetryFirstPage()
-    func didSelectPost(at index: Int)
-    func didApproachBottom(currentIndex: Int, totalCount: Int)
-}
-
-// MARK: - Interactor Input (Presenter -> Interactor)
-protocol PostListInteractorInput: AnyObject {
-    func loadPosts(category: PostListCategory, sortMode: PostListSortMode)
-    func loadMorePosts(page: Int, category: PostListCategory, sortMode: PostListSortMode)
-}
-
-// MARK: - Interactor Output (Interactor -> Presenter)
-protocol PostListInteractorOutput: AnyObject {
-    func didLoadPosts(_ posts: [PostSummary], category: PostListCategory, sortMode: PostListSortMode)
-    func didLoadMorePosts(_ posts: [PostSummary], page: Int, category: PostListCategory, sortMode: PostListSortMode)
-    func didFailLoadPosts(error: String, category: PostListCategory, sortMode: PostListSortMode)
-    func didFailLoadMorePosts(error: String, page: Int, category: PostListCategory, sortMode: PostListSortMode)
+    func didSelectPost(_ post: PostSummary)
 }
 
 // MARK: - Router Protocol (Presenter -> Router)

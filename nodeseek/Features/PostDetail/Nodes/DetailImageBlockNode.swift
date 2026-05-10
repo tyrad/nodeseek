@@ -143,21 +143,19 @@ private final class DetailImageBlockView: UIView {
         hasStartedLoad = true
         let scale = window?.windowScene?.screen.scale ?? traitCollection.displayScale
         let targetPixelWidth = max(bounds.width, DetailImageLayout.maxImageHeight) * max(scale, 1)
-        DetailImageLoader.shared.loadImageForInlineResult(
-            imageBlock.url,
-            maxPixelWidth: targetPixelWidth,
-            displayScale: scale
-        ) { [weak self] result in
-            DispatchQueue.main.async {
-                guard let self, let image = result.image else { return }
-                if let resolvedKind = result.resolvedKind {
-                    self.resolvedImageKind = resolvedKind
+        ImageLoad.url(imageBlock.url)
+            .toDetailInline(maxPixelWidth: targetPixelWidth, displayScale: scale)
+            .loadResult { [weak self] result in
+                DispatchQueue.main.async {
+                    guard let self, let image = result.image else { return }
+                    if let resolvedKind = result.resolvedKind {
+                        self.resolvedImageKind = resolvedKind
+                    }
+                    self.imageView.image = image
+                    self.onImageLoaded(image.size, result.resolvedKind)
+                    self.setNeedsLayout()
                 }
-                self.imageView.image = image
-                self.onImageLoaded(image.size, result.resolvedKind)
-                self.setNeedsLayout()
             }
-        }
     }
 
     @objc

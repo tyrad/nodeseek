@@ -16,7 +16,6 @@ import UIKit
 struct DetailImageLoaderTests {
     @Test func defaultOptimizationConfigEnablesThumbnailCache() {
         #expect(DetailImageConfig.optimizationMode == .enabled(
-            maxPixelSide: 900,
             maxThumbnailBytes: 300 * 1024,
             loggingEnabled: false
         ))
@@ -36,26 +35,25 @@ struct DetailImageLoaderTests {
             session: session,
             cacheDirectory: cacheDirectory,
             optimizationModeProvider: {
-                .enabled(maxPixelSide: 360, maxThumbnailBytes: 80 * 1024, loggingEnabled: true)
+                .enabled(maxThumbnailBytes: 80 * 1024, loggingEnabled: true)
             }
         )
 
-        let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 900)
+        let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 360)
         let previewImage = await Self.loadPreviewImage(loader: loader, url: url)
         let requestCount = protocolType.totalRequestCount()
-        let originalData = try #require(loader.cachedOriginalData(for: url))
-        let thumbnailData = try #require(loader.cachedThumbnailData(for: url))
+        let thumbnailByteSize = loader.detailImageCacheByteSize()
 
         #expect(inlineImage != nil)
         #expect(previewImage != nil)
         #expect(requestCount == 1)
-        #expect(originalData == sourceData)
-        #expect(thumbnailData.count <= 80 * 1024)
-        #expect(thumbnailData.count < sourceData.count)
+        #expect(thumbnailByteSize > 0)
+        #expect(thumbnailByteSize <= 80 * 1024)
+        #expect(thumbnailByteSize < sourceData.count)
         #expect(max(inlineImage?.size.width ?? 0, inlineImage?.size.height ?? 0) <= 360)
     }
 
-    @Test func disabledOptimizationKeepsExistingInlinePathWithoutDetailDiskCache() async throws {
+    @Test func disabledOptimizationKeepsSharedOriginalCacheWithoutThumbnailCache() async throws {
         let url = try #require(URL(string: "https://images.example.com/plain.jpg"))
         let sourceData = try Self.makeNoisyJPEGData(width: 640, height: 480, quality: 0.9)
         let cacheDirectory = Self.makeTemporaryDirectory()
@@ -72,10 +70,12 @@ struct DetailImageLoaderTests {
         )
 
         let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 320)
+        let payload = try await Self.loadOriginalImagePayload(loader: loader, url: url)
 
         #expect(inlineImage != nil)
-        #expect(loader.cachedOriginalData(for: url) == nil)
-        #expect(loader.cachedThumbnailData(for: url) == nil)
+        #expect(payload.data == sourceData)
+        #expect(protocolType.totalRequestCount() == 1)
+        #expect(loader.detailImageCacheByteSize() == 0)
     }
 
     @Test func optimizedInlineLoadDoesNotCacheThumbnailWhenByteLimitCannotBeMet() async throws {
@@ -92,15 +92,14 @@ struct DetailImageLoaderTests {
             session: session,
             cacheDirectory: cacheDirectory,
             optimizationModeProvider: {
-                .enabled(maxPixelSide: 360, maxThumbnailBytes: 256, loggingEnabled: false)
+                .enabled(maxThumbnailBytes: 256, loggingEnabled: false)
             }
         )
 
         let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 900)
 
         #expect(inlineImage != nil)
-        #expect(loader.cachedOriginalData(for: url) == sourceData)
-        #expect(loader.cachedThumbnailData(for: url) == nil)
+        #expect(loader.detailImageCacheByteSize() == 0)
     }
 
     @Test func originalImagePayloadPreservesNetworkDataAndSuggestsExtensionFromURL() async throws {
@@ -141,7 +140,7 @@ struct DetailImageLoaderTests {
         let session = URLSession(configuration: Self.urlSessionConfiguration(protocolType: protocolType))
         let loader = DetailImageLoader(session: session, cacheDirectory: cacheDirectory)
 
-        await #expect(throws: DetailOriginalImageError.unavailable) {
+        await #expect(throws: DetailOriginalFileError.unavailable) {
             try await Self.loadOriginalImagePayload(loader: loader, url: url)
         }
     }
@@ -160,13 +159,12 @@ struct DetailImageLoaderTests {
             session: session,
             cacheDirectory: cacheDirectory,
             optimizationModeProvider: {
-                .enabled(maxPixelSide: 900, maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
+                .enabled(maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
             }
         )
 
         let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 600)
 
-        #expect(loader.cachedOriginalData(for: url) == sourceData)
         #expect((inlineImage?.size.width ?? 0) > 100)
         #expect((inlineImage?.size.height ?? 0) > 100)
         #expect((inlineImage?.size.height ?? 0) > (inlineImage?.size.width ?? 0) * 0.85)
@@ -186,14 +184,13 @@ struct DetailImageLoaderTests {
             session: session,
             cacheDirectory: cacheDirectory,
             optimizationModeProvider: {
-                .enabled(maxPixelSide: 900, maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
+                .enabled(maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
             }
         )
 
         let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 600)
 
-        #expect(loader.cachedOriginalData(for: url) == sourceData)
-        #expect(loader.cachedThumbnailData(for: url) == nil)
+        #expect(loader.detailImageCacheByteSize() == 0)
         #expect((inlineImage?.size.width ?? 0) > 100)
         #expect((inlineImage?.size.height ?? 0) > 100)
     }
@@ -212,14 +209,13 @@ struct DetailImageLoaderTests {
             session: session,
             cacheDirectory: cacheDirectory,
             optimizationModeProvider: {
-                .enabled(maxPixelSide: 900, maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
+                .enabled(maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
             }
         )
 
         let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 600)
 
-        #expect(loader.cachedOriginalData(for: url) == sourceData)
-        #expect(loader.cachedThumbnailData(for: url) == nil)
+        #expect(loader.detailImageCacheByteSize() == 0)
         #expect((inlineImage?.size.width ?? 0) > 300)
         #expect((inlineImage?.size.height ?? 0) > 300)
     }
@@ -238,13 +234,12 @@ struct DetailImageLoaderTests {
             session: session,
             cacheDirectory: cacheDirectory,
             optimizationModeProvider: {
-                .enabled(maxPixelSide: 900, maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
+                .enabled(maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
             }
         )
 
         let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 600)
 
-        #expect(loader.cachedOriginalData(for: url) == sourceData)
         #expect((inlineImage?.size.width ?? 0) > 500)
         #expect((inlineImage?.size.height ?? 0) > 100)
         #expect(Self.distinctSampledPixelCount(in: try #require(inlineImage)) > 8)
@@ -266,14 +261,13 @@ struct DetailImageLoaderTests {
             session: session,
             cacheDirectory: cacheDirectory,
             optimizationModeProvider: {
-                .enabled(maxPixelSide: 900, maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
+                .enabled(maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
             }
         )
 
         let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 600)
 
         #expect(protocolType.totalRequestCount() == 1)
-        #expect(loader.cachedOriginalData(for: url) == sourceData)
         #expect((inlineImage?.size.width ?? 0) > 500)
         #expect((inlineImage?.size.height ?? 0) > 100)
         #expect(Self.distinctSampledPixelCount(in: try #require(inlineImage)) > 8)
@@ -295,20 +289,19 @@ struct DetailImageLoaderTests {
             session: session,
             cacheDirectory: cacheDirectory,
             optimizationModeProvider: {
-                .enabled(maxPixelSide: 900, maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
+                .enabled(maxThumbnailBytes: 300 * 1024, loggingEnabled: false)
             }
         )
 
         let inlineImage = await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 600)
 
         #expect(protocolType.totalRequestCount() == 1)
-        #expect(loader.cachedOriginalData(for: url) == sourceData)
-        #expect(loader.cachedThumbnailData(for: url) == nil)
+        #expect(loader.detailImageCacheByteSize() == 0)
         #expect((inlineImage?.size.width ?? 0) > 300)
         #expect((inlineImage?.size.height ?? 0) > 300)
     }
 
-    @Test func clearsDetailImageDiskAndMemoryCaches() async throws {
+    @Test func clearsDetailThumbnailDiskAndMemoryCaches() async throws {
         let url = try #require(URL(string: "https://images.example.com/clear.jpg"))
         let sourceData = try Self.makeNoisyJPEGData(width: 900, height: 700, quality: 0.9)
         let cacheDirectory = Self.makeTemporaryDirectory()
@@ -322,7 +315,7 @@ struct DetailImageLoaderTests {
             session: session,
             cacheDirectory: cacheDirectory,
             optimizationModeProvider: {
-                .enabled(maxPixelSide: 360, maxThumbnailBytes: 80 * 1024, loggingEnabled: false)
+                .enabled(maxThumbnailBytes: 80 * 1024, loggingEnabled: false)
             }
         )
 
@@ -330,10 +323,11 @@ struct DetailImageLoaderTests {
         #expect(loader.detailImageCacheByteSize() > 0)
 
         try loader.clearDetailImageCache()
+        let payload = try await Self.loadOriginalImagePayload(loader: loader, url: url)
 
         #expect(loader.detailImageCacheByteSize() == 0)
-        #expect(loader.cachedOriginalData(for: url) == nil)
-        #expect(loader.cachedThumbnailData(for: url) == nil)
+        #expect(payload.data == sourceData)
+        #expect(protocolType.totalRequestCount() == 1)
     }
 
     private static func loadInlineImage(
@@ -363,7 +357,7 @@ struct DetailImageLoaderTests {
     private static func loadOriginalImagePayload(
         loader: DetailImageLoader,
         url: URL
-    ) async throws -> DetailOriginalImagePayload {
+    ) async throws -> DetailOriginalFilePayload {
         try await withCheckedThrowingContinuation { continuation in
             loader.loadOriginalImagePayload(for: url) { result in
                 continuation.resume(with: result)

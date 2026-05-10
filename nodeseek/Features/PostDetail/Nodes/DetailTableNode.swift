@@ -1011,16 +1011,18 @@ private final class DetailTableImageView: UIImageView {
 
         let token = UUID()
         loadToken = token
-        DetailImageLoader.shared.loadImageForInline(
-            imageURL,
-            maxPixelWidth: targetPixelWidth * max(traitCollection.displayScale, 1),
-            displayScale: max(traitCollection.displayScale, 1)
-        ) { [weak self] image in
-            DispatchQueue.main.async {
-                guard let self, self.loadToken == token else { return }
-                self.image = image
+        let displayScale = max(traitCollection.displayScale, 1)
+        ImageLoad.url(imageURL)
+            .toDetailInline(
+                maxPixelWidth: targetPixelWidth * displayScale,
+                displayScale: displayScale
+            )
+            .load { [weak self] image in
+                DispatchQueue.main.async {
+                    guard let self, self.loadToken == token else { return }
+                    self.image = image
+                }
             }
-        }
     }
 
     @objc

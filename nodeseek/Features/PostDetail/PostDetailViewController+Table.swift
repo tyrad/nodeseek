@@ -230,7 +230,7 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
 
     private static func makeImageSizeProvider(from cache: [URL: CGSize]) -> (URL) -> CGSize? {
         { url in
-            guard let resolvedURL = AvatarImageLoader.resolveImageURL(url),
+            guard let resolvedURL = ImageURLResolver.resolve(url),
                   let size = cache[resolvedURL],
                   size.width > 0,
                   size.height > 0 else {
