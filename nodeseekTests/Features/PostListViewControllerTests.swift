@@ -31,7 +31,7 @@ struct PostListViewControllerTests {
         #expect(button.alpha < 1)
         #expect(button.alpha >= 0.5)
         #expect(button.frame.maxX > viewController.view.bounds.maxX)
-        #expect(button.frame.maxY < viewController.view.bounds.maxY - 50)
+        #expect(button.frame.maxY <= viewController.view.bounds.maxY - 200)
         #expect(button.titleLabel?.font.pointSize ?? 0 >= 13)
         #expect(button.titleLabel?.numberOfLines == 1)
         #expect(button.titleLabel?.lineBreakMode == .byTruncatingTail)

@@ -153,6 +153,7 @@ class PostDetailViewController: UIViewController {
 
     enum Layout {
         static let horizontalInset: CGFloat = PostDetailContentLayout.horizontalInset
+        static let replyButtonBottomInset: CGFloat = 204
     }
 
     let presenter: PostDetailPresenterProtocol
@@ -660,7 +661,7 @@ class PostDetailViewController: UIViewController {
             toastLabel.bottomAnchor.constraint(equalTo: toastContainerView.bottomAnchor, constant: -10),
 
             replyButton.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            replyButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -28),
+            replyButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Layout.replyButtonBottomInset),
             replyButton.widthAnchor.constraint(equalToConstant: 56),
             replyButton.heightAnchor.constraint(equalToConstant: 48),
 

@@ -2636,6 +2636,7 @@ struct PostDetailLoginViewControllerTests {
         let viewController = PostDetailViewController(presenter: presenter)
 
         viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         viewController.render(detail: PostDetail(
             id: "703863",
             title: "详情标题",
@@ -2646,6 +2647,7 @@ struct PostDetailLoginViewControllerTests {
             comments: []
         ))
         await waitForDetailContent(in: viewController, expectedRowCount: 1)
+        viewController.view.layoutIfNeeded()
 
         #expect(viewController.view.firstTextView(accessibilityIdentifier: "post-detail-comment-input") == nil)
         #expect(viewController.view.firstButton(accessibilityIdentifier: "post-detail-comment-send-button") == nil)
@@ -2653,6 +2655,7 @@ struct PostDetailLoginViewControllerTests {
 
         let floatingReplyButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-button"))
         #expect(floatingReplyButton.isHidden == false)
+        #expect(abs(floatingReplyButton.frame.maxY - (viewController.view.safeAreaLayoutGuide.layoutFrame.maxY - PostDetailViewController.Layout.replyButtonBottomInset)) < 1)
     }
 
     @Test func restrictedDetailHidesReplyEntry() async throws {

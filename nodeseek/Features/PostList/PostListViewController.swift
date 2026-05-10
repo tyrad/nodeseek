@@ -27,6 +27,10 @@ class PostListViewController: UIViewController {
         static let controlSize: CGFloat = 40
     }
 
+    private enum FloatingControlLayout {
+        static let sortToggleBottomInset: CGFloat = 204
+    }
+
     // MARK: - Properties
     let presenter: PostListPresenterProtocol
     let detailTestURLProvider: () -> String
@@ -174,7 +178,10 @@ class PostListViewController: UIViewController {
             compactTopButton.heightAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
 
             sortToggleTrailingConstraint,
-            sortToggleButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -56),
+            sortToggleButton.bottomAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor,
+                constant: -FloatingControlLayout.sortToggleBottomInset
+            ),
             sortToggleWidthConstraint,
             sortToggleButton.heightAnchor.constraint(equalToConstant: PostListSortToggleButton.height),
 
