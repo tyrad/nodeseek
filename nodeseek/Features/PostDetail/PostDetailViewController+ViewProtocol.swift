@@ -581,6 +581,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
         loginButton.isHidden = false
         showsReplyEntry = false
         replyComposerMode = .plain
+        updateReplyContext(for: .plain)
         dismissReplyEditor()
         updateReplyButtonVisibility()
         renderGeneration += 1
@@ -610,6 +611,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
     func finishReplySubmission() {
         replyTextView.text = nil
         replyComposerMode = .plain
+        updateReplyContext(for: .plain)
         dismissReplyEditor()
     }
 }
@@ -644,7 +646,7 @@ extension PostDetailViewController {
             createdAtText: nil,
             contentHTML: ""
         )
-        replyComposerMode = action == "引用" ? .quote(comment) : .reply(comment)
+        replyComposerMode = action == "引用" ? .quote([comment]) : .reply([comment])
         updateReplyContext(for: replyComposerMode)
         replyEditorBackdrop.isHidden = false
         replyEditorContainer.isHidden = false

@@ -8,8 +8,9 @@ import Kanna
 
 enum CommentComposerMode: Equatable {
     case plain
-    case reply(Comment)
-    case quote(Comment)
+    case reply([Comment])
+    case quote([Comment])
+    case combined(replies: [Comment], quotes: [Comment])
 }
 
 enum CommentComposerContentBuilder {
@@ -18,14 +19,33 @@ enum CommentComposerContentBuilder {
         switch mode {
         case .plain:
             return trimmedText
-        case .reply(let comment):
-            return [replyPrefix(for: comment, postURL: postURL), trimmedText]
+        case .reply(let comments):
+            let prefixes = comments.map { replyPrefix(for: $0, postURL: postURL) }
                 .filter { !$0.isEmpty }
                 .joined(separator: " ")
-        case .quote(let comment):
-            let quote = quoteText(for: comment, postURL: postURL)
+            return [prefixes, trimmedText]
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+        case .quote(let comments):
+            let quote = comments.map { quoteText(for: $0, postURL: postURL) }
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n\n")
+            guard !quote.isEmpty else { return trimmedText }
             guard !trimmedText.isEmpty else { return quote }
             return "\(quote)\n\n\(trimmedText)"
+        case .combined(let replies, let quotes):
+            let quote = quotes.map { quoteText(for: $0, postURL: postURL) }
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n\n")
+            let prefixes = replies.map { replyPrefix(for: $0, postURL: postURL) }
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+            let replyText = [prefixes, trimmedText]
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+            return [quote, replyText]
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n\n")
         }
     }
 

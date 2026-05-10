@@ -365,6 +365,7 @@ class PostDetailViewController: UIViewController {
         let label = UILabel()
         label.font = .preferredFont(forTextStyle: .footnote)
         label.textColor = .secondaryLabel
+        label.numberOfLines = 1
         label.lineBreakMode = .byTruncatingTail
         label.accessibilityIdentifier = "post-detail-reply-context-label"
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -382,6 +383,28 @@ class PostDetailViewController: UIViewController {
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
+
+    let replyContextStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .vertical
+        stackView.alignment = .fill
+        stackView.distribution = .fill
+        stackView.spacing = 2
+        stackView.accessibilityIdentifier = "post-detail-reply-context-stack"
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
+    }()
+
+    let replyContextScrollView: UIScrollView = {
+        let scrollView = UIScrollView()
+        scrollView.showsVerticalScrollIndicator = true
+        scrollView.alwaysBounceVertical = false
+        scrollView.accessibilityIdentifier = "post-detail-reply-context-scroll-view"
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        return scrollView
+    }()
+
+    let replyContextBarMaximumHeight: CGFloat = 86
 
     let replyTextView: UITextView = {
         let textView = UITextView()
@@ -680,14 +703,16 @@ class PostDetailViewController: UIViewController {
             replyContextBar.topAnchor.constraint(equalTo: replyEditorContainer.topAnchor, constant: 12),
             replyContextBarHeightConstraint,
 
-            replyContextLabel.leadingAnchor.constraint(equalTo: replyContextBar.leadingAnchor, constant: 10),
-            replyContextLabel.trailingAnchor.constraint(equalTo: replyContextCloseButton.leadingAnchor, constant: -6),
-            replyContextLabel.centerYAnchor.constraint(equalTo: replyContextBar.centerYAnchor),
+            replyContextScrollView.leadingAnchor.constraint(equalTo: replyContextBar.leadingAnchor, constant: 10),
+            replyContextScrollView.trailingAnchor.constraint(equalTo: replyContextBar.trailingAnchor, constant: -6),
+            replyContextScrollView.topAnchor.constraint(equalTo: replyContextBar.topAnchor, constant: 4),
+            replyContextScrollView.bottomAnchor.constraint(equalTo: replyContextBar.bottomAnchor, constant: -4),
 
-            replyContextCloseButton.trailingAnchor.constraint(equalTo: replyContextBar.trailingAnchor, constant: -6),
-            replyContextCloseButton.centerYAnchor.constraint(equalTo: replyContextBar.centerYAnchor),
-            replyContextCloseButton.widthAnchor.constraint(equalToConstant: 24),
-            replyContextCloseButton.heightAnchor.constraint(equalToConstant: 24),
+            replyContextStackView.leadingAnchor.constraint(equalTo: replyContextScrollView.contentLayoutGuide.leadingAnchor),
+            replyContextStackView.trailingAnchor.constraint(equalTo: replyContextScrollView.contentLayoutGuide.trailingAnchor),
+            replyContextStackView.topAnchor.constraint(equalTo: replyContextScrollView.contentLayoutGuide.topAnchor),
+            replyContextStackView.bottomAnchor.constraint(equalTo: replyContextScrollView.contentLayoutGuide.bottomAnchor),
+            replyContextStackView.widthAnchor.constraint(equalTo: replyContextScrollView.frameLayoutGuide.widthAnchor),
 
             replyTextView.leadingAnchor.constraint(equalTo: replyEditorContainer.leadingAnchor, constant: 12),
             replyTextView.topAnchor.constraint(equalTo: replyToolbarView.bottomAnchor, constant: 8),
@@ -769,9 +794,8 @@ class PostDetailViewController: UIViewController {
         replyStickerPickerView.onSelectSticker = { [weak self] item in
             self?.insertStickerToken(item.token)
         }
-        replyContextCloseButton.addTarget(self, action: #selector(clearReplyContext), for: .touchUpInside)
-        replyContextBar.addSubview(replyContextLabel)
-        replyContextBar.addSubview(replyContextCloseButton)
+        replyContextBar.addSubview(replyContextScrollView)
+        replyContextScrollView.addSubview(replyContextStackView)
         replyToolbarSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         replyToolbarView.addArrangedSubview(replyImageUploadButton)
         replyToolbarView.addArrangedSubview(replyStickerButton)

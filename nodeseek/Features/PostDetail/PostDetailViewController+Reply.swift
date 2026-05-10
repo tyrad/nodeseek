@@ -11,7 +11,7 @@ extension PostDetailViewController {
     @objc
     func replyButtonTapped() {
         ensureNodeSeekLoggedIn { [weak self] in
-            self?.presentReplyEditor(mode: .plain)
+            self?.presentCommentEditor()
         }
     }
 
@@ -56,7 +56,7 @@ extension PostDetailViewController {
             contentHTML: header.contentHTML
         )
         ensureNodeSeekLoggedIn { [weak self] in
-            self?.presentReplyEditor(mode: .reply(comment))
+            self?.presentReplyEditor(action: "回复", for: comment)
         }
     }
 
@@ -87,7 +87,12 @@ extension PostDetailViewController {
     }
 
     func presentReplyEditor(action: String, for comment: Comment) {
-        presentReplyEditor(mode: action == "引用" ? .quote(comment) : .reply(comment))
+        let mode: CommentComposerMode = action == "引用" ? .quote([comment]) : .reply([comment])
+        presentReplyEditor(mode: mergedReplyComposerMode(with: mode))
+    }
+
+    func presentCommentEditor() {
+        presentReplyEditor(mode: replyComposerMode)
     }
 
     func ensureNodeSeekLoggedIn(_ action: @escaping @MainActor () -> Void) {
@@ -129,20 +134,23 @@ extension PostDetailViewController {
     }
 
     func updateReplyContext(for mode: CommentComposerMode) {
-        let contextText: String?
+        let rows: [String]
         switch mode {
         case .plain:
-            contextText = nil
-        case .reply(let comment):
-            contextText = replyContextText(action: "回复", comment: comment)
-        case .quote(let comment):
-            contextText = replyContextText(action: "引用", comment: comment)
+            rows = []
+        case .reply(let comments):
+            rows = replyContextRows(action: "回复", comments: comments)
+        case .quote(let comments):
+            rows = replyContextRows(action: "引用", comments: comments)
+        case .combined(let replies, let quotes):
+            rows = replyContextRows(action: "回复", comments: replies)
+                + replyContextRows(action: "引用", comments: quotes)
         }
 
-        if let contextText, contextText.isEmpty == false {
-            replyContextLabel.text = contextText
+        rebuildReplyContextRows(rows)
+        if rows.isEmpty == false {
             replyContextBar.isHidden = false
-            replyContextBarHeightConstraint?.constant = 32
+            replyContextBarHeightConstraint?.constant = replyContextBarHeight(rowCount: rows.count)
         } else {
             replyContextLabel.text = nil
             replyContextBar.isHidden = true
@@ -150,15 +158,109 @@ extension PostDetailViewController {
         }
     }
 
-    func replyContextText(action: String, comment: Comment) -> String {
+    func mergedReplyComposerMode(with incomingMode: CommentComposerMode) -> CommentComposerMode {
+        switch (replyComposerMode, incomingMode) {
+        case (.reply(let existing), .reply(let incoming)):
+            return .reply(commentsByAppendingUnique(existing: existing, incoming: incoming))
+        case (.quote(let existing), .quote(let incoming)):
+            return .quote(commentsByAppendingUnique(existing: existing, incoming: incoming))
+        case (.reply(let existingReplies), .quote(let incomingQuotes)):
+            return .combined(replies: existingReplies, quotes: incomingQuotes)
+        case (.quote(let existingQuotes), .reply(let incomingReplies)):
+            return .combined(replies: incomingReplies, quotes: existingQuotes)
+        case (.combined(let replies, let quotes), .reply(let incomingReplies)):
+            return .combined(
+                replies: commentsByAppendingUnique(existing: replies, incoming: incomingReplies),
+                quotes: quotes
+            )
+        case (.combined(let replies, let quotes), .quote(let incomingQuotes)):
+            return .combined(
+                replies: replies,
+                quotes: commentsByAppendingUnique(existing: quotes, incoming: incomingQuotes)
+            )
+        default:
+            return incomingMode
+        }
+    }
+
+    func commentsByAppendingUnique(existing: [Comment], incoming: [Comment]) -> [Comment] {
+        var seenIDs = Set(existing.map(\.id))
+        var comments = existing
+        for comment in incoming where seenIDs.insert(comment.id).inserted {
+            comments.append(comment)
+        }
+        return comments
+    }
+
+    func replyContextRows(action: String, comments: [Comment]) -> [String] {
+        let targetTexts = comments.map(replyContextTargetText(comment:))
+            .filter { $0.isEmpty == false }
+        guard targetTexts.isEmpty == false else { return [] }
+
+        return targetTexts.map { "\(action) \($0)" }
+    }
+
+    func replyContextTargetText(comment: Comment) -> String {
         let authorName = AuthorDisplayPolicy.displayName(from: comment.authorName) ?? comment.authorName
         let contextParts = [
-            action,
             Self.trimmedNonEmpty(authorName),
             comment.floorText.flatMap(Self.trimmedNonEmpty)
         ]
             .compactMap(\.self)
         return contextParts.joined(separator: " ")
+    }
+
+    func rebuildReplyContextRows(_ rows: [String]) {
+        for view in replyContextStackView.arrangedSubviews {
+            replyContextStackView.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+
+        for (index, text) in rows.enumerated() {
+            let rowView = makeReplyContextRow(text: text, index: index)
+            replyContextStackView.addArrangedSubview(rowView)
+        }
+    }
+
+    func makeReplyContextRow(text: String, index: Int) -> UIView {
+        let rowStackView = UIStackView()
+        rowStackView.axis = .horizontal
+        rowStackView.alignment = .center
+        rowStackView.distribution = .fill
+        rowStackView.spacing = 6
+        rowStackView.accessibilityIdentifier = "post-detail-reply-context-row-\(index)"
+
+        let label = UILabel()
+        label.font = .preferredFont(forTextStyle: .footnote)
+        label.textColor = .secondaryLabel
+        label.numberOfLines = 1
+        label.lineBreakMode = .byTruncatingTail
+        label.text = text
+        label.accessibilityIdentifier = index == 0
+            ? "post-detail-reply-context-label"
+            : "post-detail-reply-context-label-\(index)"
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let button = UIButton(type: .system)
+        var configuration = UIButton.Configuration.plain()
+        configuration.image = UIImage(systemName: "xmark")
+        configuration.baseForegroundColor = .tertiaryLabel
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 2, leading: 2, bottom: 2, trailing: 2)
+        button.configuration = configuration
+        button.tag = index
+        button.accessibilityIdentifier = "post-detail-reply-context-remove-button-\(index)"
+        button.accessibilityLabel = "取消引用"
+        button.addTarget(self, action: #selector(removeReplyContextTarget(_:)), for: .touchUpInside)
+        button.widthAnchor.constraint(equalToConstant: 24).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 24).isActive = true
+
+        rowStackView.addArrangedSubview(label)
+        rowStackView.addArrangedSubview(button)
+        return rowStackView
+    }
+
+    func replyContextBarHeight(rowCount: Int) -> CGFloat {
+        min(replyContextBarMaximumHeight, max(32, CGFloat(rowCount) * 26 + 8))
     }
 
     @objc
@@ -167,8 +269,6 @@ extension PostDetailViewController {
         setStickerPickerVisible(false, animated: false)
         replyEditorBackdrop.isHidden = true
         replyEditorContainer.isHidden = true
-        replyComposerMode = .plain
-        updateReplyContext(for: .plain)
         updateReplyButtonVisibility()
     }
 
@@ -176,6 +276,62 @@ extension PostDetailViewController {
     func clearReplyContext() {
         replyComposerMode = .plain
         updateReplyContext(for: .plain)
+    }
+
+    @objc
+    func removeReplyContextTarget(_ sender: UIButton) {
+        let index = sender.tag
+        switch replyComposerMode {
+        case .plain:
+            return
+        case .reply(let comments):
+            replyComposerMode = modeByRemovingTarget(at: index, from: comments, makeMode: CommentComposerMode.reply)
+        case .quote(let comments):
+            replyComposerMode = modeByRemovingTarget(at: index, from: comments, makeMode: CommentComposerMode.quote)
+        case .combined(let replies, let quotes):
+            replyComposerMode = combinedModeByRemovingTarget(at: index, replies: replies, quotes: quotes)
+        }
+        updateReplyContext(for: replyComposerMode)
+    }
+
+    func modeByRemovingTarget(
+        at index: Int,
+        from comments: [Comment],
+        makeMode: ([Comment]) -> CommentComposerMode
+    ) -> CommentComposerMode {
+        guard comments.indices.contains(index) else { return makeMode(comments) }
+        var nextComments = comments
+        nextComments.remove(at: index)
+        return nextComments.isEmpty ? .plain : makeMode(nextComments)
+    }
+
+    func combinedModeByRemovingTarget(at index: Int, replies: [Comment], quotes: [Comment]) -> CommentComposerMode {
+        if replies.indices.contains(index) {
+            var nextReplies = replies
+            nextReplies.remove(at: index)
+            return modeFor(replies: nextReplies, quotes: quotes)
+        }
+
+        let quoteIndex = index - replies.count
+        guard quotes.indices.contains(quoteIndex) else {
+            return modeFor(replies: replies, quotes: quotes)
+        }
+        var nextQuotes = quotes
+        nextQuotes.remove(at: quoteIndex)
+        return modeFor(replies: replies, quotes: nextQuotes)
+    }
+
+    func modeFor(replies: [Comment], quotes: [Comment]) -> CommentComposerMode {
+        switch (replies.isEmpty, quotes.isEmpty) {
+        case (true, true):
+            return .plain
+        case (false, true):
+            return .reply(replies)
+        case (true, false):
+            return .quote(quotes)
+        case (false, false):
+            return .combined(replies: replies, quotes: quotes)
+        }
     }
 
     @objc

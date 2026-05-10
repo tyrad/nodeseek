@@ -143,7 +143,7 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                         self?.handleReply(toPostHeader: header)
                     },
                     onCommentTapped: {
-                        self?.presentReplyEditor(mode: .plain)
+                        self?.presentCommentEditor()
                     },
                     showsReplyActions: self?.showsReplyEntry == true,
                     onTextLayoutInvalidated: {

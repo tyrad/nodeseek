@@ -2700,6 +2700,61 @@ struct PostDetailLoginViewControllerTests {
         #expect(tapGesture.cancelsTouchesInView == false)
     }
 
+    @Test func dismissingReplyEditorKeepsContextForLaterAdditionalTargets() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true)
+        )
+        let comment = Comment(
+            id: "1",
+            anchorID: "10",
+            authorName: "netcup",
+            avatarURL: nil,
+            floorText: "#10",
+            createdAtText: "1min ago",
+            contentHTML: "<p>第一段</p>"
+        )
+        let second = Comment(
+            id: "2",
+            anchorID: "11",
+            authorName: "alice",
+            avatarURL: nil,
+            floorText: "#11",
+            createdAtText: "2min ago",
+            contentHTML: "<p>第二段</p>"
+        )
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [],
+        ))
+        await waitForDetailContent(in: viewController, expectedRowCount: 1)
+
+        viewController.handleQuote(comment)
+        await Task.yield()
+        viewController.dismissReplyEditor()
+
+        #expect(viewController.replyEditorContainer.isHidden)
+
+        viewController.handleQuote(second)
+        await Task.yield()
+
+        #expect(viewController.replyContextStackView.arrangedSubviews.count == 2)
+        let contextLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-detail-reply-context-label"))
+        let secondContextLabel = try #require(
+            viewController.view.firstLabel(accessibilityIdentifier: "post-detail-reply-context-label-1")
+        )
+        #expect(contextLabel.text == "引用 netcup #10")
+        #expect(secondContextLabel.text == "引用 alice #11")
+    }
+
     @Test func replyAndQuoteActionsUpdateComposerState() async throws {
         let presenter = SpyPostDetailPresenter()
         let viewController = PostDetailViewController(
@@ -2735,7 +2790,8 @@ struct PostDetailLoginViewControllerTests {
 
         let cancelButton = try #require(viewController.view.firstButton(accessibilityLabel: "取消引用"))
         cancelButton.sendActions(for: .touchUpInside)
-        #expect(contextLabel.text == nil)
+        #expect(viewController.replyContextBar.isHidden)
+        #expect(viewController.view.firstLabel(accessibilityIdentifier: "post-detail-reply-context-label") == nil)
 
         viewController.handleQuote(comment)
         await Task.yield()
@@ -2747,6 +2803,290 @@ struct PostDetailLoginViewControllerTests {
         #expect(presenter.sentReplyContent?.contains("> @netcup [#10]") == true)
         #expect(presenter.sentReplyContent?.contains("第一段") == true)
         #expect(presenter.sentReplyContent?.contains("第二段") == false)
+    }
+
+    @Test func replyActionAppendsMultipleTargetsWhileEditorIsOpen() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true)
+        )
+        let first = Comment(
+            id: "1",
+            anchorID: "10",
+            authorName: "netcup",
+            avatarURL: nil,
+            floorText: "#10",
+            createdAtText: "1min ago",
+            contentHTML: "<p>第一段</p>"
+        )
+        let second = Comment(
+            id: "2",
+            anchorID: "11",
+            authorName: "alice",
+            avatarURL: nil,
+            floorText: "#11",
+            createdAtText: "2min ago",
+            contentHTML: "<p>第二段</p>"
+        )
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [],
+        ))
+        await waitForDetailContent(in: viewController, expectedRowCount: 1)
+
+        viewController.handleReply(to: first)
+        await Task.yield()
+        viewController.handleReply(to: second)
+        await Task.yield()
+
+        let contextLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-detail-reply-context-label"))
+        #expect(contextLabel.text == "回复 netcup #10")
+        let secondContextLabel = try #require(
+            viewController.view.firstLabel(accessibilityIdentifier: "post-detail-reply-context-label-1")
+        )
+        #expect(secondContextLabel.text == "回复 alice #11")
+        #expect(viewController.replyContextStackView.arrangedSubviews.count == 2)
+        let removeButtons = viewController.view.allSubviews(of: UIButton.self).filter {
+            $0.accessibilityIdentifier?.hasPrefix("post-detail-reply-context-remove-button-") == true
+        }
+        #expect(removeButtons.count == 2)
+        #expect((viewController.replyContextBarHeightConstraint?.constant ?? 0) > 32)
+
+        removeButtons[1].sendActions(for: .touchUpInside)
+        await Task.yield()
+
+        #expect(viewController.replyContextStackView.arrangedSubviews.count == 1)
+
+        let replyTextView = try #require(viewController.view.firstTextView(accessibilityIdentifier: "post-detail-reply-text-view"))
+        replyTextView.text = "正文"
+        let sendButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-send-button"))
+        sendButton.sendActions(for: .touchUpInside)
+        await Task.yield()
+
+        #expect(presenter.sentReplyContent == """
+        @netcup [#10](https://www.nodeseek.com/post-703863-1#10) 正文
+        """)
+    }
+
+    @Test func quoteActionAppendsMultipleTargetsWhileEditorIsOpen() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true)
+        )
+        let first = Comment(
+            id: "1",
+            anchorID: "10",
+            authorName: "netcup",
+            avatarURL: nil,
+            floorText: "#10",
+            createdAtText: "1min ago",
+            createdAtTitleText: "2026-04-29 13:58:43",
+            contentHTML: "<p>第一段</p>"
+        )
+        let second = Comment(
+            id: "2",
+            anchorID: "11",
+            authorName: "alice",
+            avatarURL: nil,
+            floorText: "#11",
+            createdAtText: "2min ago",
+            createdAtTitleText: "2026-04-29 14:00:00",
+            contentHTML: "<p>第二段</p>"
+        )
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [],
+        ))
+        await waitForDetailContent(in: viewController, expectedRowCount: 1)
+
+        viewController.handleQuote(first)
+        await Task.yield()
+        viewController.handleQuote(second)
+        await Task.yield()
+
+        let contextLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-detail-reply-context-label"))
+        #expect(contextLabel.text == "引用 netcup #10")
+        let secondContextLabel = try #require(
+            viewController.view.firstLabel(accessibilityIdentifier: "post-detail-reply-context-label-1")
+        )
+        #expect(secondContextLabel.text == "引用 alice #11")
+        #expect(viewController.replyContextStackView.arrangedSubviews.count == 2)
+        let removeButtons = viewController.view.allSubviews(of: UIButton.self).filter {
+            $0.accessibilityIdentifier?.hasPrefix("post-detail-reply-context-remove-button-") == true
+        }
+        #expect(removeButtons.count == 2)
+        #expect((viewController.replyContextBarHeightConstraint?.constant ?? 0) > 32)
+
+        removeButtons[1].sendActions(for: .touchUpInside)
+        await Task.yield()
+
+        #expect(viewController.replyContextStackView.arrangedSubviews.count == 1)
+
+        let replyTextView = try #require(viewController.view.firstTextView(accessibilityIdentifier: "post-detail-reply-text-view"))
+        replyTextView.text = "正文"
+        let sendButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-send-button"))
+        sendButton.sendActions(for: .touchUpInside)
+        await Task.yield()
+
+        #expect(presenter.sentReplyContent == """
+        > @netcup [#10](https://www.nodeseek.com/post-703863-1#10) 发布于2026-04-29 13:58:43
+        > 第一段
+
+        正文
+        """)
+    }
+
+    @Test func replyAndQuoteContextsCanCoexist() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true)
+        )
+        let reply = Comment(
+            id: "1",
+            anchorID: "10",
+            authorName: "netcup",
+            avatarURL: nil,
+            floorText: "#10",
+            createdAtText: "1min ago",
+            contentHTML: "<p>第一段</p>"
+        )
+        let quote = Comment(
+            id: "2",
+            anchorID: "11",
+            authorName: "alice",
+            avatarURL: nil,
+            floorText: "#11",
+            createdAtText: "2min ago",
+            createdAtTitleText: "2026-04-29 14:00:00",
+            contentHTML: "<p>引用段落</p>"
+        )
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [],
+        ))
+        await waitForDetailContent(in: viewController, expectedRowCount: 1)
+
+        viewController.handleReply(to: reply)
+        await Task.yield()
+        viewController.handleQuote(quote)
+        await Task.yield()
+
+        #expect(viewController.replyContextStackView.arrangedSubviews.count == 2)
+        #expect(viewController.view.firstLabel(accessibilityIdentifier: "post-detail-reply-context-label")?.text == "回复 netcup #10")
+        #expect(viewController.view.firstLabel(accessibilityIdentifier: "post-detail-reply-context-label-1")?.text == "引用 alice #11")
+
+        let replyTextView = try #require(viewController.view.firstTextView(accessibilityIdentifier: "post-detail-reply-text-view"))
+        replyTextView.text = "正文"
+        let sendButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-send-button"))
+        sendButton.sendActions(for: .touchUpInside)
+        await Task.yield()
+
+        #expect(presenter.sentReplyContent == """
+        > @alice [#11](https://www.nodeseek.com/post-703863-1#11) 发布于2026-04-29 14:00:00
+        > 引用段落
+
+        @netcup [#10](https://www.nodeseek.com/post-703863-1#10) 正文
+        """)
+    }
+
+    @Test func contextBarScrollsWhenTargetsOverflowVisibleRows() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true)
+        )
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [],
+        ))
+        await waitForDetailContent(in: viewController, expectedRowCount: 1)
+
+        for index in 1...4 {
+            viewController.handleQuote(Comment(
+                id: "\(index)",
+                anchorID: "\(index)",
+                authorName: "user\(index)",
+                avatarURL: nil,
+                floorText: "#\(index)",
+                createdAtText: "\(index)min ago",
+                contentHTML: "<p>第 \(index) 段</p>"
+            ))
+            await Task.yield()
+        }
+
+        #expect(viewController.replyContextStackView.arrangedSubviews.count == 4)
+        #expect(viewController.replyContextScrollView.isScrollEnabled)
+        #expect(viewController.replyContextBarHeightConstraint?.constant == viewController.replyContextBarMaximumHeight)
+    }
+
+    @Test func commentButtonKeepsExistingReplyContext() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true)
+        )
+        let quote = Comment(
+            id: "1",
+            anchorID: "10",
+            authorName: "netcup",
+            avatarURL: nil,
+            floorText: "#10",
+            createdAtText: "1min ago",
+            createdAtTitleText: "2026-04-29 13:58:43",
+            contentHTML: "<p>引用段落</p>"
+        )
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: [],
+        ))
+        await waitForDetailContent(in: viewController, expectedRowCount: 1)
+
+        viewController.handleQuote(quote)
+        await Task.yield()
+        viewController.dismissReplyEditor()
+        viewController.replyButtonTapped()
+        await Task.yield()
+
+        #expect(viewController.replyContextStackView.arrangedSubviews.count == 1)
+        #expect(viewController.view.firstLabel(accessibilityIdentifier: "post-detail-reply-context-label")?.text == "引用 netcup #10")
     }
 
     @Test func postHeaderReplyActionUsesPosterContext() async throws {
