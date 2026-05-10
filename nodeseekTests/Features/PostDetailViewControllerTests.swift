@@ -999,7 +999,7 @@ struct PostDetailViewControllerTests {
 
         #expect(node.debugReactionActionTitles == ["1.2万", "12.3万", "1亿", "20亿"])
         #expect(node.debugFooterActionAccessibilityLabels == ["点赞 12345", "加鸡腿 123456", "反对 100000000", "收藏 2000000000", "回复楼主", "评论帖子"])
-        #expect(node.debugReactionActionPreferredWidths.allSatisfy { $0 > 52 })
+        #expect(node.debugReactionActionPreferredWidths.allSatisfy { $0 > PostDetailContentLayout.reactionActionMinWidth })
     }
 
     @Test func postBodyCellUsesDynamicWidthForTwoDigitFavoriteCount() {
@@ -1020,7 +1020,7 @@ struct PostDetailViewControllerTests {
         )
 
         #expect(node.debugReactionActionTitles[3] == "10")
-        #expect(node.debugReactionActionPreferredWidths[3] > 52)
+        #expect(node.debugReactionActionPreferredWidths[3] > PostDetailContentLayout.reactionActionMinWidth)
     }
 
     @Test func postBodyCellKeepsFavoriteIconStyleWhileSubmitting() {
@@ -1065,6 +1065,8 @@ struct PostDetailViewControllerTests {
 
         #expect(didRefresh)
         #expect(node.debugAuthorAttributedTitle?.string == "ipv4")
+        #expect((node.debugAuthorAttributedTitle?.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize == 17)
+        #expect((node.debugAuthorAttributedTitle?.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.fontDescriptor.symbolicTraits.contains(.traitBold) == true)
     }
 
     @Test func commentCellShowsPosterBadgeBesideAuthorName() {

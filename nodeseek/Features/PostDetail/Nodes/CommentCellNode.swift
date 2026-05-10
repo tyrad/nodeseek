@@ -10,22 +10,27 @@ import UIKit
 
 enum PostDetailContentLayout {
     static let horizontalInset: CGFloat = 16
-    static let commentTopInset: CGFloat = 14
-    static let commentBottomInset: CGFloat = 14
-    static let avatarSize: CGFloat = 42
-    static let avatarCornerRadius: CGFloat = 9
-    static let avatarSpacing: CGFloat = 12
-    static let reactionActionHeight: CGFloat = 32
-    static let reactionActionMinWidth: CGFloat = 52
-    static let reactionIconReservedWidth: CGFloat = 18
-    static let reactionTitleSpacing: CGFloat = 4
-    static let reactionHorizontalWidthPadding: CGFloat = 20
+    static let commentTopInset: CGFloat = 12
+    static let commentBottomInset: CGFloat = 12
+    static let avatarSize: CGFloat = 40
+    static let avatarCornerRadius: CGFloat = 8
+    static let avatarSpacing: CGFloat = 10
+    static let reactionActionHeight: CGFloat = 30
+    static let reactionActionMinWidth: CGFloat = 48
+    static let reactionIconReservedWidth: CGFloat = 16
+    static let reactionTitleSpacing: CGFloat = 3
+    static let reactionHorizontalWidthPadding: CGFloat = 16
+    static let reactionIconOnlyWidth: CGFloat = 36
+    static let reactionActionSpacing: CGFloat = 4
+    static let reactionSymbolPointSize: CGFloat = 14
+    static let inactiveReactionAlpha: CGFloat = 0.62
+    static let reactionContentEdgeInsets = UIEdgeInsets(top: 5, left: 7, bottom: 5, right: 7)
 }
 
 final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
     private enum Layout {
         static let headerSpacing: CGFloat = 5
-        static let bodySpacing: CGFloat = 10
+        static let bodySpacing: CGFloat = 8
 
         static func textColumnWidth(for maxWidth: CGFloat, includingAvatar: Bool) -> CGFloat? {
             guard maxWidth.isFinite, maxWidth > 0 else { return nil }
@@ -265,7 +270,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
             NSAttributedString(
                 string: AuthorDisplayPolicy.displayName(from: comment.authorName) ?? "",
                 attributes: [
-                    .font: UIFont.preferredFont(forTextStyle: .headline),
+                    .font: UIFont.systemFont(ofSize: 17, weight: .semibold),
                     .foregroundColor: UIColor.label
                 ]
             ),
@@ -355,7 +360,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         spacer.style.flexGrow = 1
 
         let actionStack = ASStackLayoutSpec.horizontal()
-        actionStack.spacing = 8
+        actionStack.spacing = PostDetailContentLayout.reactionActionSpacing
         actionStack.alignItems = .center
         actionStack.children = [
             spacer,
@@ -373,15 +378,18 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         systemImageName: String,
         accessibilityLabel: String,
         count: Int? = nil,
-        color: UIColor = UIColor.secondaryLabel.withAlphaComponent(0.72)
+        color: UIColor = UIColor.secondaryLabel.withAlphaComponent(PostDetailContentLayout.inactiveReactionAlpha)
     ) {
-        let configuration = UIImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+        let configuration = UIImage.SymbolConfiguration(
+            pointSize: PostDetailContentLayout.reactionSymbolPointSize,
+            weight: .regular
+        )
         let image = UIImage(systemName: systemImageName, withConfiguration: configuration)?
             .withTintColor(color, renderingMode: .alwaysOriginal)
         button.setImage(image, for: .normal)
         let displayCount = count.flatMap { $0 > 0 ? $0 : nil }
         button.contentSpacing = displayCount == nil ? 0 : PostDetailContentLayout.reactionTitleSpacing
-        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+        button.contentEdgeInsets = PostDetailContentLayout.reactionContentEdgeInsets
         if let displayCount {
             let countText = Self.reactionCountText(displayCount)
             let font = UIFont.preferredFont(forTextStyle: .caption1)
@@ -402,21 +410,24 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
             button.accessibilityLabel = "\(accessibilityLabel) \(countText)"
         } else {
             button.setAttributedTitle(nil, for: .normal)
-            button.style.preferredSize = CGSize(width: 40, height: PostDetailContentLayout.reactionActionHeight)
+            button.style.preferredSize = CGSize(
+                width: PostDetailContentLayout.reactionIconOnlyWidth,
+                height: PostDetailContentLayout.reactionActionHeight
+            )
             button.accessibilityLabel = accessibilityLabel
         }
     }
 
     private static func likeActionColor(isClicked: Bool) -> UIColor {
-        isClicked ? .systemRed : UIColor.secondaryLabel.withAlphaComponent(0.72)
+        isClicked ? .systemRed : UIColor.secondaryLabel.withAlphaComponent(PostDetailContentLayout.inactiveReactionAlpha)
     }
 
     private static func chickenLegActionColor(isClicked: Bool) -> UIColor {
-        isClicked ? .systemOrange : UIColor.secondaryLabel.withAlphaComponent(0.72)
+        isClicked ? .systemOrange : UIColor.secondaryLabel.withAlphaComponent(PostDetailContentLayout.inactiveReactionAlpha)
     }
 
     private static func opposeActionColor(isClicked: Bool) -> UIColor {
-        isClicked ? .systemRed : UIColor.secondaryLabel.withAlphaComponent(0.72)
+        isClicked ? .systemRed : UIColor.secondaryLabel.withAlphaComponent(PostDetailContentLayout.inactiveReactionAlpha)
     }
 
     private func configureLikeActionButton(count: Int?, isClicked: Bool) {

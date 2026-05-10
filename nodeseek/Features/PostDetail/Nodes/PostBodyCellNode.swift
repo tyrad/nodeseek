@@ -279,7 +279,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         spacer.style.flexGrow = 1
 
         let actionStack = ASStackLayoutSpec.horizontal()
-        actionStack.spacing = 4
+        actionStack.spacing = PostDetailContentLayout.reactionActionSpacing
         actionStack.alignItems = .center
         var actionChildren: [ASLayoutElement] = [spacer]
         if hasReactionActions {
@@ -305,15 +305,18 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         systemImageName: String,
         accessibilityLabel: String,
         count: Int? = nil,
-        color: UIColor = UIColor.secondaryLabel.withAlphaComponent(0.72)
+        color: UIColor = UIColor.secondaryLabel.withAlphaComponent(PostDetailContentLayout.inactiveReactionAlpha)
     ) {
-        let configuration = UIImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+        let configuration = UIImage.SymbolConfiguration(
+            pointSize: PostDetailContentLayout.reactionSymbolPointSize,
+            weight: .regular
+        )
         let image = UIImage(systemName: systemImageName, withConfiguration: configuration)?
             .withTintColor(color, renderingMode: .alwaysOriginal)
         button.setImage(image, for: .normal)
         let displayCount = count.flatMap { $0 > 0 ? $0 : nil }
         button.contentSpacing = displayCount == nil ? 0 : PostDetailContentLayout.reactionTitleSpacing
-        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+        button.contentEdgeInsets = PostDetailContentLayout.reactionContentEdgeInsets
         if let displayCount {
             let countText = Self.reactionCountText(displayCount)
             let font = UIFont.preferredFont(forTextStyle: .caption1)
@@ -334,7 +337,10 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
             button.accessibilityLabel = "\(accessibilityLabel) \(displayCount)"
         } else {
             button.setAttributedTitle(nil, for: .normal)
-            button.style.preferredSize = CGSize(width: 40, height: PostDetailContentLayout.reactionActionHeight)
+            button.style.preferredSize = CGSize(
+                width: PostDetailContentLayout.reactionIconOnlyWidth,
+                height: PostDetailContentLayout.reactionActionHeight
+            )
             button.accessibilityLabel = accessibilityLabel
         }
     }
@@ -373,19 +379,19 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
     }
 
     private static func favoriteActionColor(isCollected: Bool) -> UIColor {
-        return isCollected ? .systemYellow : UIColor.secondaryLabel.withAlphaComponent(0.72)
+        return isCollected ? .systemYellow : UIColor.secondaryLabel.withAlphaComponent(PostDetailContentLayout.inactiveReactionAlpha)
     }
 
     private static func likeActionColor(isClicked: Bool) -> UIColor {
-        isClicked ? .systemRed : UIColor.secondaryLabel.withAlphaComponent(0.72)
+        isClicked ? .systemRed : UIColor.secondaryLabel.withAlphaComponent(PostDetailContentLayout.inactiveReactionAlpha)
     }
 
     private static func chickenLegActionColor(isClicked: Bool) -> UIColor {
-        isClicked ? .systemOrange : UIColor.secondaryLabel.withAlphaComponent(0.72)
+        isClicked ? .systemOrange : UIColor.secondaryLabel.withAlphaComponent(PostDetailContentLayout.inactiveReactionAlpha)
     }
 
     private static func opposeActionColor(isClicked: Bool) -> UIColor {
-        isClicked ? .systemRed : UIColor.secondaryLabel.withAlphaComponent(0.72)
+        isClicked ? .systemRed : UIColor.secondaryLabel.withAlphaComponent(PostDetailContentLayout.inactiveReactionAlpha)
     }
 
     private func configureLikeActionButton(count: Int?, isClicked: Bool) {
