@@ -104,6 +104,10 @@ final class PostTextureListView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
     func setItems(_ items: [PostListItem]) {
         hideErrorView()
         if self.items.count != items.count {
@@ -211,6 +215,12 @@ final class PostTextureListView: UIView {
         refreshControl.addTarget(self, action: #selector(handlePullToRefresh), for: .valueChanged)
         tableNode.view.refreshControl = refreshControl
         tableNode.view.translatesAutoresizingMaskIntoConstraints = false
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appTextSizeDidChange(_:)),
+            name: AppTextSizeSettings.didChangeNotification,
+            object: nil
+        )
 
         addSubview(tableNode.view)
         addSubview(errorStackView)
@@ -244,6 +254,11 @@ final class PostTextureListView: UIView {
 
     @objc private func handlePullToRefresh() {
         delegate?.postTextureListViewDidRequestRefresh(self)
+    }
+
+    @objc private func appTextSizeDidChange(_ notification: Notification) {
+        guard displayMode == .content else { return }
+        tableNode.reloadData()
     }
 
     @objc private func retryFirstPageTapped() {

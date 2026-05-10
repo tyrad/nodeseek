@@ -1065,7 +1065,7 @@ struct PostDetailViewControllerTests {
 
         #expect(didRefresh)
         #expect(node.debugAuthorAttributedTitle?.string == "ipv4")
-        #expect((node.debugAuthorAttributedTitle?.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize == 17)
+        #expect((node.debugAuthorAttributedTitle?.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize == AppTextSizeSettings.adjustedPointSize(basePointSize: 17))
         #expect((node.debugAuthorAttributedTitle?.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.fontDescriptor.symbolicTraits.contains(.traitBold) == true)
     }
 

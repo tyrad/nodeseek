@@ -102,10 +102,16 @@ final class DefaultNodeImageAuthorizationPresenter: NodeImageAuthorizationPresen
 final class SettingsViewController: UITableViewController {
     private enum Section: Int, CaseIterable {
         case cache
+        case textSize
         case nodeImage
         case debug
         case build
         case account
+    }
+
+    private enum TextSizeRow: Int, CaseIterable {
+        case adjustment
+        case preview
     }
 
     private enum BuildRow: Int, CaseIterable {
@@ -144,6 +150,7 @@ final class SettingsViewController: UITableViewController {
     private let buildInfo: SettingsBuildInfo
     private let nodeImageAPIKeyStore: NodeImageAPIKeyStoring
     private let nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting
+    private let textSizeSettings: AppTextSizeSettings
     private let confirmsActionsImmediately: Bool
     private let onLogout: @MainActor () -> Void
     private let onLogFile: @MainActor () -> Void
@@ -160,6 +167,7 @@ final class SettingsViewController: UITableViewController {
         buildInfo: SettingsBuildInfo = SettingsBuildInfo(),
         nodeImageAPIKeyStore: NodeImageAPIKeyStoring = KeychainNodeImageAPIKeyStore(),
         nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting? = nil,
+        textSizeSettings: AppTextSizeSettings = .shared,
         confirmsActionsImmediately: Bool = false,
         onLogout: @escaping @MainActor () -> Void = {},
         onLogFile: @escaping @MainActor () -> Void = {},
@@ -171,6 +179,7 @@ final class SettingsViewController: UITableViewController {
         self.buildInfo = buildInfo
         self.nodeImageAPIKeyStore = nodeImageAPIKeyStore
         self.nodeImageAuthorizationPresenter = nodeImageAuthorizationPresenter ?? DefaultNodeImageAuthorizationPresenter()
+        self.textSizeSettings = textSizeSettings
         self.confirmsActionsImmediately = confirmsActionsImmediately
         self.onLogout = onLogout
         self.onLogFile = onLogFile
@@ -186,7 +195,17 @@ final class SettingsViewController: UITableViewController {
         super.viewDidLoad()
         title = "设置"
         tableView.accessibilityIdentifier = "settings-table-view"
+        tableView.rowHeight = UITableView.automaticDimension
+        tableView.estimatedRowHeight = 72
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "SettingsCell")
+        tableView.register(
+            SettingsTextSizeAdjustmentCell.self,
+            forCellReuseIdentifier: "SettingsTextSizeAdjustmentCell"
+        )
+        tableView.register(
+            SettingsTextSizePreviewCell.self,
+            forCellReuseIdentifier: "SettingsTextSizePreviewCell"
+        )
         refreshCacheSize()
         refreshAccountState()
     }
@@ -198,6 +217,9 @@ final class SettingsViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         if Section(rawValue: section) == .debug {
             return DebugRow.visibleRows.count
+        }
+        if Section(rawValue: section) == .textSize {
+            return TextSizeRow.allCases.count
         }
         if Section(rawValue: section) == .build {
             return BuildRow.allCases.count
@@ -212,6 +234,8 @@ final class SettingsViewController: UITableViewController {
         switch Section(rawValue: section) {
         case .cache:
             return "缓存"
+        case .textSize:
+            return "字体"
         case .nodeImage:
             return "NodeImage"
         case .debug:
@@ -229,6 +253,8 @@ final class SettingsViewController: UITableViewController {
         switch Section(rawValue: indexPath.section) {
         case .cache:
             return cacheCell(for: indexPath)
+        case .textSize:
+            return textSizeCell(for: indexPath)
         case .nodeImage:
             return nodeImageAuthorizationCell(for: indexPath)
         case .debug:
@@ -247,6 +273,8 @@ final class SettingsViewController: UITableViewController {
         switch Section(rawValue: indexPath.section) {
         case .cache:
             confirmClearCache()
+        case .textSize:
+            break
         case .nodeImage:
             handleNodeImageAuthorizationSelection()
         case .debug:
@@ -270,6 +298,34 @@ final class SettingsViewController: UITableViewController {
         cell.isUserInteractionEnabled = !isClearingCache
         cell.accessibilityIdentifier = "settings-clear-cache-cell"
         return cell
+    }
+
+    private func textSizeCell(for indexPath: IndexPath) -> UITableViewCell {
+        switch TextSizeRow(rawValue: indexPath.row) {
+        case .adjustment:
+            guard let cell = tableView.dequeueReusableCell(
+                withIdentifier: "SettingsTextSizeAdjustmentCell",
+                for: indexPath
+            ) as? SettingsTextSizeAdjustmentCell else {
+                return UITableViewCell()
+            }
+            cell.configure(pointOffset: textSizeSettings.pointOffset)
+            cell.onPointOffsetChanged = { [weak self] pointOffset in
+                self?.updateTextSize(pointOffset: pointOffset)
+            }
+            return cell
+        case .preview:
+            guard let cell = tableView.dequeueReusableCell(
+                withIdentifier: "SettingsTextSizePreviewCell",
+                for: indexPath
+            ) as? SettingsTextSizePreviewCell else {
+                return UITableViewCell()
+            }
+            cell.configure(pointOffset: textSizeSettings.pointOffset)
+            return cell
+        case .none:
+            return UITableViewCell()
+        }
     }
 
     private func nodeImageAuthorizationCell(for indexPath: IndexPath) -> UITableViewCell {
@@ -399,6 +455,20 @@ final class SettingsViewController: UITableViewController {
             let snapshot = await currentAccountStore.snapshot()
             isLoggedIn = snapshot?.account.isLoggedIn == true
             tableView.reloadSections(IndexSet(integer: Section.account.rawValue), with: .none)
+        }
+    }
+
+    private func updateTextSize(pointOffset: CGFloat) {
+        textSizeSettings.setPointOffset(pointOffset)
+        let previewIndexPath = IndexPath(row: TextSizeRow.preview.rawValue, section: Section.textSize.rawValue)
+        if let previewCell = tableView.cellForRow(at: previewIndexPath) as? SettingsTextSizePreviewCell {
+            previewCell.configure(pointOffset: textSizeSettings.pointOffset)
+            UIView.performWithoutAnimation {
+                tableView.beginUpdates()
+                tableView.endUpdates()
+            }
+        } else {
+            tableView.reloadRows(at: [previewIndexPath], with: .none)
         }
     }
 

@@ -155,7 +155,7 @@ struct DTCoreTextHTMLContentRenderer {
 
         let options: [String: Any] = [
             NSBaseURLDocumentOption: baseURL,
-            DTDefaultFontSize: UIFont.preferredFont(forTextStyle: .body).pointSize,
+            DTDefaultFontSize: AppTypography.commentBodyFont().pointSize,
             DTDefaultTextColor: UIColor.label,
             DTDefaultLinkColor: NodeSeekLinkStyle.color,
             DTMaxImageSize: NSValue(cgSize: CGSize(width: maxImageWidth, height: DetailImageLayout.maxImageHeight)),

@@ -38,7 +38,7 @@ extension DTCoreTextHTMLContentRenderer {
         let fullRange = NSRange(location: 0, length: attributed.length)
         let bodyColor = UIColor.label
 
-        let bodyFont = UIFont.preferredFont(forTextStyle: .body)
+        let bodyFont = AppTypography.commentBodyFont()
         attributed.enumerateAttribute(.font, in: fullRange) { value, range, _ in
             guard let font = value as? UIFont else {
                 attributed.addAttribute(.font, value: bodyFont, range: range)

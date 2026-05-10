@@ -314,11 +314,11 @@ enum PostListCellStyle {
         static let metadataWeight = UIFont.Weight.regular
 
         static var titleFont: UIFont {
-            UIFont.systemFont(ofSize: titlePointSize, weight: titleWeight)
+            AppTypography.listTitleFont()
         }
 
         static var metadataFont: UIFont {
-            UIFont.systemFont(ofSize: metadataPointSize, weight: metadataWeight)
+            AppTypography.listMetadataFont()
         }
     }
 

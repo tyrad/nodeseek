@@ -54,7 +54,7 @@ struct HTMLContentRenderer {
         scaleImageAttachments(in: attributed, maxImageWidth: maxImageWidth)
         attributed.addAttributes(
             [
-                .font: UIFont.preferredFont(forTextStyle: .body),
+                .font: AppTypography.commentBodyFont(),
                 .foregroundColor: UIColor.label
             ],
             range: NSRange(location: 0, length: attributed.length)

@@ -205,7 +205,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
             NSAttributedString(
                 string: AuthorDisplayPolicy.displayName(from: content.authorName) ?? "",
                 attributes: [
-                    .font: UIFont.preferredFont(forTextStyle: .subheadline),
+                    .font: AppTypography.detailMetadataFont(),
                     .foregroundColor: UIColor.secondaryLabel
                 ]
             ),
@@ -217,7 +217,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         metadataNode.attributedText = NSAttributedString(
             string: Self.metadataText(for: content),
             attributes: [
-                .font: UIFont.preferredFont(forTextStyle: .subheadline),
+                .font: AppTypography.detailMetadataFont(),
                 .foregroundColor: UIColor.secondaryLabel
             ]
         )
@@ -231,7 +231,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
     }
 
     private static func titleAttributedText(for content: PostDetailHeaderContent) -> NSAttributedString {
-        let titleFont = UIFont.preferredFont(forTextStyle: .title2)
+        let titleFont = AppTypography.detailTitleFont()
         let result = NSMutableAttributedString(
             string: content.title,
             attributes: [
@@ -244,7 +244,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
             return result
         }
 
-        let badgeFont = UIFont.preferredFont(forTextStyle: .subheadline)
+        let badgeFont = AppTypography.detailMetadataFont()
         let badgeColor = UIColor.systemRed
         result.append(NSAttributedString(
             string: " 🔒 \(requiredReadingLevel)",
@@ -319,7 +319,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         button.contentEdgeInsets = PostDetailContentLayout.reactionContentEdgeInsets
         if let displayCount {
             let countText = Self.reactionCountText(displayCount)
-            let font = UIFont.preferredFont(forTextStyle: .caption1)
+            let font = AppTypography.commentActionFont()
             button.setAttributedTitle(
                 NSAttributedString(
                     string: countText,

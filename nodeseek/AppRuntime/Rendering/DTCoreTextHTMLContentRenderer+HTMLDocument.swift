@@ -9,14 +9,23 @@ import Foundation
 
 extension DTCoreTextHTMLContentRenderer {
     func wrapHTML(fragment: String, baseURL: URL) -> String {
-        """
+        let bodySize = cssPixelSize(basePointSize: 17)
+        let h1Size = cssPixelSize(basePointSize: 24)
+        let h2Size = cssPixelSize(basePointSize: 22)
+        let h3Size = cssPixelSize(basePointSize: 20)
+        let h4Size = cssPixelSize(basePointSize: 19)
+        let h5Size = cssPixelSize(basePointSize: 18)
+        let h6Size = cssPixelSize(basePointSize: 17)
+        let codeSize = cssPixelSize(basePointSize: 13)
+
+        return """
         <html>
         <head>
         <base href="\(baseURL.absoluteString)">
         <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
-            font-size: 17px;
+            font-size: \(bodySize);
             line-height: 1.42;
             color: #111111;
         }
@@ -28,12 +37,12 @@ extension DTCoreTextHTMLContentRenderer {
             font-weight: 700;
             color: #111111;
         }
-        h1 { font-size: 24px; }
-        h2 { font-size: 22px; color: #2ea44f; }
-        h3 { font-size: 20px; }
-        h4 { font-size: 19px; }
-        h5 { font-size: 18px; }
-        h6 { font-size: 17px; }
+        h1 { font-size: \(h1Size); }
+        h2 { font-size: \(h2Size); color: #2ea44f; }
+        h3 { font-size: \(h3Size); }
+        h4 { font-size: \(h4Size); }
+        h5 { font-size: \(h5Size); }
+        h6 { font-size: \(h6Size); }
         strong, b { font-weight: 700; }
         em, i { font-style: italic; }
         s, del, strike { text-decoration: line-through; }
@@ -56,19 +65,24 @@ extension DTCoreTextHTMLContentRenderer {
         }
         pre {
             font-family: Menlo, Monaco, monospace;
-            font-size: 13px;
+            font-size: \(codeSize);
             line-height: 1.35;
             white-space: pre-wrap;
             margin: 8px 0 12px 0;
         }
         code {
             font-family: Menlo, Monaco, monospace;
-            font-size: 13px;
+            font-size: \(codeSize);
         }
         </style>
         </head>
         <body>\(fragment)</body>
         </html>
         """
+    }
+
+    private func cssPixelSize(basePointSize: CGFloat) -> String {
+        let size = AppTextSizeSettings.adjustedPointSize(basePointSize: basePointSize)
+        return "\(Int(size.rounded()))px"
     }
 }

@@ -270,7 +270,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
             NSAttributedString(
                 string: AuthorDisplayPolicy.displayName(from: comment.authorName) ?? "",
                 attributes: [
-                    .font: UIFont.systemFont(ofSize: 17, weight: .semibold),
+                    .font: AppTypography.commentAuthorFont(),
                     .foregroundColor: UIColor.label
                 ]
             ),
@@ -282,7 +282,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         posterBadgeNode.attributedText = NSAttributedString(
             string: "楼主",
             attributes: [
-                .font: UIFont.preferredFont(forTextStyle: .caption2),
+                .font: AppTypography.commentBadgeFont(),
                 .foregroundColor: UIColor.systemOrange
             ]
         )
@@ -300,7 +300,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         timeNode.attributedText = NSAttributedString(
             string: comment.createdAtText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
             attributes: [
-                .font: UIFont.preferredFont(forTextStyle: .subheadline),
+                .font: AppTypography.commentMetadataFont(),
                 .foregroundColor: UIColor.secondaryLabel
             ]
         )
@@ -309,7 +309,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         floorNode.attributedText = NSAttributedString(
             string: comment.floorText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
             attributes: [
-                .font: UIFont.preferredFont(forTextStyle: .subheadline),
+                .font: AppTypography.commentMetadataFont(),
                 .foregroundColor: UIColor.tertiaryLabel
             ]
         )
@@ -335,7 +335,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
 
     private static func makeAuthorBadgeNode(text: String) -> ASButtonNode {
         let node = ASButtonNode()
-        let font = UIFont.preferredFont(forTextStyle: .caption2)
+        let font = AppTypography.commentBadgeFont()
         node.setAttributedTitle(
             NSAttributedString(
                 string: text,
@@ -392,7 +392,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         button.contentEdgeInsets = PostDetailContentLayout.reactionContentEdgeInsets
         if let displayCount {
             let countText = Self.reactionCountText(displayCount)
-            let font = UIFont.preferredFont(forTextStyle: .caption1)
+            let font = AppTypography.commentActionFont()
             button.setAttributedTitle(
                 NSAttributedString(
                     string: countText,

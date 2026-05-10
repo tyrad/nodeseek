@@ -725,6 +725,12 @@ class PostDetailViewController: UIViewController {
             name: UIResponder.keyboardWillHideNotification,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appTextSizeDidChange(_:)),
+            name: AppTextSizeSettings.didChangeNotification,
+            object: nil
+        )
 
         reloadTableData()
         updateReplyButtonVisibility()
@@ -734,6 +740,20 @@ class PostDetailViewController: UIViewController {
     func refreshCommentsAtEndTapped() {
         AppLog.info(.postDetail, "点击详情评论到底 footer 更新按钮: currentPage=\(currentPage), totalComments=\(comments.count)")
         presenter.didTapRefreshCommentsAtEnd()
+    }
+
+    @objc
+    func appTextSizeDidChange(_ notification: Notification) {
+        renderGeneration += 1
+        commentRenderInFlight.removeAll(keepingCapacity: true)
+        commentRenderedCache.removeAll(keepingCapacity: true)
+        renderedCommentIDs.removeAll(keepingCapacity: true)
+        if let currentHeaderContent {
+            headerRenderedContent = nil
+            scheduleHeaderRender(for: currentHeaderContent)
+        }
+        reloadTableData()
+        preheatCommentRender(for: comments)
     }
 
     func configureReplyEditor() {

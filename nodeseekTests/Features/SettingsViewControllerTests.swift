@@ -28,19 +28,21 @@ struct SettingsViewControllerTests {
         viewController.loadViewIfNeeded()
         viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         viewController.view.layoutIfNeeded()
-        try await waitUntil { viewController.tableView.numberOfRows(inSection: 4) == 1 }
+        try await waitUntil { viewController.tableView.numberOfRows(inSection: 5) == 1 }
 
         let tableView = try #require(viewController.tableView)
         #expect(viewController.title == "设置")
-        #expect(tableView.numberOfSections == 5)
+        #expect(tableView.numberOfSections == 6)
         #expect(tableView.numberOfRows(inSection: 0) == 1)
-        #expect(tableView.numberOfRows(inSection: 1) == 1)
-        #expect(tableView.numberOfRows(inSection: 2) == 4)
-        #expect(tableView.numberOfRows(inSection: 3) == 6)
-        #expect(tableView.numberOfRows(inSection: 4) == 1)
-        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 1) == "NodeImage")
-        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 2) == "调试")
-        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 3) == "版本")
+        #expect(tableView.numberOfRows(inSection: 1) == 2)
+        #expect(tableView.numberOfRows(inSection: 2) == 1)
+        #expect(tableView.numberOfRows(inSection: 3) == 4)
+        #expect(tableView.numberOfRows(inSection: 4) == 6)
+        #expect(tableView.numberOfRows(inSection: 5) == 1)
+        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 1) == "字体")
+        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 2) == "NodeImage")
+        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 3) == "调试")
+        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 4) == "版本")
 
         let cacheCell = try #require(tableView.dataSource?.tableView(
             tableView,
@@ -48,51 +50,51 @@ struct SettingsViewControllerTests {
         ))
         let nodeImageCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 0, section: 1)
+            cellForRowAt: IndexPath(row: 0, section: 2)
         ))
         let logCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 0, section: 2)
+            cellForRowAt: IndexPath(row: 0, section: 3)
         ))
         let logFileCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 1, section: 2)
+            cellForRowAt: IndexPath(row: 1, section: 3)
         ))
         let detailTestCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 2, section: 2)
+            cellForRowAt: IndexPath(row: 2, section: 3)
         ))
         let debugLinksCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 3, section: 2)
+            cellForRowAt: IndexPath(row: 3, section: 3)
         ))
         let appVersionCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 0, section: 3)
+            cellForRowAt: IndexPath(row: 0, section: 4)
         ))
         let buildNumberCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 1, section: 3)
+            cellForRowAt: IndexPath(row: 1, section: 4)
         ))
         let gitCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 2, section: 3)
+            cellForRowAt: IndexPath(row: 2, section: 4)
         ))
         let repositoryCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 3, section: 3)
+            cellForRowAt: IndexPath(row: 3, section: 4)
         ))
         let workflowCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 4, section: 3)
+            cellForRowAt: IndexPath(row: 4, section: 4)
         ))
         let githubCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 5, section: 3)
+            cellForRowAt: IndexPath(row: 5, section: 4)
         ))
         let logoutCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 0, section: 4)
+            cellForRowAt: IndexPath(row: 0, section: 5)
         ))
 
         #expect(cacheCell.textLabel?.text == "清除缓存")
@@ -133,9 +135,71 @@ struct SettingsViewControllerTests {
         )
 
         viewController.loadViewIfNeeded()
-        try await waitUntil { viewController.tableView.numberOfRows(inSection: 4) == 0 }
+        try await waitUntil { viewController.tableView.numberOfRows(inSection: 5) == 0 }
 
-        #expect(viewController.tableView.numberOfRows(inSection: 4) == 0)
+        #expect(viewController.tableView.numberOfRows(inSection: 5) == 0)
+    }
+
+    @Test func textSizeSliderPersistsOffsetAndUpdatesPreview() throws {
+        let suiteName = "settings-text-size-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let textSizeSettings = AppTextSizeSettings(userDefaults: defaults, storageKey: "text-size")
+        let viewController = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager(),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
+            textSizeSettings: textSizeSettings
+        )
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.view.layoutIfNeeded()
+
+        let adjustmentCell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: IndexPath(row: 0, section: 1)
+        ) as? SettingsTextSizeAdjustmentCell)
+        let previewCell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: IndexPath(row: 1, section: 1)
+        ) as? SettingsTextSizePreviewCell)
+
+        adjustmentCell.slider.value = 2
+        adjustmentCell.slider.sendActions(for: .valueChanged)
+        previewCell.configure(pointOffset: textSizeSettings.pointOffset)
+
+        #expect(textSizeSettings.pointOffset == 2)
+        #expect(previewCell.debugListTitleFont?.pointSize == 19)
+        #expect(previewCell.debugCommentBodyFont?.pointSize == 19)
+    }
+
+    @Test func textSizePreviewCellRecalculatesFlexibleHeightForLargeFont() {
+        let cell = SettingsTextSizePreviewCell(style: .default, reuseIdentifier: nil)
+        cell.bounds = CGRect(x: 0, y: 0, width: 390, height: 1)
+        cell.contentView.bounds = CGRect(x: 0, y: 0, width: 390, height: 1)
+
+        cell.configure(pointOffset: 0)
+        let standardHeight = cell.contentView.systemLayoutSizeFitting(
+            CGSize(width: 390, height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        ).height
+
+        cell.configure(pointOffset: AppTextSizeSettings.maximumPointOffset)
+        let largeHeight = cell.contentView.systemLayoutSizeFitting(
+            CGSize(width: 390, height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        ).height
+
+        #expect(largeHeight > standardHeight)
+        #expect(cell.debugCommentActionNumberOfLines == 0)
+    }
+
+    @Test func textSizeSettingsUsesExpandedAdjustmentRange() {
+        #expect(AppTextSizeSettings.normalizedPointOffset(-100) == -4)
+        #expect(AppTextSizeSettings.normalizedPointOffset(100) == 8)
+        #expect(AppTextSizeSettings.displayText(for: 8) == "+8")
     }
 
     @Test func selectingClearCacheClearsCacheWithoutLoggingOut() async throws {
@@ -177,11 +241,11 @@ struct SettingsViewControllerTests {
             }
         )
         viewController.loadViewIfNeeded()
-        try await waitUntil { viewController.tableView.numberOfRows(inSection: 4) == 1 }
+        try await waitUntil { viewController.tableView.numberOfRows(inSection: 5) == 1 }
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 4)
+            didSelectRowAt: IndexPath(row: 0, section: 5)
         )
         try await Task.sleep(nanoseconds: 100_000_000)
 
@@ -208,11 +272,11 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 1, section: 2)
+            didSelectRowAt: IndexPath(row: 1, section: 3)
         )
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 2, section: 2)
+            didSelectRowAt: IndexPath(row: 2, section: 3)
         )
 
         #expect(logFileTapCount == 1)
@@ -236,7 +300,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 2, section: 2)
+            didSelectRowAt: IndexPath(row: 2, section: 3)
         )
 
         #expect(detailTestTapCount == 1)
@@ -254,7 +318,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 3, section: 2)
+            didSelectRowAt: IndexPath(row: 3, section: 3)
         )
 
         #expect(navigationController.viewControllers.count == 2)
@@ -307,7 +371,7 @@ struct SettingsViewControllerTests {
 
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 0, section: 2)
+            cellForRowAt: IndexPath(row: 0, section: 3)
         ))
         let loggingSwitch = try #require(cell.accessoryView as? UISwitch)
         loggingSwitch.isOn = true
@@ -328,7 +392,7 @@ struct SettingsViewControllerTests {
 
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 0, section: 1)
+            cellForRowAt: IndexPath(row: 0, section: 2)
         ))
 
         #expect(cell.textLabel?.text == "取消 NodeImage 授权")
@@ -350,14 +414,14 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 1)
+            didSelectRowAt: IndexPath(row: 0, section: 2)
         )
 
         #expect(authorizationPresenter.presentCount == 1)
         #expect(nodeImageAPIKeyStore.apiKey() == "new-nodeimage-key")
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 0, section: 1)
+            cellForRowAt: IndexPath(row: 0, section: 2)
         ))
         #expect(cell.textLabel?.text == "取消 NodeImage 授权")
     }
@@ -382,7 +446,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 1)
+            didSelectRowAt: IndexPath(row: 0, section: 2)
         )
         try await Task.sleep(nanoseconds: 100_000_000)
 
@@ -403,14 +467,14 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 1)
+            didSelectRowAt: IndexPath(row: 0, section: 2)
         )
 
         #expect(nodeImageAPIKeyStore.clearCount == 1)
         #expect(nodeImageAPIKeyStore.apiKey() == nil)
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 0, section: 1)
+            cellForRowAt: IndexPath(row: 0, section: 2)
         ))
         #expect(cell.textLabel?.text == "NodeImage 授权")
     }
