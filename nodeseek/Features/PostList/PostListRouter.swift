@@ -93,6 +93,30 @@ class PostListRouter: PostListRouterProtocol {
         show(recentViewController)
     }
 
+    func navigateToUserDiscussions() {
+        let viewController = UserDiscussionsViewController()
+        viewController.onSelectPost = { [weak self, weak viewController] post, page, anchorID in
+            self?.pushPostDetail(post: post, page: page, anchorID: anchorID, from: viewController)
+        }
+        show(viewController)
+    }
+
+    func navigateToUserComments() {
+        let viewController = UserCommentsViewController()
+        viewController.onSelectPost = { [weak self, weak viewController] post, page, anchorID in
+            self?.pushPostDetail(post: post, page: page, anchorID: anchorID, from: viewController)
+        }
+        show(viewController)
+    }
+
+    func navigateToUserCollections() {
+        let viewController = UserCollectionsViewController()
+        viewController.onSelectPost = { [weak self, weak viewController] post, page, anchorID in
+            self?.pushPostDetail(post: post, page: page, anchorID: anchorID, from: viewController)
+        }
+        show(viewController)
+    }
+
     func navigateToSettings(
         onLogout: @escaping @MainActor () -> Void,
         onLogFile: @escaping @MainActor () -> Void,
@@ -117,6 +141,24 @@ class PostListRouter: PostListRouterProtocol {
 
         let navigationWrapper = UINavigationController(rootViewController: targetViewController)
         viewController?.present(navigationWrapper, animated: true)
+    }
+
+    private func pushPostDetail(
+        post: PostSummary,
+        page: Int,
+        anchorID: String?,
+        from sourceViewController: UIViewController?
+    ) {
+        let detailViewController = PostDetailRouter.createModule(
+            post: post,
+            page: page,
+            initialAnchorID: anchorID
+        )
+        if let navigationController = sourceViewController?.navigationController {
+            navigationController.pushViewController(detailViewController, animated: true)
+            return
+        }
+        viewController?.navigationController?.pushViewController(detailViewController, animated: true)
     }
 
     private static func postSummary(from record: VisitedPostRecord) -> PostSummary {

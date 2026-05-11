@@ -16,6 +16,9 @@ final class PostListSideMenuViewController: UIViewController {
     var onCheckInTapped: (() -> Void)?
     var onNotificationTapped: ((URL) -> Void)?
     var onRecentVisitedTapped: (() -> Void)?
+    var onUserDiscussionsTapped: (() -> Void)?
+    var onUserCommentsTapped: (() -> Void)?
+    var onUserCollectionsTapped: (() -> Void)?
     var onSearchTapped: (() -> Void)?
     var onSettingsTapped: (() -> Void)?
     private let accountController: PostListSideMenuAccountController
@@ -94,6 +97,36 @@ final class PostListSideMenuViewController: UIViewController {
         button.accessibilityIdentifier = "post-list-side-menu-account-header-button"
         button.accessibilityLabel = "登录账号"
         button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
+    private let extensionEntryStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .horizontal
+        stackView.alignment = .center
+        stackView.distribution = .fill
+        stackView.spacing = 8
+        stackView.isHidden = true
+        stackView.accessibilityIdentifier = "post-list-side-menu-extension-entry-stack"
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
+    }()
+
+    private let postsEntryButton: UIButton = {
+        let button = PostListSideMenuViewController.makeExtensionEntryButton(label: "帖子", systemImageName: "list.bullet")
+        button.accessibilityIdentifier = "post-list-side-menu-extension-posts-button"
+        return button
+    }()
+
+    private let commentsEntryButton: UIButton = {
+        let button = PostListSideMenuViewController.makeExtensionEntryButton(label: "评论", systemImageName: "bubble.left")
+        button.accessibilityIdentifier = "post-list-side-menu-extension-comments-button"
+        return button
+    }()
+
+    private let favoritesEntryButton: UIButton = {
+        let button = PostListSideMenuViewController.makeExtensionEntryButton(label: "收藏", systemImageName: "bookmark")
+        button.accessibilityIdentifier = "post-list-side-menu-extension-favorites-button"
         return button
     }()
 
@@ -177,6 +210,29 @@ final class PostListSideMenuViewController: UIViewController {
         return button
     }
 
+    private static func makeExtensionEntryButton(label: String, systemImageName: String) -> UIButton {
+        let button = UIButton(type: .system)
+        let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 11, weight: .regular)
+        var configuration = UIButton.Configuration.plain()
+        configuration.image = UIImage(systemName: systemImageName, withConfiguration: symbolConfiguration)
+        configuration.imagePadding = 2
+        configuration.imagePlacement = .leading
+        configuration.title = label
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = .preferredFont(forTextStyle: .caption2)
+            return outgoing
+        }
+        configuration.baseForegroundColor = .secondaryLabel
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0)
+        button.configuration = configuration
+        button.backgroundColor = .clear
+        button.accessibilityLabel = label
+        button.isHidden = true
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }
+
     private static func color(fromCSSColor cssColor: String?) -> UIColor? {
         guard let value = cssColor?.trimmingCharacters(in: .whitespacesAndNewlines), value.isEmpty == false else {
             return nil
@@ -249,6 +305,7 @@ final class PostListSideMenuViewController: UIViewController {
             : "登录后同步账号信息"
         accountHeaderButton.accessibilityLabel = account.isLoggedIn ? "账号信息" : "登录账号"
         accountHeaderButton.isEnabled = !account.isLoggedIn || account.profileURL != nil
+        setExtensionEntriesVisible(account.isLoggedIn)
         notificationURL = account.notification?.url ?? NodeSeekSite.baseURL.appendingPathComponent("notification")
         applyNotificationColor(account.notification?.iconColorCSS)
 
@@ -286,6 +343,9 @@ final class PostListSideMenuViewController: UIViewController {
         notificationButton.addTarget(self, action: #selector(notificationButtonTapped), for: .touchUpInside)
         recentVisitedButton.addTarget(self, action: #selector(recentVisitedButtonTapped), for: .touchUpInside)
         searchButton.addTarget(self, action: #selector(searchButtonTapped), for: .touchUpInside)
+        postsEntryButton.addTarget(self, action: #selector(postsEntryButtonTapped), for: .touchUpInside)
+        commentsEntryButton.addTarget(self, action: #selector(commentsEntryButtonTapped), for: .touchUpInside)
+        favoritesEntryButton.addTarget(self, action: #selector(favoritesEntryButtonTapped), for: .touchUpInside)
 
         view.addSubview(backdropView)
         view.addSubview(sideMenuView)
@@ -293,6 +353,10 @@ final class PostListSideMenuViewController: UIViewController {
         sideMenuView.addSubview(nameLabel)
         sideMenuView.addSubview(statsLabel)
         sideMenuView.addSubview(accountHeaderButton)
+        sideMenuView.addSubview(extensionEntryStackView)
+        extensionEntryStackView.addArrangedSubview(postsEntryButton)
+        extensionEntryStackView.addArrangedSubview(commentsEntryButton)
+        extensionEntryStackView.addArrangedSubview(favoritesEntryButton)
         sideMenuView.addSubview(newDiscussionButton)
         sideMenuView.addSubview(checkInButton)
         sideMenuView.addSubview(notificationButton)
@@ -335,6 +399,14 @@ final class PostListSideMenuViewController: UIViewController {
             accountHeaderButton.topAnchor.constraint(equalTo: avatarImageView.topAnchor, constant: -8),
             accountHeaderButton.bottomAnchor.constraint(equalTo: avatarImageView.bottomAnchor, constant: 8),
 
+            extensionEntryStackView.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+            extensionEntryStackView.topAnchor.constraint(equalTo: statsLabel.bottomAnchor, constant: 4),
+            extensionEntryStackView.heightAnchor.constraint(equalToConstant: 24),
+
+            postsEntryButton.heightAnchor.constraint(equalToConstant: 24),
+            commentsEntryButton.heightAnchor.constraint(equalToConstant: 24),
+            favoritesEntryButton.heightAnchor.constraint(equalToConstant: 24),
+
             settingsButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
             settingsButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
             settingsButton.bottomAnchor.constraint(equalTo: sideMenuView.safeAreaLayoutGuide.bottomAnchor, constant: -18),
@@ -365,6 +437,13 @@ final class PostListSideMenuViewController: UIViewController {
             newDiscussionButton.bottomAnchor.constraint(equalTo: checkInButton.topAnchor, constant: -8),
             newDiscussionButton.heightAnchor.constraint(equalToConstant: 48)
         ])
+    }
+
+    private func setExtensionEntriesVisible(_ isVisible: Bool) {
+        extensionEntryStackView.isHidden = !isVisible
+        postsEntryButton.isHidden = !isVisible
+        commentsEntryButton.isHidden = !isVisible
+        favoritesEntryButton.isHidden = !isVisible
     }
 
     private func applyNotificationColor(_ cssColor: String?) {
@@ -427,6 +506,21 @@ final class PostListSideMenuViewController: UIViewController {
     @objc private func searchButtonTapped() {
         hide(animated: true)
         onSearchTapped?()
+    }
+
+    @objc private func postsEntryButtonTapped() {
+        hide(animated: true)
+        onUserDiscussionsTapped?()
+    }
+
+    @objc private func commentsEntryButtonTapped() {
+        hide(animated: true)
+        onUserCommentsTapped?()
+    }
+
+    @objc private func favoritesEntryButtonTapped() {
+        hide(animated: true)
+        onUserCollectionsTapped?()
     }
 
     private func setVisible(_ visible: Bool, animated: Bool) {

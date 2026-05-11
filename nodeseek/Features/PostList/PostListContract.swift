@@ -29,6 +29,9 @@ protocol PostListPresenterProtocol: AnyObject {
     func didTapCheckIn()
     func didTapNotification(url: URL)
     func didTapRecentVisited()
+    func didTapUserDiscussions()
+    func didTapUserComments()
+    func didTapUserCollections()
     func didTapSearch()
     func didTapSettings()
     func didTapLogFile()
@@ -50,6 +53,9 @@ protocol PostListRouterProtocol: AnyObject {
     func navigateToCheckIn(boardURL: URL)
     func navigateToNotification(notificationURL: URL)
     func navigateToRecentVisitedPosts(visitedStore: VisitedPostStoreProtocol)
+    func navigateToUserDiscussions()
+    func navigateToUserComments()
+    func navigateToUserCollections()
     func navigateToSearch()
     func navigateToSettings(
         onLogout: @escaping @MainActor () -> Void,

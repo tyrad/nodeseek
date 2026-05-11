@@ -227,6 +227,9 @@ struct PostListViewControllerTests {
         let nameLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-name-label"))
         let statsLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-stats-label"))
         let accountHeaderButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-account-header-button"))
+        let postsEntryButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-extension-posts-button"))
+        let commentsEntryButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-extension-comments-button"))
+        let favoritesEntryButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-extension-favorites-button"))
         let newDiscussionButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-new-discussion-button"))
         let checkInButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-check-in-button"))
         let notificationButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-notification-button"))
@@ -249,6 +252,9 @@ struct PostListViewControllerTests {
         #expect(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-detail-test-button") == nil)
         #expect(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-log-file-button") == nil)
         #expect(accountHeaderButton.accessibilityLabel == "登录账号")
+        #expect(postsEntryButton.isHidden == true)
+        #expect(commentsEntryButton.isHidden == true)
+        #expect(favoritesEntryButton.isHidden == true)
         #expect(newDiscussionButton.configuration?.title == "发帖")
         #expect(newDiscussionButton.configuration?.image != nil)
         #expect(checkInButton.configuration?.title == "签到")
@@ -344,6 +350,73 @@ struct PostListViewControllerTests {
         #expect(backdrop.isHidden == true)
     }
 
+    @Test func loggedInSideMenuShowsCompactExtensionEntryButtonsBelowAccountStats() async throws {
+        let defaults = try #require(UserDefaults(suiteName: "post-list-side-menu-\(UUID().uuidString)"))
+        let store = CurrentAccountStore(userDefaults: defaults, storageKey: "account")
+        await store.save(AccountResponse(displayName: "mistj", isLoggedIn: true))
+        let viewController = PostListSideMenuViewController(
+            currentAccountStore: store,
+            accountRefresher: StubCurrentAccountRefresher()
+        )
+
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        try await waitUntil {
+            viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-name-label")?.text == "mistj"
+        }
+        viewController.show(animated: false)
+        viewController.view.layoutIfNeeded()
+
+        let nameLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-name-label"))
+        let statsLabel = try #require(viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-stats-label"))
+        let extensionEntryStack = try #require(viewController.view.firstView(accessibilityIdentifier: "post-list-side-menu-extension-entry-stack"))
+        let postsEntryButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-extension-posts-button"))
+        let commentsEntryButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-extension-comments-button"))
+        let favoritesEntryButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-extension-favorites-button"))
+        let newDiscussionButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-new-discussion-button"))
+
+        #expect(extensionEntryStack.isHidden == false)
+        #expect(postsEntryButton.isHidden == false)
+        #expect(postsEntryButton.accessibilityLabel == "帖子")
+        #expect(postsEntryButton.configuration?.image != nil)
+        #expect(postsEntryButton.configuration?.title == "帖子")
+        #expect(postsEntryButton.configuration?.imagePlacement == .leading)
+        #expect(postsEntryButton.configuration?.baseForegroundColor == .secondaryLabel)
+        #expect((postsEntryButton.configuration?.background.backgroundColor?.cgColor.alpha ?? 0) == 0)
+        #expect(commentsEntryButton.isHidden == false)
+        #expect(commentsEntryButton.accessibilityLabel == "评论")
+        #expect(commentsEntryButton.configuration?.image != nil)
+        #expect(commentsEntryButton.configuration?.title == "评论")
+        #expect(commentsEntryButton.configuration?.imagePlacement == .leading)
+        #expect(commentsEntryButton.configuration?.baseForegroundColor == .secondaryLabel)
+        #expect((commentsEntryButton.configuration?.background.backgroundColor?.cgColor.alpha ?? 0) == 0)
+        #expect(favoritesEntryButton.isHidden == false)
+        #expect(favoritesEntryButton.accessibilityLabel == "收藏")
+        #expect(favoritesEntryButton.configuration?.image != nil)
+        #expect(favoritesEntryButton.configuration?.title == "收藏")
+        #expect(favoritesEntryButton.configuration?.imagePlacement == .leading)
+        #expect(favoritesEntryButton.configuration?.baseForegroundColor == .secondaryLabel)
+        #expect((favoritesEntryButton.configuration?.background.backgroundColor?.cgColor.alpha ?? 0) == 0)
+        let nameFrame = nameLabel.convert(nameLabel.bounds, to: viewController.view)
+        let statsFrame = statsLabel.convert(statsLabel.bounds, to: viewController.view)
+        let extensionEntryStackFrame = extensionEntryStack.convert(extensionEntryStack.bounds, to: viewController.view)
+        let postsEntryFrame = postsEntryButton.convert(postsEntryButton.bounds, to: viewController.view)
+        let commentsEntryFrame = commentsEntryButton.convert(commentsEntryButton.bounds, to: viewController.view)
+        let favoritesEntryFrame = favoritesEntryButton.convert(favoritesEntryButton.bounds, to: viewController.view)
+        let newDiscussionFrame = newDiscussionButton.convert(newDiscussionButton.bounds, to: viewController.view)
+        #expect(extensionEntryStackFrame.width < 150)
+        #expect(abs(extensionEntryStackFrame.minX - nameFrame.minX) < 1)
+        #expect(abs(postsEntryFrame.minY - statsFrame.maxY - 4) < 1)
+        #expect(commentsEntryFrame.minY == postsEntryFrame.minY)
+        #expect(favoritesEntryFrame.minY == postsEntryFrame.minY)
+        #expect(postsEntryFrame.height == 24)
+        #expect(commentsEntryFrame.height == 24)
+        #expect(favoritesEntryFrame.height == 24)
+        #expect(postsEntryFrame.maxX < commentsEntryFrame.minX)
+        #expect(commentsEntryFrame.maxX < favoritesEntryFrame.minX)
+        #expect(favoritesEntryFrame.maxY < newDiscussionFrame.minY)
+    }
+
     @Test func loggedInSideMenuNewDiscussionRoutesToComposer() async throws {
         let defaults = try #require(UserDefaults(suiteName: "post-list-side-menu-\(UUID().uuidString)"))
         let store = CurrentAccountStore(userDefaults: defaults, storageKey: "account")
@@ -397,6 +470,44 @@ struct PostListViewControllerTests {
 
         #expect(checkInTapCount == 1)
         #expect(loginTapCount == 0)
+    }
+
+    @Test func loggedInSideMenuExtensionEntriesRouteToUserContent() async throws {
+        let defaults = try #require(UserDefaults(suiteName: "post-list-side-menu-\(UUID().uuidString)"))
+        let store = CurrentAccountStore(userDefaults: defaults, storageKey: "account")
+        await store.save(AccountResponse(displayName: "mistj", isLoggedIn: true))
+        let viewController = PostListSideMenuViewController(
+            currentAccountStore: store,
+            accountRefresher: StubCurrentAccountRefresher()
+        )
+        var postsTapCount = 0
+        var commentsTapCount = 0
+        var favoritesTapCount = 0
+        viewController.onUserDiscussionsTapped = {
+            postsTapCount += 1
+        }
+        viewController.onUserCommentsTapped = {
+            commentsTapCount += 1
+        }
+        viewController.onUserCollectionsTapped = {
+            favoritesTapCount += 1
+        }
+
+        viewController.loadViewIfNeeded()
+        try await waitUntil {
+            viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-name-label")?.text == "mistj"
+        }
+
+        try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-extension-posts-button"))
+            .sendActions(for: .touchUpInside)
+        try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-extension-comments-button"))
+            .sendActions(for: .touchUpInside)
+        try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-extension-favorites-button"))
+            .sendActions(for: .touchUpInside)
+
+        #expect(postsTapCount == 1)
+        #expect(commentsTapCount == 1)
+        #expect(favoritesTapCount == 1)
     }
 
     @Test func loggedInSideMenuAccountHeaderRoutesToProfileInsteadOfLogin() async throws {
@@ -521,6 +632,9 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
     private(set) var didTapSearchCount = 0
     private(set) var didTapNewDiscussionCount = 0
     private(set) var didTapCheckInCount = 0
+    private(set) var didTapUserDiscussionsCount = 0
+    private(set) var didTapUserCommentsCount = 0
+    private(set) var didTapUserCollectionsCount = 0
     private(set) var notificationURLs: [URL] = []
     private(set) var didTapSettingsCount = 0
     private(set) var accountProfileURLs: [URL] = []
@@ -564,6 +678,18 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
 
     func didTapCheckIn() {
         didTapCheckInCount += 1
+    }
+
+    func didTapUserDiscussions() {
+        didTapUserDiscussionsCount += 1
+    }
+
+    func didTapUserComments() {
+        didTapUserCommentsCount += 1
+    }
+
+    func didTapUserCollections() {
+        didTapUserCollectionsCount += 1
     }
 
     func didTapNotification(url: URL) {

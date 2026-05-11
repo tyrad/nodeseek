@@ -75,6 +75,18 @@ class PostListPresenter: PostListPresenterProtocol {
         router.navigateToRecentVisitedPosts(visitedStore: visitedStore)
     }
 
+    func didTapUserDiscussions() {
+        router.navigateToUserDiscussions()
+    }
+
+    func didTapUserComments() {
+        router.navigateToUserComments()
+    }
+
+    func didTapUserCollections() {
+        router.navigateToUserCollections()
+    }
+
     func didTapSearch() {
         router.navigateToSearch()
     }

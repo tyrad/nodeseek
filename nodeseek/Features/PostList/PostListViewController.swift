@@ -365,6 +365,15 @@ class PostListViewController: UIViewController {
         sideMenuViewController.onRecentVisitedTapped = { [weak self] in
             self?.presenter.didTapRecentVisited()
         }
+        sideMenuViewController.onUserDiscussionsTapped = { [weak self] in
+            self?.presenter.didTapUserDiscussions()
+        }
+        sideMenuViewController.onUserCommentsTapped = { [weak self] in
+            self?.presenter.didTapUserComments()
+        }
+        sideMenuViewController.onUserCollectionsTapped = { [weak self] in
+            self?.presenter.didTapUserCollections()
+        }
         sideMenuViewController.onSearchTapped = { [weak self] in
             self?.presenter.didTapSearch()
         }

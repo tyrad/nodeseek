@@ -98,6 +98,19 @@ struct PostListPresenterTests {
         #expect(router.recentVisitedStore === visitedStore)
     }
 
+    @Test func tappingUserContentEntriesRoutesToDedicatedPages() {
+        let router = SpyPostListRouter()
+        let presenter = makePresenter(router: router)
+
+        presenter.didTapUserDiscussions()
+        presenter.didTapUserComments()
+        presenter.didTapUserCollections()
+
+        #expect(router.navigateToUserDiscussionsCount == 1)
+        #expect(router.navigateToUserCommentsCount == 1)
+        #expect(router.navigateToUserCollectionsCount == 1)
+    }
+
     @Test func tappingSearchRoutesToSearchPage() {
         let router = SpyPostListRouter()
         let presenter = makePresenter(router: router)
@@ -323,6 +336,9 @@ private final class SpyPostListRouter: PostListRouterProtocol {
     var navigateToSearchCount = 0
     var navigateToSettingsCount = 0
     var navigateToLogFileCount = 0
+    var navigateToUserDiscussionsCount = 0
+    var navigateToUserCommentsCount = 0
+    var navigateToUserCollectionsCount = 0
     var onLoginClose: (@MainActor () -> Void)?
     var onSettingsLogout: (@MainActor () -> Void)?
     var onSettingsLogFile: (@MainActor () -> Void)?
@@ -366,6 +382,18 @@ private final class SpyPostListRouter: PostListRouterProtocol {
 
     func navigateToRecentVisitedPosts(visitedStore: VisitedPostStoreProtocol) {
         recentVisitedStore = visitedStore
+    }
+
+    func navigateToUserDiscussions() {
+        navigateToUserDiscussionsCount += 1
+    }
+
+    func navigateToUserComments() {
+        navigateToUserCommentsCount += 1
+    }
+
+    func navigateToUserCollections() {
+        navigateToUserCollectionsCount += 1
     }
 
     func navigateToSearch() {
