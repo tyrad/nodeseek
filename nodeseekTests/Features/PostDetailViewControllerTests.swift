@@ -2655,7 +2655,20 @@ struct PostDetailLoginViewControllerTests {
 
         let floatingReplyButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-button"))
         #expect(floatingReplyButton.isHidden == false)
-        #expect(abs(floatingReplyButton.frame.maxY - (viewController.view.safeAreaLayoutGuide.layoutFrame.maxY - PostDetailViewController.Layout.replyButtonBottomInset)) < 1)
+        let floatingContainer = try #require(
+            viewController.view.firstView(accessibilityIdentifier: "post-detail-floating-reply-button") as? FloatingControlContainerView
+        )
+        let panGesture = try #require(floatingReplyButton.gestureRecognizers?.first { $0 is UIPanGestureRecognizer })
+        let replyButtonFrame = floatingReplyButton.convert(floatingReplyButton.bounds, to: viewController.view)
+
+        #expect(panGesture.view === floatingReplyButton)
+        #expect(panGesture.cancelsTouchesInView == false)
+        #expect(floatingReplyButton.superview === floatingContainer)
+        #expect(abs(replyButtonFrame.maxY - (viewController.view.safeAreaLayoutGuide.layoutFrame.maxY - PostDetailViewController.Layout.replyButtonBottomInset)) < 1)
+
+        floatingContainer.frame.origin.x = 0
+        floatingContainer.floatingViewDidEndDragging(panGestureRecognizer: UIPanGestureRecognizer())
+        #expect(floatingReplyButton.layer.maskedCorners == [.layerMaxXMinYCorner, .layerMaxXMaxYCorner])
     }
 
     @Test func restrictedDetailHidesReplyEntry() async throws {
@@ -3550,6 +3563,20 @@ private extension UIView {
 
         for subview in subviews {
             if let matched = subview.firstButton(accessibilityIdentifier: accessibilityIdentifier) {
+                return matched
+            }
+        }
+
+        return nil
+    }
+
+    func firstView(accessibilityIdentifier: String) -> UIView? {
+        if self.accessibilityIdentifier == accessibilityIdentifier {
+            return self
+        }
+
+        for subview in subviews {
+            if let matched = subview.firstView(accessibilityIdentifier: accessibilityIdentifier) {
                 return matched
             }
         }

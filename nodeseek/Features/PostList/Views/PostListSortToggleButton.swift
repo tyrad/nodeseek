@@ -39,6 +39,8 @@ final class PostListSortToggleButton: UIButton {
         }
     }
 
+    private var dockedEdge: FloatingAdsorbableEdges = .right
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         configureAppearance()
@@ -79,7 +81,13 @@ final class PostListSortToggleButton: UIButton {
         backgroundColor = .label
         tintColor = .systemBackground
         layer.borderColor = UIColor.separator.cgColor
+        applyDockedEdge(dockedEdge)
         accessibilityLabel = title
+    }
+
+    func applyDockedEdge(_ edge: FloatingAdsorbableEdges) {
+        dockedEdge = edge
+        applyFloatingDockedCorners(for: edge)
     }
 
     func applyAlpha(expanded: Bool) {
@@ -123,7 +131,7 @@ final class PostListSortToggleButton: UIButton {
         configureTitleLabel()
         backgroundColor = .label
         layer.cornerRadius = Layout.cornerRadius
-        layer.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+        applyDockedEdge(dockedEdge)
         layer.borderWidth = 0.5
         layer.borderColor = UIColor.separator.cgColor
         layer.shadowColor = UIColor.black.cgColor

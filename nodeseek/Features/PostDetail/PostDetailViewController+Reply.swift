@@ -67,7 +67,9 @@ extension PostDetailViewController {
     }
 
     func updateReplyButtonVisibility() {
-        replyButton.isHidden = showsReplyEntry == false || displayMode != .content || replyEditorContainer.isHidden == false
+        let isHidden = showsReplyEntry == false || displayMode != .content || replyEditorContainer.isHidden == false
+        replyButton.isHidden = isHidden
+        floatingReplyButtonContainer.isHidden = isHidden
     }
 
     func presentReplyEditor(mode: CommentComposerMode) {

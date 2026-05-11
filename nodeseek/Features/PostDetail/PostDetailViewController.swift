@@ -326,6 +326,17 @@ class PostDetailViewController: UIViewController {
         return button
     }()
 
+    private let replyButtonAnchorView: UIView = {
+        let view = UIView()
+        view.isHidden = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    let floatingReplyButtonContainer = FloatingControlContainerView(
+        accessibilityIdentifier: "post-detail-floating-reply-button"
+    )
+
     let replyEditorBackdrop: UIControl = {
         let control = UIControl()
         control.backgroundColor = UIColor.black.withAlphaComponent(0.08)
@@ -551,6 +562,15 @@ class PostDetailViewController: UIViewController {
         updateTableContentInsets()
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        floatingReplyButtonContainer.updateFloatingEdgeInsets(
+            in: view,
+            horizontalAnchorView: replyButtonAnchorView
+        )
+        floatingReplyButtonContainer.syncFrame(with: replyButtonAnchorView)
+    }
+
     func configureNavigationItems() {
         title = nil
         navigationItem.titleView = navigationAuthorTitleView
@@ -660,10 +680,10 @@ class PostDetailViewController: UIViewController {
             toastLabel.topAnchor.constraint(equalTo: toastContainerView.topAnchor, constant: 10),
             toastLabel.bottomAnchor.constraint(equalTo: toastContainerView.bottomAnchor, constant: -10),
 
-            replyButton.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            replyButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Layout.replyButtonBottomInset),
-            replyButton.widthAnchor.constraint(equalToConstant: 56),
-            replyButton.heightAnchor.constraint(equalToConstant: 48),
+            replyButtonAnchorView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            replyButtonAnchorView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Layout.replyButtonBottomInset),
+            replyButtonAnchorView.widthAnchor.constraint(equalToConstant: 56),
+            replyButtonAnchorView.heightAnchor.constraint(equalToConstant: 48),
 
             replyEditorBackdrop.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             replyEditorBackdrop.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -762,7 +782,12 @@ class PostDetailViewController: UIViewController {
 
     func configureReplyEditor() {
         replyButton.addTarget(self, action: #selector(replyButtonTapped), for: .touchUpInside)
-        view.addSubview(replyButton)
+        floatingReplyButtonContainer.onAdsorbedEdgeChanged = { [weak self] edge in
+            self?.replyButton.applyFloatingDockedCorners(for: edge)
+        }
+        floatingReplyButtonContainer.hostControl(replyButton)
+        view.addSubview(replyButtonAnchorView)
+        view.addSubview(floatingReplyButtonContainer)
         replyEditorBackdrop.addTarget(self, action: #selector(dismissReplyEditor), for: .touchUpInside)
         view.addSubview(replyEditorBackdrop)
         inlineReplySendButton.addTarget(self, action: #selector(sendReplyTapped), for: .touchUpInside)

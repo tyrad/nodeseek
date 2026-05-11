@@ -30,25 +30,28 @@ struct PostListViewControllerTests {
         #expect(button.bounds.width <= 60)
         #expect(button.alpha < 1)
         #expect(button.alpha >= 0.5)
-        #expect(button.frame.maxX > viewController.view.bounds.maxX)
-        #expect(button.frame.maxY <= viewController.view.bounds.maxY - 200)
         #expect(button.titleLabel?.font.pointSize ?? 0 >= 13)
         #expect(button.titleLabel?.numberOfLines == 1)
         #expect(button.titleLabel?.lineBreakMode == .byTruncatingTail)
         #expect(button.configuration?.titleLineBreakMode == .byTruncatingTail)
+        var buttonFrame = button.convert(button.bounds, to: viewController.view)
+
+        #expect(buttonFrame.maxX > viewController.view.bounds.maxX)
+        #expect(buttonFrame.maxY <= viewController.view.bounds.maxY - 200)
 
         let animationsWereEnabled = UIView.areAnimationsEnabled
         UIView.setAnimationsEnabled(false)
         button.sendActions(for: .touchUpInside)
         viewController.view.layoutIfNeeded()
         UIView.setAnimationsEnabled(animationsWereEnabled)
+        buttonFrame = button.convert(button.bounds, to: viewController.view)
 
         #expect(button.title(for: .normal) == "回复时间优先")
         #expect(button.alpha == 1)
         #expect(button.bounds.width >= 168)
         #expect(button.configuration?.titleTextAttributesTransformer != nil)
         #expect(button.intrinsicContentSize.width <= button.bounds.width)
-        #expect(abs(button.frame.maxX - viewController.view.bounds.maxX) < 0.5)
+        #expect(abs(buttonFrame.maxX - viewController.view.bounds.maxX) < 0.5)
 
         viewController.renderSortMode(.postTime)
         #expect(button.title(for: .normal) == "发帖时间优先")
@@ -93,6 +96,94 @@ struct PostListViewControllerTests {
         #expect(abs(selectedTabFrame.height - menuButtonFrame.height) < 1)
         #expect(abs(menuButtonFrame.minY - (viewController.view.safeAreaInsets.top - 4)) < 1)
         #expect(abs(viewController.pageContainerViewController.view.frame.minY - selectedTabFrame.maxY - 2) < 1)
+    }
+
+    @Test func sortToggleButtonIsHostedInDraggableFloatingContainer() throws {
+        let presenter = SpyPostListPresenter()
+        let viewController = makePostListViewController(presenter: presenter)
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.view.layoutIfNeeded()
+
+        let floatingContainer = try #require(
+            viewController.view.firstView(accessibilityIdentifier: "post-list-floating-sort-toggle") as? FloatingControlContainerView
+        )
+        let sortToggleButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-sort-toggle"))
+        let panGesture = try #require(sortToggleButton.gestureRecognizers?.first { $0 is UIPanGestureRecognizer })
+
+        #expect(panGesture.view === sortToggleButton)
+        #expect(panGesture.cancelsTouchesInView == false)
+        #expect(sortToggleButton.superview === floatingContainer)
+        #expect(floatingContainer.translatesAutoresizingMaskIntoConstraints == true)
+        #expect(
+            viewController.view.constraints.contains {
+                let referencesFloatingContainer = ($0.firstItem as? UIView) === floatingContainer
+                    || ($0.secondItem as? UIView) === floatingContainer
+                let isAutoresizingMaskConstraint = String(describing: type(of: $0)).contains("NSAutoresizingMaskLayoutConstraint")
+                return referencesFloatingContainer && !isAutoresizingMaskConstraint
+            } == false
+        )
+        #expect(sortToggleButton.bounds.height >= 42)
+        #expect(sortToggleButton.bounds.width >= 56)
+        let sortToggleFrame = sortToggleButton.convert(sortToggleButton.bounds, to: viewController.view)
+        #expect(sortToggleFrame.maxX > viewController.view.bounds.maxX)
+        #expect(abs(floatingContainer.floatingEdgeInsets.top - viewController.pageContainerViewController.view.frame.minY) < 1)
+        #expect(floatingContainer.floatingEdgeInsets.bottom >= viewController.view.safeAreaInsets.bottom)
+        #expect(floatingContainer.floatingEdgeInsets.right < 0)
+
+        floatingContainer.frame.origin.y = 0
+        floatingContainer.updateFloatingEdgeInsets(
+            in: viewController.view,
+            topBoundary: viewController.pageContainerViewController.view.frame.minY
+        )
+        #expect(floatingContainer.frame.minY >= viewController.pageContainerViewController.view.frame.minY)
+
+        floatingContainer.frame.origin.y = viewController.view.bounds.maxY
+        floatingContainer.updateFloatingEdgeInsets(
+            in: viewController.view,
+            topBoundary: viewController.pageContainerViewController.view.frame.minY
+        )
+        #expect(floatingContainer.frame.maxY <= viewController.view.safeAreaLayoutGuide.layoutFrame.maxY)
+
+        floatingContainer.frame.origin.x = 0
+        floatingContainer.floatingViewDidEndDragging(panGestureRecognizer: UIPanGestureRecognizer())
+        #expect(sortToggleButton.layer.maskedCorners == [.layerMaxXMinYCorner, .layerMaxXMaxYCorner])
+    }
+
+    @Test func sortToggleButtonRestoresLastDraggedPosition() throws {
+        let positionStore = InMemoryFloatingControlPositionStore()
+        let firstViewController = makePostListViewController(
+            presenter: SpyPostListPresenter(),
+            floatingPositionStore: positionStore
+        )
+        firstViewController.loadViewIfNeeded()
+        firstViewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        firstViewController.view.layoutIfNeeded()
+
+        let firstContainer = try #require(
+            firstViewController.view.firstView(accessibilityIdentifier: "post-list-floating-sort-toggle") as? FloatingControlContainerView
+        )
+        let topBoundary = firstViewController.pageContainerViewController.view.frame.minY
+        firstContainer.frame.origin.x = 0
+        firstContainer.frame.origin.y = topBoundary + 96
+        firstContainer.floatingViewDidEndDragging(panGestureRecognizer: UIPanGestureRecognizer())
+
+        let secondViewController = makePostListViewController(
+            presenter: SpyPostListPresenter(),
+            floatingPositionStore: positionStore
+        )
+        secondViewController.loadViewIfNeeded()
+        secondViewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        secondViewController.view.layoutIfNeeded()
+
+        let restoredContainer = try #require(
+            secondViewController.view.firstView(accessibilityIdentifier: "post-list-floating-sort-toggle") as? FloatingControlContainerView
+        )
+        let restoredButton = try #require(secondViewController.view.firstButton(accessibilityIdentifier: "post-list-sort-toggle"))
+
+        #expect(abs(restoredContainer.frame.minX) < 0.5)
+        #expect(abs(restoredContainer.frame.minY - firstContainer.frame.minY) < 1)
+        #expect(restoredButton.layer.maskedCorners == [.layerMaxXMinYCorner, .layerMaxXMaxYCorner])
     }
 
     @Test func tappingSelectedCategoryRequestsFirstPageReload() throws {
@@ -389,14 +480,28 @@ struct PostListViewControllerTests {
 
 private func makePostListViewController(
     presenter: SpyPostListPresenter,
+    floatingPositionStore: FloatingControlPositionStoring = InMemoryFloatingControlPositionStore(),
     detailTestURLProvider: @escaping () -> String = {
         UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string ?? ""
     }
 ) -> PostListViewController {
     PostListViewController(
         presenter: presenter,
+        floatingPositionStore: floatingPositionStore,
         detailTestURLProvider: detailTestURLProvider
     )
+}
+
+private final class InMemoryFloatingControlPositionStore: FloatingControlPositionStoring {
+    private var positions: [String: FloatingControlPosition] = [:]
+
+    func position(forKey key: String) -> FloatingControlPosition? {
+        positions[key]
+    }
+
+    func save(_ position: FloatingControlPosition, forKey key: String) {
+        positions[key] = position
+    }
 }
 
 private final class StubCurrentAccountRefresher: CurrentAccountRefreshing, @unchecked Sendable {

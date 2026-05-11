@@ -79,6 +79,15 @@ class PostListViewController: UIViewController {
         return button
     }()
 
+    private let sortToggleAnchorView: UIView = {
+        let view = UIView()
+        view.isHidden = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let floatingSortToggleContainer: FloatingControlContainerView
+
     let sortToggleButton = PostListSortToggleButton()
     
     private let tabScrollView: UIScrollView = {
@@ -103,6 +112,7 @@ class PostListViewController: UIViewController {
     init(
         presenter: PostListPresenterProtocol,
         visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore(),
+        floatingPositionStore: FloatingControlPositionStoring = UserDefaultsFloatingControlPositionStore(),
         detailTestURLProvider: @escaping () -> String = {
             UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string ?? ""
         }
@@ -111,6 +121,11 @@ class PostListViewController: UIViewController {
         self.detailTestURLProvider = detailTestURLProvider
         self.pageContainerViewController = PostPageContainerViewController(
             visitedStore: visitedStore
+        )
+        self.floatingSortToggleContainer = FloatingControlContainerView(
+            accessibilityIdentifier: "post-list-floating-sort-toggle",
+            positionStorageKey: FloatingControlPositionKeys.postListSortToggle,
+            positionStore: floatingPositionStore
         )
         super.init(nibName: nil, bundle: nil)
     }
@@ -137,6 +152,16 @@ class PostListViewController: UIViewController {
         navigationController?.setNavigationBarHidden(false, animated: animated)
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        floatingSortToggleContainer.updateFloatingEdgeInsets(
+            in: view,
+            topBoundary: pageContainerViewController.view.frame.minY,
+            horizontalAnchorView: sortToggleAnchorView
+        )
+        floatingSortToggleContainer.syncFrame(with: sortToggleAnchorView)
+    }
+
     // MARK: - Setup UI
     private func setupUI() {
         navigationItem.title = nil
@@ -150,17 +175,22 @@ class PostListViewController: UIViewController {
         compactTopButton.addTarget(self, action: #selector(leftButtonTapped), for: .touchUpInside)
         compactTopButton.addTarget(self, action: #selector(prepareMenuButtonFeedback), for: .touchDown)
         sortToggleButton.addTarget(self, action: #selector(sortToggleButtonTapped), for: .touchUpInside)
+        floatingSortToggleContainer.onAdsorbedEdgeChanged = { [weak self] edge in
+            self?.sortToggleButton.applyDockedEdge(edge)
+        }
+        floatingSortToggleContainer.hostControl(sortToggleButton)
         view.addSubview(pageContainerView)
         view.addSubview(compactTopButton)
-        view.addSubview(sortToggleButton)
+        view.addSubview(sortToggleAnchorView)
+        view.addSubview(floatingSortToggleContainer)
         view.addSubview(tabScrollView)
         tabScrollView.addSubview(tabStackView)
 
-        let sortToggleTrailingConstraint = sortToggleButton.trailingAnchor.constraint(
+        let sortToggleTrailingConstraint = sortToggleAnchorView.trailingAnchor.constraint(
             equalTo: view.safeAreaLayoutGuide.trailingAnchor,
             constant: PostListSortToggleButton.collapsedTrailing
         )
-        let sortToggleWidthConstraint = sortToggleButton.widthAnchor.constraint(
+        let sortToggleWidthConstraint = sortToggleAnchorView.widthAnchor.constraint(
             equalToConstant: PostListSortToggleButton.collapsedWidth
         )
         self.sortToggleTrailingConstraint = sortToggleTrailingConstraint
@@ -171,19 +201,19 @@ class PostListViewController: UIViewController {
             pageContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             pageContainerView.topAnchor.constraint(equalTo: tabScrollView.bottomAnchor, constant: TopBarLayout.contentSpacing),
             pageContainerView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            
+
             compactTopButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
             compactTopButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: TopBarLayout.topOffset),
             compactTopButton.widthAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
             compactTopButton.heightAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
 
             sortToggleTrailingConstraint,
-            sortToggleButton.bottomAnchor.constraint(
+            sortToggleAnchorView.bottomAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.bottomAnchor,
                 constant: -FloatingControlLayout.sortToggleBottomInset
             ),
             sortToggleWidthConstraint,
-            sortToggleButton.heightAnchor.constraint(equalToConstant: PostListSortToggleButton.height),
+            sortToggleAnchorView.heightAnchor.constraint(equalToConstant: PostListSortToggleButton.height),
 
             tabScrollView.leadingAnchor.constraint(equalTo: compactTopButton.trailingAnchor, constant: 8),
             tabScrollView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8),
