@@ -30,7 +30,8 @@ final class PostTextureListView: UIView {
     private var displayMode: DisplayMode = .content
     private var items: [PostListItem] = []
     private let minimumSkeletonRowCount = 8
-    private let estimatedSkeletonRowHeight: CGFloat = 84
+    private let estimatedSkeletonRowHeight = PostListCellStyle.Avatar.skeletonSize
+        + PostListCellStyle.Layout.verticalContentInset * 2
     private let leadingScreensForBatching: CGFloat = 2.0
     private var skeletonRowCount: Int = 8
     private var lastBatchFetchRequestedItemCount: Int?

@@ -45,6 +45,19 @@ struct PostTextureListViewTests {
         #expect(tableView.numberOfRows(inSection: 0) == 1)
     }
 
+    @Test func loadingSkeletonRowsFillVisibleListHeight() throws {
+        let view = PostTextureListView()
+        view.frame = CGRect(x: 0, y: 0, width: 390, height: 806)
+
+        view.showLoadingSkeleton()
+        view.layoutIfNeeded()
+
+        let tableView = try #require(view.firstSubview(of: UITableView.self))
+        let minimumSkeletonHeight = PostListCellStyle.Avatar.skeletonSize
+            + PostListCellStyle.Layout.verticalContentInset * 2
+        #expect(CGFloat(tableView.numberOfRows(inSection: 0)) * minimumSkeletonHeight >= tableView.bounds.height)
+    }
+
     @Test func retryButtonNotifiesDelegateAfterFirstPageError() throws {
         let view = PostTextureListView()
         let delegate = SpyPostTextureListViewDelegate()
