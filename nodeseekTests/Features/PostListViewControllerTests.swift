@@ -112,7 +112,7 @@ struct PostListViewControllerTests {
         let panGesture = try #require(sortToggleButton.gestureRecognizers?.first { $0 is UIPanGestureRecognizer })
 
         #expect(panGesture.view === sortToggleButton)
-        #expect(panGesture.cancelsTouchesInView == false)
+        #expect(panGesture.cancelsTouchesInView)
         #expect(sortToggleButton.superview === floatingContainer)
         #expect(floatingContainer.translatesAutoresizingMaskIntoConstraints == true)
         #expect(

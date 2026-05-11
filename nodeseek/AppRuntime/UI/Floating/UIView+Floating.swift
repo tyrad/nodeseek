@@ -39,7 +39,7 @@ extension UIView {
     func addFloatingPanGestureRecognizer(to targetView: UIView) {
         guard floatingPanGesture == nil else { return }
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handleFloatingViewPanGesture(_:)))
-        panGesture.cancelsTouchesInView = false
+        panGesture.cancelsTouchesInView = true
         panGesture.delaysTouchesBegan = false
         panGesture.delaysTouchesEnded = false
         floatingPanGesture = panGesture

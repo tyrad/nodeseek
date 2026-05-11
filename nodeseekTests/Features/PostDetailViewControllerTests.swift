@@ -2662,13 +2662,69 @@ struct PostDetailLoginViewControllerTests {
         let replyButtonFrame = floatingReplyButton.convert(floatingReplyButton.bounds, to: viewController.view)
 
         #expect(panGesture.view === floatingReplyButton)
-        #expect(panGesture.cancelsTouchesInView == false)
+        #expect(panGesture.cancelsTouchesInView)
         #expect(floatingReplyButton.superview === floatingContainer)
         #expect(abs(replyButtonFrame.maxY - (viewController.view.safeAreaLayoutGuide.layoutFrame.maxY - PostDetailViewController.Layout.replyButtonBottomInset)) < 1)
 
         floatingContainer.frame.origin.x = 0
         floatingContainer.floatingViewDidEndDragging(panGestureRecognizer: UIPanGestureRecognizer())
         #expect(floatingReplyButton.layer.maskedCorners == [.layerMaxXMinYCorner, .layerMaxXMaxYCorner])
+    }
+
+    @Test func detailReplyButtonRestoresLastDraggedPosition() async throws {
+        let positionStore = InMemoryFloatingControlPositionStore()
+
+        let firstViewController = PostDetailViewController(
+            presenter: SpyPostDetailPresenter(),
+            floatingPositionStore: positionStore
+        )
+        firstViewController.loadViewIfNeeded()
+        firstViewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        firstViewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: []
+        ))
+        await waitForDetailContent(in: firstViewController, expectedRowCount: 1)
+        firstViewController.view.layoutIfNeeded()
+
+        let firstContainer = try #require(
+            firstViewController.view.firstView(accessibilityIdentifier: "post-detail-floating-reply-button") as? FloatingControlContainerView
+        )
+        firstContainer.frame.origin.x = 0
+        firstContainer.frame.origin.y = 128
+        firstContainer.floatingViewDidEndDragging(panGestureRecognizer: UIPanGestureRecognizer())
+
+        let secondViewController = PostDetailViewController(
+            presenter: SpyPostDetailPresenter(),
+            floatingPositionStore: positionStore
+        )
+        secondViewController.loadViewIfNeeded()
+        secondViewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        secondViewController.render(detail: PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: []
+        ))
+        await waitForDetailContent(in: secondViewController, expectedRowCount: 1)
+        secondViewController.view.layoutIfNeeded()
+
+        let restoredContainer = try #require(
+            secondViewController.view.firstView(accessibilityIdentifier: "post-detail-floating-reply-button") as? FloatingControlContainerView
+        )
+        let restoredButton = try #require(secondViewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-button"))
+
+        #expect(abs(restoredContainer.frame.minX) < 0.5)
+        #expect(abs(restoredContainer.frame.minY - firstContainer.frame.minY) < 1)
+        #expect(restoredButton.layer.maskedCorners == [.layerMaxXMinYCorner, .layerMaxXMaxYCorner])
     }
 
     @Test func restrictedDetailHidesReplyEntry() async throws {
@@ -3387,6 +3443,18 @@ struct PostDetailLoginViewControllerTests {
         return try #require(UIImage(cgImage: image).jpegData(compressionQuality: quality))
     }
 
+}
+
+private final class InMemoryFloatingControlPositionStore: FloatingControlPositionStoring {
+    private var positions: [String: FloatingControlPosition] = [:]
+
+    func position(forKey key: String) -> FloatingControlPosition? {
+        positions[key]
+    }
+
+    func save(_ position: FloatingControlPosition, forKey key: String) {
+        positions[key] = position
+    }
 }
 
 private final class SpyPostDetailPresenter: PostDetailPresenterProtocol {

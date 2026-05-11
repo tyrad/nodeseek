@@ -333,9 +333,7 @@ class PostDetailViewController: UIViewController {
         return view
     }()
 
-    let floatingReplyButtonContainer = FloatingControlContainerView(
-        accessibilityIdentifier: "post-detail-floating-reply-button"
-    )
+    let floatingReplyButtonContainer: FloatingControlContainerView
 
     let replyEditorBackdrop: UIControl = {
         let control = UIControl()
@@ -516,6 +514,7 @@ class PostDetailViewController: UIViewController {
         accountRefresher: (any CurrentAccountRefreshing)? = nil,
         nodeImageAPIKeyStore: NodeImageAPIKeyStoring = KeychainNodeImageAPIKeyStore(),
         nodeImageUploadClient: NodeImageUploading = NodeImageUploadClient(),
+        floatingPositionStore: FloatingControlPositionStoring = UserDefaultsFloatingControlPositionStore(),
         pasteboardStringWriter: @escaping PasteboardStringWriter = { UIPasteboard.general.string = $0 }
     ) {
         self.presenter = presenter
@@ -528,6 +527,11 @@ class PostDetailViewController: UIViewController {
         self.accountRefresher = accountRefresher ?? CurrentAccountRefresher.shared
         self.nodeImageAPIKeyStore = nodeImageAPIKeyStore
         self.nodeImageUploadClient = nodeImageUploadClient
+        self.floatingReplyButtonContainer = FloatingControlContainerView(
+            accessibilityIdentifier: "post-detail-floating-reply-button",
+            positionStorageKey: FloatingControlPositionKeys.postDetailReplyButton,
+            positionStore: floatingPositionStore
+        )
         self.pasteboardStringWriter = pasteboardStringWriter
         super.init(nibName: nil, bundle: nil)
 
