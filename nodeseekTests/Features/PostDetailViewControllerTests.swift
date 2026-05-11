@@ -3404,6 +3404,11 @@ struct PostDetailLoginViewControllerTests {
         #expect(payload.fileName == "large-source.jpg")
     }
 
+    @Test func nodeImageUploadSourceOptionsIncludeCameraOnlyWhenAvailable() {
+        #expect(ReplyImageSourceOption.available(isCameraAvailable: true) == [.camera, .photoLibrary])
+        #expect(ReplyImageSourceOption.available(isCameraAvailable: false) == [.photoLibrary])
+    }
+
     @Test func renderShowsToastMessage() throws {
         let presenter = SpyPostDetailPresenter()
         let viewController = PostDetailViewController(presenter: presenter)

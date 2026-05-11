@@ -10,6 +10,8 @@
 	<false/>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>保存图片到系统相册</string>
+	<key>NSCameraUsageDescription</key>
+	<string>拍照上传到 NodeImage 并插入回复</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIApplicationSceneManifest</key>
