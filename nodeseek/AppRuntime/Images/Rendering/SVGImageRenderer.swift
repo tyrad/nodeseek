@@ -20,6 +20,10 @@ enum SVGImageRenderer {
         }
     }
 
+    #if DEBUG
+    static var renderThreadObserver: ((Bool) -> Void)?
+    #endif
+
     static func image(from data: Data, size: CGSize) -> UIImage? {
         withSVGImage(from: data) { svgImage in
             svgImage.size = size
@@ -48,17 +52,28 @@ enum SVGImageRenderer {
 
     private static func withSVGImage<Result>(
         from data: Data,
-        _ body: (SVGKImage) -> Result?
+        _ body: @escaping (SVGKImage) -> Result?
     ) -> Result? {
-        renderQueue.sync {
+        let render: () -> Result? = {
+            #if DEBUG
+            renderThreadObserver?(Thread.isMainThread)
+            #endif
             guard let svgImage = SVGKImage(data: SVGImageNormalizer.normalizedData(from: data)) else {
                 return nil
             }
             return body(svgImage)
         }
-    }
 
-    private static let renderQueue = DispatchQueue(label: "com.nodeseek.app.svgkit.render")
+        if Thread.isMainThread {
+            return render()
+        }
+
+        var result: Result?
+        DispatchQueue.main.sync {
+            result = render()
+        }
+        return result
+    }
 
     private static func normalizedSize(
         _ size: CGSize,

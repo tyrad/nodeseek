@@ -12,6 +12,19 @@ import XCTest
 
 final class AvatarImageProcessorTests: XCTestCase {
 
+    func testAvatarOptionsDoNotRequestBackgroundDecode() {
+        let downloader = ImageDownloader(name: "AvatarImageProcessorTests")
+        let options = KingfisherParsedOptionsInfo(AvatarImageLoadingOptions.makeOptions(downloader: downloader))
+
+        XCTAssertFalse(options.backgroundDecode)
+    }
+
+    func testProcessorIdentifierChangesWhenDecodePolicyChanges() {
+        let processor = AvatarImageProcessor(size: CGSize(width: 56, height: 56))
+
+        XCTAssertTrue(processor.identifier.contains("v2"))
+    }
+
     func testProcessorRendersSVGToAvatarSize() throws {
         let processor = AvatarImageProcessor(size: CGSize(width: 56, height: 56))
         let image = try XCTUnwrap(processor.process(
@@ -35,6 +48,35 @@ final class AvatarImageProcessorTests: XCTestCase {
         XCTAssertEqual(image.scale, 3, accuracy: 0.1)
     }
 
+    func testBitmapDecodePreflightRejectsHTMLChallengePayload() {
+        let html = Data("""
+        <!DOCTYPE html>
+        <html><head><title>Just a moment...</title></head><body></body></html>
+        """.utf8)
+
+        XCTAssertFalse(AvatarImageProcessor.shouldAttemptBitmapDecode(html))
+    }
+
+    func testBitmapDecodePreflightRejectsPlainTextPayload() {
+        XCTAssertFalse(AvatarImageProcessor.shouldAttemptBitmapDecode(Data("not an image".utf8)))
+    }
+
+    func testBitmapDecodePreflightAllowsPNGPayload() {
+        XCTAssertTrue(AvatarImageProcessor.shouldAttemptBitmapDecode(Self.pngData(size: CGSize(width: 12, height: 12))))
+    }
+
+    func testBitmapDecodePreflightRejectsTruncatedPNGPayload() {
+        let data = Self.pngData(size: CGSize(width: 12, height: 12))
+
+        XCTAssertFalse(AvatarImageProcessor.shouldAttemptBitmapDecode(data.prefix(24)))
+    }
+
+    func testBitmapDecodePreflightRejectsTruncatedJPEGPayload() {
+        let data = Self.jpegData(size: CGSize(width: 12, height: 12))
+
+        XCTAssertFalse(AvatarImageProcessor.shouldAttemptBitmapDecode(data.dropLast(2)))
+    }
+
     private static func pngData(size: CGSize) -> Data {
         let renderer = UIGraphicsImageRenderer(size: size)
         let image = renderer.image { context in
@@ -42,6 +84,15 @@ final class AvatarImageProcessorTests: XCTestCase {
             context.fill(CGRect(origin: .zero, size: size))
         }
         return image.pngData() ?? Data()
+    }
+
+    private static func jpegData(size: CGSize) -> Data {
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let image = renderer.image { context in
+            UIColor.systemBlue.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+        }
+        return image.jpegData(compressionQuality: 0.9) ?? Data()
     }
 
     private static func svgData() -> Data {
