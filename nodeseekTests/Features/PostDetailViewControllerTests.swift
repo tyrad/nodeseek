@@ -3020,6 +3020,27 @@ struct PostDetailLoginViewControllerTests {
         #expect(presenter.sentReplyContent?.contains("第二段") == false)
     }
 
+    @Test func hiddenReplyContextCanCollapseWithoutRequiredPaddingConflict() throws {
+        let viewController = PostDetailViewController(
+            presenter: SpyPostDetailPresenter(),
+            accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true)
+        )
+
+        viewController.loadViewIfNeeded()
+
+        let verticalPaddingConstraints = viewController.replyContextBar.constraints.filter { constraint in
+            let firstMatches = constraint.firstItem === viewController.replyContextScrollView
+            let secondMatches = constraint.secondItem === viewController.replyContextBar
+            return firstMatches
+                && secondMatches
+                && (constraint.firstAttribute == .top || constraint.firstAttribute == .bottom)
+        }
+
+        #expect(viewController.replyContextBarHeightConstraint?.constant == 0)
+        #expect(verticalPaddingConstraints.count == 2)
+        #expect(verticalPaddingConstraints.allSatisfy { $0.priority < .required })
+    }
+
     @Test func replyActionAppendsMultipleTargetsWhileEditorIsOpen() async throws {
         let presenter = SpyPostDetailPresenter()
         let viewController = PostDetailViewController(

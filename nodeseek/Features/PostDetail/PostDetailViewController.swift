@@ -685,6 +685,16 @@ class PostDetailViewController: UIViewController {
         )
         let replyContextBarHeightConstraint = replyContextBar.heightAnchor.constraint(equalToConstant: 0)
         let replyStickerPickerHeightConstraint = replyStickerPickerView.heightAnchor.constraint(equalToConstant: 0)
+        let replyContextScrollTopConstraint = replyContextScrollView.topAnchor.constraint(
+            equalTo: replyContextBar.topAnchor,
+            constant: 4
+        )
+        let replyContextScrollBottomConstraint = replyContextScrollView.bottomAnchor.constraint(
+            equalTo: replyContextBar.bottomAnchor,
+            constant: -4
+        )
+        replyContextScrollTopConstraint.priority = UILayoutPriority(999)
+        replyContextScrollBottomConstraint.priority = UILayoutPriority(999)
         self.replyContextBarHeightConstraint = replyContextBarHeightConstraint
         self.replyStickerPickerHeightConstraint = replyStickerPickerHeightConstraint
         NSLayoutConstraint.activate([
@@ -736,8 +746,8 @@ class PostDetailViewController: UIViewController {
 
             replyContextScrollView.leadingAnchor.constraint(equalTo: replyContextBar.leadingAnchor, constant: 10),
             replyContextScrollView.trailingAnchor.constraint(equalTo: replyContextBar.trailingAnchor, constant: -6),
-            replyContextScrollView.topAnchor.constraint(equalTo: replyContextBar.topAnchor, constant: 4),
-            replyContextScrollView.bottomAnchor.constraint(equalTo: replyContextBar.bottomAnchor, constant: -4),
+            replyContextScrollTopConstraint,
+            replyContextScrollBottomConstraint,
 
             replyContextStackView.leadingAnchor.constraint(equalTo: replyContextScrollView.contentLayoutGuide.leadingAnchor),
             replyContextStackView.trailingAnchor.constraint(equalTo: replyContextScrollView.contentLayoutGuide.trailingAnchor),
