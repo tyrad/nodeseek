@@ -60,6 +60,7 @@ class PostListPresenter: PostListPresenterProtocol {
     }
 
     func didTapNewDiscussion() {
+        AppLog.info(.postList, "Presenter 收到发帖入口点击，准备导航到发帖页")
         router.navigateToNewDiscussion()
     }
 

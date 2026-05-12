@@ -65,26 +65,53 @@ extension PostDetailViewController {
 }
 
 extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
-    func handlePostChickenLegTap(_ header: PostDetailHeaderContent) {
-        guard header.isChickenLegClicked == false else {
-            presenter.didTapPostChickenLeg()
-            return
+    func handlePostLikeTap(_ header: PostDetailHeaderContent) {
+        confirmActionIfNeeded(isAlreadyApplied: header.isLikeClicked, context: .postLike) { [weak self] in
+            self?.presenter.didTapPostLike()
         }
+    }
 
-        chickenLegConfirmationPresenter(self, .post) { [weak self] in
+    func handleCommentLikeTap(_ comment: Comment) {
+        confirmActionIfNeeded(isAlreadyApplied: comment.isLikeClicked, context: .commentLike) { [weak self] in
+            self?.presenter.didTapCommentLike(comment)
+        }
+    }
+
+    func handlePostChickenLegTap(_ header: PostDetailHeaderContent) {
+        confirmActionIfNeeded(isAlreadyApplied: header.isChickenLegClicked, context: .postChickenLeg) { [weak self] in
             self?.presenter.didTapPostChickenLeg()
         }
     }
 
     func handleCommentChickenLegTap(_ comment: Comment) {
-        guard comment.isChickenLegClicked == false else {
-            presenter.didTapCommentChickenLeg(comment)
+        confirmActionIfNeeded(isAlreadyApplied: comment.isChickenLegClicked, context: .commentChickenLeg) { [weak self] in
+            self?.presenter.didTapCommentChickenLeg(comment)
+        }
+    }
+
+    func handlePostOpposeTap(_ header: PostDetailHeaderContent) {
+        confirmActionIfNeeded(isAlreadyApplied: header.isOpposeClicked, context: .postOppose) { [weak self] in
+            self?.presenter.didTapPostOppose()
+        }
+    }
+
+    func handleCommentOpposeTap(_ comment: Comment) {
+        confirmActionIfNeeded(isAlreadyApplied: comment.isOpposeClicked, context: .commentOppose) { [weak self] in
+            self?.presenter.didTapCommentOppose(comment)
+        }
+    }
+
+    private func confirmActionIfNeeded(
+        isAlreadyApplied: Bool,
+        context: PostDetailActionConfirmationContext,
+        onConfirm: @escaping @MainActor () -> Void
+    ) {
+        guard isAlreadyApplied == false else {
+            onConfirm()
             return
         }
 
-        chickenLegConfirmationPresenter(self, .comment) { [weak self] in
-            self?.presenter.didTapCommentChickenLeg(comment)
-        }
+        actionConfirmationPresenter(self, context, onConfirm)
     }
 
     func tableNode(_ tableNode: ASTableNode, numberOfRowsInSection section: Int) -> Int {
@@ -128,13 +155,13 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                         self?.openUserInfo(profileURL: url)
                     },
                     onLikeTapped: {
-                        self?.presenter.didTapPostLike()
+                        self?.handlePostLikeTap(header)
                     },
                     onChickenLegTapped: {
                         self?.handlePostChickenLegTap(header)
                     },
                     onOpposeTapped: {
-                        self?.presenter.didTapPostOppose()
+                        self?.handlePostOpposeTap(header)
                     },
                     onFavoriteTapped: {
                         self?.presenter.didTapFavorite()
@@ -195,13 +222,13 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                         self?.openUserInfo(profileURL: url)
                     },
                     onLikeTapped: { comment in
-                        self?.presenter.didTapCommentLike(comment)
+                        self?.handleCommentLikeTap(comment)
                     },
                     onChickenLegTapped: { comment in
                         self?.handleCommentChickenLegTap(comment)
                     },
                     onOpposeTapped: { comment in
-                        self?.presenter.didTapCommentOppose(comment)
+                        self?.handleCommentOpposeTap(comment)
                     },
                     onReplyTapped: { comment in
                         self?.handleReply(to: comment)

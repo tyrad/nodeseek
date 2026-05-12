@@ -15,13 +15,22 @@ struct CommentAutomationResponse: Equatable, Sendable {
     let message: String?
     let reason: String
     let body: String?
+    let diagnostics: [String]
 
-    init(ok: Bool, statusCode: Int? = nil, message: String? = nil, reason: String, body: String? = nil) {
+    init(
+        ok: Bool,
+        statusCode: Int? = nil,
+        message: String? = nil,
+        reason: String,
+        body: String? = nil,
+        diagnostics: [String] = []
+    ) {
         self.ok = ok
         self.statusCode = statusCode
         self.message = message
         self.reason = reason
         self.body = body
+        self.diagnostics = diagnostics
     }
 }
 
@@ -62,23 +71,30 @@ final class NodeSeekCommentSubmitter {
     }
 
     func submitComment(postID: String, content: String, referer: URL) async throws -> CommentSubmitResponse {
+        let startedAt = Date()
+        AppLog.info(.postDetail, "Submitter 收到回复提交: postID=\(postID), contentLength=\(content.count), referer=\(referer.absoluteString)")
         guard let numericPostID = Int(postID) else {
+            AppLog.error(.postDetail, "Submitter 中止回复提交: postID 无法转 Int, postID=\(postID), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             throw NodeSeekCommentSubmitterError.invalidPostID
         }
 
+        AppLog.info(.postDetail, "Submitter 即将调用自动化: postID=\(numericPostID), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
         let response = try await automation.submitComment(
             postID: numericPostID,
             content: content,
             referer: referer
         )
+        AppLog.info(.postDetail, "Submitter 自动化返回: postID=\(numericPostID), ok=\(response.ok), status=\(response.statusCode.map(String.init) ?? "nil"), reason=\(response.reason), message=\(response.message ?? "nil"), bodyLength=\(response.body?.count ?? 0), diagnosticsCount=\(response.diagnostics.count), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
 
         if response.reason == "challenge" {
+            AppLog.warning(.postDetail, "Submitter 识别为挑战页: postID=\(numericPostID), message=\(response.message ?? "nil")")
             throw NodeSeekCommentSubmitterError.challengeRequired(
                 response.message ?? "站点当前返回了拦截页面，请稍后重试。"
             )
         }
 
         if let statusCode = response.statusCode, !(200..<300).contains(statusCode) {
+            AppLog.warning(.postDetail, "Submitter 收到非 2xx 状态: postID=\(numericPostID), status=\(statusCode), message=\(response.message ?? "nil")")
             if let message = response.message?.trimmingCharacters(in: .whitespacesAndNewlines), !message.isEmpty {
                 throw NodeSeekCommentSubmitterError.serverMessage(message)
             }
@@ -86,12 +102,14 @@ final class NodeSeekCommentSubmitter {
         }
 
         guard response.ok else {
+            AppLog.warning(.postDetail, "Submitter 自动化标记失败: postID=\(numericPostID), reason=\(response.reason), message=\(response.message ?? "nil")")
             if let message = response.message?.trimmingCharacters(in: .whitespacesAndNewlines), !message.isEmpty {
                 throw NodeSeekCommentSubmitterError.serverMessage(message)
             }
             throw NodeSeekCommentSubmitterError.pageAutomationFailed(Self.message(forAutomationReason: response.reason))
         }
 
+        AppLog.info(.postDetail, "Submitter 回复提交成功: postID=\(numericPostID), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
         return CommentSubmitResponse(message: response.message)
     }
 
@@ -121,7 +139,11 @@ final class WebViewCommentSubmissionAutomator: CommentSubmissionAutomating {
     }
 
     func submitComment(postID: Int, content: String, referer: URL) async throws -> CommentAutomationResponse {
-        try await client.submitComment(postID: postID, content: content, referer: referer)
+        let startedAt = Date()
+        AppLog.info(.webView, "WebViewCommentSubmissionAutomator 开始: postID=\(postID), contentLength=\(content.count), referer=\(referer.absoluteString)")
+        let response = try await client.submitComment(postID: postID, content: content, referer: referer)
+        AppLog.info(.webView, "WebViewCommentSubmissionAutomator 结束: postID=\(postID), ok=\(response.ok), reason=\(response.reason), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+        return response
     }
 }
 

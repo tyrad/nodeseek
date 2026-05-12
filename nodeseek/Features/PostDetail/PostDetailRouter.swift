@@ -20,7 +20,11 @@ class PostDetailRouter: PostDetailRouterProtocol {
         initialAnchorID: String? = nil
     ) -> UIViewController {
         let router = PostDetailRouter()
-        let interactor = PostDetailInteractor(post: post, page: page)
+        let interactor = PostDetailInteractor(
+            post: post,
+            actionPagePreparer: WebViewPostActionPagePreparer(),
+            page: page
+        )
         let presenter = PostDetailPresenter(
             interactor: interactor,
             router: router,

@@ -31,7 +31,8 @@ struct AppLogTests {
             AppLog.flushFileLogsForTesting()
 
             let content = try String(contentsOf: logURL(in: directory), encoding: .utf8)
-            #expect(content.contains("[warning] [WebView] enabled message"))
+            #expect(content.contains("[warning] [WebView] ["))
+            #expect(content.contains("enabled message"))
             #expect(content.contains("disabled message") == false)
         }
     }
@@ -44,7 +45,8 @@ struct AppLogTests {
             let content = try AppLog.fileLogContent()
 
             #expect(AppLog.fileLogURL.lastPathComponent == "nodeseek.log")
-            #expect(content.contains("[info] [PostDetail] detail log message"))
+            #expect(content.contains("[info] [PostDetail] ["))
+            #expect(content.contains("detail log message"))
         }
     }
 
