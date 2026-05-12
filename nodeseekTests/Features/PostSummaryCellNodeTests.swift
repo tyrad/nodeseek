@@ -108,6 +108,53 @@ struct PostSummaryCellNodeTests {
         #expect(titleText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor == .secondaryLabel)
     }
 
+    @Test func postTitleHighlightsSpecialFollowKeyword() throws {
+        let post = PostSummary(
+            id: "7",
+            title: "NodeImage 正式版发布",
+            url: URL(string: "https://www.nodeseek.com/post-7")!,
+            authorName: "mist",
+            nodeName: "NodeSeek",
+            replyCount: 1,
+            lastActivityText: "just now"
+        )
+        let rules = [
+            try SpecialFollowKeywordRule(keyword: "nodeimage", colorHex: "#34C759")
+        ]
+
+        let titleText = PostSummaryCellNode.titleAttributedText(for: post, specialFollowRules: rules)
+
+        let hitColor = try #require(titleText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
+        let normalColor = try #require(titleText.attribute(.foregroundColor, at: 10, effectiveRange: nil) as? UIColor)
+        #expect(hitColor.isEqual(UIColor(hex: "#34C759")))
+        #expect(normalColor.isEqual(UIColor.label))
+    }
+
+    @Test func metadataHighlightsSpecialFollowAuthorName() throws {
+        let post = PostSummary(
+            id: "8",
+            title: "普通标题",
+            url: URL(string: "https://www.nodeseek.com/post-8")!,
+            authorName: "mist",
+            nodeName: "NodeSeek",
+            replyCount: 1,
+            viewCount: 12,
+            lastActivityText: "just now"
+        )
+        let rules = [
+            try SpecialFollowKeywordRule(keyword: "mist", colorHex: "#FF9500")
+        ]
+
+        let metadataText = PostSummaryCellNode.metadataAttributedText(for: post, specialFollowRules: rules)
+
+        let hitColor = try #require(metadataText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
+        let viewCountRange = (metadataText.string as NSString).range(of: "12")
+        #expect(viewCountRange.location != NSNotFound)
+        let normalColor = try #require(metadataText.attribute(.foregroundColor, at: viewCountRange.location, effectiveRange: nil) as? UIColor)
+        #expect(hitColor.isEqual(UIColor(hex: "#FF9500")))
+        #expect(normalColor.isEqual(UIColor.secondaryLabel))
+    }
+
     @Test func pinnedPostTitleShowsPinSymbolBeforeTitle() throws {
         let post = PostSummary(
             id: "1033",

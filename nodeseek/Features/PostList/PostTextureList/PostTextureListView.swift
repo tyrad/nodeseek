@@ -222,6 +222,12 @@ final class PostTextureListView: UIView {
             name: AppTextSizeSettings.didChangeNotification,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(specialFollowKeywordsDidChange(_:)),
+            name: SpecialFollowKeywordStore.didChangeNotification,
+            object: SpecialFollowKeywordStore.shared
+        )
 
         addSubview(tableNode.view)
         addSubview(errorStackView)
@@ -258,6 +264,17 @@ final class PostTextureListView: UIView {
     }
 
     @objc private func appTextSizeDidChange(_ notification: Notification) {
+        guard displayMode == .content else { return }
+        tableNode.reloadData()
+    }
+
+    @objc private func specialFollowKeywordsDidChange(_ notification: Notification) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.specialFollowKeywordsDidChange(notification)
+            }
+            return
+        }
         guard displayMode == .content else { return }
         tableNode.reloadData()
     }

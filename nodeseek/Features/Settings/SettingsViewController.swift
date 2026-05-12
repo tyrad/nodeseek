@@ -104,6 +104,7 @@ final class SettingsViewController: UITableViewController {
         case cache
         case textSize
         case nodeImage
+        case specialFollow
         case debug
         case build
         case account
@@ -151,6 +152,7 @@ final class SettingsViewController: UITableViewController {
     private let nodeImageAPIKeyStore: NodeImageAPIKeyStoring
     private let nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting
     private let textSizeSettings: AppTextSizeSettings
+    private let specialFollowKeywordStore: SpecialFollowKeywordStore
     private let confirmsActionsImmediately: Bool
     private let onLogout: @MainActor () -> Void
     private let onLogFile: @MainActor () -> Void
@@ -168,6 +170,7 @@ final class SettingsViewController: UITableViewController {
         nodeImageAPIKeyStore: NodeImageAPIKeyStoring = KeychainNodeImageAPIKeyStore(),
         nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting? = nil,
         textSizeSettings: AppTextSizeSettings = .shared,
+        specialFollowKeywordStore: SpecialFollowKeywordStore = .shared,
         confirmsActionsImmediately: Bool = false,
         onLogout: @escaping @MainActor () -> Void = {},
         onLogFile: @escaping @MainActor () -> Void = {},
@@ -180,6 +183,7 @@ final class SettingsViewController: UITableViewController {
         self.nodeImageAPIKeyStore = nodeImageAPIKeyStore
         self.nodeImageAuthorizationPresenter = nodeImageAuthorizationPresenter ?? DefaultNodeImageAuthorizationPresenter()
         self.textSizeSettings = textSizeSettings
+        self.specialFollowKeywordStore = specialFollowKeywordStore
         self.confirmsActionsImmediately = confirmsActionsImmediately
         self.onLogout = onLogout
         self.onLogFile = onLogFile
@@ -208,6 +212,16 @@ final class SettingsViewController: UITableViewController {
         )
         refreshCacheSize()
         refreshAccountState()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(specialFollowKeywordsDidChange(_:)),
+            name: SpecialFollowKeywordStore.didChangeNotification,
+            object: specialFollowKeywordStore
+        )
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     override func numberOfSections(in tableView: UITableView) -> Int {
@@ -238,6 +252,8 @@ final class SettingsViewController: UITableViewController {
             return "字体"
         case .nodeImage:
             return "NodeImage"
+        case .specialFollow:
+            return "关注"
         case .debug:
             return "调试"
         case .build:
@@ -257,6 +273,8 @@ final class SettingsViewController: UITableViewController {
             return textSizeCell(for: indexPath)
         case .nodeImage:
             return nodeImageAuthorizationCell(for: indexPath)
+        case .specialFollow:
+            return specialFollowCell(for: indexPath)
         case .debug:
             return debugCell(for: indexPath)
         case .build:
@@ -277,6 +295,8 @@ final class SettingsViewController: UITableViewController {
             break
         case .nodeImage:
             handleNodeImageAuthorizationSelection()
+        case .specialFollow:
+            showSpecialFollowKeywords()
         case .debug:
             handleDebugSelection(at: indexPath)
         case .build:
@@ -342,6 +362,17 @@ final class SettingsViewController: UITableViewController {
             cell.accessoryType = .disclosureIndicator
         }
         cell.accessibilityIdentifier = "settings-nodeimage-authorization-cell"
+        return cell
+    }
+
+    private func specialFollowCell(for indexPath: IndexPath) -> UITableViewCell {
+        let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
+        cell.textLabel?.text = "特别关注"
+        cell.detailTextLabel?.text = "\(specialFollowKeywordStore.count)"
+        cell.detailTextLabel?.textColor = .secondaryLabel
+        cell.imageView?.image = UIImage(systemName: "star.circle")
+        cell.accessoryType = .disclosureIndicator
+        cell.accessibilityIdentifier = "settings-special-follow-cell"
         return cell
     }
 
@@ -499,6 +530,11 @@ final class SettingsViewController: UITableViewController {
         }
     }
 
+    private func showSpecialFollowKeywords() {
+        let viewController = SpecialFollowKeywordsViewController(store: specialFollowKeywordStore)
+        navigationController?.pushViewController(viewController, animated: true)
+    }
+
     private func confirmCancelNodeImageAuthorization() {
         guard !confirmsActionsImmediately else {
             performCancelNodeImageAuthorization()
@@ -581,6 +617,10 @@ final class SettingsViewController: UITableViewController {
 
     @objc private func fileLoggingSwitchChanged(_ sender: UISwitch) {
         NodeSeekDebugConfig.enableFileLogging = sender.isOn
+    }
+
+    @objc private func specialFollowKeywordsDidChange(_ notification: Notification) {
+        tableView.reloadSections(IndexSet(integer: Section.specialFollow.rawValue), with: .none)
     }
 
     private func performClearCache() {
