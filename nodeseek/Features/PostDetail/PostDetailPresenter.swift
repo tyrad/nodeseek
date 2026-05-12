@@ -293,16 +293,24 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
     }
 
     func didTapSendReply(content: String) {
-        guard isSubmittingReply == false else { return }
+        let startedAt = Date()
+        AppLog.info(.postDetail, "Presenter 收到发送回复: contentLength=\(content.count), isSubmittingReply=\(isSubmittingReply), currentPage=\(currentPage), isLastPage=\(currentDetail?.isLastPage == true)")
+        guard isSubmittingReply == false else {
+            AppLog.warning(.postDetail, "Presenter 忽略发送回复: 已在提交中, elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+            return
+        }
 
         let normalizedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard normalizedContent.isEmpty == false else {
+            AppLog.warning(.postDetail, "Presenter 中止发送回复: 规范化后内容为空, elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             view?.showError(message: "回复内容不能为空。")
             return
         }
 
         isSubmittingReply = true
+        AppLog.info(.postDetail, "Presenter 设置回复提交状态=true 前: elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
         view?.setReplySubmitting(true)
+        AppLog.info(.postDetail, "Presenter 设置回复提交状态=true 后，准备调用 interactor: normalizedLength=\(normalizedContent.count), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
         interactor.submitReply(content: normalizedContent)
     }
 
@@ -759,8 +767,11 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
     }
 
     func didSubmitReply(_ response: PostDetailSubmitReplyResponse) {
+        AppLog.info(.postDetail, "Presenter 收到回复提交成功: message=\(response.message ?? "nil"), currentPage=\(currentPage), isLastPage=\(currentDetail?.isLastPage == true)")
         isSubmittingReply = false
+        AppLog.info(.postDetail, "Presenter 设置回复提交状态=false 前: success")
         view?.setReplySubmitting(false)
+        AppLog.info(.postDetail, "Presenter 完成回复提交 UI 收尾前: success")
         view?.finishReplySubmission()
 
         let responseMessage = response.message?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -779,13 +790,16 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
     }
 
     func didFailSubmitReply(error: String) {
+        AppLog.error(.postDetail, "Presenter 收到回复提交失败: \(error)")
         isSubmittingReply = false
+        AppLog.info(.postDetail, "Presenter 设置回复提交状态=false 前: failure")
         view?.setReplySubmitting(false)
         view?.showError(message: error)
     }
 
     private func scheduleCurrentPageRefreshAfterReplySubmission() {
         let page = currentPage
+        AppLog.info(.postDetail, "回复提交成功后调度当前页刷新: page=\(page), delayNs=\(Self.replyRefreshDelayNanoseconds)")
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: Self.replyRefreshDelayNanoseconds)
             guard let self else { return }
@@ -794,6 +808,7 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
                 return
             }
             self.activeCommentPageRequest = .replyRefresh(page: page)
+            AppLog.info(.postDetail, "回复提交成功后开始刷新当前页: page=\(page)")
             self.interactor.loadPostDetail(page: page)
         }
     }

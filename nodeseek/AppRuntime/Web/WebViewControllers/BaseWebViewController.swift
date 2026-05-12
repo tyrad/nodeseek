@@ -56,6 +56,7 @@ class BaseWebViewController: UIViewController, WKNavigationDelegate, WKUIDelegat
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        AppLog.info(.webView, "BaseWebView viewDidLoad: title=\(pageTitle), url=\(initialURL.absoluteString), automaticallyLoadsPage=\(automaticallyLoadsPage)")
         title = pageTitle
         view.backgroundColor = .systemBackground
         configureNavigationItems()
@@ -118,32 +119,49 @@ class BaseWebViewController: UIViewController, WKNavigationDelegate, WKUIDelegat
     }
 
     func loadPage(_ url: URL) {
+        let startedAt = Date()
+        AppLog.info(.webView, "BaseWebView loadPage 开始: title=\(pageTitle), url=\(url.absoluteString)")
         cancelLoad()
         loadingIndicator.startAnimating()
+        AppLog.info(.webView, "BaseWebView loadingIndicator 已 startAnimating: title=\(pageTitle), isAnimating=\(loadingIndicator.isAnimating), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
         loadTask = Task { @MainActor [weak self] in
-            guard let self else { return }
+            guard let self else {
+                AppLog.warning(.webView, "BaseWebView loadTask 中止: controllerReleased, url=\(url.absoluteString)")
+                return
+            }
+            AppLog.info(.webView, "BaseWebView loadTask 进入 MainActor: title=\(self.pageTitle), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             await webViewContext.prepareForInitialLoad(userInterfaceStyle: traitCollection.userInterfaceStyle)
-            guard !Task.isCancelled else { return }
+            AppLog.info(.webView, "BaseWebView prepareForInitialLoad 完成: title=\(self.pageTitle), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+            guard !Task.isCancelled else {
+                AppLog.warning(.webView, "BaseWebView loadTask 已取消: title=\(self.pageTitle), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+                return
+            }
 
             var request = URLRequest(url: url)
             request.timeoutInterval = 20
             request.cachePolicy = .reloadRevalidatingCacheData
             WebRequestFingerprint.applyHTMLHeaders(to: &request)
+            AppLog.info(.webView, "BaseWebView 即将 webView.load: title=\(self.pageTitle), url=\(url.absoluteString), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             webView.load(request)
         }
     }
 
     func cancelLoad() {
+        if loadTask != nil {
+            AppLog.info(.webView, "BaseWebView cancelLoad: title=\(pageTitle)")
+        }
         loadTask?.cancel()
         loadTask = nil
     }
 
     func reloadCurrentPage() {
+        AppLog.info(.webView, "BaseWebView reloadCurrentPage: title=\(pageTitle), currentURL=\(webView.url?.absoluteString ?? "nil")")
         guard webView.url != nil else {
             loadInitialPage()
             return
         }
         loadingIndicator.startAnimating()
+        AppLog.info(.webView, "BaseWebView reload loadingIndicator 已 startAnimating: title=\(pageTitle), isAnimating=\(loadingIndicator.isAnimating)")
         webView.reload()
     }
 
@@ -160,10 +178,12 @@ class BaseWebViewController: UIViewController, WKNavigationDelegate, WKUIDelegat
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        AppLog.info(.webView, "BaseWebView didFinish: title=\(pageTitle), url=\(webView.url?.absoluteString ?? "nil")")
         loadingIndicator.stopAnimating()
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        AppLog.error(.webView, "BaseWebView didFail: title=\(pageTitle), error=\(error.localizedDescription), url=\(webView.url?.absoluteString ?? "nil")")
         loadingIndicator.stopAnimating()
     }
 
@@ -172,6 +192,7 @@ class BaseWebViewController: UIViewController, WKNavigationDelegate, WKUIDelegat
         didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: Error
     ) {
+        AppLog.error(.webView, "BaseWebView didFailProvisionalNavigation: title=\(pageTitle), error=\(error.localizedDescription), url=\(webView.url?.absoluteString ?? "nil")")
         loadingIndicator.stopAnimating()
     }
 

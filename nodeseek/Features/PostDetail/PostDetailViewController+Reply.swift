@@ -10,7 +10,9 @@ import UIKit
 extension PostDetailViewController {
     @objc
     func replyButtonTapped() {
-        ensureNodeSeekLoggedIn(allowCachedLogin: true) { [weak self] in
+        AppLog.info(.postDetail, "回复入口点击: source=floatingReplyButton, editorHidden=\(replyEditorContainer.isHidden), displayMode=\(displayMode), showsReplyEntry=\(showsReplyEntry)")
+        ensureNodeSeekLoggedIn(context: "openReplyEditor", allowCachedLogin: true) { [weak self] in
+            AppLog.info(.postDetail, "回复入口登录检查完成，准备展示编辑器")
             self?.presentCommentEditor()
         }
     }
@@ -38,7 +40,9 @@ extension PostDetailViewController {
     }
 
     func handleReply(to comment: Comment) {
-        ensureNodeSeekLoggedIn(allowCachedLogin: true) { [weak self] in
+        AppLog.info(.postDetail, "评论回复入口点击: commentID=\(comment.id), floor=\(comment.floorText ?? "nil")")
+        ensureNodeSeekLoggedIn(context: "replyComment", allowCachedLogin: true) { [weak self] in
+            AppLog.info(.postDetail, "评论回复入口登录检查完成: commentID=\(comment.id)")
             self?.presentReplyEditor(action: "回复", for: comment)
         }
     }
@@ -55,13 +59,17 @@ extension PostDetailViewController {
             createdAtText: header.metadataText,
             contentHTML: header.contentHTML
         )
-        ensureNodeSeekLoggedIn(allowCachedLogin: true) { [weak self] in
+        AppLog.info(.postDetail, "楼主回复入口点击: postID=\(header.postID)")
+        ensureNodeSeekLoggedIn(context: "replyPostHeader", allowCachedLogin: true) { [weak self] in
+            AppLog.info(.postDetail, "楼主回复入口登录检查完成: postID=\(header.postID)")
             self?.presentReplyEditor(action: "回复", for: comment)
         }
     }
 
     func handleQuote(_ comment: Comment) {
-        ensureNodeSeekLoggedIn(allowCachedLogin: true) { [weak self] in
+        AppLog.info(.postDetail, "评论引用入口点击: commentID=\(comment.id), floor=\(comment.floorText ?? "nil")")
+        ensureNodeSeekLoggedIn(context: "quoteComment", allowCachedLogin: true) { [weak self] in
+            AppLog.info(.postDetail, "评论引用入口登录检查完成: commentID=\(comment.id)")
             self?.presentReplyEditor(action: "引用", for: comment)
         }
     }
@@ -73,7 +81,11 @@ extension PostDetailViewController {
     }
 
     func presentReplyEditor(mode: CommentComposerMode) {
-        guard showsReplyEntry, displayMode == .content else { return }
+        AppLog.info(.postDetail, "准备展示回复编辑器: showsReplyEntry=\(showsReplyEntry), displayMode=\(displayMode), replies=\(mode.replies.count), quotes=\(mode.quotes.count)")
+        guard showsReplyEntry, displayMode == .content else {
+            AppLog.warning(.postDetail, "跳过展示回复编辑器: showsReplyEntry=\(showsReplyEntry), displayMode=\(displayMode)")
+            return
+        }
         replyComposerMode = mode
         updateReplyContext(for: mode)
         replyEditorBackdrop.isHidden = false
@@ -85,6 +97,9 @@ extension PostDetailViewController {
         updateReplyButtonVisibility()
         if view.window != nil {
             replyTextView.becomeFirstResponder()
+            AppLog.info(.postDetail, "回复编辑器已展示并请求键盘: editorFrame=\(replyEditorContainer.frame), textLength=\(replyTextView.text?.count ?? 0)")
+        } else {
+            AppLog.warning(.postDetail, "回复编辑器已展示但 view.window 为空，未请求键盘")
         }
     }
 
@@ -98,33 +113,54 @@ extension PostDetailViewController {
     }
 
     func ensureNodeSeekLoggedIn(
+        context: String = "default",
         allowCachedLogin: Bool = false,
         _ action: @escaping @MainActor () -> Void
     ) {
+        let startedAt = Date()
+        AppLog.info(.account, "登录检查开始: context=\(context), allowCachedLogin=\(allowCachedLogin)")
         Task { @MainActor [weak self] in
-            guard let self else { return }
+            guard let self else {
+                AppLog.warning(.account, "登录检查中止: context=\(context), reason=viewControllerReleased, elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+                return
+            }
+            AppLog.debug(.account, "登录检查进入 MainActor: context=\(context), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             if allowCachedLogin,
-               let cachedAccount = await accountRefresher.cachedAccount(),
-               cachedAccount.isLoggedIn {
-                action()
-                refreshCachedAccountInBackground()
-                return
+               let cachedAccount = await accountRefresher.cachedAccount() {
+                AppLog.info(.account, "登录检查缓存结果: context=\(context), isLoggedIn=\(cachedAccount.isLoggedIn), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+                if cachedAccount.isLoggedIn {
+                    AppLog.info(.account, "登录检查通过缓存，执行后续动作: context=\(context), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+                    action()
+                    refreshCachedAccountInBackground(context: context)
+                    return
+                }
+            } else if allowCachedLogin {
+                AppLog.info(.account, "登录检查无缓存账号: context=\(context), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             }
 
+            AppLog.info(.account, "登录检查开始刷新账号: context=\(context), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             let account = await accountRefresher.refreshIfNeeded(force: false, maxAge: 60)
+            AppLog.info(.account, "登录检查刷新完成: context=\(context), isLoggedIn=\(account?.isLoggedIn == true), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             if account?.isLoggedIn == true {
+                AppLog.info(.account, "登录检查刷新通过，执行后续动作: context=\(context), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
                 action()
                 return
             }
 
+            AppLog.warning(.account, "登录检查未通过，准备打开登录页: context=\(context), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             showToast(message: "请先登录 NodeSeek")
             presentNodeSeekLogin {
+                let loginCloseStartedAt = Date()
+                AppLog.info(.account, "登录页关闭后开始强制刷新账号: context=\(context)")
                 Task { @MainActor [weak self] in
                     guard let self else { return }
                     let account = await accountRefresher.refreshIfNeeded(force: true, maxAge: 0)
+                    AppLog.info(.account, "登录页关闭后账号刷新完成: context=\(context), isLoggedIn=\(account?.isLoggedIn == true), elapsedMs=\(AppLog.elapsedMilliseconds(since: loginCloseStartedAt))")
                     if account?.isLoggedIn == true {
+                        AppLog.info(.account, "登录页关闭后登录通过，执行后续动作: context=\(context)")
                         action()
                     } else {
+                        AppLog.warning(.account, "登录页关闭后仍未登录: context=\(context)")
                         showError(message: "请先登录 NodeSeek 后再继续。")
                     }
                 }
@@ -132,10 +168,13 @@ extension PostDetailViewController {
         }
     }
 
-    func refreshCachedAccountInBackground() {
+    func refreshCachedAccountInBackground(context: String = "default") {
         let accountRefresher = accountRefresher
+        AppLog.debug(.account, "后台刷新缓存账号已调度: context=\(context)")
         Task {
+            let startedAt = Date()
             _ = await accountRefresher.refreshIfNeeded(force: false, maxAge: 60)
+            AppLog.debug(.account, "后台刷新缓存账号完成: context=\(context), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
         }
     }
 
@@ -279,14 +318,21 @@ extension PostDetailViewController {
 
     @objc
     func sendReplyTapped() {
+        let startedAt = Date()
+        let rawText = replyTextView.text ?? ""
+        AppLog.info(.postDetail, "发送回复按钮点击: rawLength=\(rawText.count), trimmedLength=\(rawText.trimmingCharacters(in: .whitespacesAndNewlines).count), replies=\(replyComposerMode.replies.count), quotes=\(replyComposerMode.quotes.count), buttonEnabled=\(inlineReplySendButton.isEnabled), buttonUserInteraction=\(inlineReplySendButton.isUserInteractionEnabled), editorEditable=\(replyTextView.isEditable)")
         guard let content = Self.trimmedNonEmpty(replyTextView.text) else {
+            AppLog.warning(.postDetail, "发送回复中止: 内容为空, elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             showError(message: "回复内容不能为空。")
             return
         }
 
-        ensureNodeSeekLoggedIn { [weak self] in
+        ensureNodeSeekLoggedIn(context: "sendReply") { [weak self] in
             guard let self else { return }
-            presenter.didTapSendReply(content: resolvedReplyContent(from: content))
+            AppLog.info(.postDetail, "发送回复登录检查完成: elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+            let resolvedContent = resolvedReplyContent(from: content)
+            AppLog.info(.postDetail, "发送回复内容构建完成: inputLength=\(content.count), resolvedLength=\(resolvedContent.count), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+            presenter.didTapSendReply(content: resolvedContent)
         }
     }
 

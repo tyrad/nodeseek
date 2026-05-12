@@ -59,7 +59,9 @@ class PostListRouter: PostListRouterProtocol {
     }
 
     func navigateToNewDiscussion() {
+        AppLog.info(.postList, "Router 开始导航到发帖页")
         show(NewDiscussionWebViewController())
+        AppLog.info(.postList, "Router 已触发发帖页展示")
     }
 
     func navigateToCheckIn(boardURL: URL) {

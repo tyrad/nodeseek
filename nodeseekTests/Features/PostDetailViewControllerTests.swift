@@ -505,16 +505,16 @@ struct PostDetailViewControllerTests {
             contentHTML: "<p>正文</p>",
             chickenLegCount: 1
         )
-        var confirmationContext: ChickenLegConfirmationContext?
+        var confirmationContext: PostDetailActionConfirmationContext?
         var confirmAction: (() -> Void)?
-        viewController.chickenLegConfirmationPresenter = { _, context, onConfirm in
+        viewController.actionConfirmationPresenter = { _, context, onConfirm in
             confirmationContext = context
             confirmAction = onConfirm
         }
 
         viewController.handlePostChickenLegTap(header)
 
-        #expect(confirmationContext == .post)
+        #expect(confirmationContext == .postChickenLeg)
         #expect(presenter.didTapPostChickenLegCount == 0)
 
         let action = try #require(confirmAction)
@@ -535,22 +535,142 @@ struct PostDetailViewControllerTests {
             contentHTML: "<p>内容</p>",
             chickenLegCount: 1
         )
-        var confirmationContext: ChickenLegConfirmationContext?
+        var confirmationContext: PostDetailActionConfirmationContext?
         var confirmAction: (() -> Void)?
-        viewController.chickenLegConfirmationPresenter = { _, context, onConfirm in
+        viewController.actionConfirmationPresenter = { _, context, onConfirm in
             confirmationContext = context
             confirmAction = onConfirm
         }
 
         viewController.handleCommentChickenLegTap(comment)
 
-        #expect(confirmationContext == .comment)
+        #expect(confirmationContext == .commentChickenLeg)
         #expect(presenter.chickenLeggedCommentIDs.isEmpty)
 
         let action = try #require(confirmAction)
         action()
 
         #expect(presenter.chickenLeggedCommentIDs == ["9835758"])
+    }
+
+    @Test func tappingPostLikeRequiresConfirmationBeforeSubmitting() throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        let header = PostDetailHeaderContent(
+            postID: "710379",
+            title: "带操作区的主题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            likeCount: 1
+        )
+        var confirmationContext: PostDetailActionConfirmationContext?
+        var confirmAction: (() -> Void)?
+        viewController.actionConfirmationPresenter = { _, context, onConfirm in
+            confirmationContext = context
+            confirmAction = onConfirm
+        }
+
+        viewController.handlePostLikeTap(header)
+
+        #expect(confirmationContext == .postLike)
+        #expect(presenter.didTapPostLikeCount == 0)
+
+        let action = try #require(confirmAction)
+        action()
+
+        #expect(presenter.didTapPostLikeCount == 1)
+    }
+
+    @Test func tappingCommentLikeRequiresConfirmationBeforeSubmitting() throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        let comment = Comment(
+            id: "9835758",
+            authorName: "mist",
+            avatarURL: nil,
+            floorText: "#1",
+            createdAtText: "刚刚",
+            contentHTML: "<p>内容</p>",
+            likeCount: 1
+        )
+        var confirmationContext: PostDetailActionConfirmationContext?
+        var confirmAction: (() -> Void)?
+        viewController.actionConfirmationPresenter = { _, context, onConfirm in
+            confirmationContext = context
+            confirmAction = onConfirm
+        }
+
+        viewController.handleCommentLikeTap(comment)
+
+        #expect(confirmationContext == .commentLike)
+        #expect(presenter.likedCommentIDs.isEmpty)
+
+        let action = try #require(confirmAction)
+        action()
+
+        #expect(presenter.likedCommentIDs == ["9835758"])
+    }
+
+    @Test func tappingPostOpposeRequiresConfirmationBeforeSubmitting() throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        let header = PostDetailHeaderContent(
+            postID: "710379",
+            title: "带操作区的主题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            opposeCount: 1
+        )
+        var confirmationContext: PostDetailActionConfirmationContext?
+        var confirmAction: (() -> Void)?
+        viewController.actionConfirmationPresenter = { _, context, onConfirm in
+            confirmationContext = context
+            confirmAction = onConfirm
+        }
+
+        viewController.handlePostOpposeTap(header)
+
+        #expect(confirmationContext == .postOppose)
+        #expect(presenter.didTapPostOpposeCount == 0)
+
+        let action = try #require(confirmAction)
+        action()
+
+        #expect(presenter.didTapPostOpposeCount == 1)
+    }
+
+    @Test func tappingCommentOpposeRequiresConfirmationBeforeSubmitting() throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        let comment = Comment(
+            id: "9835758",
+            authorName: "mist",
+            avatarURL: nil,
+            floorText: "#1",
+            createdAtText: "刚刚",
+            contentHTML: "<p>内容</p>",
+            opposeCount: 1
+        )
+        var confirmationContext: PostDetailActionConfirmationContext?
+        var confirmAction: (() -> Void)?
+        viewController.actionConfirmationPresenter = { _, context, onConfirm in
+            confirmationContext = context
+            confirmAction = onConfirm
+        }
+
+        viewController.handleCommentOpposeTap(comment)
+
+        #expect(confirmationContext == .commentOppose)
+        #expect(presenter.opposedCommentIDs.isEmpty)
+
+        let action = try #require(confirmAction)
+        action()
+
+        #expect(presenter.opposedCommentIDs == ["9835758"])
     }
 
     @Test func addsMoreMenuAndCanTriggerReload() throws {

@@ -71,6 +71,10 @@ enum AppLog {
         try fileWriter.deleteLogFile()
     }
 
+    nonisolated static func elapsedMilliseconds(since startDate: Date) -> Int {
+        max(0, Int(Date().timeIntervalSince(startDate) * 1_000))
+    }
+
     #if DEBUG
     nonisolated static func setFileLogDirectoryForTesting(_ directory: URL?) {
         fileWriter.setDirectoryOverride(directory)
@@ -82,20 +86,29 @@ enum AppLog {
     #endif
 
     nonisolated private static func write(_ level: AppLogLevel, _ type: AppLogType, _ message: String) {
+        let stampedMessage = "\(messageTimestamp()) \(message)"
         let logger = loggers[type] ?? Logger(subsystem: subsystem, category: type.rawValue)
         switch level {
         case .debug:
-            logger.debug("\(message, privacy: .public)")
+            logger.debug("\(stampedMessage, privacy: .public)")
         case .info:
-            logger.info("\(message, privacy: .public)")
+            logger.info("\(stampedMessage, privacy: .public)")
         case .notice:
-            logger.notice("\(message, privacy: .public)")
+            logger.notice("\(stampedMessage, privacy: .public)")
         case .warning:
-            logger.warning("\(message, privacy: .public)")
+            logger.warning("\(stampedMessage, privacy: .public)")
         case .error:
-            logger.error("\(message, privacy: .public)")
+            logger.error("\(stampedMessage, privacy: .public)")
         }
-        fileWriter.write(level: level, type: type, message: message)
+        fileWriter.write(level: level, type: type, message: stampedMessage)
+    }
+
+    nonisolated private static func messageTimestamp() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS ZZZZZ"
+        return "[\(formatter.string(from: Date()))]"
     }
 }
 

@@ -366,6 +366,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     private var statusCode = 200
     private var headers: [String: String] = [:]
     private var initialURL: URL?
+    private var lastCompletedResponse: HTMLResponse?
     private var completed = false
     private var challengePollCount = 0
     private let maxChallengePollCount = 10
@@ -419,8 +420,16 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     }
 
     func submitComment(pageURL: URL, content: String, timeoutInterval: TimeInterval) async throws -> CommentAutomationResponse {
-        let response = try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
+        let startedAt = Date()
+        AppLog.info(.webView, "HiddenWebViewLoader 评论提交开始: url=\(pageURL.absoluteString), contentLength=\(content.count), timeout=\(Int(timeoutInterval))s")
+        let response = try await loadAutomationPageIfNeeded(
+            pageURL: pageURL,
+            timeoutInterval: timeoutInterval,
+            actionName: "评论提交"
+        )
+        AppLog.info(.webView, "HiddenWebViewLoader 评论提交页面加载完成: status=\(response.statusCode), finalURL=\(response.finalURL.absoluteString), htmlLength=\(response.html.count), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
         if let challenge = ChallengeDetector().detect(response: response) {
+            AppLog.warning(.webView, "HiddenWebViewLoader 评论提交遇到挑战页: kind=\(challenge), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             return CommentAutomationResponse(
                 ok: false,
                 statusCode: response.statusCode,
@@ -429,8 +438,11 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
             )
         }
 
+        AppLog.info(.webView, "HiddenWebViewLoader 准备执行评论提交脚本: elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
         let result = try await evaluateCommentSubmissionScript(content: content, timeoutInterval: timeoutInterval)
+        AppLog.info(.webView, "HiddenWebViewLoader 评论提交脚本完成: ok=\(result.ok), status=\(result.statusCode.map(String.init) ?? "nil"), reason=\(result.reason), diagnosticsCount=\(result.diagnostics.count), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
         await cookieSession.captureWebViewSession()
+        AppLog.info(.webView, "HiddenWebViewLoader 评论提交后 Cookie 捕获完成: elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
         return result
     }
 
@@ -440,7 +452,11 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         action: String,
         timeoutInterval: TimeInterval
     ) async throws -> PostCollectionAutomationResponse {
-        let response = try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
+        let response = try await loadAutomationPageIfNeeded(
+            pageURL: pageURL,
+            timeoutInterval: timeoutInterval,
+            actionName: "收藏动作"
+        )
         if let challenge = ChallengeDetector().detect(response: response) {
             return PostCollectionAutomationResponse(
                 ok: false,
@@ -465,7 +481,11 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         action: String,
         timeoutInterval: TimeInterval
     ) async throws -> CommentUpvoteAutomationResponse {
-        let response = try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
+        let response = try await loadAutomationPageIfNeeded(
+            pageURL: pageURL,
+            timeoutInterval: timeoutInterval,
+            actionName: "评论点赞"
+        )
         if let challenge = ChallengeDetector().detect(response: response) {
             return CommentUpvoteAutomationResponse(
                 ok: false,
@@ -490,7 +510,11 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         action: String,
         timeoutInterval: TimeInterval
     ) async throws -> PostUpvoteAutomationResponse {
-        let response = try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
+        let response = try await loadAutomationPageIfNeeded(
+            pageURL: pageURL,
+            timeoutInterval: timeoutInterval,
+            actionName: "帖子点赞"
+        )
         if let challenge = ChallengeDetector().detect(response: response) {
             return PostUpvoteAutomationResponse(
                 ok: false,
@@ -515,7 +539,11 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         action: String,
         timeoutInterval: TimeInterval
     ) async throws -> CommentChickenLegAutomationResponse {
-        let response = try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
+        let response = try await loadAutomationPageIfNeeded(
+            pageURL: pageURL,
+            timeoutInterval: timeoutInterval,
+            actionName: "评论鸡腿"
+        )
         if let challenge = ChallengeDetector().detect(response: response) {
             return CommentChickenLegAutomationResponse(
                 ok: false,
@@ -540,7 +568,11 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         action: String,
         timeoutInterval: TimeInterval
     ) async throws -> PostChickenLegAutomationResponse {
-        let response = try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
+        let response = try await loadAutomationPageIfNeeded(
+            pageURL: pageURL,
+            timeoutInterval: timeoutInterval,
+            actionName: "帖子鸡腿"
+        )
         if let challenge = ChallengeDetector().detect(response: response) {
             return PostChickenLegAutomationResponse(
                 ok: false,
@@ -565,7 +597,11 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         action: String,
         timeoutInterval: TimeInterval
     ) async throws -> CommentDislikeAutomationResponse {
-        let response = try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
+        let response = try await loadAutomationPageIfNeeded(
+            pageURL: pageURL,
+            timeoutInterval: timeoutInterval,
+            actionName: "评论反对"
+        )
         if let challenge = ChallengeDetector().detect(response: response) {
             return CommentDislikeAutomationResponse(
                 ok: false,
@@ -590,7 +626,11 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         action: String,
         timeoutInterval: TimeInterval
     ) async throws -> PostDislikeAutomationResponse {
-        let response = try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
+        let response = try await loadAutomationPageIfNeeded(
+            pageURL: pageURL,
+            timeoutInterval: timeoutInterval,
+            actionName: "帖子反对"
+        )
         if let challenge = ChallengeDetector().detect(response: response) {
             return PostDislikeAutomationResponse(
                 ok: false,
@@ -609,9 +649,54 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         return result
     }
 
+    func prepareAutomationPage(pageURL: URL, timeoutInterval: TimeInterval, reason: String) async throws {
+        let startedAt = Date()
+        AppLog.info(.webView, "动作页预热开始: reason=\(reason), url=\(pageURL.absoluteString)")
+        let response = try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
+        if let challenge = ChallengeDetector().detect(response: response) {
+            AppLog.warning(.webView, "动作页预热完成但命中验证: reason=\(reason), kind=\(challenge), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+            return
+        }
+        AppLog.info(.webView, "动作页预热完成: reason=\(reason), status=\(response.statusCode), finalURL=\(response.finalURL.absoluteString), htmlLength=\(response.html.count), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+    }
+
     private func loadAutomationPage(pageURL: URL, timeoutInterval: TimeInterval) async throws -> HTMLResponse {
         let request = makeAutomationPageRequest(pageURL: pageURL, timeoutInterval: timeoutInterval)
+        AppLog.info(.webView, "自动化页面请求已创建: method=\(request.httpMethod ?? "nil"), url=\(pageURL.absoluteString), cachePolicy=\(request.cachePolicy.rawValue), timeout=\(Int(timeoutInterval))s")
         return try await load(request: request, timeoutInterval: timeoutInterval)
+    }
+
+    private func loadAutomationPageIfNeeded(
+        pageURL: URL,
+        timeoutInterval: TimeInterval,
+        actionName: String
+    ) async throws -> HTMLResponse {
+        if let cachedResponse = reusableAutomationPageResponse(for: pageURL, actionName: actionName) {
+            return cachedResponse
+        }
+        AppLog.info(.webView, "动作页缓存未命中，重新加载: action=\(actionName), url=\(pageURL.absoluteString)")
+        return try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
+    }
+
+    private func reusableAutomationPageResponse(for pageURL: URL, actionName: String) -> HTMLResponse? {
+        guard let response = lastCompletedResponse else {
+            AppLog.info(.webView, "动作页缓存未命中: action=\(actionName), reason=noCompletedPage")
+            return nil
+        }
+        guard Self.isSameAutomationPage(response.finalURL, pageURL) else {
+            AppLog.info(.webView, "动作页缓存未命中: action=\(actionName), reason=urlMismatch, cached=\(response.finalURL.absoluteString), target=\(pageURL.absoluteString)")
+            return nil
+        }
+        guard (200..<300).contains(response.statusCode) else {
+            AppLog.info(.webView, "动作页缓存未命中: action=\(actionName), reason=status\(response.statusCode)")
+            return nil
+        }
+        if let challenge = ChallengeDetector().detect(response: response) {
+            AppLog.info(.webView, "动作页缓存未命中: action=\(actionName), reason=challenge(\(challenge))")
+            return nil
+        }
+        AppLog.info(.webView, "动作页缓存命中，跳过重新加载: action=\(actionName), url=\(pageURL.absoluteString), htmlLength=\(response.html.count)")
+        return response
     }
 
     private func makeAutomationPageRequest(pageURL: URL, timeoutInterval: TimeInterval) -> URLRequest {
@@ -621,6 +706,18 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         request.cachePolicy = WebViewCachePolicy.getRequestPolicy
         WebRequestFingerprint.applyHTMLHeaders(to: &request)
         return request
+    }
+
+    private static func isSameAutomationPage(_ lhs: URL, _ rhs: URL) -> Bool {
+        guard let lhsComponents = URLComponents(url: lhs, resolvingAgainstBaseURL: false),
+              let rhsComponents = URLComponents(url: rhs, resolvingAgainstBaseURL: false) else {
+            return lhs.absoluteString == rhs.absoluteString
+        }
+        return lhsComponents.scheme?.lowercased() == rhsComponents.scheme?.lowercased()
+            && lhsComponents.host?.lowercased() == rhsComponents.host?.lowercased()
+            && lhsComponents.port == rhsComponents.port
+            && lhsComponents.path == rhsComponents.path
+            && lhsComponents.percentEncodedQuery == rhsComponents.percentEncodedQuery
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -724,6 +821,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
 
         switch result {
         case .success(let response):
+            lastCompletedResponse = response
             AppLog.info(.webView, "抓取完成: status=\(response.statusCode), htmlLength=\(response.html.count), finalURL=\(response.finalURL.absoluteString)")
             continuation.resume(returning: response)
         case .failure(let error):
@@ -753,9 +851,11 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     }
 
     private func evaluateCommentSubmissionScript(content: String, timeoutInterval: TimeInterval) async throws -> CommentAutomationResponse {
+        let startedAt = Date()
         let timeoutMilliseconds = max(5_000, Int(timeoutInterval * 1_000))
         let result: Any?
         do {
+            AppLog.info(.webView, "评论脚本 callAsyncJavaScript 开始: contentLength=\(content.count), timeoutMs=\(timeoutMilliseconds)")
             result = try await webView.callAsyncJavaScript(
                 CommentSubmissionAutomationScript.source,
                 arguments: [
@@ -765,6 +865,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
                 in: nil,
                 contentWorld: .page
             )
+            AppLog.info(.webView, "评论脚本 callAsyncJavaScript 返回: elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
         } catch {
             let nsError = error as NSError
             AppLog.error(.webView, "评论脚本执行异常: domain=\(nsError.domain), code=\(nsError.code), info=\(String(describing: nsError.userInfo))")
@@ -776,6 +877,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         }
 
         guard let object = result as? [String: Any] else {
+            AppLog.error(.webView, "评论脚本返回格式异常: type=\(String(describing: result)), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             return CommentAutomationResponse(ok: false, message: nil, reason: "invalid_script_result")
         }
 
@@ -784,12 +886,18 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         let message = object["message"] as? String
         let reason = object["reason"] as? String ?? "unknown"
         let body = object["body"] as? String
+        let diagnostics = object["diagnostics"] as? [String] ?? []
+        for (index, diagnostic) in diagnostics.enumerated() {
+            AppLog.info(.webView, "评论脚本诊断[\(index + 1)/\(diagnostics.count)]: \(diagnostic)")
+        }
+        AppLog.info(.webView, "评论脚本结果解析完成: ok=\(ok), status=\(statusCode.map(String.init) ?? "nil"), reason=\(reason), message=\(message ?? "nil"), bodyLength=\(body?.count ?? 0), diagnosticsCount=\(diagnostics.count), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
         return CommentAutomationResponse(
             ok: ok,
             statusCode: statusCode,
             message: message,
             reason: reason,
-            body: body
+            body: body,
+            diagnostics: diagnostics
         )
     }
 
@@ -1031,6 +1139,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         htmlPollingTask = nil
         continuation = nil
         initialURL = nil
+        lastCompletedResponse = nil
         statusCode = 200
         headers = [:]
         completed = false

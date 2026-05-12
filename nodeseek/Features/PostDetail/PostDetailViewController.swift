@@ -17,27 +17,57 @@ enum PostDetailLinkDestination {
     case externalApp(URL)
 }
 
-enum ChickenLegConfirmationContext: Equatable {
-    case post
-    case comment
+enum PostDetailActionConfirmationContext: Equatable {
+    case postLike
+    case commentLike
+    case postChickenLeg
+    case commentChickenLeg
+    case postOppose
+    case commentOppose
 
     var title: String {
         switch self {
-        case .post:
+        case .postLike:
+            return "点赞帖子？"
+        case .commentLike:
+            return "点赞评论？"
+        case .postChickenLeg:
             return "给帖子投放鸡腿？"
-        case .comment:
+        case .commentChickenLeg:
             return "给评论投放鸡腿？"
+        case .postOppose:
+            return "反对帖子？"
+        case .commentOppose:
+            return "反对评论？"
         }
     }
 
     var message: String {
-        "将投放 1 个鸡腿，成功后会标记为已投放。"
+        switch self {
+        case .postLike, .commentLike:
+            return "操作成功后会标记为已点赞。"
+        case .postChickenLeg, .commentChickenLeg:
+            return "将投放 1 个鸡腿，成功后会标记为已投放。"
+        case .postOppose, .commentOppose:
+            return "操作成功后会标记为已反对。"
+        }
+    }
+
+    var confirmTitle: String {
+        switch self {
+        case .postLike, .commentLike:
+            return "确认点赞"
+        case .postChickenLeg, .commentChickenLeg:
+            return "投放 1 个"
+        case .postOppose, .commentOppose:
+            return "确认反对"
+        }
     }
 }
 
-typealias ChickenLegConfirmationPresenter = @MainActor (
+typealias PostDetailActionConfirmationPresenter = @MainActor (
     _ viewController: UIViewController,
-    _ context: ChickenLegConfirmationContext,
+    _ context: PostDetailActionConfirmationContext,
     _ onConfirm: @escaping @MainActor () -> Void
 ) -> Void
 
@@ -188,14 +218,14 @@ class PostDetailViewController: UIViewController {
     var replyStickerPickerHeightConstraint: NSLayoutConstraint?
     let leadingScreensForBatching: CGFloat = 2.0
     var lastBatchFetchRequestedCommentCount: Int?
-    var chickenLegConfirmationPresenter: ChickenLegConfirmationPresenter = { viewController, context, onConfirm in
+    var actionConfirmationPresenter: PostDetailActionConfirmationPresenter = { viewController, context, onConfirm in
         let alert = UIAlertController(
             title: context.title,
             message: context.message,
             preferredStyle: .alert
         )
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "投放 1 个", style: .default) { _ in
+        alert.addAction(UIAlertAction(title: context.confirmTitle, style: .default) { _ in
             Task { @MainActor in
                 onConfirm()
             }

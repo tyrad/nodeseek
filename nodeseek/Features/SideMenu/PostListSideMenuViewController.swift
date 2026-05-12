@@ -476,10 +476,13 @@ final class PostListSideMenuViewController: UIViewController {
     }
 
     @objc private func newDiscussionButtonTapped() {
+        AppLog.info(.postList, "侧边栏发帖按钮点击: isLoggedIn=\(accountController.isLoggedIn)")
         hide(animated: true)
         if accountController.isLoggedIn {
+            AppLog.info(.postList, "侧边栏发帖按钮通过登录状态，触发新发帖")
             onNewDiscussionTapped?()
         } else {
+            AppLog.warning(.postList, "侧边栏发帖按钮未登录，触发登录")
             onLoginTapped?()
         }
     }

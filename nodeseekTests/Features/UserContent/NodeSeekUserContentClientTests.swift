@@ -9,6 +9,7 @@ import Foundation
 import Testing
 @testable import nodeseek
 
+@Suite(.serialized)
 struct NodeSeekUserContentClientTests {
     @Test func accountUIDParsesSpaceProfileURL() throws {
         let account = AccountResponse(

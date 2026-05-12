@@ -7,6 +7,14 @@
 
 import Foundation
 
+protocol PostDetailActionPagePreparing {
+    func prepareActionPage(pageURL: URL)
+}
+
+struct NoopPostDetailActionPagePreparer: PostDetailActionPagePreparing {
+    func prepareActionPage(pageURL: URL) {}
+}
+
 @MainActor
 class PostDetailInteractor: PostDetailInteractorInput {
     private enum FavoriteAction {
@@ -28,6 +36,8 @@ class PostDetailInteractor: PostDetailInteractorInput {
     private let postDislikeSubmitter: PostDislikeSubmitting
     private let commentDislikeSubmitter: CommentDislikeSubmitting
     private let sessionStore: NodeSeekSessionStore
+    private let actionPagePreparer: PostDetailActionPagePreparing
+    private var currentActionPageURL: URL?
     
     // MARK: - Initialization
     init(
@@ -41,6 +51,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
         commentChickenLegSubmitter: CommentChickenLegSubmitting? = nil,
         postDislikeSubmitter: PostDislikeSubmitting? = nil,
         commentDislikeSubmitter: CommentDislikeSubmitting? = nil,
+        actionPagePreparer: PostDetailActionPagePreparing = NoopPostDetailActionPagePreparer(),
         page: Int = 1,
         sessionStore: NodeSeekSessionStore = .shared
     ) {
@@ -56,6 +67,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
         self.postDislikeSubmitter = postDislikeSubmitter ?? NodeSeekPostDislikeSubmitter()
         self.commentDislikeSubmitter = commentDislikeSubmitter ?? NodeSeekCommentDislikeSubmitter()
         self.sessionStore = sessionStore
+        self.actionPagePreparer = actionPagePreparer
     }
     
     // MARK: - Methods
@@ -77,6 +89,9 @@ class PostDetailInteractor: PostDetailInteractorInput {
                     return
                 }
                 AppLog.info(.postDetail, "帖子详情加载成功，postID=\(detail.id), 评论数量: \(detail.comments.count)")
+                let actionPageURL = NodeSeekSite.postURL(id: detail.id, page: normalizedPage)
+                currentActionPageURL = actionPageURL
+                actionPagePreparer.prepareActionPage(pageURL: actionPageURL)
                 await MainActor.run {
                     presenter?.didLoadPostDetail(PostDetailResponse(detail: detail))
                 }
@@ -95,31 +110,41 @@ class PostDetailInteractor: PostDetailInteractorInput {
     }
 
     func submitReply(content: String) {
+        let startedAt = Date()
+        AppLog.info(.postDetail, "Interactor 收到提交回复请求: contentLength=\(content.count), hasPost=\(post != nil)")
         let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmedContent.isEmpty == false else {
+            AppLog.warning(.postDetail, "Interactor 中止提交回复: 内容为空, elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             presenter?.didFailSubmitReply(error: "回复内容不能为空。")
             return
         }
 
         guard let post else {
+            AppLog.error(.postDetail, "Interactor 中止提交回复: 缺少帖子信息, elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             presenter?.didFailSubmitReply(error: "缺少帖子信息，无法发表评论。")
             return
         }
 
+        let referer = actionReferer(for: post)
+        AppLog.info(.postDetail, "Interactor 创建提交回复 Task: postID=\(post.id), referer=\(referer.absoluteString), trimmedLength=\(trimmedContent.count), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
         Task {
-            AppLog.info(.postDetail, "开始通过 WebView 提交回复，postID=\(post.id)")
+            let taskStartedAt = Date()
+            AppLog.info(.postDetail, "Interactor 提交回复 Task 开始: postID=\(post.id), elapsedFromTapMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             do {
+                AppLog.info(.postDetail, "Interactor 即将调用 commentSubmitter: postID=\(post.id), elapsedMs=\(AppLog.elapsedMilliseconds(since: taskStartedAt))")
                 let response = try await commentSubmitter.submitComment(
                     postID: post.id,
                     content: trimmedContent,
-                    referer: post.url
+                    referer: referer
                 )
+                AppLog.info(.postDetail, "Interactor commentSubmitter 成功返回: postID=\(post.id), message=\(response.message ?? "nil"), elapsedMs=\(AppLog.elapsedMilliseconds(since: taskStartedAt))")
                 await sessionStore.recordSuccess()
+                AppLog.info(.postDetail, "Interactor 已记录会话成功，准备回调 Presenter: postID=\(post.id), elapsedMs=\(AppLog.elapsedMilliseconds(since: taskStartedAt))")
                 await MainActor.run {
                     presenter?.didSubmitReply(PostDetailSubmitReplyResponse(message: response.message))
                 }
             } catch {
-                AppLog.error(.postDetail, "回复提交失败: \(error.localizedDescription)")
+                AppLog.error(.postDetail, "Interactor 回复提交失败: postID=\(post.id), error=\(error.localizedDescription), elapsedMs=\(AppLog.elapsedMilliseconds(since: taskStartedAt))")
                 await MainActor.run {
                     presenter?.didFailSubmitReply(error: error.localizedDescription)
                 }
@@ -141,10 +166,11 @@ class PostDetailInteractor: PostDetailInteractorInput {
             return
         }
 
+        let referer = actionReferer(for: post)
         Task {
             AppLog.info(.postDetail, "开始点赞帖子，postID=\(post.id)")
             do {
-                let response = try await postUpvoteSubmitter.addUpvote(postID: post.id, referer: post.url)
+                let response = try await postUpvoteSubmitter.addUpvote(postID: post.id, referer: referer)
                 await sessionStore.recordSuccess()
                 await MainActor.run {
                     presenter?.didAddPostLike(response)
@@ -164,10 +190,11 @@ class PostDetailInteractor: PostDetailInteractorInput {
             return
         }
 
+        let referer = actionReferer(for: post)
         Task {
             AppLog.info(.postDetail, "开始点赞评论，postID=\(post.id), commentID=\(commentID)")
             do {
-                let response = try await commentUpvoteSubmitter.addUpvote(commentID: commentID, referer: post.url)
+                let response = try await commentUpvoteSubmitter.addUpvote(commentID: commentID, referer: referer)
                 await sessionStore.recordSuccess()
                 await MainActor.run {
                     presenter?.didAddCommentLike(commentID: commentID, response: response)
@@ -187,10 +214,11 @@ class PostDetailInteractor: PostDetailInteractorInput {
             return
         }
 
+        let referer = actionReferer(for: post)
         Task {
             AppLog.info(.postDetail, "开始给帖子投放鸡腿，postID=\(post.id)")
             do {
-                let response = try await postChickenLegSubmitter.addChickenLeg(postID: post.id, referer: post.url)
+                let response = try await postChickenLegSubmitter.addChickenLeg(postID: post.id, referer: referer)
                 await sessionStore.recordSuccess()
                 await MainActor.run {
                     presenter?.didAddPostChickenLeg(response)
@@ -210,10 +238,11 @@ class PostDetailInteractor: PostDetailInteractorInput {
             return
         }
 
+        let referer = actionReferer(for: post)
         Task {
             AppLog.info(.postDetail, "开始给评论投放鸡腿，postID=\(post.id), commentID=\(commentID)")
             do {
-                let response = try await commentChickenLegSubmitter.addChickenLeg(commentID: commentID, referer: post.url)
+                let response = try await commentChickenLegSubmitter.addChickenLeg(commentID: commentID, referer: referer)
                 await sessionStore.recordSuccess()
                 await MainActor.run {
                     presenter?.didAddCommentChickenLeg(commentID: commentID, response: response)
@@ -233,10 +262,11 @@ class PostDetailInteractor: PostDetailInteractorInput {
             return
         }
 
+        let referer = actionReferer(for: post)
         Task {
             AppLog.info(.postDetail, "开始反对帖子，postID=\(post.id)")
             do {
-                let response = try await postDislikeSubmitter.addDislike(postID: post.id, referer: post.url)
+                let response = try await postDislikeSubmitter.addDislike(postID: post.id, referer: referer)
                 await sessionStore.recordSuccess()
                 await MainActor.run {
                     presenter?.didAddPostOppose(response)
@@ -256,10 +286,11 @@ class PostDetailInteractor: PostDetailInteractorInput {
             return
         }
 
+        let referer = actionReferer(for: post)
         Task {
             AppLog.info(.postDetail, "开始反对评论，postID=\(post.id), commentID=\(commentID)")
             do {
-                let response = try await commentDislikeSubmitter.addDislike(commentID: commentID, referer: post.url)
+                let response = try await commentDislikeSubmitter.addDislike(commentID: commentID, referer: referer)
                 await sessionStore.recordSuccess()
                 await MainActor.run {
                     presenter?.didAddCommentOppose(commentID: commentID, response: response)
@@ -285,6 +316,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
             return
         }
 
+        let referer = actionReferer(for: post)
         Task {
             let actionText: String
             switch action {
@@ -298,9 +330,9 @@ class PostDetailInteractor: PostDetailInteractorInput {
                 let response: PostCollectionResponse
                 switch action {
                 case .add:
-                    response = try await collectionSubmitter.addFavorite(postID: post.id, referer: post.url)
+                    response = try await collectionSubmitter.addFavorite(postID: post.id, referer: referer)
                 case .remove:
-                    response = try await collectionSubmitter.removeFavorite(postID: post.id, referer: post.url)
+                    response = try await collectionSubmitter.removeFavorite(postID: post.id, referer: referer)
                 }
                 await sessionStore.recordSuccess()
                 await MainActor.run {
@@ -343,6 +375,10 @@ class PostDetailInteractor: PostDetailInteractorInput {
             }
             throw MessageError(message: message)
         }
+    }
+
+    private func actionReferer(for post: PostSummary) -> URL {
+        currentActionPageURL ?? post.url
     }
 
     private static func isCancelledLoad(_ error: Error) -> Bool {

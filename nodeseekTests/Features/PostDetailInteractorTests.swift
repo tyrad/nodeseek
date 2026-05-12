@@ -98,6 +98,73 @@ struct PostDetailInteractorTests {
         #expect(presenter.loginRequiredMessage == "本帖需要注册用户才能查看😭")
     }
 
+    @Test func loadPostDetailPreparesActionPageAfterSuccess() async throws {
+        let baseURL = URL(string: "https://www.nodeseek.com/")!
+        let post = Self.makePost()
+        let htmlClient = URLCapturingHTMLClient(response: HTMLResponse(
+            statusCode: 200,
+            headers: [:],
+            finalURL: post.url,
+            html: try FixtureLoader.html(named: "post-703863-1")
+        ))
+        let service = NodeSeekService(
+            baseURL: baseURL,
+            htmlClient: htmlClient,
+            parser: KannaNodeSeekParser(baseURL: baseURL)
+        )
+        let actionPagePreparer = SpyPostDetailActionPagePreparer()
+        let presenter = SpyPostDetailInteractorOutput()
+        let interactor = PostDetailInteractor(
+            post: post,
+            service: service,
+            actionPagePreparer: actionPagePreparer,
+            sessionStore: NodeSeekSessionStore()
+        )
+        interactor.presenter = presenter
+
+        interactor.loadPostDetail()
+        await waitForInteractorCallbacks()
+
+        #expect(presenter.loadedResponse?.detail.id == post.id)
+        #expect(actionPagePreparer.preparedURLs == [post.url])
+    }
+
+    @Test func commentActionsUseCurrentDetailPageAfterLoadingNonFirstPage() async throws {
+        let baseURL = URL(string: "https://www.nodeseek.com/")!
+        let post = Self.makePost()
+        let pageURL = URL(string: "https://www.nodeseek.com/post-703863-4")!
+        let htmlClient = URLCapturingHTMLClient(response: HTMLResponse(
+            statusCode: 200,
+            headers: [:],
+            finalURL: pageURL,
+            html: try FixtureLoader.html(named: "post-703863-1")
+        ))
+        let service = NodeSeekService(
+            baseURL: baseURL,
+            htmlClient: htmlClient,
+            parser: KannaNodeSeekParser(baseURL: baseURL)
+        )
+        let actionPagePreparer = SpyPostDetailActionPagePreparer()
+        let upvoteSubmitter = SpyCommentUpvoteSubmitting(response: CommentUpvoteResponse(message: "added", current: 1))
+        let presenter = SpyPostDetailInteractorOutput()
+        let interactor = PostDetailInteractor(
+            post: post,
+            service: service,
+            commentUpvoteSubmitter: upvoteSubmitter,
+            actionPagePreparer: actionPagePreparer,
+            sessionStore: NodeSeekSessionStore()
+        )
+        interactor.presenter = presenter
+
+        interactor.loadPostDetail(page: 4)
+        await waitForInteractorCallbacks()
+        interactor.addCommentLike(commentID: "9835758")
+        await waitForInteractorCallbacks()
+
+        #expect(actionPagePreparer.preparedURLs == [pageURL])
+        #expect(upvoteSubmitter.submittedReferer == pageURL)
+    }
+
     @Test func submitReplyUsesCommentSubmitterAndReportsSuccess() async throws {
         let automation = SpyCommentSubmissionAutomation(response: CommentAutomationResponse(
             ok: true,
@@ -562,6 +629,15 @@ private actor URLCapturingHTMLClient: HTMLClient {
 
     func requestedURLs() -> [URL] {
         urls
+    }
+}
+
+@MainActor
+private final class SpyPostDetailActionPagePreparer: PostDetailActionPagePreparing {
+    private(set) var preparedURLs: [URL] = []
+
+    func prepareActionPage(pageURL: URL) {
+        preparedURLs.append(pageURL)
     }
 }
 

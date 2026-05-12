@@ -33,6 +33,7 @@ final class NewDiscussionWebViewController: BaseWebViewController {
     }
 
     override func loadInitialPage() {
+        AppLog.info(.webView, "发帖页 loadInitialPage: url=\(initialURL.absoluteString)")
         lastResponseStatusCode = nil
         hasPresentedLoginRequiredHint = false
         loadPage(initialURL)
@@ -43,9 +44,16 @@ final class NewDiscussionWebViewController: BaseWebViewController {
     }
 
     private func presentLoginRequiredHint(message: String) {
-        guard !hasPresentedLoginRequiredHint else { return }
-        guard view.window != nil else { return }
+        guard !hasPresentedLoginRequiredHint else {
+            AppLog.info(.webView, "发帖页登录提示已展示过，跳过")
+            return
+        }
+        guard view.window != nil else {
+            AppLog.warning(.webView, "发帖页登录提示跳过: view.window 为空")
+            return
+        }
         hasPresentedLoginRequiredHint = true
+        AppLog.warning(.webView, "发帖页准备展示登录提示: message=\(message)")
 
         let alert = UIAlertController(title: "需要登录", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
@@ -62,13 +70,17 @@ final class NewDiscussionWebViewController: BaseWebViewController {
 
     private func checkLoginRequiredFallback() {
         let statusCode = lastResponseStatusCode
+        let startedAt = Date()
+        AppLog.info(.webView, "发帖页开始检查登录兜底: status=\(statusCode.map(String.init) ?? "nil")")
         webView.evaluateJavaScript("document.body.innerText") { [weak self] result, _ in
             guard let self else { return }
             let responseText = result as? String ?? ""
+            AppLog.info(.webView, "发帖页登录兜底 JS 返回: status=\(statusCode.map(String.init) ?? "nil"), textLength=\(responseText.count), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             guard let message = Self.loginRequiredMessage(
                 statusCode: statusCode,
                 responseText: responseText
             ) else {
+                AppLog.info(.webView, "发帖页登录兜底未命中: status=\(statusCode.map(String.init) ?? "nil")")
                 return
             }
             self.presentLoginRequiredHint(message: message)
@@ -77,14 +89,17 @@ final class NewDiscussionWebViewController: BaseWebViewController {
 
     private func handleExternalNavigationIfNeeded(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
+            AppLog.info(.webView, "发帖页忽略非 http 导航: url=\(url.absoluteString)")
             return false
         }
         guard NodeSeekSite.isNodeSeekHost(url) == false else { return false }
+        AppLog.info(.webView, "发帖页外链跳转到 SafariViewController: url=\(url.absoluteString)")
         openInSafariViewController(url)
         return true
     }
 
     override func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        AppLog.info(.webView, "发帖页 didFinish: url=\(webView.url?.absoluteString ?? "nil"), lastStatus=\(lastResponseStatusCode.map(String.init) ?? "nil")")
         super.webView(webView, didFinish: navigation)
         checkLoginRequiredFallback()
     }
@@ -95,6 +110,7 @@ final class NewDiscussionWebViewController: BaseWebViewController {
         decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
     ) {
         lastResponseStatusCode = (navigationResponse.response as? HTTPURLResponse)?.statusCode
+        AppLog.info(.webView, "发帖页收到导航响应: status=\(lastResponseStatusCode.map(String.init) ?? "nil"), url=\(navigationResponse.response.url?.absoluteString ?? "nil")")
         decisionHandler(.allow)
     }
 
@@ -103,6 +119,7 @@ final class NewDiscussionWebViewController: BaseWebViewController {
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
+        AppLog.info(.webView, "发帖页导航动作: type=\(navigationAction.navigationType.rawValue), url=\(navigationAction.request.url?.absoluteString ?? "nil"), targetFrameNil=\(navigationAction.targetFrame == nil)")
         if navigationAction.navigationType == .linkActivated,
            let url = navigationAction.request.url,
            handleExternalNavigationIfNeeded(url) {

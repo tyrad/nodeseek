@@ -558,6 +558,8 @@ extension PostDetailViewController: PostDetailViewProtocol {
     }
 
     func setReplySubmitting(_ isSubmitting: Bool) {
+        let startedAt = Date()
+        AppLog.info(.postDetail, "View 设置回复发送按钮 loading 开始: isSubmitting=\(isSubmitting), oldButtonEnabled=\(inlineReplySendButton.isEnabled), oldInteraction=\(inlineReplySendButton.isUserInteractionEnabled), oldEditorEditable=\(replyTextView.isEditable)")
         var configuration = inlineReplySendButton.configuration ?? UIButton.Configuration.plain()
         configuration.showsActivityIndicator = isSubmitting
         configuration.image = nil
@@ -573,6 +575,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
         inlineReplySendButton.isUserInteractionEnabled = !isSubmitting
         setReplyContextControlsEnabled(!isSubmitting)
         inlineReplySendButton.alpha = 1
+        AppLog.info(.postDetail, "View 设置回复发送按钮 loading 完成: isSubmitting=\(isSubmitting), showsActivityIndicator=\(configuration.showsActivityIndicator), buttonEnabled=\(inlineReplySendButton.isEnabled), interaction=\(inlineReplySendButton.isUserInteractionEnabled), editorEditable=\(replyTextView.isEditable), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
     }
 
     func renderLoginRequired(message: String) {
