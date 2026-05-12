@@ -123,6 +123,10 @@ enum AppTypography {
         font(basePointSize: 12, weight: .regular, pointOffset: pointOffset)
     }
 
+    static func signatureFont(pointOffset: CGFloat = AppTextSizeSettings.shared.pointOffset) -> UIFont {
+        font(basePointSize: 11, weight: .regular, pointOffset: pointOffset)
+    }
+
     static func detailTitleFont(pointOffset: CGFloat = AppTextSizeSettings.shared.pointOffset) -> UIFont {
         font(basePointSize: 22, weight: .regular, pointOffset: pointOffset)
     }

@@ -20,6 +20,18 @@ enum NodeSeekLinkStyle {
     }
 }
 
+enum NodeSeekSignatureStyle {
+    static let textColor = UIColor.secondaryLabel
+    static let linkColor = UIColor(red: 111 / 255, green: 163 / 255, blue: 143 / 255, alpha: 0.76)
+
+    static func linkAttributes(url: URL) -> [NSAttributedString.Key: Any] {
+        [
+            .foregroundColor: linkColor,
+            .link: url
+        ]
+    }
+}
+
 struct DTCoreTextHTMLContentRenderer {
     let stickerAspectRatioProvider: any StickerAspectRatioProviding
 

@@ -572,6 +572,7 @@ private extension PostDetail {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             likeCount: likeCount,
             isLikeClicked: isLikeClicked,
             chickenLegCount: chickenLegCount,

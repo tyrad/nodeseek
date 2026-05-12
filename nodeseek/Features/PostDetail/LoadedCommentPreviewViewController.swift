@@ -97,7 +97,6 @@ final class LoadedCommentPreviewViewController: UIViewController {
         } else {
             textHeight = estimatedTextHeight(comment.contentHTML, width: width, font: bodyFont)
         }
-
         return max(
             PostDetailContentLayout.avatarSize,
             textHeight + extraBlockHeight + 96

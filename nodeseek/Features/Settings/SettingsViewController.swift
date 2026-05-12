@@ -101,18 +101,23 @@ final class DefaultNodeImageAuthorizationPresenter: NodeImageAuthorizationPresen
 
 final class SettingsViewController: UITableViewController {
     private enum Section: Int, CaseIterable {
-        case cache
-        case textSize
-        case nodeImage
-        case specialFollow
+        case reading
+        case features
+        case storage
         case debug
-        case build
+        case about
         case account
     }
 
-    private enum TextSizeRow: Int, CaseIterable {
+    private enum ReadingRow: Int, CaseIterable {
         case adjustment
         case preview
+        case signatureDisplay
+    }
+
+    private enum FeatureRow: Int, CaseIterable {
+        case nodeImage
+        case specialFollow
     }
 
     private enum BuildRow: Int, CaseIterable {
@@ -152,6 +157,7 @@ final class SettingsViewController: UITableViewController {
     private let nodeImageAPIKeyStore: NodeImageAPIKeyStoring
     private let nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting
     private let textSizeSettings: AppTextSizeSettings
+    private let signatureDisplaySettings: PostSignatureDisplaySettings
     private let specialFollowKeywordStore: SpecialFollowKeywordStore
     private let confirmsActionsImmediately: Bool
     private let onLogout: @MainActor () -> Void
@@ -170,6 +176,7 @@ final class SettingsViewController: UITableViewController {
         nodeImageAPIKeyStore: NodeImageAPIKeyStoring = KeychainNodeImageAPIKeyStore(),
         nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting? = nil,
         textSizeSettings: AppTextSizeSettings = .shared,
+        signatureDisplaySettings: PostSignatureDisplaySettings = .shared,
         specialFollowKeywordStore: SpecialFollowKeywordStore = .shared,
         confirmsActionsImmediately: Bool = false,
         onLogout: @escaping @MainActor () -> Void = {},
@@ -183,6 +190,7 @@ final class SettingsViewController: UITableViewController {
         self.nodeImageAPIKeyStore = nodeImageAPIKeyStore
         self.nodeImageAuthorizationPresenter = nodeImageAuthorizationPresenter ?? DefaultNodeImageAuthorizationPresenter()
         self.textSizeSettings = textSizeSettings
+        self.signatureDisplaySettings = signatureDisplaySettings
         self.specialFollowKeywordStore = specialFollowKeywordStore
         self.confirmsActionsImmediately = confirmsActionsImmediately
         self.onLogout = onLogout
@@ -229,35 +237,36 @@ final class SettingsViewController: UITableViewController {
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        if Section(rawValue: section) == .debug {
+        switch Section(rawValue: section) {
+        case .reading:
+            return ReadingRow.allCases.count
+        case .features:
+            return FeatureRow.allCases.count
+        case .storage:
+            return 1
+        case .debug:
             return DebugRow.visibleRows.count
-        }
-        if Section(rawValue: section) == .textSize {
-            return TextSizeRow.allCases.count
-        }
-        if Section(rawValue: section) == .build {
+        case .about:
             return BuildRow.allCases.count
-        }
-        if Section(rawValue: section) == .account {
+        case .account:
             return isLoggedIn ? 1 : 0
+        case .none:
+            return 0
         }
-        return 1
     }
 
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         switch Section(rawValue: section) {
-        case .cache:
-            return "缓存"
-        case .textSize:
-            return "字体"
-        case .nodeImage:
-            return "NodeImage"
-        case .specialFollow:
-            return "关注"
+        case .reading:
+            return "阅读"
+        case .features:
+            return "功能"
+        case .storage:
+            return "存储"
         case .debug:
             return "调试"
-        case .build:
-            return "版本"
+        case .about:
+            return "关于"
         case .account:
             return isLoggedIn ? "账号" : nil
         case .none:
@@ -267,17 +276,15 @@ final class SettingsViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         switch Section(rawValue: indexPath.section) {
-        case .cache:
+        case .reading:
+            return readingCell(for: indexPath)
+        case .features:
+            return featureCell(for: indexPath)
+        case .storage:
             return cacheCell(for: indexPath)
-        case .textSize:
-            return textSizeCell(for: indexPath)
-        case .nodeImage:
-            return nodeImageAuthorizationCell(for: indexPath)
-        case .specialFollow:
-            return specialFollowCell(for: indexPath)
         case .debug:
             return debugCell(for: indexPath)
-        case .build:
+        case .about:
             return buildCell(for: indexPath)
         case .account:
             return logoutCell(for: indexPath)
@@ -289,17 +296,15 @@ final class SettingsViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         switch Section(rawValue: indexPath.section) {
-        case .cache:
-            confirmClearCache()
-        case .textSize:
+        case .reading:
             break
-        case .nodeImage:
-            handleNodeImageAuthorizationSelection()
-        case .specialFollow:
-            showSpecialFollowKeywords()
+        case .features:
+            handleFeatureSelection(at: indexPath)
+        case .storage:
+            confirmClearCache()
         case .debug:
             handleDebugSelection(at: indexPath)
-        case .build:
+        case .about:
             handleBuildSelection(at: indexPath)
         case .account:
             guard isLoggedIn else { return }
@@ -320,8 +325,8 @@ final class SettingsViewController: UITableViewController {
         return cell
     }
 
-    private func textSizeCell(for indexPath: IndexPath) -> UITableViewCell {
-        switch TextSizeRow(rawValue: indexPath.row) {
+    private func readingCell(for indexPath: IndexPath) -> UITableViewCell {
+        switch ReadingRow(rawValue: indexPath.row) {
         case .adjustment:
             guard let cell = tableView.dequeueReusableCell(
                 withIdentifier: "SettingsTextSizeAdjustmentCell",
@@ -343,6 +348,19 @@ final class SettingsViewController: UITableViewController {
             }
             cell.configure(pointOffset: textSizeSettings.pointOffset)
             return cell
+        case .signatureDisplay:
+            return signatureDisplayCell(for: indexPath)
+        case .none:
+            return UITableViewCell()
+        }
+    }
+
+    private func featureCell(for indexPath: IndexPath) -> UITableViewCell {
+        switch FeatureRow(rawValue: indexPath.row) {
+        case .nodeImage:
+            return nodeImageAuthorizationCell(for: indexPath)
+        case .specialFollow:
+            return specialFollowCell(for: indexPath)
         case .none:
             return UITableViewCell()
         }
@@ -365,11 +383,26 @@ final class SettingsViewController: UITableViewController {
         return cell
     }
 
+    private func signatureDisplayCell(for indexPath: IndexPath) -> UITableViewCell {
+        let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.text = "显示帖子签名"
+        cell.imageView?.image = UIImage(systemName: "signature")
+        let signatureSwitch = UISwitch()
+        signatureSwitch.isOn = signatureDisplaySettings.showsSignatures
+        signatureSwitch.accessibilityIdentifier = "settings-post-signature-switch"
+        signatureSwitch.addTarget(self, action: #selector(signatureDisplaySwitchChanged(_:)), for: .valueChanged)
+        cell.accessoryView = signatureSwitch
+        cell.selectionStyle = .none
+        cell.accessibilityIdentifier = "settings-post-signature-cell"
+        return cell
+    }
+
     private func specialFollowCell(for indexPath: IndexPath) -> UITableViewCell {
-        let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
+        let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
         cell.textLabel?.text = "特别关注"
-        cell.detailTextLabel?.text = "\(specialFollowKeywordStore.count)"
+        cell.detailTextLabel?.text = specialFollowDetailText
         cell.detailTextLabel?.textColor = .secondaryLabel
+        cell.detailTextLabel?.numberOfLines = 2
         cell.imageView?.image = UIImage(systemName: "star.circle")
         cell.accessoryType = .disclosureIndicator
         cell.accessibilityIdentifier = "settings-special-follow-cell"
@@ -472,11 +505,19 @@ final class SettingsViewController: UITableViewController {
         nodeImageAPIKeyStore.apiKey()?.isEmpty == false
     }
 
+    private var specialFollowDetailText: String {
+        let count = specialFollowKeywordStore.count
+        guard count > 0 else {
+            return "帖子列表关键字高亮展示"
+        }
+        return "帖子列表关键字高亮展示 · \(count) 个"
+    }
+
     private func refreshCacheSize() {
         Task { @MainActor [weak self] in
             guard let self else { return }
             cacheByteSize = await cacheManager.cacheByteSize()
-            tableView.reloadSections(IndexSet(integer: Section.cache.rawValue), with: .none)
+            tableView.reloadSections(IndexSet(integer: Section.storage.rawValue), with: .none)
         }
     }
 
@@ -491,7 +532,7 @@ final class SettingsViewController: UITableViewController {
 
     private func updateTextSize(pointOffset: CGFloat) {
         textSizeSettings.setPointOffset(pointOffset)
-        let previewIndexPath = IndexPath(row: TextSizeRow.preview.rawValue, section: Section.textSize.rawValue)
+        let previewIndexPath = IndexPath(row: ReadingRow.preview.rawValue, section: Section.reading.rawValue)
         if let previewCell = tableView.cellForRow(at: previewIndexPath) as? SettingsTextSizePreviewCell {
             previewCell.configure(pointOffset: textSizeSettings.pointOffset)
             UIView.performWithoutAnimation {
@@ -500,6 +541,17 @@ final class SettingsViewController: UITableViewController {
             }
         } else {
             tableView.reloadRows(at: [previewIndexPath], with: .none)
+        }
+    }
+
+    private func handleFeatureSelection(at indexPath: IndexPath) {
+        switch FeatureRow(rawValue: indexPath.row) {
+        case .nodeImage:
+            handleNodeImageAuthorizationSelection()
+        case .specialFollow:
+            showSpecialFollowKeywords()
+        case .none:
+            break
         }
     }
 
@@ -555,7 +607,7 @@ final class SettingsViewController: UITableViewController {
 
     private func performCancelNodeImageAuthorization() {
         nodeImageAPIKeyStore.clear()
-        tableView.reloadSections(IndexSet(integer: Section.nodeImage.rawValue), with: .none)
+        tableView.reloadSections(IndexSet(integer: Section.features.rawValue), with: .none)
         showAlert(title: "已取消 NodeImage 授权", message: "之后上传图片时需要重新授权。")
     }
 
@@ -563,7 +615,7 @@ final class SettingsViewController: UITableViewController {
         nodeImageAuthorizationPresenter.presentAuthorization(from: self) { [weak self] apiKey in
             guard let self else { return }
             nodeImageAPIKeyStore.save(apiKey: apiKey)
-            tableView.reloadSections(IndexSet(integer: Section.nodeImage.rawValue), with: .none)
+            tableView.reloadSections(IndexSet(integer: Section.features.rawValue), with: .none)
         }
     }
 
@@ -619,24 +671,28 @@ final class SettingsViewController: UITableViewController {
         NodeSeekDebugConfig.enableFileLogging = sender.isOn
     }
 
+    @objc private func signatureDisplaySwitchChanged(_ sender: UISwitch) {
+        signatureDisplaySettings.setShowsSignatures(sender.isOn)
+    }
+
     @objc private func specialFollowKeywordsDidChange(_ notification: Notification) {
-        tableView.reloadSections(IndexSet(integer: Section.specialFollow.rawValue), with: .none)
+        tableView.reloadSections(IndexSet(integer: Section.features.rawValue), with: .none)
     }
 
     private func performClearCache() {
         isClearingCache = true
-        tableView.reloadRows(at: [IndexPath(row: 0, section: Section.cache.rawValue)], with: .none)
+        tableView.reloadRows(at: [IndexPath(row: 0, section: Section.storage.rawValue)], with: .none)
         Task { @MainActor [weak self] in
             guard let self else { return }
             do {
                 try await cacheManager.clearPreservingCookies()
                 cacheByteSize = await cacheManager.cacheByteSize()
                 isClearingCache = false
-                tableView.reloadSections(IndexSet(integer: Section.cache.rawValue), with: .none)
+                tableView.reloadSections(IndexSet(integer: Section.storage.rawValue), with: .none)
                 showAlert(title: "已清除缓存", message: "登录状态已保留。")
             } catch {
                 isClearingCache = false
-                tableView.reloadSections(IndexSet(integer: Section.cache.rawValue), with: .none)
+                tableView.reloadSections(IndexSet(integer: Section.storage.rawValue), with: .none)
                 showAlert(title: "清除失败", message: error.localizedDescription)
             }
         }

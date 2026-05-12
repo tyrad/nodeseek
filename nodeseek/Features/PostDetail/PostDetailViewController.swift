@@ -799,6 +799,12 @@ class PostDetailViewController: UIViewController {
             name: AppTextSizeSettings.didChangeNotification,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(postSignatureDisplayDidChange(_:)),
+            name: PostSignatureDisplaySettings.didChangeNotification,
+            object: nil
+        )
 
         reloadTableData()
         updateReplyButtonVisibility()
@@ -812,6 +818,15 @@ class PostDetailViewController: UIViewController {
 
     @objc
     func appTextSizeDidChange(_ notification: Notification) {
+        invalidateRenderedContentAndReload()
+    }
+
+    @objc
+    func postSignatureDisplayDidChange(_ notification: Notification) {
+        invalidateRenderedContentAndReload()
+    }
+
+    private func invalidateRenderedContentAndReload() {
         renderGeneration += 1
         commentRenderInFlight.removeAll(keepingCapacity: true)
         commentRenderedCache.removeAll(keepingCapacity: true)

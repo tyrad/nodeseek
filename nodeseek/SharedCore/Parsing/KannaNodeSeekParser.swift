@@ -330,6 +330,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
         let categoryText = bodyItem.flatMap { firstText(in: $0, xpaths: [XPathRules.contentCategory]) }
         let metadataText = [createdAtText, categoryText].compactMap(\.self).joined(separator: " · ").trimmedNonEmpty
         let contentHTML = postDetailContentHTML(bodyItem: bodyItem, document: document)
+        let signatureHTML = contentSignatureHTML(in: bodyItem)
         let requiredReadingLevel = document
             .at_xpath(XPathRules.postDetailRequiredReadingLevel)?
             .text?
@@ -368,6 +369,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             likeCount: bodyLikeCount,
             isLikeClicked: bodyItem.map { parseReactionClicked(in: $0, kind: .like) } ?? false,
             chickenLegCount: bodyChickenLegCount,
@@ -394,6 +396,10 @@ struct KannaNodeSeekParser: NodeSeekParser {
         }
 
         return ""
+    }
+
+    private func contentSignatureHTML(in item: Kanna.XMLElement?) -> String? {
+        item?.at_xpath(XPathRules.contentSignature)?.innerHTML?.trimmedNonEmpty
     }
 
     private func postDetailRestrictedNotice(in document: HTMLDocument) -> String? {
@@ -570,6 +576,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
                 attribute: "title"
             ),
             contentHTML: item.at_xpath(XPathRules.contentArticle)?.innerHTML?.trimmedNonEmpty ?? "",
+            signatureHTML: contentSignatureHTML(in: item),
             isHot: item.at_xpath(XPathRules.contentHotBadge) != nil,
             likeCount: likeCount,
             isLikeClicked: parseReactionClicked(in: item, kind: .like),
