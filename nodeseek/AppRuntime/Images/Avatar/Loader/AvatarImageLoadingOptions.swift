@@ -27,7 +27,6 @@ enum AvatarImageLoadingOptions {
                 return request
             }),
             .downloader(downloader),
-            .backgroundDecode,
             .transition(.fade(0.2))
         ]
     }
@@ -36,7 +35,7 @@ enum AvatarImageLoadingOptions {
         let configuration = URLSessionConfiguration.default
         configuration.httpCookieStorage = .shared
         configuration.httpShouldSetCookies = true
-        configuration.requestCachePolicy = .returnCacheDataElseLoad
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.timeoutIntervalForRequest = 20
         configuration.timeoutIntervalForResource = 20
         return configuration

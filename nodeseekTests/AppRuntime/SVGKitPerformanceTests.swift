@@ -14,6 +14,23 @@ final class SVGKitPerformanceTests: XCTestCase {
     private let avatarRenderSize = CGSize(width: 56, height: 56)
     private lazy var svgData: Data = makeAvatarLikeSVGData()
 
+    func testSVGKitRenderingRunsOnMainThreadWhenRequestedFromBackgroundQueue() {
+        let expectation = expectation(description: "后台请求完成")
+        var observedMainThread = false
+
+        SVGImageRenderer.renderThreadObserver = { observedMainThread = $0 }
+        defer { SVGImageRenderer.renderThreadObserver = nil }
+
+        DispatchQueue.global(qos: .userInitiated).async { [svgData, avatarRenderSize] in
+            let image = SVGImageRenderer.image(from: svgData, size: avatarRenderSize)
+            XCTAssertNotNil(image)
+            expectation.fulfill()
+        }
+
+        wait(for: [expectation], timeout: 3)
+        XCTAssertTrue(observedMainThread)
+    }
+
     func testSVGKitParseAndRasterizePerformance() throws {
         measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
             autoreleasepool {
