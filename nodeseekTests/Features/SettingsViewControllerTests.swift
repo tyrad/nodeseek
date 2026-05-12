@@ -28,21 +28,23 @@ struct SettingsViewControllerTests {
         viewController.loadViewIfNeeded()
         viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         viewController.view.layoutIfNeeded()
-        try await waitUntil { viewController.tableView.numberOfRows(inSection: 5) == 1 }
+        try await waitUntil { viewController.tableView.numberOfRows(inSection: 6) == 1 }
 
         let tableView = try #require(viewController.tableView)
         #expect(viewController.title == "设置")
-        #expect(tableView.numberOfSections == 6)
+        #expect(tableView.numberOfSections == 7)
         #expect(tableView.numberOfRows(inSection: 0) == 1)
         #expect(tableView.numberOfRows(inSection: 1) == 2)
         #expect(tableView.numberOfRows(inSection: 2) == 1)
-        #expect(tableView.numberOfRows(inSection: 3) == 4)
-        #expect(tableView.numberOfRows(inSection: 4) == 6)
-        #expect(tableView.numberOfRows(inSection: 5) == 1)
+        #expect(tableView.numberOfRows(inSection: 3) == 1)
+        #expect(tableView.numberOfRows(inSection: 4) == 4)
+        #expect(tableView.numberOfRows(inSection: 5) == 6)
+        #expect(tableView.numberOfRows(inSection: 6) == 1)
         #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 1) == "字体")
         #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 2) == "NodeImage")
-        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 3) == "调试")
-        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 4) == "版本")
+        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 3) == "关注")
+        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 4) == "调试")
+        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 5) == "版本")
 
         let cacheCell = try #require(tableView.dataSource?.tableView(
             tableView,
@@ -54,47 +56,47 @@ struct SettingsViewControllerTests {
         ))
         let logCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 0, section: 3)
+            cellForRowAt: IndexPath(row: 0, section: 4)
         ))
         let logFileCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 1, section: 3)
+            cellForRowAt: IndexPath(row: 1, section: 4)
         ))
         let detailTestCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 2, section: 3)
+            cellForRowAt: IndexPath(row: 2, section: 4)
         ))
         let debugLinksCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 3, section: 3)
+            cellForRowAt: IndexPath(row: 3, section: 4)
         ))
         let appVersionCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 0, section: 4)
+            cellForRowAt: IndexPath(row: 0, section: 5)
         ))
         let buildNumberCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 1, section: 4)
+            cellForRowAt: IndexPath(row: 1, section: 5)
         ))
         let gitCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 2, section: 4)
+            cellForRowAt: IndexPath(row: 2, section: 5)
         ))
         let repositoryCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 3, section: 4)
+            cellForRowAt: IndexPath(row: 3, section: 5)
         ))
         let workflowCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 4, section: 4)
+            cellForRowAt: IndexPath(row: 4, section: 5)
         ))
         let githubCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 5, section: 4)
+            cellForRowAt: IndexPath(row: 5, section: 5)
         ))
         let logoutCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 0, section: 5)
+            cellForRowAt: IndexPath(row: 0, section: 6)
         ))
 
         #expect(cacheCell.textLabel?.text == "清除缓存")
@@ -135,9 +137,9 @@ struct SettingsViewControllerTests {
         )
 
         viewController.loadViewIfNeeded()
-        try await waitUntil { viewController.tableView.numberOfRows(inSection: 5) == 0 }
+        try await waitUntil { viewController.tableView.numberOfRows(inSection: 6) == 0 }
 
-        #expect(viewController.tableView.numberOfRows(inSection: 5) == 0)
+        #expect(viewController.tableView.numberOfRows(inSection: 6) == 0)
     }
 
     @Test func textSizeSliderPersistsOffsetAndUpdatesPreview() throws {
@@ -202,6 +204,66 @@ struct SettingsViewControllerTests {
         #expect(AppTextSizeSettings.displayText(for: 8) == "+8")
     }
 
+    @Test func settingsPageShowsSpecialFollowCountAndPushesKeywordList() throws {
+        let store = makeSpecialFollowStore()
+        try store.save(keyword: "NodeImage")
+        try store.save(keyword: "mist", colorHex: "#34C759")
+        let viewController = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager(),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
+            specialFollowKeywordStore: store
+        )
+        let navigationController = UINavigationController(rootViewController: viewController)
+        viewController.loadViewIfNeeded()
+
+        let cell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: IndexPath(row: 0, section: 3)
+        ))
+        #expect(cell.textLabel?.text == "特别关注")
+        #expect(cell.detailTextLabel?.text == "2")
+        #expect(cell.accessoryType == .disclosureIndicator)
+
+        viewController.tableView.delegate?.tableView?(
+            viewController.tableView,
+            didSelectRowAt: IndexPath(row: 0, section: 3)
+        )
+
+        #expect(navigationController.topViewController is SpecialFollowKeywordsViewController)
+    }
+
+    @Test func specialFollowKeywordListEditsAndDeletesKeywords() throws {
+        let store = makeSpecialFollowStore()
+        let viewController = SpecialFollowKeywordsViewController(store: store)
+        viewController.loadViewIfNeeded()
+
+        #expect(viewController.title == "特别关注")
+        try viewController.saveKeywordForTesting(keyword: "NodeImage", colorHex: "#34C759")
+
+        #expect(viewController.tableView.numberOfRows(inSection: 0) == 1)
+        let cell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: IndexPath(row: 0, section: 0)
+        ))
+        #expect(cell.textLabel?.text == "NodeImage")
+        #expect(cell.detailTextLabel?.text == "#34C759")
+        let footerText = viewController.tableView.dataSource?.tableView?(
+            viewController.tableView,
+            titleForFooterInSection: 0
+        )
+        #expect(footerText?.contains("右滑删除") == true)
+
+        try viewController.saveKeywordForTesting(keyword: "nodeimage", colorHex: "#007AFF")
+        #expect(store.keywords == [
+            SpecialFollowKeyword(keyword: "nodeimage", colorHex: "#007AFF")
+        ])
+
+        viewController.deleteKeywordForTesting(keyword: "nodeimage")
+        #expect(store.keywords.isEmpty)
+        #expect(viewController.tableView.numberOfRows(inSection: 0) == 0)
+    }
+
     @Test func selectingClearCacheClearsCacheWithoutLoggingOut() async throws {
         let cacheManager = FakeSettingsCacheManager(cacheByteSize: 4_096)
         let sessionManager = FakeSettingsSessionManager()
@@ -241,11 +303,11 @@ struct SettingsViewControllerTests {
             }
         )
         viewController.loadViewIfNeeded()
-        try await waitUntil { viewController.tableView.numberOfRows(inSection: 5) == 1 }
+        try await waitUntil { viewController.tableView.numberOfRows(inSection: 6) == 1 }
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 5)
+            didSelectRowAt: IndexPath(row: 0, section: 6)
         )
         try await Task.sleep(nanoseconds: 100_000_000)
 
@@ -272,11 +334,11 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 1, section: 3)
+            didSelectRowAt: IndexPath(row: 1, section: 4)
         )
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 2, section: 3)
+            didSelectRowAt: IndexPath(row: 2, section: 4)
         )
 
         #expect(logFileTapCount == 1)
@@ -300,7 +362,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 2, section: 3)
+            didSelectRowAt: IndexPath(row: 2, section: 4)
         )
 
         #expect(detailTestTapCount == 1)
@@ -318,7 +380,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 3, section: 3)
+            didSelectRowAt: IndexPath(row: 3, section: 4)
         )
 
         #expect(navigationController.viewControllers.count == 2)
@@ -371,7 +433,7 @@ struct SettingsViewControllerTests {
 
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 0, section: 3)
+            cellForRowAt: IndexPath(row: 0, section: 4)
         ))
         let loggingSwitch = try #require(cell.accessoryView as? UISwitch)
         loggingSwitch.isOn = true
@@ -511,6 +573,13 @@ private extension SettingsBuildInfo {
         githubRunID: "25443881348",
         githubRunURL: URL(string: "https://github.com/tyrad/nodeseek/actions/runs/25443881348")
     )
+}
+
+private func makeSpecialFollowStore() -> SpecialFollowKeywordStore {
+    let suiteName = "settings-special-follow-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    return SpecialFollowKeywordStore(userDefaults: defaults, storageKey: "keywords")
 }
 
 @MainActor

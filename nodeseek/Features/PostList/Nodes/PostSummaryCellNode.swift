@@ -112,13 +112,18 @@ final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
     }
 
     private func configureText() {
+        let specialFollowRules = SpecialFollowKeywordStore.shared.rules
         titleNode.maximumNumberOfLines = PostListCellStyle.Typography.titleMaximumNumberOfLines
         titleNode.truncationMode = .byTruncatingTail
-        titleNode.attributedText = Self.titleAttributedText(for: post, isVisited: isVisited)
+        titleNode.attributedText = Self.titleAttributedText(
+            for: post,
+            isVisited: isVisited,
+            specialFollowRules: specialFollowRules
+        )
 
         metadataNode.maximumNumberOfLines = PostListCellStyle.Typography.metadataMaximumNumberOfLines
         metadataNode.truncationMode = .byTruncatingTail
-        metadataNode.attributedText = Self.metadataAttributedText(for: post)
+        metadataNode.attributedText = Self.metadataAttributedText(for: post, specialFollowRules: specialFollowRules)
     }
 
     var debugTitleAttributedText: NSAttributedString? {
@@ -144,7 +149,10 @@ final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
         avatarLoader.cancel(on: avatarImageView)
     }
 
-    static func metadataAttributedText(for post: PostSummary) -> NSAttributedString {
+    static func metadataAttributedText(
+        for post: PostSummary,
+        specialFollowRules: [SpecialFollowKeywordRule] = []
+    ) -> NSAttributedString {
         let font = PostListCellStyle.Typography.metadataFont
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
@@ -159,7 +167,11 @@ final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
 
         if let authorName = AuthorDisplayPolicy.displayName(from: post.authorName) {
             appendSeparatorIfNeeded()
-            metadata.append(NSAttributedString(string: authorName, attributes: attributes))
+            metadata.append(SpecialFollowKeywordHighlighter.attributedText(
+                string: authorName,
+                baseAttributes: attributes,
+                rules: specialFollowRules
+            ))
         }
 
         appendSeparatorIfNeeded()
@@ -186,7 +198,11 @@ final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
         return metadata
     }
 
-    static func titleAttributedText(for post: PostSummary, isVisited: Bool = false) -> NSAttributedString {
+    static func titleAttributedText(
+        for post: PostSummary,
+        isVisited: Bool = false,
+        specialFollowRules: [SpecialFollowKeywordRule] = []
+    ) -> NSAttributedString {
         let font = PostListCellStyle.Typography.titleFont
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
@@ -207,6 +223,7 @@ final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
         }
 
         title.append(NSAttributedString(string: post.title, attributes: attributes))
+        SpecialFollowKeywordHighlighter.applyHighlight(to: title, rules: specialFollowRules)
 
         guard post.isLocked else {
             return title
