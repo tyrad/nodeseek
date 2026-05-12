@@ -805,6 +805,38 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(displaySize == CGSize(width: 32.5, height: 65))
     }
 
+    @Test func usesCachedStickerAspectRatioForUnknownStickerSize() throws {
+        let stickerURL = try #require(URL(string: "https://www.nodeseek.com/static/image/sticker/xhj/003.png"))
+        let cache = StickerAspectRatioCache(storageURL: nil)
+        cache.recordLoadedSize(CGSize(width: 80, height: 160), for: stickerURL)
+        let renderer = DTCoreTextHTMLContentRenderer(stickerAspectRatioProvider: cache)
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let blocks = renderer.render(
+            fragment: "<p><img src=\"/static/image/sticker/xhj/003.png\"></p>",
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributed = try #require(
+            blocks.compactMap { block -> NSAttributedString? in
+                guard case let .text(text) = block else { return nil }
+                return text
+            }.first
+        )
+
+        var attachment: DTTextAttachment?
+        attributed.enumerateAttribute(
+            .attachment,
+            in: NSRange(location: 0, length: attributed.length)
+        ) { value, _, stop in
+            guard let value = value as? DTTextAttachment else { return }
+            attachment = value
+            stop.pointee = true
+        }
+
+        let displaySize = try #require(attachment?.displaySize)
+        #expect(displaySize == CGSize(width: 32.5, height: 65))
+    }
+
     @Test func treatsStickerClassAsStickerEvenWhenURLDoesNotContainSticker() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))

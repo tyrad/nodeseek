@@ -21,6 +21,8 @@ enum NodeSeekLinkStyle {
 }
 
 struct DTCoreTextHTMLContentRenderer {
+    let stickerAspectRatioProvider: any StickerAspectRatioProviding
+
     enum Layout {
         static let defaultMaxImageWidth: CGFloat = 320
         static let bodyLineSpacing: CGFloat = 5
@@ -122,6 +124,11 @@ struct DTCoreTextHTMLContentRenderer {
         "h5",
         "h6"
     ]
+
+    init(stickerAspectRatioProvider: any StickerAspectRatioProviding = StickerAspectRatioCache.shared) {
+        self.stickerAspectRatioProvider = stickerAspectRatioProvider
+    }
+
     func render(fragment: String, baseURL: URL) -> [RenderedContentBlock] {
         render(fragment: fragment, baseURL: baseURL, maxImageWidth: Layout.defaultMaxImageWidth)
     }

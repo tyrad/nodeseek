@@ -24,9 +24,15 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
     private var lastLayoutWidth: CGFloat = 0
     private let diagnosticID = String(UUID().uuidString.prefix(8))
     private var pendingRelayoutWorkItem: DispatchWorkItem?
+    private let stickerAspectRatioProvider: any StickerAspectRatioProviding = StickerAspectRatioCache.shared
 
     private enum RelayoutDebounce {
         static let interval: TimeInterval = 0.10
+    }
+
+    private struct ImageAttachmentUpdate {
+        let displaySize: CGSize
+        let requiresRelayout: Bool
     }
 
     override init(frame: CGRect) {
@@ -111,6 +117,12 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
     var debugAttributedString: NSAttributedString? {
         attributedString
     }
+
+    #if DEBUG
+    func debugHandleLoadedImage(_ url: URL, imageSize: CGSize) {
+        handleLoadedImage(url, imageSize: imageSize)
+    }
+    #endif
 
     override func layoutSubviews() {
         let width = bounds.width
@@ -342,16 +354,26 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
     }
 
     private func handleLoadedImage(_ url: URL, imageSize: CGSize) {
-        guard let displaySize = updateImageAttachments(matching: url, originalSize: imageSize) else {
+        if shouldRecordStickerAspectRatio(for: url) {
+            stickerAspectRatioProvider.recordLoadedSize(imageSize, for: url)
+        }
+
+        guard let update = updateImageAttachments(matching: url, originalSize: imageSize) else {
             logDiagnostics(
                 "imageLoaded noAttachmentUpdate url=\(url.absoluteString) imageSize=\(Self.string(from: imageSize)) attachments=\(attachmentDiagnostics())"
             )
             return
         }
+        guard update.requiresRelayout else {
+            logDiagnostics(
+                "imageLoaded metadataOnly url=\(url.absoluteString) imageSize=\(Self.string(from: imageSize)) display=\(Self.string(from: update.displaySize))"
+            )
+            return
+        }
         logDiagnostics(
-            "imageLoaded updated url=\(url.absoluteString) imageSize=\(Self.string(from: imageSize)) display=\(Self.string(from: displaySize))"
+            "imageLoaded updated url=\(url.absoluteString) imageSize=\(Self.string(from: imageSize)) display=\(Self.string(from: update.displaySize))"
         )
-        attachmentLayoutUpdatedHandler?(url, imageSize, displaySize)
+        attachmentLayoutUpdatedHandler?(url, imageSize, update.displaySize)
         scheduleDebouncedRelayout(reason: "imageLoaded")
     }
 
@@ -374,14 +396,14 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         DispatchQueue.main.asyncAfter(deadline: .now() + RelayoutDebounce.interval, execute: workItem)
     }
 
-    private func updateImageAttachments(matching url: URL, originalSize: CGSize) -> CGSize? {
+    private func updateImageAttachments(matching url: URL, originalSize: CGSize) -> ImageAttachmentUpdate? {
         guard attributedString.length > 0,
               originalSize.width > 0,
               originalSize.height > 0 else {
             return nil
         }
 
-        var updatedDisplaySize: CGSize?
+        var updatedAttachment: ImageAttachmentUpdate?
         attributedString.enumerateAttribute(
             .attachment,
             in: NSRange(location: 0, length: attributedString.length)
@@ -406,11 +428,17 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
                         maxWidth: maxImageWidth()
                     )
                     attachment.displaySize = fixedSize
-                    updatedDisplaySize = fixedSize
+                    updatedAttachment = Self.merging(
+                        updatedAttachment,
+                        with: ImageAttachmentUpdate(displaySize: fixedSize, requiresRelayout: true)
+                    )
                 }
                 if attachment.originalSize != originalSize {
                     attachment.originalSize = originalSize
-                    updatedDisplaySize = attachment.displaySize
+                    updatedAttachment = Self.merging(
+                        updatedAttachment,
+                        with: ImageAttachmentUpdate(displaySize: attachment.displaySize, requiresRelayout: true)
+                    )
                 }
                 return
             }
@@ -433,11 +461,55 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
                 return
             }
 
+            let displaySizeChanged = Self.layoutSizeNeedsUpdate(
+                from: attachment.displaySize,
+                to: displaySize
+            )
             attachment.originalSize = originalSize
-            attachment.displaySize = displaySize
-            updatedDisplaySize = displaySize
+            if displaySizeChanged {
+                attachment.displaySize = displaySize
+            }
+            updatedAttachment = Self.merging(
+                updatedAttachment,
+                with: ImageAttachmentUpdate(displaySize: attachment.displaySize, requiresRelayout: displaySizeChanged)
+            )
         }
-        return updatedDisplaySize
+        return updatedAttachment
+    }
+
+    private func shouldRecordStickerAspectRatio(for url: URL) -> Bool {
+        if isStickerImageURL(url) {
+            return true
+        }
+
+        var shouldRecord = false
+        attributedString.enumerateAttribute(
+            .attachment,
+            in: NSRange(location: 0, length: attributedString.length)
+        ) { value, _, stop in
+            guard let attachment = value as? DTTextAttachment,
+                  attachment.contentURL == url,
+                  isStickerAttachment(attachment, contentURL: url) else {
+                return
+            }
+            shouldRecord = true
+            stop.pointee = true
+        }
+        return shouldRecord
+    }
+
+    private static func merging(
+        _ existing: ImageAttachmentUpdate?,
+        with update: ImageAttachmentUpdate
+    ) -> ImageAttachmentUpdate {
+        ImageAttachmentUpdate(
+            displaySize: update.displaySize,
+            requiresRelayout: (existing?.requiresRelayout ?? false) || update.requiresRelayout
+        )
+    }
+
+    private static func layoutSizeNeedsUpdate(from currentSize: CGSize, to newSize: CGSize) -> Bool {
+        abs(currentSize.width - newSize.width) >= 0.5 || abs(currentSize.height - newSize.height) >= 0.5
     }
 
     private func handleImageTap(_ tappedURL: URL) {

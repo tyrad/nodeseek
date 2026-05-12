@@ -264,6 +264,9 @@ extension DTCoreTextHTMLContentRenderer {
                 fixedQuoteImage = true
             } else if originalSize.width > 0, originalSize.height > 0 {
                 layoutSourceSize = originalSize
+            } else if isSticker,
+                      let cachedSourceSize = stickerAspectRatioProvider.cachedSourceSize(for: imageURL) {
+                layoutSourceSize = cachedSourceSize
             } else if isSticker, attachment.displaySize.width > 0, attachment.displaySize.height > 0 {
                 layoutSourceSize = attachment.displaySize
             } else {

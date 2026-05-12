@@ -2404,6 +2404,37 @@ struct PostDetailViewControllerTests {
         #expect(richTextView.debugAttributedString !== initialAttributedText)
     }
 
+    @Test func richTextViewDoesNotRelayoutWhenLoadedStickerKeepsCachedDisplaySize() async throws {
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let stickerURL = try #require(URL(string: "https://www.nodeseek.com/static/image/sticker/xhj/003.png"))
+        let cache = StickerAspectRatioCache(storageURL: nil)
+        cache.recordLoadedSize(CGSize(width: 80, height: 160), for: stickerURL)
+        let blocks = DTCoreTextHTMLContentRenderer(stickerAspectRatioProvider: cache).render(
+            fragment: "<p><img src=\"/static/image/sticker/xhj/003.png\"></p>",
+            baseURL: baseURL,
+            maxImageWidth: 320
+        )
+        let attributedText = try #require(blocks.compactMap { block -> NSAttributedString? in
+            guard case .text(let text) = block else { return nil }
+            return text
+        }.first)
+        var didInvalidateLayout = false
+        let richTextView = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 320, height: 120))
+        richTextView.configure(
+            attributedText,
+            onImageTapped: nil,
+            onLinkTapped: nil,
+            onLayoutInvalidated: {
+                didInvalidateLayout = true
+            }
+        )
+
+        richTextView.debugHandleLoadedImage(stickerURL, imageSize: CGSize(width: 80, height: 160))
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        #expect(didInvalidateLayout == false)
+    }
+
     @Test func quoteBlockNodeKeepsBorderVertical() throws {
         let textNode = ASTextNode()
         textNode.maximumNumberOfLines = 0
