@@ -54,6 +54,7 @@ enum XPathRules {
     static let contentFloor = ".//*[contains(@class, 'floor-link')]"
     static let contentHotBadge = ".//*[contains(concat(' ', normalize-space(@class), ' '), ' hot-badge ')]"
     static let contentArticle = ".//*[self::article or self::div][contains(concat(' ', normalize-space(@class), ' '), ' post-content ')]"
+    static let contentSignature = "./*[contains(concat(' ', normalize-space(@class), ' '), ' signature ')][1]"
     static let postDetailBodyLeft = "//*[@id='nsk-body-left'][1]"
     static let postDetailRestrictedNotice = "//*[@id='nsk-body-left']//*[(contains(normalize-space(.), '需要注册用户才能查看') or contains(normalize-space(.), '权限不足')) and not(*)][1] | //*[contains(concat(' ', normalize-space(@class), ' '), ' restricted-post ')]//*[(contains(normalize-space(.), '需要注册用户才能查看') or contains(normalize-space(.), '权限不足'))][1]"
 }

@@ -28,81 +28,93 @@ struct SettingsViewControllerTests {
         viewController.loadViewIfNeeded()
         viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         viewController.view.layoutIfNeeded()
-        try await waitUntil { viewController.tableView.numberOfRows(inSection: 6) == 1 }
+        try await waitUntil { viewController.tableView.numberOfRows(inSection: 5) == 1 }
 
         let tableView = try #require(viewController.tableView)
         #expect(viewController.title == "设置")
-        #expect(tableView.numberOfSections == 7)
-        #expect(tableView.numberOfRows(inSection: 0) == 1)
+        #expect(tableView.numberOfSections == 6)
+        #expect(tableView.numberOfRows(inSection: 0) == 3)
         #expect(tableView.numberOfRows(inSection: 1) == 2)
         #expect(tableView.numberOfRows(inSection: 2) == 1)
-        #expect(tableView.numberOfRows(inSection: 3) == 1)
-        #expect(tableView.numberOfRows(inSection: 4) == 4)
-        #expect(tableView.numberOfRows(inSection: 5) == 6)
-        #expect(tableView.numberOfRows(inSection: 6) == 1)
-        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 1) == "字体")
-        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 2) == "NodeImage")
-        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 3) == "关注")
-        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 4) == "调试")
-        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 5) == "版本")
+        #expect(tableView.numberOfRows(inSection: 3) == 4)
+        #expect(tableView.numberOfRows(inSection: 4) == 6)
+        #expect(tableView.numberOfRows(inSection: 5) == 1)
+        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 0) == "阅读")
+        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 1) == "功能")
+        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 2) == "存储")
+        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 3) == "调试")
+        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 4) == "关于")
 
         let cacheCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 0, section: 0)
+            cellForRowAt: IndexPath(row: 0, section: 2)
         ))
         let nodeImageCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 0, section: 2)
+            cellForRowAt: IndexPath(row: 0, section: 1)
+        ))
+        let specialFollowCell = try #require(tableView.dataSource?.tableView(
+            tableView,
+            cellForRowAt: IndexPath(row: 1, section: 1)
+        ))
+        let signatureCell = try #require(tableView.dataSource?.tableView(
+            tableView,
+            cellForRowAt: IndexPath(row: 2, section: 0)
         ))
         let logCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 0, section: 4)
+            cellForRowAt: IndexPath(row: 0, section: 3)
         ))
         let logFileCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 1, section: 4)
+            cellForRowAt: IndexPath(row: 1, section: 3)
         ))
         let detailTestCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 2, section: 4)
+            cellForRowAt: IndexPath(row: 2, section: 3)
         ))
         let debugLinksCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 3, section: 4)
+            cellForRowAt: IndexPath(row: 3, section: 3)
         ))
         let appVersionCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 0, section: 5)
+            cellForRowAt: IndexPath(row: 0, section: 4)
         ))
         let buildNumberCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 1, section: 5)
+            cellForRowAt: IndexPath(row: 1, section: 4)
         ))
         let gitCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 2, section: 5)
+            cellForRowAt: IndexPath(row: 2, section: 4)
         ))
         let repositoryCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 3, section: 5)
+            cellForRowAt: IndexPath(row: 3, section: 4)
         ))
         let workflowCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 4, section: 5)
+            cellForRowAt: IndexPath(row: 4, section: 4)
         ))
         let githubCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 5, section: 5)
+            cellForRowAt: IndexPath(row: 5, section: 4)
         ))
         let logoutCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 0, section: 6)
+            cellForRowAt: IndexPath(row: 0, section: 5)
         ))
 
         #expect(cacheCell.textLabel?.text == "清除缓存")
         #expect(cacheCell.detailTextLabel?.text == "4 KB")
         #expect(nodeImageCell.textLabel?.text == "NodeImage 授权")
         #expect(nodeImageCell.accessoryType == .disclosureIndicator)
+        #expect(specialFollowCell.textLabel?.text == "特别关注")
+        #expect(specialFollowCell.detailTextLabel?.text == "帖子列表关键字高亮展示")
+        #expect(signatureCell.textLabel?.text == "显示帖子签名")
+        let signatureSwitch = try #require(signatureCell.accessoryView as? UISwitch)
+        #expect(signatureSwitch.isOn == true)
         #expect(logCell.textLabel?.text == "记录日志")
         let loggingSwitch = try #require(logCell.accessoryView as? UISwitch)
         #expect(loggingSwitch.isOn == false)
@@ -137,9 +149,35 @@ struct SettingsViewControllerTests {
         )
 
         viewController.loadViewIfNeeded()
-        try await waitUntil { viewController.tableView.numberOfRows(inSection: 6) == 0 }
+        try await waitUntil { viewController.tableView.numberOfRows(inSection: 5) == 0 }
 
-        #expect(viewController.tableView.numberOfRows(inSection: 6) == 0)
+        #expect(viewController.tableView.numberOfRows(inSection: 5) == 0)
+    }
+
+    @Test func togglingSignatureDisplaySwitchPersistsPreference() throws {
+        let suiteName = "settings-signature-display-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let signatureSettings = PostSignatureDisplaySettings(userDefaults: defaults, storageKey: "show-signatures")
+        let viewController = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager(),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
+            signatureDisplaySettings: signatureSettings
+        )
+        viewController.loadViewIfNeeded()
+
+        let cell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: IndexPath(row: 2, section: 0)
+        ))
+        let signatureSwitch = try #require(cell.accessoryView as? UISwitch)
+        #expect(signatureSwitch.isOn == true)
+
+        signatureSwitch.isOn = false
+        signatureSwitch.sendActions(for: .valueChanged)
+
+        #expect(signatureSettings.showsSignatures == false)
     }
 
     @Test func textSizeSliderPersistsOffsetAndUpdatesPreview() throws {
@@ -159,11 +197,11 @@ struct SettingsViewControllerTests {
 
         let adjustmentCell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 0, section: 1)
+            cellForRowAt: IndexPath(row: 0, section: 0)
         ) as? SettingsTextSizeAdjustmentCell)
         let previewCell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 1, section: 1)
+            cellForRowAt: IndexPath(row: 1, section: 0)
         ) as? SettingsTextSizePreviewCell)
 
         adjustmentCell.slider.value = 2
@@ -219,15 +257,15 @@ struct SettingsViewControllerTests {
 
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 0, section: 3)
+            cellForRowAt: IndexPath(row: 1, section: 1)
         ))
         #expect(cell.textLabel?.text == "特别关注")
-        #expect(cell.detailTextLabel?.text == "2")
+        #expect(cell.detailTextLabel?.text == "帖子列表关键字高亮展示 · 2 个")
         #expect(cell.accessoryType == .disclosureIndicator)
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 3)
+            didSelectRowAt: IndexPath(row: 1, section: 1)
         )
 
         #expect(navigationController.topViewController is SpecialFollowKeywordsViewController)
@@ -277,7 +315,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 0)
+            didSelectRowAt: IndexPath(row: 0, section: 2)
         )
         try await Task.sleep(nanoseconds: 100_000_000)
 
@@ -303,11 +341,11 @@ struct SettingsViewControllerTests {
             }
         )
         viewController.loadViewIfNeeded()
-        try await waitUntil { viewController.tableView.numberOfRows(inSection: 6) == 1 }
+        try await waitUntil { viewController.tableView.numberOfRows(inSection: 5) == 1 }
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 6)
+            didSelectRowAt: IndexPath(row: 0, section: 5)
         )
         try await Task.sleep(nanoseconds: 100_000_000)
 
@@ -334,11 +372,11 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 1, section: 4)
+            didSelectRowAt: IndexPath(row: 1, section: 3)
         )
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 2, section: 4)
+            didSelectRowAt: IndexPath(row: 2, section: 3)
         )
 
         #expect(logFileTapCount == 1)
@@ -362,7 +400,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 2, section: 4)
+            didSelectRowAt: IndexPath(row: 2, section: 3)
         )
 
         #expect(detailTestTapCount == 1)
@@ -380,7 +418,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 3, section: 4)
+            didSelectRowAt: IndexPath(row: 3, section: 3)
         )
 
         #expect(navigationController.viewControllers.count == 2)
@@ -433,7 +471,7 @@ struct SettingsViewControllerTests {
 
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 0, section: 4)
+            cellForRowAt: IndexPath(row: 0, section: 3)
         ))
         let loggingSwitch = try #require(cell.accessoryView as? UISwitch)
         loggingSwitch.isOn = true
@@ -454,7 +492,7 @@ struct SettingsViewControllerTests {
 
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 0, section: 2)
+            cellForRowAt: IndexPath(row: 0, section: 1)
         ))
 
         #expect(cell.textLabel?.text == "取消 NodeImage 授权")
@@ -476,14 +514,14 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 2)
+            didSelectRowAt: IndexPath(row: 0, section: 1)
         )
 
         #expect(authorizationPresenter.presentCount == 1)
         #expect(nodeImageAPIKeyStore.apiKey() == "new-nodeimage-key")
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 0, section: 2)
+            cellForRowAt: IndexPath(row: 0, section: 1)
         ))
         #expect(cell.textLabel?.text == "取消 NodeImage 授权")
     }
@@ -508,7 +546,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 2)
+            didSelectRowAt: IndexPath(row: 0, section: 1)
         )
         try await Task.sleep(nanoseconds: 100_000_000)
 
@@ -529,14 +567,14 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 2)
+            didSelectRowAt: IndexPath(row: 0, section: 1)
         )
 
         #expect(nodeImageAPIKeyStore.clearCount == 1)
         #expect(nodeImageAPIKeyStore.apiKey() == nil)
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 0, section: 2)
+            cellForRowAt: IndexPath(row: 0, section: 1)
         ))
         #expect(cell.textLabel?.text == "NodeImage 授权")
     }

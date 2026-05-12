@@ -934,6 +934,166 @@ struct PostDetailViewControllerTests {
         #expect(node.debugTitleAttributedText?.string == "主题切换标题")
     }
 
+    @Test func mergedRendererIncludesPostSignatureWithoutChangingSourceContent() throws {
+        let bodyHTML = "<p>正文</p>"
+        let signatureHTML = "<p>签名</p>"
+        let rendered = try #require(PostDetailViewController.makeRenderedContent(
+            html: bodyHTML,
+            signatureHTML: signatureHTML,
+            baseURL: URL(string: "https://www.nodeseek.com")!,
+            maxImageWidth: 320
+        ))
+        let text = rendered.compactMap { block -> String? in
+            if case .text(let attributedText) = block {
+                return attributedText.string
+            }
+            return nil
+        }.joined(separator: "\n")
+
+        #expect(text.contains("正文"))
+        #expect(text.contains("签名"))
+        #expect(bodyHTML == "<p>正文</p>")
+        #expect(signatureHTML == "<p>签名</p>")
+    }
+
+    @Test func mergedRendererOmitsSignatureWhenDisplaySettingIsDisabled() throws {
+        let rendered = try #require(PostDetailViewController.makeRenderedContent(
+            html: "<p>正文</p>",
+            signatureHTML: "<p>签名</p>",
+            baseURL: URL(string: "https://www.nodeseek.com")!,
+            maxImageWidth: 320,
+            showsSignature: false
+        ))
+        let text = rendered.compactMap { block -> String? in
+            if case .text(let attributedText) = block {
+                return attributedText.string
+            }
+            return nil
+        }.joined(separator: "\n")
+
+        #expect(text.contains("正文"))
+        #expect(text.contains("签名") == false)
+    }
+
+    @Test func mergedRendererAllowsMultipleSignatureLines() throws {
+        let rendered = try #require(PostDetailViewController.makeRenderedContent(
+            html: "<p>正文</p>",
+            signatureHTML: "<p>第一行签名内容<br>第二行签名内容<br>第三行签名内容</p>",
+            baseURL: URL(string: "https://www.nodeseek.com")!,
+            maxImageWidth: 120
+        ))
+        let text = try #require(rendered.compactMap { block -> NSAttributedString? in
+            if case .text(let attributedText) = block {
+                return attributedText
+            }
+            return nil
+        }.first)
+        let richTextNode = DetailRichTextNode(
+            attributedText: text,
+            onImageTapped: { _, _ in },
+            onLayoutInvalidated: {}
+        )
+
+        let layout = richTextNode.layoutThatFits(ASSizeRange(
+            min: .zero,
+            max: CGSize(width: 120, height: CGFloat.greatestFiniteMagnitude)
+        ))
+
+        #expect(layout.size.height > 60)
+    }
+
+    @Test func mergedRendererKeepsSingleLineSignatureCompact() throws {
+        let rendered = try #require(PostDetailViewController.makeRenderedContent(
+            html: "<p>各位大佬可以带自己的 AFF 哈</p>",
+            signatureHTML: "<p>人生未定，步履即章</p>",
+            baseURL: URL(string: "https://www.nodeseek.com")!,
+            maxImageWidth: 320
+        ))
+        let attributedText = try #require(rendered.compactMap { block -> NSAttributedString? in
+            if case .text(let attributedText) = block {
+                return attributedText
+            }
+            return nil
+        }.first)
+        let richTextNode = DetailRichTextNode(
+            attributedText: attributedText,
+            onImageTapped: { _, _ in },
+            onLayoutInvalidated: {}
+        )
+
+        let layout = richTextNode.layoutThatFits(ASSizeRange(
+            min: .zero,
+            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
+        ))
+
+        #expect(attributedText.string.contains("哈\n\n人生") == false)
+        #expect(layout.size.height < 70)
+    }
+
+    @Test func mergedRendererUsesMutedTextAndLinkColorsForSignatureOnly() throws {
+        let rendered = try #require(PostDetailViewController.makeRenderedContent(
+            html: "<p>正文</p>",
+            signatureHTML: "<p>签名 <a href=\"https://example.com\">链接</a></p>",
+            baseURL: URL(string: "https://www.nodeseek.com")!,
+            maxImageWidth: 320
+        ))
+        let attributedText = try #require(rendered.compactMap { block -> NSAttributedString? in
+            if case .text(let text) = block {
+                return text
+            }
+            return nil
+        }.first)
+        let bodyRange = (attributedText.string as NSString).range(of: "正文")
+        let signatureRange = (attributedText.string as NSString).range(of: "签名")
+        let linkRange = (attributedText.string as NSString).range(of: "链接")
+        #expect(bodyRange.location != NSNotFound)
+        #expect(signatureRange.location != NSNotFound)
+        #expect(linkRange.location != NSNotFound)
+        let bodyColor = try #require(
+            attributedText.attribute(.foregroundColor, at: bodyRange.location, effectiveRange: nil) as? UIColor
+        )
+        let signatureColor = try #require(
+            attributedText.attribute(.foregroundColor, at: signatureRange.location, effectiveRange: nil) as? UIColor
+        )
+        let linkColor = try #require(
+            attributedText.attribute(.foregroundColor, at: linkRange.location, effectiveRange: nil) as? UIColor
+        )
+
+        #expect(bodyColor != NodeSeekSignatureStyle.textColor)
+        #expect(signatureColor == NodeSeekSignatureStyle.textColor)
+        #expect(linkColor == NodeSeekSignatureStyle.linkColor)
+        #expect(linkColor.isClose(to: UIColor(red: 111 / 255, green: 163 / 255, blue: 143 / 255, alpha: 0.76)))
+        #expect(linkColor != NodeSeekLinkStyle.color)
+    }
+
+    @Test func mergedRendererNormalizesHeadingSignatureTypography() throws {
+        let rendered = try #require(PostDetailViewController.makeRenderedContent(
+            html: "<p>正文</p>",
+            signatureHTML: "<h2>标题签名</h2>",
+            baseURL: URL(string: "https://www.nodeseek.com")!,
+            maxImageWidth: 320
+        ))
+        let attributedText = try #require(rendered.compactMap { block -> NSAttributedString? in
+            if case .text(let text) = block {
+                return text
+            }
+            return nil
+        }.first)
+        let signatureRange = (attributedText.string as NSString).range(of: "标题签名")
+        #expect(signatureRange.location != NSNotFound)
+        let font = try #require(
+            attributedText.attribute(.font, at: signatureRange.location, effectiveRange: nil) as? UIFont
+        )
+        let paragraphStyle = try #require(
+            attributedText.attribute(.paragraphStyle, at: signatureRange.location, effectiveRange: nil) as? NSParagraphStyle
+        )
+
+        #expect(font.pointSize == AppTypography.signatureFont().pointSize)
+        #expect(font.fontDescriptor.symbolicTraits.contains(.traitBold) == false)
+        #expect(paragraphStyle.paragraphSpacing == 0)
+        #expect(paragraphStyle.paragraphSpacingBefore == 6)
+    }
+
     @Test func postBodyTitleShowsRequiredReadingLevelWithLockAttachment() throws {
         let header = PostDetailHeaderContent(
             postID: "710379",

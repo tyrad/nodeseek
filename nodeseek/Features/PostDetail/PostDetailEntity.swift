@@ -29,6 +29,7 @@ struct PostDetailHeaderContent: Equatable {
     let authorProfileURL: URL?
     let metadataText: String?
     let contentHTML: String
+    let signatureHTML: String?
     let likeCount: Int?
     let isLikeClicked: Bool
     let chickenLegCount: Int?
@@ -47,6 +48,7 @@ struct PostDetailHeaderContent: Equatable {
         authorProfileURL: URL? = nil,
         metadataText: String?,
         contentHTML: String = "",
+        signatureHTML: String? = nil,
         requiredReadingLevel: Int? = nil,
         likeCount: Int? = nil,
         isLikeClicked: Bool = false,
@@ -66,6 +68,7 @@ struct PostDetailHeaderContent: Equatable {
         self.authorProfileURL = authorProfileURL
         self.metadataText = metadataText
         self.contentHTML = contentHTML
+        self.signatureHTML = signatureHTML
         self.likeCount = likeCount
         self.isLikeClicked = isLikeClicked
         self.chickenLegCount = chickenLegCount
@@ -104,6 +107,7 @@ struct PostDetailHeaderContent: Equatable {
             authorProfileURL: detail.authorProfileURL,
             metadataText: detail.metadataText,
             contentHTML: detail.contentHTML,
+            signatureHTML: detail.signatureHTML,
             requiredReadingLevel: detail.requiredReadingLevel,
             likeCount: detail.likeCount,
             isLikeClicked: detail.isLikeClicked,
@@ -126,6 +130,7 @@ struct PostDetailHeaderContent: Equatable {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             requiredReadingLevel: requiredReadingLevel,
             likeCount: likeCount,
             isLikeClicked: isLikeClicked,
@@ -148,6 +153,7 @@ struct PostDetailHeaderContent: Equatable {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             requiredReadingLevel: requiredReadingLevel,
             likeCount: likeCount,
             isLikeClicked: isLikeClicked,
@@ -170,6 +176,7 @@ struct PostDetailHeaderContent: Equatable {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             requiredReadingLevel: requiredReadingLevel,
             likeCount: count,
             isLikeClicked: isClicked,
@@ -192,6 +199,7 @@ struct PostDetailHeaderContent: Equatable {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             requiredReadingLevel: requiredReadingLevel,
             likeCount: likeCount,
             isLikeClicked: isLikeClicked,
@@ -214,6 +222,7 @@ struct PostDetailHeaderContent: Equatable {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             requiredReadingLevel: requiredReadingLevel,
             likeCount: likeCount,
             isLikeClicked: isLikeClicked,

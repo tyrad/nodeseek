@@ -332,6 +332,39 @@ struct KannaNodeSeekParserTests {
         #expect(detail.isFavoriteCollected == true)
     }
 
+    @Test func parsesPostBodyAndCommentSignaturesFromDetailDOM() throws {
+        let html = """
+        <div class="nsk-post">
+            <div class="post-title"><h1><a class="post-title-link" href="/post-1-1">测试详情</a></h1></div>
+            <div id="0" data-comment-id="100" class="content-item">
+                <div class="author-info"><a class="author-name" href="/space/1">楼主</a></div>
+                <article class="post-content"><p>正文</p></article>
+                <div class="signature">
+                    <p><a href="https://github.com/chaos-zhu/easynode">✨webssh面板EasyNode</a> ｜ <a href="https://t.me/easynode_notify">✨TG频道</a></p>
+                </div>
+            </div>
+            <ul class="comments">
+                <li id="1" data-comment-id="101" class="content-item">
+                    <div class="author-info"><a class="author-name" href="/space/2">alice</a></div>
+                    <article class="post-content"><p>评论</p></article>
+                    <div class="signature">
+                        <h2>[★跳楼机★] | <a href="https://vps-jsq.xiaoge.de/">余值算器</a></h2>
+                    </div>
+                </li>
+            </ul>
+        </div>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let detail = try parser.parsePostDetail(html: html, url: URL(string: "https://www.nodeseek.com/post-1-1")!)
+
+        #expect(detail.signatureHTML?.contains("webssh面板EasyNode") == true)
+        #expect(detail.contentHTML.contains("webssh面板EasyNode") == false)
+        let comment = try #require(detail.comments.first)
+        #expect(comment.signatureHTML?.contains("余值算器") == true)
+        #expect(comment.contentHTML.contains("余值算器") == false)
+    }
+
     @Test func parsesRenderedPostBodyReactionCountsFromCurrentMenuDOM() throws {
         let html = """
         <div class="nsk-post">

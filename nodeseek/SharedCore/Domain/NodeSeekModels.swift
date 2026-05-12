@@ -103,6 +103,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
     let authorProfileURL: URL?
     let metadataText: String?
     let contentHTML: String
+    let signatureHTML: String?
     let likeCount: Int?
     let isLikeClicked: Bool
     let chickenLegCount: Int?
@@ -126,6 +127,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
         authorProfileURL: URL? = nil,
         metadataText: String?,
         contentHTML: String,
+        signatureHTML: String? = nil,
         likeCount: Int? = nil,
         isLikeClicked: Bool = false,
         chickenLegCount: Int? = nil,
@@ -148,6 +150,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
         self.authorProfileURL = authorProfileURL
         self.metadataText = metadataText
         self.contentHTML = contentHTML
+        self.signatureHTML = signatureHTML
         self.likeCount = likeCount
         self.isLikeClicked = isLikeClicked
         self.chickenLegCount = chickenLegCount
@@ -173,6 +176,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             likeCount: likeCount,
             isLikeClicked: isLikeClicked,
             chickenLegCount: chickenLegCount,
@@ -199,6 +203,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             likeCount: count,
             isLikeClicked: isClicked,
             chickenLegCount: chickenLegCount,
@@ -231,6 +236,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             likeCount: likeCount,
             isLikeClicked: isLikeClicked,
             chickenLegCount: chickenLegCount,
@@ -257,6 +263,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             likeCount: likeCount,
             isLikeClicked: isLikeClicked,
             chickenLegCount: count,
@@ -289,6 +296,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             likeCount: likeCount,
             isLikeClicked: isLikeClicked,
             chickenLegCount: chickenLegCount,
@@ -315,6 +323,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             likeCount: likeCount,
             isLikeClicked: isLikeClicked,
             chickenLegCount: chickenLegCount,
@@ -347,6 +356,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             likeCount: likeCount,
             isLikeClicked: isLikeClicked,
             chickenLegCount: chickenLegCount,
@@ -376,6 +386,7 @@ nonisolated struct Comment: Equatable, Sendable {
     let createdAtText: String?
     let createdAtTitleText: String?
     let contentHTML: String
+    let signatureHTML: String?
     let isHot: Bool
     let likeCount: Int?
     let isLikeClicked: Bool
@@ -396,6 +407,7 @@ nonisolated struct Comment: Equatable, Sendable {
         createdAtText: String?,
         createdAtTitleText: String? = nil,
         contentHTML: String,
+        signatureHTML: String? = nil,
         isHot: Bool = false,
         likeCount: Int? = nil,
         isLikeClicked: Bool = false,
@@ -415,6 +427,7 @@ nonisolated struct Comment: Equatable, Sendable {
         self.createdAtText = createdAtText
         self.createdAtTitleText = createdAtTitleText
         self.contentHTML = contentHTML
+        self.signatureHTML = signatureHTML
         self.isHot = isHot
         self.likeCount = likeCount
         self.isLikeClicked = isLikeClicked
@@ -437,6 +450,7 @@ nonisolated struct Comment: Equatable, Sendable {
             createdAtText: createdAtText,
             createdAtTitleText: createdAtTitleText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             isHot: isHot,
             likeCount: count,
             isLikeClicked: isClicked,
@@ -460,6 +474,7 @@ nonisolated struct Comment: Equatable, Sendable {
             createdAtText: createdAtText,
             createdAtTitleText: createdAtTitleText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             isHot: isHot,
             likeCount: likeCount,
             isLikeClicked: isLikeClicked,
@@ -483,6 +498,7 @@ nonisolated struct Comment: Equatable, Sendable {
             createdAtText: createdAtText,
             createdAtTitleText: createdAtTitleText,
             contentHTML: contentHTML,
+            signatureHTML: signatureHTML,
             isHot: isHot,
             likeCount: likeCount,
             isLikeClicked: isLikeClicked,

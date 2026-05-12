@@ -180,8 +180,10 @@ extension PostDetailViewController {
         #endif
         let renderedContent = commentRenderedCache[comment.id] ?? Self.makeRenderedContent(
             html: comment.contentHTML,
+            signatureHTML: comment.signatureHTML,
             baseURL: baseURL,
-            maxImageWidth: availableCommentContentWidth
+            maxImageWidth: availableCommentContentWidth,
+            showsSignature: PostSignatureDisplaySettings.shared.showsSignatures
         )
 
         let previewController = LoadedCommentPreviewViewController(

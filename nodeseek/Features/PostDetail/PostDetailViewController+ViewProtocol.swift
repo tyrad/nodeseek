@@ -129,6 +129,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
         let nextHeaderContent = PostDetailHeaderContent(detail: detail)
         let canReuseHeaderRender = isSamePageRefresh
             && existingHeaderContent?.contentHTML == nextHeaderContent.contentHTML
+            && existingHeaderContent?.signatureHTML == nextHeaderContent.signatureHTML
             && existingRenderedContent != nil
         let shouldPreserveHeader = hasRenderedDetailContent
             && targetPage != 1
@@ -221,7 +222,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
             let newComment = newComments[offset]
             guard oldComment != newComment else { return nil }
             comments[oldRange.lowerBound + offset] = newComments[offset]
-            if oldComment.contentHTML != newComment.contentHTML {
+            if oldComment.contentHTML != newComment.contentHTML || oldComment.signatureHTML != newComment.signatureHTML {
                 commentRenderedCache[newComment.id] = nil
                 renderedCommentIDs.remove(newComment.id)
                 commentRenderInFlight.remove(newComment.id)
@@ -378,6 +379,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
             && lhs.authorProfileURL == rhs.authorProfileURL
             && lhs.metadataText == rhs.metadataText
             && lhs.contentHTML == rhs.contentHTML
+            && lhs.signatureHTML == rhs.signatureHTML
     }
 
     private var shouldPrepareInitialContentReveal: Bool {
@@ -402,6 +404,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
         let baseURL = baseURL
         let headerWidth = availableHeaderContentWidth
         let commentWidth = availableCommentContentWidth
+        let showsSignature = PostSignatureDisplaySettings.shared.showsSignatures
 
         let timeoutWorkItem = DispatchWorkItem { [weak self] in
             self?.revealInitialContent(
@@ -424,8 +427,10 @@ extension PostDetailViewController: PostDetailViewProtocol {
         renderQueue.async { [weak self] in
             let renderedHeaderContent = Self.makeRenderedContent(
                 html: headerContent.contentHTML,
+                signatureHTML: headerContent.signatureHTML,
                 baseURL: baseURL,
-                maxImageWidth: headerWidth
+                maxImageWidth: headerWidth,
+                showsSignature: showsSignature
             )
             var renderedCommentCache: [String: [RenderedContentBlock]] = [:]
             var renderedCommentIDs = Set<String>()
@@ -433,8 +438,10 @@ extension PostDetailViewController: PostDetailViewProtocol {
             for comment in detail.comments {
                 let renderedContent = Self.makeRenderedContent(
                     html: comment.contentHTML,
+                    signatureHTML: comment.signatureHTML,
                     baseURL: baseURL,
-                    maxImageWidth: commentWidth
+                    maxImageWidth: commentWidth,
+                    showsSignature: showsSignature
                 )
                 renderedCommentIDs.insert(comment.id)
                 if let renderedContent {
