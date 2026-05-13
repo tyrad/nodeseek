@@ -286,6 +286,7 @@ struct SettingsViewControllerTests {
         ))
         #expect(cell.textLabel?.text == "NodeImage")
         #expect(cell.detailTextLabel?.text == "#34C759")
+        #expect(cell.imageView?.image?.renderingMode == .alwaysOriginal)
         let footerText = viewController.tableView.dataSource?.tableView?(
             viewController.tableView,
             titleForFooterInSection: 0

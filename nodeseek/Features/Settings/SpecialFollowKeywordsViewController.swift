@@ -228,7 +228,7 @@ final class SpecialFollowKeywordsViewController: UITableViewController {
             let path = UIBezierPath(roundedRect: rect, cornerRadius: 6)
             path.lineWidth = 1
             path.stroke()
-        }
+        }.withRenderingMode(.alwaysOriginal)
     }
 
     private func showAlert(title: String, message: String) {
