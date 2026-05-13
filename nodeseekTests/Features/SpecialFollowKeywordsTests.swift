@@ -70,7 +70,7 @@ struct SpecialFollowKeywordsTests {
         ])
     }
 
-    @Test func highlighterColorsMatchingKeywordRanges() throws {
+    @Test func highlighterAppliesBackgroundColorToMatchingKeywordRanges() throws {
         let rules = [
             try SpecialFollowKeywordRule(keyword: "NodeImage", colorHex: "#34C759")
         ]
@@ -85,10 +85,13 @@ struct SpecialFollowKeywordsTests {
             rules: rules
         )
 
-        let hitColor = try #require(text.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
-        let normalColor = try #require(text.attribute(.foregroundColor, at: 10, effectiveRange: nil) as? UIColor)
-        #expect(hitColor.isEqual(UIColor(hex: "#34C759")))
-        #expect(normalColor.isEqual(UIColor.label))
+        let hitBackgroundColor = try #require(text.attribute(.backgroundColor, at: 0, effectiveRange: nil) as? UIColor)
+        let hitTextColor = try #require(text.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
+        let normalTextColor = try #require(text.attribute(.foregroundColor, at: 10, effectiveRange: nil) as? UIColor)
+        #expect(hitBackgroundColor.isEqual(UIColor(hex: "#34C759")))
+        #expect(hitTextColor.isEqual(UIColor.white))
+        #expect(text.attribute(.backgroundColor, at: 10, effectiveRange: nil) == nil)
+        #expect(normalTextColor.isEqual(UIColor.label))
     }
 
     @Test func presetColorsAvoidLightColors() throws {

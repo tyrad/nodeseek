@@ -81,7 +81,7 @@ final class SpecialFollowKeywordsViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
         if keywords.isEmpty {
-            return "添加关键词后，首页帖子标题和发帖人命中时会按颜色高亮。右滑删除关键词。"
+            return "添加关键词后，首页帖子标题和发帖人命中时会按背景色标记。右滑删除关键词。"
         }
         return "右滑删除关键词。"
     }

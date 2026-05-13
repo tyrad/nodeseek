@@ -187,7 +187,8 @@ enum SpecialFollowKeywordHighlighter {
                 )
                 guard range.location != NSNotFound else { break }
 
-                attributedText.addAttribute(.foregroundColor, value: rule.color, range: range)
+                attributedText.addAttribute(.backgroundColor, value: rule.color, range: range)
+                attributedText.addAttribute(.foregroundColor, value: UIColor.white, range: range)
                 let nextLocation = range.location + max(range.length, 1)
                 searchRange = NSRange(
                     location: nextLocation,
