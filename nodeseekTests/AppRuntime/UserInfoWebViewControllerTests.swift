@@ -6,6 +6,7 @@
 import Testing
 import Foundation
 import UIKit
+import WebKit
 @testable import nodeseek
 
 @MainActor
@@ -49,6 +50,21 @@ struct UserInfoWebViewControllerTests {
         let url = try #require(URL(string: "/post-704174-2#8", relativeTo: baseURL))
 
         let route = try #require(UserInfoWebViewController.nativePostRoute(for: url, baseURL: baseURL))
+
+        #expect(route.postID == "704174")
+        #expect(route.page == 2)
+        #expect(route.anchorID == "8")
+    }
+
+    @Test func classifiesScriptDrivenPostNavigationAsNativeRoute() throws {
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com/space/1541#/general"))
+        let url = try #require(URL(string: "/post-704174-2#8", relativeTo: baseURL))
+
+        let route = try #require(UserInfoWebViewController.nativePostRoute(
+            for: url,
+            baseURL: baseURL,
+            navigationType: .other
+        ))
 
         #expect(route.postID == "704174")
         #expect(route.page == 2)

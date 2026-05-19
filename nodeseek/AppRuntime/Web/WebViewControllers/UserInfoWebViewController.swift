@@ -48,7 +48,22 @@ final class UserInfoWebViewController: BaseWebViewController {
     }
 
     static func nativePostRoute(for url: URL, baseURL: URL) -> NodeSeekPostRoute? {
-        NodeSeekPostRouteResolver.route(for: url, baseURL: baseURL)
+        return NodeSeekPostRouteResolver.route(for: url, baseURL: baseURL)
+    }
+
+    static func nativePostRoute(
+        for url: URL,
+        baseURL: URL,
+        navigationType: WKNavigationType
+    ) -> NodeSeekPostRoute? {
+        switch navigationType {
+        case .linkActivated, .other, .backForward:
+            break
+        default:
+            return nil
+        }
+
+        return NodeSeekPostRouteResolver.route(for: url, baseURL: baseURL)
     }
 
     private func openNativePost(_ route: NodeSeekPostRoute) {
@@ -73,8 +88,12 @@ final class UserInfoWebViewController: BaseWebViewController {
         }
     }
 
-    private func handleNativePostNavigationIfNeeded(_ url: URL) -> Bool {
-        guard let route = Self.nativePostRoute(for: url, baseURL: currentPageURL()) else {
+    private func handleNativePostNavigationIfNeeded(_ url: URL, navigationType: WKNavigationType) -> Bool {
+        guard let route = Self.nativePostRoute(
+            for: url,
+            baseURL: currentPageURL(),
+            navigationType: navigationType
+        ) else {
             return false
         }
 
@@ -87,9 +106,8 @@ final class UserInfoWebViewController: BaseWebViewController {
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
-        if navigationAction.navigationType == .linkActivated,
-           let url = navigationAction.request.url,
-           handleNativePostNavigationIfNeeded(url) {
+        if let url = navigationAction.request.url,
+           handleNativePostNavigationIfNeeded(url, navigationType: navigationAction.navigationType) {
             decisionHandler(.cancel)
             return
         }
@@ -106,7 +124,7 @@ final class UserInfoWebViewController: BaseWebViewController {
         guard navigationAction.targetFrame == nil else { return nil }
         guard let targetURL = navigationAction.request.url else { return nil }
 
-        if handleNativePostNavigationIfNeeded(targetURL) {
+        if handleNativePostNavigationIfNeeded(targetURL, navigationType: navigationAction.navigationType) {
             return nil
         }
 
