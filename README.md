@@ -1,5 +1,10 @@
 # NodeSeek iOS
 
+[![TestFlight](https://github.com/tyrad/nodeseek/actions/workflows/testflight.yml/badge.svg)](https://github.com/tyrad/nodeseek/actions/workflows/testflight.yml)
+![Swift](https://img.shields.io/badge/Swift-5.9-F05138?logo=swift&logoColor=white)
+![iOS](https://img.shields.io/badge/iOS-15%2B-000000?logo=apple&logoColor=white)
+![License](https://img.shields.io/github/license/tyrad/nodeseek)
+
 NodeSeek iOS 是一个非官方三方 iOS 客户端，使用 UIKit 构建，通过 HTML/XPath 解析提供原生浏览、帖子详情、登录态复用、回复、图片查看和 NodeImage 图片上传等能力。
 
 本项目不隶属于 NodeSeek，也不代表 NodeSeek 官方。用户登录、授权和内容访问均发生在用户自己的 NodeSeek / NodeImage 账号上下文中。
