@@ -12,139 +12,147 @@ import UIKit
 @MainActor
 struct SettingsViewControllerTests {
     @Test func settingsPageShowsCacheActionAndLogoutAtBottomWhenLoggedIn() async throws {
-        let previousFileLogging = NodeSeekDebugConfig.enableFileLogging
-        defer { NodeSeekDebugConfig.enableFileLogging = previousFileLogging }
-        NodeSeekDebugConfig.enableFileLogging = false
-        let defaults = try #require(UserDefaults(suiteName: "settings-account-\(UUID().uuidString)"))
-        let accountStore = CurrentAccountStore(userDefaults: defaults, storageKey: "account")
-        await accountStore.save(AccountResponse(displayName: "mistj", isLoggedIn: true))
-        let categoryStore = makeCategoryPreferenceStore()
-        let viewController = SettingsViewController(
-            cacheManager: FakeSettingsCacheManager(cacheByteSize: 4_096),
-            sessionManager: FakeSettingsSessionManager(),
-            currentAccountStore: accountStore,
-            buildInfo: .testFlightFixture,
-            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
-            categoryPreferenceStore: categoryStore
-        )
-        viewController.loadViewIfNeeded()
-        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
-        viewController.view.layoutIfNeeded()
-        try await waitUntil { viewController.tableView.numberOfRows(inSection: 5) == 1 }
+        try await withFileLoggingConfigIsolation {
+            NodeSeekDebugConfig.enableFileLogging = false
+            let defaults = try #require(UserDefaults(suiteName: "settings-account-\(UUID().uuidString)"))
+            let accountStore = CurrentAccountStore(userDefaults: defaults, storageKey: "account")
+            await accountStore.save(AccountResponse(displayName: "mistj", isLoggedIn: true))
+            let categoryStore = makeCategoryPreferenceStore()
+            let viewController = SettingsViewController(
+                cacheManager: FakeSettingsCacheManager(cacheByteSize: 4_096),
+                sessionManager: FakeSettingsSessionManager(),
+                currentAccountStore: accountStore,
+                buildInfo: .testFlightFixture,
+                nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
+                categoryPreferenceStore: categoryStore,
+                autoCheckInSummaryProvider: { "未开启" }
+            )
+            viewController.loadViewIfNeeded()
+            viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+            viewController.view.layoutIfNeeded()
+            try await waitUntil { viewController.tableView.numberOfRows(inSection: 5) == 1 }
 
-        let tableView = try #require(viewController.tableView)
-        #expect(viewController.title == "设置")
-        #expect(tableView.numberOfSections == 6)
-        #expect(tableView.numberOfRows(inSection: 0) == 4)
-        #expect(tableView.numberOfRows(inSection: 1) == 2)
-        #expect(tableView.numberOfRows(inSection: 2) == 1)
-        #expect(tableView.numberOfRows(inSection: 3) == 4)
-        #expect(tableView.numberOfRows(inSection: 4) == 6)
-        #expect(tableView.numberOfRows(inSection: 5) == 1)
-        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 0) == "阅读")
-        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 1) == "功能")
-        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 2) == "存储")
-        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 3) == "调试")
-        #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 4) == "关于")
+            let tableView = try #require(viewController.tableView)
+            #expect(viewController.title == "设置")
+            #expect(tableView.numberOfSections == 6)
+            #expect(tableView.numberOfRows(inSection: 0) == 4)
+            #expect(tableView.numberOfRows(inSection: 1) == 3)
+            #expect(tableView.numberOfRows(inSection: 2) == 1)
+            #expect(tableView.numberOfRows(inSection: 3) == 4)
+            #expect(tableView.numberOfRows(inSection: 4) == 6)
+            #expect(tableView.numberOfRows(inSection: 5) == 1)
+            #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 0) == "阅读")
+            #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 1) == "功能")
+            #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 2) == "存储")
+            #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 3) == "调试")
+            #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 4) == "关于")
 
-        let cacheCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 0, section: 2)
-        ))
-        let nodeImageCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 0, section: 1)
-        ))
-        let specialFollowCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 1, section: 1)
-        ))
-        let categoryPreferencesCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 0, section: 0)
-        ))
-        let signatureCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 3, section: 0)
-        ))
-        let logCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 0, section: 3)
-        ))
-        let logFileCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 1, section: 3)
-        ))
-        let detailTestCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 2, section: 3)
-        ))
-        let debugLinksCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 3, section: 3)
-        ))
-        let appVersionCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 0, section: 4)
-        ))
-        let buildNumberCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 1, section: 4)
-        ))
-        let gitCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 2, section: 4)
-        ))
-        let repositoryCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 3, section: 4)
-        ))
-        let workflowCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 4, section: 4)
-        ))
-        let githubCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 5, section: 4)
-        ))
-        let logoutCell = try #require(tableView.dataSource?.tableView(
-            tableView,
-            cellForRowAt: IndexPath(row: 0, section: 5)
-        ))
+            let cacheCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 0, section: 2)
+            ))
+            let nodeImageCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 0, section: 1)
+            ))
+            let specialFollowCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 1, section: 1)
+            ))
+            let autoCheckInCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 2, section: 1)
+            ))
+            let categoryPreferencesCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 0, section: 0)
+            ))
+            let signatureCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 3, section: 0)
+            ))
+            let logCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 0, section: 3)
+            ))
+            let logFileCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 1, section: 3)
+            ))
+            let detailTestCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 2, section: 3)
+            ))
+            let debugLinksCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 3, section: 3)
+            ))
+            let appVersionCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 0, section: 4)
+            ))
+            let buildNumberCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 1, section: 4)
+            ))
+            let gitCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 2, section: 4)
+            ))
+            let repositoryCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 3, section: 4)
+            ))
+            let workflowCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 4, section: 4)
+            ))
+            let githubCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 5, section: 4)
+            ))
+            let logoutCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 0, section: 5)
+            ))
 
-        #expect(cacheCell.textLabel?.text == "清除缓存")
-        #expect(cacheCell.detailTextLabel?.text == "4 KB")
-        #expect(nodeImageCell.textLabel?.text == "NodeImage 授权")
-        #expect(nodeImageCell.accessoryType == .disclosureIndicator)
-        #expect(specialFollowCell.textLabel?.text == "特别关注")
-        #expect(specialFollowCell.detailTextLabel?.text == "帖子列表关键字高亮展示")
-        #expect(categoryPreferencesCell.textLabel?.text == "首页分类")
-        #expect(categoryPreferencesCell.detailTextLabel?.text == "全部、日常、技术等 10 个")
-        #expect(categoryPreferencesCell.accessoryType == .disclosureIndicator)
-        #expect(signatureCell.textLabel?.text == "显示帖子签名")
-        let signatureSwitch = try #require(signatureCell.accessoryView as? UISwitch)
-        #expect(signatureSwitch.isOn == true)
-        #expect(logCell.textLabel?.text == "记录日志")
-        let loggingSwitch = try #require(logCell.accessoryView as? UISwitch)
-        #expect(loggingSwitch.isOn == false)
-        #expect(logFileCell.textLabel?.text == "日志文件")
-        #expect(detailTestCell.textLabel?.text == "详情测试")
-        #expect(debugLinksCell.textLabel?.text == "调试链接")
-        #expect(appVersionCell.textLabel?.text == "版本")
-        #expect(appVersionCell.detailTextLabel?.text == "1.0.1")
-        #expect(buildNumberCell.textLabel?.text == "Build")
-        #expect(buildNumberCell.detailTextLabel?.text == "42")
-        #expect(gitCell.textLabel?.text == "Git")
-        #expect(gitCell.detailTextLabel?.text == "abcdef1")
-        #expect(repositoryCell.textLabel?.text == "仓库")
-        #expect(repositoryCell.detailTextLabel?.text == "https://github.com/tyrad/nodeseek")
-        #expect(repositoryCell.accessoryType == .disclosureIndicator)
-        #expect(workflowCell.textLabel?.text == "Workflow")
-        #expect(workflowCell.detailTextLabel?.text == "TestFlight #25443881348")
-        #expect(githubCell.textLabel?.text == "GitHub")
-        #expect(githubCell.detailTextLabel?.text == "https://github.com/tyrad/nodeseek/actions/runs/25443881348")
-        #expect(logoutCell.textLabel?.text == "退出登录")
-        #expect(logoutCell.textLabel?.textColor == .systemRed)
+            #expect(cacheCell.textLabel?.text == "清除缓存")
+            #expect(cacheCell.detailTextLabel?.text == "4 KB")
+            #expect(nodeImageCell.textLabel?.text == "NodeImage 授权")
+            #expect(nodeImageCell.accessoryType == .disclosureIndicator)
+            #expect(specialFollowCell.textLabel?.text == "特别关注")
+            #expect(specialFollowCell.detailTextLabel?.text == "帖子列表关键字高亮展示")
+            #expect(categoryPreferencesCell.textLabel?.text == "首页分类")
+            #expect(categoryPreferencesCell.detailTextLabel?.text == "全部、日常、技术等 16 个")
+            #expect(categoryPreferencesCell.accessoryType == .disclosureIndicator)
+            #expect(autoCheckInCell.textLabel?.text == "自动签到")
+            #expect(autoCheckInCell.detailTextLabel?.text == "Beta · 未开启")
+            #expect(autoCheckInCell.accessoryType == .disclosureIndicator)
+            #expect(signatureCell.textLabel?.text == "显示帖子签名")
+            let signatureSwitch = try #require(signatureCell.accessoryView as? UISwitch)
+            #expect(signatureSwitch.isOn == true)
+            #expect(logCell.textLabel?.text == "记录日志")
+            let loggingSwitch = try #require(logCell.accessoryView as? UISwitch)
+            #expect(loggingSwitch.isOn == false)
+            #expect(logFileCell.textLabel?.text == "日志文件")
+            #expect(detailTestCell.textLabel?.text == "详情测试")
+            #expect(debugLinksCell.textLabel?.text == "调试链接")
+            #expect(appVersionCell.textLabel?.text == "版本")
+            #expect(appVersionCell.detailTextLabel?.text == "1.0.1")
+            #expect(buildNumberCell.textLabel?.text == "Build")
+            #expect(buildNumberCell.detailTextLabel?.text == "42")
+            #expect(gitCell.textLabel?.text == "Git")
+            #expect(gitCell.detailTextLabel?.text == "abcdef1")
+            #expect(repositoryCell.textLabel?.text == "仓库")
+            #expect(repositoryCell.detailTextLabel?.text == "https://github.com/tyrad/nodeseek")
+            #expect(repositoryCell.accessoryType == .disclosureIndicator)
+            #expect(workflowCell.textLabel?.text == "Workflow")
+            #expect(workflowCell.detailTextLabel?.text == "TestFlight #25443881348")
+            #expect(githubCell.textLabel?.text == "GitHub")
+            #expect(githubCell.detailTextLabel?.text == "https://github.com/tyrad/nodeseek/actions/runs/25443881348")
+            #expect(logoutCell.textLabel?.text == "退出登录")
+            #expect(logoutCell.textLabel?.textColor == .systemRed)
+        }
     }
 
     @Test func settingsPageHidesLogoutWhenNotLoggedIn() async throws {
@@ -297,7 +305,7 @@ struct SettingsViewControllerTests {
             cellForRowAt: IndexPath(row: 0, section: 0)
         ))
         #expect(cell.textLabel?.text == "首页分类")
-        #expect(cell.detailTextLabel?.text == "显示 9 个，隐藏 1 个")
+        #expect(cell.detailTextLabel?.text == "显示 15 个，隐藏 1 个")
         #expect(cell.accessoryType == .disclosureIndicator)
 
         viewController.tableView.delegate?.tableView?(
@@ -327,13 +335,13 @@ struct SettingsViewControllerTests {
 
         let indexPath = IndexPath(row: 0, section: 0)
         let initialCell = try #require(viewController.tableView.cellForRow(at: indexPath))
-        #expect(initialCell.detailTextLabel?.text == "全部、日常、技术等 10 个")
+        #expect(initialCell.detailTextLabel?.text == "全部、日常、技术等 16 个")
         let initialRequestCount = viewController.categoryPreferencesCellRequestCount
 
         otherCategoryStore.hideCategory(.tech)
         try await Task.sleep(nanoseconds: 50_000_000)
         #expect(viewController.categoryPreferencesCellRequestCount == initialRequestCount)
-        #expect(viewController.tableView.cellForRow(at: indexPath)?.detailTextLabel?.text == "全部、日常、技术等 10 个")
+        #expect(viewController.tableView.cellForRow(at: indexPath)?.detailTextLabel?.text == "全部、日常、技术等 16 个")
 
         let animationsEnabled = UIView.areAnimationsEnabled
         UIView.setAnimationsEnabled(false)
@@ -342,11 +350,61 @@ struct SettingsViewControllerTests {
         viewController.tableView.layoutIfNeeded()
         try await waitUntil {
             viewController.categoryPreferencesCellRequestCount > initialRequestCount
-                && viewController.tableView.cellForRow(at: indexPath)?.detailTextLabel?.text == "显示 9 个，隐藏 1 个"
+                && viewController.tableView.cellForRow(at: indexPath)?.detailTextLabel?.text == "显示 15 个，隐藏 1 个"
         }
 
         #expect(viewController.categoryPreferencesCellRequestCount > initialRequestCount)
-        #expect(viewController.tableView.cellForRow(at: indexPath)?.detailTextLabel?.text == "显示 9 个，隐藏 1 个")
+        #expect(viewController.tableView.cellForRow(at: indexPath)?.detailTextLabel?.text == "显示 15 个，隐藏 1 个")
+    }
+
+    @Test func selectingAutoCheckInPushesModuleSettingsScreen() throws {
+        let viewController = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager(),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore()
+        )
+        let navigationController = UINavigationController(rootViewController: viewController)
+        viewController.loadViewIfNeeded()
+
+        viewController.tableView.delegate?.tableView?(
+            viewController.tableView,
+            didSelectRowAt: IndexPath(row: 2, section: 1)
+        )
+
+        #expect(navigationController.topViewController is AutoCheckInSettingsViewController)
+    }
+
+    @Test func returningToSettingsRefreshesAutoCheckInSummary() throws {
+        let summary = AutoCheckInSummaryBox("未开启")
+        let viewController = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager(),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
+            autoCheckInSummaryProvider: { summary.value }
+        )
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = viewController
+        window.makeKeyAndVisible()
+        defer {
+            window.isHidden = true
+        }
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = window.bounds
+        viewController.view.layoutIfNeeded()
+        let indexPath = IndexPath(row: 2, section: 1)
+        viewController.tableView.scrollToRow(at: indexPath, at: .middle, animated: false)
+        viewController.tableView.layoutIfNeeded()
+
+        let cell = try #require(viewController.tableView.cellForRow(at: indexPath))
+        #expect(cell.detailTextLabel?.text == "Beta · 未开启")
+
+        summary.value = "已开启 · 试试手气"
+        #expect(cell.detailTextLabel?.text == "Beta · 未开启")
+        viewController.viewWillAppear(false)
+        viewController.tableView.layoutIfNeeded()
+        let refreshedCell = try #require(viewController.tableView.cellForRow(at: indexPath))
+
+        #expect(refreshedCell.detailTextLabel?.text == "Beta · 已开启 · 试试手气")
     }
 
     @Test func specialFollowKeywordListEditsAndDeletesKeywords() throws {
@@ -537,26 +595,26 @@ struct SettingsViewControllerTests {
         #expect(selectedTarget?.page == 1)
     }
 
-    @Test func togglingFileLoggingSwitchUpdatesRuntimeConfig() throws {
-        let previousFileLogging = NodeSeekDebugConfig.enableFileLogging
-        defer { NodeSeekDebugConfig.enableFileLogging = previousFileLogging }
-        NodeSeekDebugConfig.enableFileLogging = false
-        let viewController = SettingsViewController(
-            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
-            sessionManager: FakeSettingsSessionManager(),
-            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore()
-        )
-        viewController.loadViewIfNeeded()
+    @Test func togglingFileLoggingSwitchUpdatesRuntimeConfig() async throws {
+        try await withFileLoggingConfigIsolation {
+            NodeSeekDebugConfig.enableFileLogging = false
+            let viewController = SettingsViewController(
+                cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+                sessionManager: FakeSettingsSessionManager(),
+                nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore()
+            )
+            viewController.loadViewIfNeeded()
 
-        let cell = try #require(viewController.tableView.dataSource?.tableView(
-            viewController.tableView,
-            cellForRowAt: IndexPath(row: 0, section: 3)
-        ))
-        let loggingSwitch = try #require(cell.accessoryView as? UISwitch)
-        loggingSwitch.isOn = true
-        loggingSwitch.sendActions(for: .valueChanged)
+            let cell = try #require(viewController.tableView.dataSource?.tableView(
+                viewController.tableView,
+                cellForRowAt: IndexPath(row: 0, section: 3)
+            ))
+            let loggingSwitch = try #require(cell.accessoryView as? UISwitch)
+            loggingSwitch.isOn = true
+            loggingSwitch.sendActions(for: .valueChanged)
 
-        #expect(NodeSeekDebugConfig.enableFileLogging == true)
+            #expect(NodeSeekDebugConfig.enableFileLogging == true)
+        }
     }
 
     @Test func nodeImageCellShowsCancelAuthorizationWhenAPIKeyExists() throws {
@@ -605,7 +663,7 @@ struct SettingsViewControllerTests {
         #expect(cell.textLabel?.text == "取消 NodeImage 授权")
     }
 
-    @Test func selectingNodeImageAuthorizationDoesNotShowSuccessAlertAfterSavingAPIKey() async throws {
+    @Test func selectingNodeImageAuthorizationDoesNotShowSuccessAlertAfterSavingAPIKey() throws {
         let nodeImageAPIKeyStore = FakeNodeImageAPIKeyStore()
         let authorizationPresenter = FakeNodeImageAuthorizationPresenter(apiKeyToReturn: "new-nodeimage-key")
         let viewController = SettingsViewController(
@@ -615,19 +673,11 @@ struct SettingsViewControllerTests {
             nodeImageAuthorizationPresenter: authorizationPresenter
         )
         viewController.loadViewIfNeeded()
-        let window = UIWindow(frame: UIScreen.main.bounds)
-        window.rootViewController = viewController
-        window.makeKeyAndVisible()
-        defer {
-            viewController.dismiss(animated: false)
-            window.isHidden = true
-        }
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
             didSelectRowAt: IndexPath(row: 0, section: 1)
         )
-        try await Task.sleep(nanoseconds: 100_000_000)
 
         #expect(nodeImageAPIKeyStore.apiKey() == "new-nodeimage-key")
         #expect(viewController.presentedViewController == nil)
@@ -716,6 +766,28 @@ private final class SpySettingsViewController: SettingsViewController {
             categoryPreferencesCellRequestCount += 1
         }
         return cell
+    }
+}
+
+@MainActor
+private func withFileLoggingConfigIsolation(_ body: () async throws -> Void) async throws {
+    try await FileLoggingTestGate.shared.withExclusiveAccess {
+        let previousFileLogging = NodeSeekDebugConfig.enableFileLogging
+        let previousAvatarLogging = NodeSeekDebugConfig.enableAvatarImageLogs
+        defer {
+            NodeSeekDebugConfig.enableFileLogging = previousFileLogging
+            NodeSeekDebugConfig.enableAvatarImageLogs = previousAvatarLogging
+        }
+        try await body()
+    }
+}
+
+@MainActor
+private final class AutoCheckInSummaryBox {
+    var value: String
+
+    init(_ value: String) {
+        self.value = value
     }
 }
 

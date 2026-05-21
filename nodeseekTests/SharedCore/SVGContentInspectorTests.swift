@@ -5,7 +5,11 @@
 
 import Foundation
 import Testing
+#if SWIFT_PACKAGE
+@testable import NodeSeekCore
+#else
 @testable import nodeseek
+#endif
 
 struct SVGContentInspectorTests {
     @Test func inspectsSVGDataFromMarkup() throws {

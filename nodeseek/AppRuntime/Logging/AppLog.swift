@@ -16,6 +16,7 @@ enum AppLogType: String, CaseIterable {
     case image = "Image"
     case rendering = "Rendering"
     case account = "Account"
+    case autoCheckIn = "AutoCheckIn"
 }
 
 enum AppLogLevel: String {

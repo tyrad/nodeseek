@@ -119,6 +119,7 @@ class SettingsViewController: UITableViewController {
     private enum FeatureRow: Int, CaseIterable {
         case nodeImage
         case specialFollow
+        case autoCheckIn
     }
 
     private enum BuildRow: Int, CaseIterable {
@@ -161,6 +162,8 @@ class SettingsViewController: UITableViewController {
     private let signatureDisplaySettings: PostSignatureDisplaySettings
     private let categoryPreferenceStore: PostCategoryPreferenceStore
     private let specialFollowKeywordStore: SpecialFollowKeywordStore
+    private let autoCheckInSummaryProvider: @MainActor () -> String
+    private let autoCheckInSettingsViewControllerFactory: @MainActor () -> UIViewController
     private let confirmsActionsImmediately: Bool
     private let onLogout: @MainActor () -> Void
     private let onLogFile: @MainActor () -> Void
@@ -181,6 +184,10 @@ class SettingsViewController: UITableViewController {
         signatureDisplaySettings: PostSignatureDisplaySettings = .shared,
         categoryPreferenceStore: PostCategoryPreferenceStore = .shared,
         specialFollowKeywordStore: SpecialFollowKeywordStore = .shared,
+        autoCheckInSummaryProvider: @escaping @MainActor () -> String = { AutoCheckInModule.settingsSummary },
+        autoCheckInSettingsViewControllerFactory: @escaping @MainActor () -> UIViewController = {
+            AutoCheckInModule.makeSettingsViewController()
+        },
         confirmsActionsImmediately: Bool = false,
         onLogout: @escaping @MainActor () -> Void = {},
         onLogFile: @escaping @MainActor () -> Void = {},
@@ -196,6 +203,8 @@ class SettingsViewController: UITableViewController {
         self.signatureDisplaySettings = signatureDisplaySettings
         self.categoryPreferenceStore = categoryPreferenceStore
         self.specialFollowKeywordStore = specialFollowKeywordStore
+        self.autoCheckInSummaryProvider = autoCheckInSummaryProvider
+        self.autoCheckInSettingsViewControllerFactory = autoCheckInSettingsViewControllerFactory
         self.confirmsActionsImmediately = confirmsActionsImmediately
         self.onLogout = onLogout
         self.onLogFile = onLogFile
@@ -236,6 +245,11 @@ class SettingsViewController: UITableViewController {
             name: PostCategoryPreferenceStore.didChangeNotification,
             object: categoryPreferenceStore
         )
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        tableView.reloadSections(IndexSet(integer: Section.features.rawValue), with: .none)
     }
 
     deinit {
@@ -373,6 +387,8 @@ class SettingsViewController: UITableViewController {
             return nodeImageAuthorizationCell(for: indexPath)
         case .specialFollow:
             return specialFollowCell(for: indexPath)
+        case .autoCheckIn:
+            return autoCheckInCell(for: indexPath)
         case .none:
             return UITableViewCell()
         }
@@ -430,6 +446,17 @@ class SettingsViewController: UITableViewController {
         cell.imageView?.image = UIImage(systemName: "star.circle")
         cell.accessoryType = .disclosureIndicator
         cell.accessibilityIdentifier = "settings-special-follow-cell"
+        return cell
+    }
+
+    private func autoCheckInCell(for indexPath: IndexPath) -> UITableViewCell {
+        let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+        cell.textLabel?.text = "自动签到"
+        cell.detailTextLabel?.text = "Beta · \(autoCheckInSummaryProvider())"
+        cell.detailTextLabel?.textColor = .secondaryLabel
+        cell.imageView?.image = UIImage(systemName: "checkmark.circle")
+        cell.accessoryType = .disclosureIndicator
+        cell.accessibilityIdentifier = "settings-auto-check-in-cell"
         return cell
     }
 
@@ -588,6 +615,8 @@ class SettingsViewController: UITableViewController {
             handleNodeImageAuthorizationSelection()
         case .specialFollow:
             showSpecialFollowKeywords()
+        case .autoCheckIn:
+            showAutoCheckInSettings()
         case .none:
             break
         }
@@ -637,6 +666,10 @@ class SettingsViewController: UITableViewController {
     private func showPostCategoryPreferences() {
         let viewController = PostCategoryPreferencesViewController(store: categoryPreferenceStore)
         navigationController?.pushViewController(viewController, animated: true)
+    }
+
+    private func showAutoCheckInSettings() {
+        navigationController?.pushViewController(autoCheckInSettingsViewControllerFactory(), animated: true)
     }
 
     private func confirmCancelNodeImageAuthorization() {

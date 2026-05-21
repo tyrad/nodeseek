@@ -10,6 +10,9 @@ import UIKit
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
+    var autoCheckInRunner: @MainActor (UIViewController?) async -> Void = { presentationContext in
+        await AutoCheckInModule.runIfNeeded(presentationContext: presentationContext)
+    }
 
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
@@ -17,12 +20,13 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         let window = UIWindow(windowScene: windowScene)
         let appRouter = AppRouter()
-        window.rootViewController = NodeSeekSplashViewController { [weak window] in
+        window.rootViewController = NodeSeekSplashViewController { [weak self, weak window] in
             guard let window else { return }
             UIView.performWithoutAnimation {
                 window.rootViewController = appRouter.makeRootViewController()
                 window.layoutIfNeeded()
             }
+            self?.runAutoCheckInIfNeeded()
         }
         window.makeKeyAndVisible()
         self.window = window
@@ -36,8 +40,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
-        // Called when the scene has moved from an inactive state to an active state.
-        // Use this method to restart any tasks that were paused (or not yet started) when the scene was inactive.
+        runAutoCheckInIfNeeded()
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
@@ -46,13 +49,23 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneWillEnterForeground(_ scene: UIScene) {
-        // Called as the scene transitions from the background to the foreground.
-        // Use this method to undo the changes made on entering the background.
+        runAutoCheckInIfNeeded()
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {
         VisitedPostStore.shared.flush()
     }
 
+    func runAutoCheckInIfNeeded() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let presentationContext = self.window?.rootViewController
+            guard (presentationContext is NodeSeekSplashViewController) == false else {
+                AppLog.info(.autoCheckIn, "skip=presentation_splash")
+                return
+            }
+            await autoCheckInRunner(presentationContext)
+        }
+    }
 
 }

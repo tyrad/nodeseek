@@ -13,14 +13,23 @@ import UIKit
 @MainActor
 @Suite(.serialized)
 struct AppLogTests {
-    @Test func fileLoggingDefaultsToDisabled() {
-        NodeSeekDebugConfig.resetRuntimeLoggingForTesting()
+    @Test func fileLoggingDefaultsToDisabled() async throws {
+        await FileLoggingTestGate.shared.withExclusiveAccess {
+            let previousFileLoggingEnabled = NodeSeekDebugConfig.enableFileLogging
+            let previousAvatarLoggingEnabled = NodeSeekDebugConfig.enableAvatarImageLogs
+            defer {
+                NodeSeekDebugConfig.enableFileLogging = previousFileLoggingEnabled
+                NodeSeekDebugConfig.enableAvatarImageLogs = previousAvatarLoggingEnabled
+            }
 
-        #expect(NodeSeekDebugConfig.enableFileLogging == false)
+            NodeSeekDebugConfig.resetRuntimeLoggingForTesting()
+
+            #expect(NodeSeekDebugConfig.enableFileLogging == false)
+        }
     }
 
     @Test func fileLoggingWritesOnlyWhenDebugSwitchIsEnabled() async throws {
-        try withTemporaryFileLogging { directory in
+        try await withTemporaryFileLogging { directory in
             NodeSeekDebugConfig.enableFileLogging = false
             AppLog.info(.service, "disabled message")
             AppLog.flushFileLogsForTesting()
@@ -38,7 +47,7 @@ struct AppLogTests {
     }
 
     @Test func readsCurrentFileLogContent() async throws {
-        try withTemporaryFileLogging { _ in
+        try await withTemporaryFileLogging { _ in
             AppLog.info(.postDetail, "detail log message")
             AppLog.flushFileLogsForTesting()
 
@@ -51,7 +60,7 @@ struct AppLogTests {
     }
 
     @Test func deleteFileLogRemovesCurrentLogFile() async throws {
-        try withTemporaryFileLogging { _ in
+        try await withTemporaryFileLogging { _ in
             AppLog.info(.service, "log before delete")
             AppLog.flushFileLogsForTesting()
 
@@ -63,7 +72,7 @@ struct AppLogTests {
     }
 
     @Test func avatarImageLogsAreSkippedWhenDebugSwitchIsDisabled() async throws {
-        try withTemporaryFileLogging(avatarImageLogs: false) { _ in
+        try await withTemporaryFileLogging(avatarImageLogs: false) { _ in
             AvatarImageLoader(cookieBridge: CookieBridge()).loadAvatar(
                 into: UIImageView(),
                 postID: "avatar-log-test",
@@ -79,25 +88,27 @@ struct AppLogTests {
     private func withTemporaryFileLogging(
         avatarImageLogs: Bool? = nil,
         _ body: (URL) throws -> Void
-    ) throws {
-        let previousFileLoggingEnabled = NodeSeekDebugConfig.enableFileLogging
-        let previousAvatarLoggingEnabled = NodeSeekDebugConfig.enableAvatarImageLogs
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        defer {
-            try? FileManager.default.removeItem(at: directory)
-            NodeSeekDebugConfig.enableFileLogging = previousFileLoggingEnabled
-            NodeSeekDebugConfig.enableAvatarImageLogs = previousAvatarLoggingEnabled
-            AppLog.setFileLogDirectoryForTesting(nil)
-        }
+    ) async throws {
+        try await FileLoggingTestGate.shared.withExclusiveAccess {
+            let previousFileLoggingEnabled = NodeSeekDebugConfig.enableFileLogging
+            let previousAvatarLoggingEnabled = NodeSeekDebugConfig.enableAvatarImageLogs
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            defer {
+                try? FileManager.default.removeItem(at: directory)
+                NodeSeekDebugConfig.enableFileLogging = previousFileLoggingEnabled
+                NodeSeekDebugConfig.enableAvatarImageLogs = previousAvatarLoggingEnabled
+                AppLog.setFileLogDirectoryForTesting(nil)
+            }
 
-        AppLog.setFileLogDirectoryForTesting(directory)
-        NodeSeekDebugConfig.enableFileLogging = true
-        if let avatarImageLogs {
-            NodeSeekDebugConfig.enableAvatarImageLogs = avatarImageLogs
-        }
+            AppLog.setFileLogDirectoryForTesting(directory)
+            NodeSeekDebugConfig.enableFileLogging = true
+            if let avatarImageLogs {
+                NodeSeekDebugConfig.enableAvatarImageLogs = avatarImageLogs
+            }
 
-        try body(directory)
+            try body(directory)
+        }
     }
 
     private func logURL(in directory: URL) -> URL {
