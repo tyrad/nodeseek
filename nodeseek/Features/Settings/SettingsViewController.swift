@@ -111,8 +111,7 @@ class SettingsViewController: UITableViewController {
 
     private enum ReadingRow: Int, CaseIterable {
         case categoryPreferences
-        case adjustment
-        case preview
+        case textSize
         case signatureDisplay
     }
 
@@ -122,37 +121,7 @@ class SettingsViewController: UITableViewController {
         case autoCheckIn
     }
 
-    private enum BuildRow: Int, CaseIterable {
-        case appVersion
-        case buildNumber
-        case gitSHA
-        case repository
-        case workflow
-        case githubURL
-    }
-
-    private enum DebugRow: Int, CaseIterable {
-        case fileLogging
-        case logFile
-        case detailTest
-        #if DEBUG
-        case debugLinks
-        #endif
-
-        static var visibleRows: [DebugRow] {
-            var rows: [DebugRow] = [.fileLogging, .logFile]
-            #if DEBUG
-            if NodeSeekDebugConfig.enablePostDetailTestEntry {
-                rows.append(.detailTest)
-                rows.append(.debugLinks)
-            }
-            #endif
-            return rows
-        }
-    }
-
     private let cacheManager: SettingsCacheManaging
-    private let repositoryURL = URL(string: "https://github.com/tyrad/nodeseek")!
     private let sessionManager: SettingsSessionManaging
     private let currentAccountStore: CurrentAccountStore
     private let buildInfo: SettingsBuildInfo
@@ -223,14 +192,6 @@ class SettingsViewController: UITableViewController {
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 72
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "SettingsCell")
-        tableView.register(
-            SettingsTextSizeAdjustmentCell.self,
-            forCellReuseIdentifier: "SettingsTextSizeAdjustmentCell"
-        )
-        tableView.register(
-            SettingsTextSizePreviewCell.self,
-            forCellReuseIdentifier: "SettingsTextSizePreviewCell"
-        )
         refreshCacheSize()
         refreshAccountState()
         NotificationCenter.default.addObserver(
@@ -249,6 +210,7 @@ class SettingsViewController: UITableViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        tableView.reloadSections(IndexSet(integer: Section.reading.rawValue), with: .none)
         tableView.reloadSections(IndexSet(integer: Section.features.rawValue), with: .none)
     }
 
@@ -269,9 +231,9 @@ class SettingsViewController: UITableViewController {
         case .storage:
             return 1
         case .debug:
-            return DebugRow.visibleRows.count
+            return 1
         case .about:
-            return BuildRow.allCases.count
+            return 1
         case .account:
             return isLoggedIn ? 1 : 0
         case .none:
@@ -288,9 +250,9 @@ class SettingsViewController: UITableViewController {
         case .storage:
             return "存储"
         case .debug:
-            return "调试"
+            return nil
         case .about:
-            return "关于"
+            return nil
         case .account:
             return isLoggedIn ? "账号" : nil
         case .none:
@@ -307,9 +269,9 @@ class SettingsViewController: UITableViewController {
         case .storage:
             return cacheCell(for: indexPath)
         case .debug:
-            return debugCell(for: indexPath)
+            return debugEntryCell(for: indexPath)
         case .about:
-            return buildCell(for: indexPath)
+            return aboutCell(for: indexPath)
         case .account:
             return logoutCell(for: indexPath)
         case .none:
@@ -327,9 +289,9 @@ class SettingsViewController: UITableViewController {
         case .storage:
             confirmClearCache()
         case .debug:
-            handleDebugSelection(at: indexPath)
+            showDebugSettings()
         case .about:
-            handleBuildSelection(at: indexPath)
+            showAboutSettings()
         case .account:
             guard isLoggedIn else { return }
             confirmLogout()
@@ -351,29 +313,10 @@ class SettingsViewController: UITableViewController {
 
     private func readingCell(for indexPath: IndexPath) -> UITableViewCell {
         switch ReadingRow(rawValue: indexPath.row) {
-        case .adjustment:
-            guard let cell = tableView.dequeueReusableCell(
-                withIdentifier: "SettingsTextSizeAdjustmentCell",
-                for: indexPath
-            ) as? SettingsTextSizeAdjustmentCell else {
-                return UITableViewCell()
-            }
-            cell.configure(pointOffset: textSizeSettings.pointOffset)
-            cell.onPointOffsetChanged = { [weak self] pointOffset in
-                self?.updateTextSize(pointOffset: pointOffset)
-            }
-            return cell
-        case .preview:
-            guard let cell = tableView.dequeueReusableCell(
-                withIdentifier: "SettingsTextSizePreviewCell",
-                for: indexPath
-            ) as? SettingsTextSizePreviewCell else {
-                return UITableViewCell()
-            }
-            cell.configure(pointOffset: textSizeSettings.pointOffset)
-            return cell
         case .categoryPreferences:
             return categoryPreferencesCell(for: indexPath)
+        case .textSize:
+            return textSizeCell(for: indexPath)
         case .signatureDisplay:
             return signatureDisplayCell(for: indexPath)
         case .none:
@@ -437,6 +380,17 @@ class SettingsViewController: UITableViewController {
         return cell
     }
 
+    private func textSizeCell(for indexPath: IndexPath) -> UITableViewCell {
+        let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
+        cell.textLabel?.text = "字体大小"
+        cell.detailTextLabel?.text = textSizeSettings.displayText
+        cell.detailTextLabel?.textColor = .secondaryLabel
+        cell.imageView?.image = UIImage(systemName: "textformat.size")
+        cell.accessoryType = .disclosureIndicator
+        cell.accessibilityIdentifier = "settings-text-size-cell"
+        return cell
+    }
+
     private func specialFollowCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
         cell.textLabel?.text = "特别关注"
@@ -471,77 +425,21 @@ class SettingsViewController: UITableViewController {
         return cell
     }
 
-    private func buildCell(for indexPath: IndexPath) -> UITableViewCell {
-        let buildRow = BuildRow(rawValue: indexPath.row)
-        let usesSubtitle = buildRow == .repository || buildRow == .githubURL
-        let cell = UITableViewCell(style: usesSubtitle ? .subtitle : .value1, reuseIdentifier: nil)
-        cell.selectionStyle = .none
-        cell.detailTextLabel?.textColor = .secondaryLabel
-        cell.detailTextLabel?.numberOfLines = usesSubtitle ? 2 : 1
-        switch buildRow {
-        case .appVersion:
-            cell.textLabel?.text = "版本"
-            cell.detailTextLabel?.text = buildInfo.appVersion
-            cell.accessibilityIdentifier = "settings-version-cell"
-        case .buildNumber:
-            cell.textLabel?.text = "Build"
-            cell.detailTextLabel?.text = buildInfo.buildNumber
-            cell.accessibilityIdentifier = "settings-build-number-cell"
-        case .gitSHA:
-            cell.textLabel?.text = "Git"
-            cell.detailTextLabel?.text = buildInfo.shortGitSHA
-            cell.accessibilityIdentifier = "settings-git-sha-cell"
-        case .repository:
-            cell.textLabel?.text = "仓库"
-            cell.detailTextLabel?.text = repositoryURL.absoluteString
-            cell.accessoryType = .disclosureIndicator
-            cell.selectionStyle = .default
-            cell.accessibilityIdentifier = "settings-github-repository-cell"
-        case .workflow:
-            cell.textLabel?.text = "Workflow"
-            cell.detailTextLabel?.text = buildInfo.workflowDisplayText
-            cell.accessoryType = buildInfo.githubRunURL == nil ? .none : .disclosureIndicator
-            cell.selectionStyle = buildInfo.githubRunURL == nil ? .none : .default
-            cell.accessibilityIdentifier = "settings-workflow-cell"
-        case .githubURL:
-            cell.textLabel?.text = "GitHub"
-            cell.detailTextLabel?.text = buildInfo.githubRunURL?.absoluteString ?? "未注入"
-            cell.accessibilityIdentifier = "settings-github-run-url-cell"
-        case .none:
-            break
-        }
+    private func aboutCell(for indexPath: IndexPath) -> UITableViewCell {
+        let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.text = "关于"
+        cell.imageView?.image = UIImage(systemName: "info.circle")
+        cell.accessoryType = .disclosureIndicator
+        cell.accessibilityIdentifier = "settings-about-cell"
         return cell
     }
 
-    private func debugCell(for indexPath: IndexPath) -> UITableViewCell {
+    private func debugEntryCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
-        switch DebugRow.visibleRows[indexPath.row] {
-        case .fileLogging:
-            cell.textLabel?.text = "记录日志"
-            let loggingSwitch = UISwitch()
-            loggingSwitch.isOn = NodeSeekDebugConfig.enableFileLogging
-            loggingSwitch.accessibilityIdentifier = "settings-file-logging-switch"
-            loggingSwitch.addTarget(self, action: #selector(fileLoggingSwitchChanged(_:)), for: .valueChanged)
-            cell.accessoryView = loggingSwitch
-            cell.selectionStyle = .none
-            cell.accessibilityIdentifier = "settings-file-logging-cell"
-            return cell
-        case .logFile:
-            cell.textLabel?.text = "日志文件"
-            cell.imageView?.image = UIImage(systemName: "doc.text")
-            cell.accessibilityIdentifier = "settings-log-file-cell"
-        case .detailTest:
-            cell.textLabel?.text = "详情测试"
-            cell.imageView?.image = UIImage(systemName: "doc.text.magnifyingglass")
-            cell.accessibilityIdentifier = "settings-detail-test-cell"
-        #if DEBUG
-        case .debugLinks:
-            cell.textLabel?.text = "调试链接"
-            cell.imageView?.image = UIImage(systemName: "link")
-            cell.accessibilityIdentifier = "settings-debug-links-cell"
-        #endif
-        }
+        cell.textLabel?.text = "调试"
+        cell.imageView?.image = UIImage(systemName: "hammer")
         cell.accessoryType = .disclosureIndicator
+        cell.accessibilityIdentifier = "settings-debug-cell"
         return cell
     }
 
@@ -595,20 +493,6 @@ class SettingsViewController: UITableViewController {
         }
     }
 
-    private func updateTextSize(pointOffset: CGFloat) {
-        textSizeSettings.setPointOffset(pointOffset)
-        let previewIndexPath = IndexPath(row: ReadingRow.preview.rawValue, section: Section.reading.rawValue)
-        if let previewCell = tableView.cellForRow(at: previewIndexPath) as? SettingsTextSizePreviewCell {
-            previewCell.configure(pointOffset: textSizeSettings.pointOffset)
-            UIView.performWithoutAnimation {
-                tableView.beginUpdates()
-                tableView.endUpdates()
-            }
-        } else {
-            tableView.reloadRows(at: [previewIndexPath], with: .none)
-        }
-    }
-
     private func handleFeatureSelection(at indexPath: IndexPath) {
         switch FeatureRow(rawValue: indexPath.row) {
         case .nodeImage:
@@ -626,7 +510,9 @@ class SettingsViewController: UITableViewController {
         switch ReadingRow(rawValue: indexPath.row) {
         case .categoryPreferences:
             showPostCategoryPreferences()
-        case .adjustment, .preview, .signatureDisplay, .none:
+        case .textSize:
+            showTextSizeSettings()
+        case .signatureDisplay, .none:
             break
         }
     }
@@ -668,8 +554,26 @@ class SettingsViewController: UITableViewController {
         navigationController?.pushViewController(viewController, animated: true)
     }
 
+    private func showTextSizeSettings() {
+        let viewController = SettingsTextSizeViewController(textSizeSettings: textSizeSettings)
+        navigationController?.pushViewController(viewController, animated: true)
+    }
+
     private func showAutoCheckInSettings() {
         navigationController?.pushViewController(autoCheckInSettingsViewControllerFactory(), animated: true)
+    }
+
+    private func showAboutSettings() {
+        let viewController = SettingsAboutViewController(buildInfo: buildInfo)
+        navigationController?.pushViewController(viewController, animated: true)
+    }
+
+    private func showDebugSettings() {
+        let viewController = SettingsDebugViewController(
+            onLogFile: onLogFile,
+            onDetailTest: onDetailTest
+        )
+        navigationController?.pushViewController(viewController, animated: true)
     }
 
     private func confirmCancelNodeImageAuthorization() {
@@ -723,39 +627,6 @@ class SettingsViewController: UITableViewController {
         present(alert, animated: true)
     }
 
-    private func handleDebugSelection(at indexPath: IndexPath) {
-        switch DebugRow.visibleRows[indexPath.row] {
-        case .fileLogging:
-            break
-        case .logFile:
-            onLogFile()
-        case .detailTest:
-            guard let onDetailTest else { return }
-            onDetailTest()
-        #if DEBUG
-        case .debugLinks:
-            guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }
-            navigationController?.pushViewController(PostDetailDebugLinksViewController(), animated: true)
-        #endif
-        }
-    }
-
-    private func handleBuildSelection(at indexPath: IndexPath) {
-        switch BuildRow(rawValue: indexPath.row) {
-        case .repository:
-            UIApplication.shared.open(repositoryURL)
-        case .workflow:
-            guard let githubRunURL = buildInfo.githubRunURL else { return }
-            UIApplication.shared.open(githubRunURL)
-        case .appVersion, .buildNumber, .gitSHA, .githubURL, .none:
-            return
-        }
-    }
-
-    @objc private func fileLoggingSwitchChanged(_ sender: UISwitch) {
-        NodeSeekDebugConfig.enableFileLogging = sender.isOn
-    }
-
     @objc private func signatureDisplaySwitchChanged(_ sender: UISwitch) {
         signatureDisplaySettings.setShowsSignatures(sender.isOn)
     }
@@ -807,6 +678,278 @@ class SettingsViewController: UITableViewController {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "确定", style: .default))
         present(alert, animated: true)
+    }
+}
+
+final class SettingsTextSizeViewController: UITableViewController {
+    private enum Row: Int, CaseIterable {
+        case adjustment
+        case preview
+    }
+
+    private let textSizeSettings: AppTextSizeSettings
+
+    init(textSizeSettings: AppTextSizeSettings = .shared) {
+        self.textSizeSettings = textSizeSettings
+        super.init(style: .insetGrouped)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "字体大小"
+        tableView.rowHeight = UITableView.automaticDimension
+        tableView.estimatedRowHeight = 72
+        tableView.accessibilityIdentifier = "settings-text-size-table-view"
+        tableView.register(
+            SettingsTextSizeAdjustmentCell.self,
+            forCellReuseIdentifier: "SettingsTextSizeAdjustmentCell"
+        )
+        tableView.register(
+            SettingsTextSizePreviewCell.self,
+            forCellReuseIdentifier: "SettingsTextSizePreviewCell"
+        )
+    }
+
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        Row.allCases.count
+    }
+
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        switch Row(rawValue: indexPath.row) {
+        case .adjustment:
+            guard let cell = tableView.dequeueReusableCell(
+                withIdentifier: "SettingsTextSizeAdjustmentCell",
+                for: indexPath
+            ) as? SettingsTextSizeAdjustmentCell else {
+                return UITableViewCell()
+            }
+            cell.configure(pointOffset: textSizeSettings.pointOffset)
+            cell.onPointOffsetChanged = { [weak self] pointOffset in
+                self?.updateTextSize(pointOffset: pointOffset)
+            }
+            return cell
+        case .preview:
+            guard let cell = tableView.dequeueReusableCell(
+                withIdentifier: "SettingsTextSizePreviewCell",
+                for: indexPath
+            ) as? SettingsTextSizePreviewCell else {
+                return UITableViewCell()
+            }
+            cell.configure(pointOffset: textSizeSettings.pointOffset)
+            return cell
+        case .none:
+            return UITableViewCell()
+        }
+    }
+
+    private func updateTextSize(pointOffset: CGFloat) {
+        textSizeSettings.setPointOffset(pointOffset)
+        let previewIndexPath = IndexPath(row: Row.preview.rawValue, section: 0)
+        if let previewCell = tableView.cellForRow(at: previewIndexPath) as? SettingsTextSizePreviewCell {
+            previewCell.configure(pointOffset: textSizeSettings.pointOffset)
+            UIView.performWithoutAnimation {
+                tableView.beginUpdates()
+                tableView.endUpdates()
+            }
+        } else {
+            tableView.reloadRows(at: [previewIndexPath], with: .none)
+        }
+    }
+}
+
+final class SettingsAboutViewController: UITableViewController {
+    private enum Row: Int, CaseIterable {
+        case appVersion
+        case buildNumber
+        case gitSHA
+        case repository
+        case workflow
+        case githubURL
+    }
+
+    private let repositoryURL = URL(string: "https://github.com/tyrad/nodeseek")!
+    private let buildInfo: SettingsBuildInfo
+
+    init(buildInfo: SettingsBuildInfo = SettingsBuildInfo()) {
+        self.buildInfo = buildInfo
+        super.init(style: .insetGrouped)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "关于"
+        tableView.accessibilityIdentifier = "settings-about-table-view"
+        tableView.rowHeight = UITableView.automaticDimension
+        tableView.estimatedRowHeight = 56
+    }
+
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        Row.allCases.count
+    }
+
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let row = Row(rawValue: indexPath.row)
+        let usesSubtitle = row == .repository || row == .githubURL
+        let cell = UITableViewCell(style: usesSubtitle ? .subtitle : .value1, reuseIdentifier: nil)
+        cell.selectionStyle = .none
+        cell.detailTextLabel?.textColor = .secondaryLabel
+        cell.detailTextLabel?.numberOfLines = usesSubtitle ? 2 : 1
+        switch row {
+        case .appVersion:
+            cell.textLabel?.text = "版本"
+            cell.detailTextLabel?.text = buildInfo.appVersion
+            cell.accessibilityIdentifier = "settings-version-cell"
+        case .buildNumber:
+            cell.textLabel?.text = "Build"
+            cell.detailTextLabel?.text = buildInfo.buildNumber
+            cell.accessibilityIdentifier = "settings-build-number-cell"
+        case .gitSHA:
+            cell.textLabel?.text = "Git"
+            cell.detailTextLabel?.text = buildInfo.shortGitSHA
+            cell.accessibilityIdentifier = "settings-git-sha-cell"
+        case .repository:
+            cell.textLabel?.text = "仓库"
+            cell.detailTextLabel?.text = repositoryURL.absoluteString
+            cell.accessoryType = .disclosureIndicator
+            cell.selectionStyle = .default
+            cell.accessibilityIdentifier = "settings-github-repository-cell"
+        case .workflow:
+            cell.textLabel?.text = "Workflow"
+            cell.detailTextLabel?.text = buildInfo.workflowDisplayText
+            cell.accessoryType = buildInfo.githubRunURL == nil ? .none : .disclosureIndicator
+            cell.selectionStyle = buildInfo.githubRunURL == nil ? .none : .default
+            cell.accessibilityIdentifier = "settings-workflow-cell"
+        case .githubURL:
+            cell.textLabel?.text = "GitHub"
+            cell.detailTextLabel?.text = buildInfo.githubRunURL?.absoluteString ?? "未注入"
+            cell.accessibilityIdentifier = "settings-github-run-url-cell"
+        case .none:
+            break
+        }
+        return cell
+    }
+
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        switch Row(rawValue: indexPath.row) {
+        case .repository:
+            UIApplication.shared.open(repositoryURL)
+        case .workflow:
+            guard let githubRunURL = buildInfo.githubRunURL else { return }
+            UIApplication.shared.open(githubRunURL)
+        case .appVersion, .buildNumber, .gitSHA, .githubURL, .none:
+            return
+        }
+    }
+}
+
+final class SettingsDebugViewController: UITableViewController {
+    private enum Row: Int, CaseIterable {
+        case fileLogging
+        case logFile
+        case detailTest
+        #if DEBUG
+        case debugLinks
+        #endif
+
+        static var visibleRows: [Row] {
+            var rows: [Row] = [.fileLogging, .logFile]
+            #if DEBUG
+            if NodeSeekDebugConfig.enablePostDetailTestEntry {
+                rows.append(.detailTest)
+                rows.append(.debugLinks)
+            }
+            #endif
+            return rows
+        }
+    }
+
+    private let onLogFile: @MainActor () -> Void
+    private let onDetailTest: (@MainActor () -> Void)?
+
+    init(
+        onLogFile: @escaping @MainActor () -> Void = {},
+        onDetailTest: (@MainActor () -> Void)? = nil
+    ) {
+        self.onLogFile = onLogFile
+        self.onDetailTest = onDetailTest
+        super.init(style: .insetGrouped)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "调试"
+        tableView.accessibilityIdentifier = "settings-debug-table-view"
+    }
+
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        Row.visibleRows.count
+    }
+
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        switch Row.visibleRows[indexPath.row] {
+        case .fileLogging:
+            cell.textLabel?.text = "记录日志"
+            let loggingSwitch = UISwitch()
+            loggingSwitch.isOn = NodeSeekDebugConfig.enableFileLogging
+            loggingSwitch.accessibilityIdentifier = "settings-file-logging-switch"
+            loggingSwitch.addTarget(self, action: #selector(fileLoggingSwitchChanged(_:)), for: .valueChanged)
+            cell.accessoryView = loggingSwitch
+            cell.selectionStyle = .none
+            cell.accessibilityIdentifier = "settings-file-logging-cell"
+            return cell
+        case .logFile:
+            cell.textLabel?.text = "日志文件"
+            cell.imageView?.image = UIImage(systemName: "doc.text")
+            cell.accessibilityIdentifier = "settings-log-file-cell"
+        case .detailTest:
+            cell.textLabel?.text = "详情测试"
+            cell.imageView?.image = UIImage(systemName: "doc.text.magnifyingglass")
+            cell.accessibilityIdentifier = "settings-detail-test-cell"
+        #if DEBUG
+        case .debugLinks:
+            cell.textLabel?.text = "调试链接"
+            cell.imageView?.image = UIImage(systemName: "link")
+            cell.accessibilityIdentifier = "settings-debug-links-cell"
+        #endif
+        }
+        cell.accessoryType = .disclosureIndicator
+        return cell
+    }
+
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        switch Row.visibleRows[indexPath.row] {
+        case .fileLogging:
+            break
+        case .logFile:
+            onLogFile()
+        case .detailTest:
+            guard let onDetailTest else { return }
+            onDetailTest()
+        #if DEBUG
+        case .debugLinks:
+            guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }
+            navigationController?.pushViewController(PostDetailDebugLinksViewController(), animated: true)
+        #endif
+        }
+    }
+
+    @objc private func fileLoggingSwitchChanged(_ sender: UISwitch) {
+        NodeSeekDebugConfig.enableFileLogging = sender.isOn
     }
 }
 
