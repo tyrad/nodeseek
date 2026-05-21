@@ -70,6 +70,15 @@ enum HiddenWebViewPostActionPageScheduler {
     }
 }
 
+enum HiddenWebViewPageActionScheduler {
+    private static let requestLock = HiddenWebViewRequestLock()
+    private static let channel = HiddenWebViewChannel.isolated(UUID())
+
+    fileprivate static var lockAndChannel: (HiddenWebViewRequestLock, HiddenWebViewChannel) {
+        (requestLock, channel)
+    }
+}
+
 private struct HiddenWebViewPostActionSubmitter {
     let timeoutInterval: TimeInterval
 
@@ -295,6 +304,32 @@ struct HiddenWebViewPostDislikeClient {
                 timeoutInterval: timeoutInterval
             )
         }
+    }
+}
+
+func withHiddenWebViewPageActionLoader<T>(
+    logMessage: String,
+    operation: @MainActor (HiddenWebViewLoader) async throws -> T
+) async throws -> T {
+    let startedAt = Date()
+    let (requestLock, channel) = HiddenWebViewPageActionScheduler.lockAndChannel
+    AppLog.info(.webView, "隐藏 WebView 页面动作请求锁等待开始")
+    try await requestLock.acquire()
+    AppLog.info(.webView, "隐藏 WebView 页面动作请求锁获取成功: waitMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+    do {
+        try Task.checkCancellation()
+        AppLog.info(.webView, logMessage)
+        let loader = await MainActor.run {
+            HiddenWebViewLoader.loader(for: channel)
+        }
+        let result = try await operation(loader)
+        await requestLock.release()
+        AppLog.info(.webView, "隐藏 WebView 页面动作请求锁已释放: totalMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+        return result
+    } catch {
+        await requestLock.release()
+        AppLog.error(.webView, "隐藏 WebView 页面动作请求锁异常释放: error=\(error.localizedDescription), totalMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+        throw error
     }
 }
 

@@ -118,6 +118,7 @@ final class SettingsViewController: UITableViewController {
     private enum FeatureRow: Int, CaseIterable {
         case nodeImage
         case specialFollow
+        case autoCheckIn
     }
 
     private enum BuildRow: Int, CaseIterable {
@@ -159,6 +160,8 @@ final class SettingsViewController: UITableViewController {
     private let textSizeSettings: AppTextSizeSettings
     private let signatureDisplaySettings: PostSignatureDisplaySettings
     private let specialFollowKeywordStore: SpecialFollowKeywordStore
+    private let autoCheckInSummaryProvider: @MainActor () -> String
+    private let autoCheckInSettingsViewControllerFactory: @MainActor () -> UIViewController
     private let confirmsActionsImmediately: Bool
     private let onLogout: @MainActor () -> Void
     private let onLogFile: @MainActor () -> Void
@@ -178,6 +181,10 @@ final class SettingsViewController: UITableViewController {
         textSizeSettings: AppTextSizeSettings = .shared,
         signatureDisplaySettings: PostSignatureDisplaySettings = .shared,
         specialFollowKeywordStore: SpecialFollowKeywordStore = .shared,
+        autoCheckInSummaryProvider: @escaping @MainActor () -> String = { AutoCheckInModule.settingsSummary },
+        autoCheckInSettingsViewControllerFactory: @escaping @MainActor () -> UIViewController = {
+            AutoCheckInModule.makeSettingsViewController()
+        },
         confirmsActionsImmediately: Bool = false,
         onLogout: @escaping @MainActor () -> Void = {},
         onLogFile: @escaping @MainActor () -> Void = {},
@@ -192,6 +199,8 @@ final class SettingsViewController: UITableViewController {
         self.textSizeSettings = textSizeSettings
         self.signatureDisplaySettings = signatureDisplaySettings
         self.specialFollowKeywordStore = specialFollowKeywordStore
+        self.autoCheckInSummaryProvider = autoCheckInSummaryProvider
+        self.autoCheckInSettingsViewControllerFactory = autoCheckInSettingsViewControllerFactory
         self.confirmsActionsImmediately = confirmsActionsImmediately
         self.onLogout = onLogout
         self.onLogFile = onLogFile
@@ -226,6 +235,11 @@ final class SettingsViewController: UITableViewController {
             name: SpecialFollowKeywordStore.didChangeNotification,
             object: specialFollowKeywordStore
         )
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        tableView.reloadSections(IndexSet(integer: Section.features.rawValue), with: .none)
     }
 
     deinit {
@@ -361,6 +375,8 @@ final class SettingsViewController: UITableViewController {
             return nodeImageAuthorizationCell(for: indexPath)
         case .specialFollow:
             return specialFollowCell(for: indexPath)
+        case .autoCheckIn:
+            return autoCheckInCell(for: indexPath)
         case .none:
             return UITableViewCell()
         }
@@ -406,6 +422,17 @@ final class SettingsViewController: UITableViewController {
         cell.imageView?.image = UIImage(systemName: "star.circle")
         cell.accessoryType = .disclosureIndicator
         cell.accessibilityIdentifier = "settings-special-follow-cell"
+        return cell
+    }
+
+    private func autoCheckInCell(for indexPath: IndexPath) -> UITableViewCell {
+        let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+        cell.textLabel?.text = "自动签到"
+        cell.detailTextLabel?.text = "Beta · \(autoCheckInSummaryProvider())"
+        cell.detailTextLabel?.textColor = .secondaryLabel
+        cell.imageView?.image = UIImage(systemName: "checkmark.circle")
+        cell.accessoryType = .disclosureIndicator
+        cell.accessibilityIdentifier = "settings-auto-check-in-cell"
         return cell
     }
 
@@ -550,6 +577,8 @@ final class SettingsViewController: UITableViewController {
             handleNodeImageAuthorizationSelection()
         case .specialFollow:
             showSpecialFollowKeywords()
+        case .autoCheckIn:
+            showAutoCheckInSettings()
         case .none:
             break
         }
@@ -585,6 +614,10 @@ final class SettingsViewController: UITableViewController {
     private func showSpecialFollowKeywords() {
         let viewController = SpecialFollowKeywordsViewController(store: specialFollowKeywordStore)
         navigationController?.pushViewController(viewController, animated: true)
+    }
+
+    private func showAutoCheckInSettings() {
+        navigationController?.pushViewController(autoCheckInSettingsViewControllerFactory(), animated: true)
     }
 
     private func confirmCancelNodeImageAuthorization() {

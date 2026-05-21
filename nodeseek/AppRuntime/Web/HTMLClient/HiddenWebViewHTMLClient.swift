@@ -660,6 +660,55 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         AppLog.info(.webView, "动作页预热完成: reason=\(reason), status=\(response.statusCode), finalURL=\(response.finalURL.absoluteString), htmlLength=\(response.html.count), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
     }
 
+    func runPageAutomationScript(
+        pageURL: URL,
+        source: String,
+        arguments: [String: Any],
+        timeoutInterval: TimeInterval,
+        actionName: String
+    ) async throws -> [String: Any] {
+        let response = try await loadAutomationPageIfNeeded(
+            pageURL: pageURL,
+            timeoutInterval: timeoutInterval,
+            actionName: actionName
+        )
+        if let challenge = ChallengeDetector().detect(response: response) {
+            return [
+                "ok": false,
+                "statusCode": response.statusCode,
+                "reason": "challenge",
+                "message": Self.message(for: challenge)
+            ]
+        }
+
+        var scriptArguments = arguments
+        scriptArguments["timeoutMs"] = max(5_000, Int(timeoutInterval * 1_000))
+        let result: Any?
+        do {
+            result = try await webView.callAsyncJavaScript(
+                source,
+                arguments: scriptArguments,
+                in: nil,
+                contentWorld: .page
+            )
+        } catch {
+            let nsError = error as NSError
+            AppLog.warning(.webView, "页面自动化脚本执行异常: action=\(actionName), domain=\(nsError.domain), code=\(nsError.code), message=\(nsError.localizedDescription)")
+            return [
+                "ok": false,
+                "statusCode": NSNull(),
+                "reason": "javascript_exception",
+                "message": error.localizedDescription,
+                "response": [:]
+            ]
+        }
+        await cookieSession.captureWebViewSession()
+        return result as? [String: Any] ?? [
+            "ok": false,
+            "reason": "invalid_script_result"
+        ]
+    }
+
     private func loadAutomationPage(pageURL: URL, timeoutInterval: TimeInterval) async throws -> HTMLResponse {
         let request = makeAutomationPageRequest(pageURL: pageURL, timeoutInterval: timeoutInterval)
         AppLog.info(.webView, "自动化页面请求已创建: method=\(request.httpMethod ?? "nil"), url=\(pageURL.absoluteString), cachePolicy=\(request.cachePolicy.rawValue), timeout=\(Int(timeoutInterval))s")
@@ -868,7 +917,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
             AppLog.info(.webView, "评论脚本 callAsyncJavaScript 返回: elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
         } catch {
             let nsError = error as NSError
-            AppLog.error(.webView, "评论脚本执行异常: domain=\(nsError.domain), code=\(nsError.code), info=\(String(describing: nsError.userInfo))")
+            AppLog.error(.webView, "评论脚本执行异常: domain=\(nsError.domain), code=\(nsError.code), message=\(nsError.localizedDescription)")
             return CommentAutomationResponse(
                 ok: false,
                 message: error.localizedDescription,
@@ -921,7 +970,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
             )
         } catch {
             let nsError = error as NSError
-            AppLog.error(.webView, "收藏脚本执行异常: domain=\(nsError.domain), code=\(nsError.code), info=\(String(describing: nsError.userInfo))")
+            AppLog.error(.webView, "收藏脚本执行异常: domain=\(nsError.domain), code=\(nsError.code), message=\(nsError.localizedDescription)")
             return PostCollectionAutomationResponse(
                 ok: false,
                 response: PostCollectionResponse(message: error.localizedDescription),
@@ -1073,7 +1122,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
             )
         } catch {
             let nsError = error as NSError
-            AppLog.error(.webView, "\(logContext)脚本执行异常: domain=\(nsError.domain), code=\(nsError.code), info=\(String(describing: nsError.userInfo))")
+            AppLog.error(.webView, "\(logContext)脚本执行异常: domain=\(nsError.domain), code=\(nsError.code), message=\(nsError.localizedDescription)")
             return CommentUpvoteAutomationResponse(
                 ok: false,
                 response: CommentUpvoteResponse(message: error.localizedDescription),
