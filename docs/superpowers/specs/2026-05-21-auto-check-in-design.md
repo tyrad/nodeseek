@@ -219,6 +219,41 @@ No alert for:
 
 These cases should only be logged through `AppLog`.
 
+## Logging
+
+The module must produce detailed logs because a real account normally has only one eligible check-in attempt per day.
+
+Add a dedicated log category:
+
+```swift
+case autoCheckIn = "AutoCheckIn"
+```
+
+Every run gets a short `runID` generated at the start, such as the first 8 characters of a UUID. Every log line from the run includes that `runID` so a manual verifier can filter one attempt from the log file.
+
+Required log points:
+
+- Run start: trigger source, current day identifier, enabled state, configured mode.
+- Local skip: disabled, already completed day, in-flight task, active cooldown.
+- Web page load start and finish: URL, status code, final URL path, elapsed milliseconds, challenge detection result.
+- Login detection: logged-in or guest, detection source, no account name required.
+- Board state fetch start and finish: endpoint path, status code, elapsed milliseconds, parsed `isCheckedIn`, response key summary.
+- Server already checked in: mark local day complete, no alert.
+- Submit start: configured mode and `random` value.
+- Submit finish: status code, elapsed milliseconds, `success`, `current`, reason, and sanitized message.
+- Local state write: completed day identifier and whether it came from board state or submit success.
+- Alert decision: shown, skipped because no presentation context, or skipped because result was not submit success.
+- Failure: reason, status code if present, elapsed milliseconds, and sanitized message.
+
+Privacy and noise rules:
+
+- Do not log Cookie values, authorization headers, full HTML, raw JSON bodies, avatar URLs, or full member lists.
+- Do not log the user's NodeSeek display name unless it is already surfaced by `CurrentAccountStore` in existing account logs.
+- For JSON responses, log only known fields and key names, not the full body.
+- Use `info` for normal start/finish/skip decisions, `notice` for automatic submit success, `warning` for recoverable site/network/challenge failures, and `error` only for malformed internal state or script execution exceptions.
+
+Manual verification should begin by enabling the existing `记录日志` setting, then checking `日志文件` after one foreground attempt.
+
 ## Lifecycle Integration
 
 `SceneDelegate` should be thin:
@@ -258,6 +293,7 @@ Unit-level coverage:
 - Coordinator submits `random=0` for `试试手气`.
 - Coordinator shows alert only on submit success.
 - Coordinator logs/returns silently for not logged in and failed submit.
+- Coordinator emits runID-tagged logs for skip, board state, submit, state write, alert decision, and failure paths.
 
 Web automation coverage:
 
@@ -269,11 +305,13 @@ Manual verification:
 
 1. Fresh install or cleared defaults: auto check-in is off.
 2. Enable auto check-in and choose `鸡腿 x 5`.
-3. Relaunch or foreground the app while logged in and not yet checked in.
-4. Confirm success alert appears after the automatic submit.
-5. Background and foreground again on the same day; no second alert and no second submit.
-6. Log out and enable auto check-in; foreground app; no alert and no login page opens.
-7. Switch to `试试手气`; verify the next eligible day uses the random path.
+3. Enable `记录日志` in Settings.
+4. Relaunch or foreground the app while logged in and not yet checked in.
+5. Confirm success alert appears after the automatic submit.
+6. Open `日志文件` and confirm the run contains the generated runID, board state, submit result, local state write, and alert decision.
+7. Background and foreground again on the same day; no second alert and no second submit.
+8. Log out and enable auto check-in; foreground app; no alert and no login page opens.
+9. Switch to `试试手气`; verify the next eligible day uses the random path.
 
 ## Non-Goals
 
@@ -294,4 +332,5 @@ This design does not add:
 - Existing manual `/board` check-in route still works.
 - The app does not submit twice after a same-day success or already-checked-in board state.
 - Only automatic submit success shows an alert.
+- Auto check-in logs are detailed enough to diagnose one daily attempt from the app log file without exposing cookies or raw response bodies.
 - Settings and app lifecycle code do not contain check-in endpoint or WebView automation logic.
