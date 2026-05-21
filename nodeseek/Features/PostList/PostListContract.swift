@@ -13,7 +13,7 @@ protocol PostListViewProtocol: AnyObject {
     #if DEBUG
     func openDetailTestURLFromPasteboard()
     #endif
-    func renderCategories(_ categories: [PostListCategory], selected: PostListCategory)
+    func renderCategories(_ categories: [PostListCategoryItem], selected: PostListCategoryItem)
     func renderSortMode(_ sortMode: PostListSortMode)
     func reloadSelectedCategory()
 }
@@ -21,8 +21,8 @@ protocol PostListViewProtocol: AnyObject {
 // MARK: - Presenter Protocol (View -> Presenter)
 protocol PostListPresenterProtocol: AnyObject {
     func viewDidLoad()
-    func didSelectCategory(_ category: PostListCategory)
-    func didReselectCategory(_ category: PostListCategory)
+    func didSelectCategory(_ category: PostListCategoryItem)
+    func didReselectCategory(_ category: PostListCategoryItem)
     func didTapLogin()
     func didTapAccountProfile(profileURL: URL)
     func didTapNewDiscussion()
@@ -34,6 +34,7 @@ protocol PostListPresenterProtocol: AnyObject {
     func didTapUserCollections()
     func didTapSearch()
     func didTapSettings()
+    func didTapCategoryPreferences()
     func didTapLogFile()
     #if DEBUG
     func didTapDetailTest()
@@ -57,6 +58,7 @@ protocol PostListRouterProtocol: AnyObject {
     func navigateToUserComments()
     func navigateToUserCollections()
     func navigateToSearch()
+    func navigateToPostCategoryPreferences()
     func navigateToSettings(
         onLogout: @escaping @MainActor () -> Void,
         onLogFile: @escaping @MainActor () -> Void,

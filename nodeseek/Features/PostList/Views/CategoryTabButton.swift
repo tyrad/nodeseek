@@ -10,7 +10,7 @@ final class CategoryTabButton: UIButton {
         static let horizontalInset: CGFloat = 3
     }
 
-    var category: PostListCategory?
+    var category: PostListCategoryItem?
 
     private let indicatorView: UIView = {
         let view = UIView()

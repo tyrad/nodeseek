@@ -9,7 +9,7 @@ final class PostTextureListHostPresenter: PostTextureListHostPresenterProtocol {
     weak var delegate: PostTextureListHostPresenterDelegate?
 
     private weak var view: PostTextureListHostViewProtocol?
-    private let category: PostListCategory
+    private let category: PostListCategoryItem
     private let interactor: PostTextureListHostInteractorInput
     private let visitedStore: VisitedPostStoreProtocol
     private var sortMode: PostListSortMode = .replyTime
@@ -23,7 +23,7 @@ final class PostTextureListHostPresenter: PostTextureListHostPresenterProtocol {
     private var isLoadingMore = false
 
     init(
-        category: PostListCategory,
+        category: PostListCategoryItem,
         interactor: PostTextureListHostInteractorInput,
         visitedStore: VisitedPostStoreProtocol
     ) {
@@ -83,7 +83,7 @@ final class PostTextureListHostPresenter: PostTextureListHostPresenterProtocol {
 extension PostTextureListHostPresenter: PostTextureListHostInteractorOutput {
     func didLoadPosts(
         _ posts: [PostSummary],
-        category: PostListCategory,
+        category: PostListCategoryItem,
         sortMode: PostListSortMode
     ) {
         guard category == self.category else { return }
@@ -106,7 +106,7 @@ extension PostTextureListHostPresenter: PostTextureListHostInteractorOutput {
     func didLoadMorePosts(
         _ posts: [PostSummary],
         page: Int,
-        category: PostListCategory,
+        category: PostListCategoryItem,
         sortMode: PostListSortMode
     ) {
         guard category == self.category else { return }
@@ -134,7 +134,7 @@ extension PostTextureListHostPresenter: PostTextureListHostInteractorOutput {
         view?.hideLoadingMore()
     }
 
-    func didFailLoadPosts(error: String, category: PostListCategory, sortMode: PostListSortMode) {
+    func didFailLoadPosts(error: String, category: PostListCategoryItem, sortMode: PostListSortMode) {
         guard category == self.category else { return }
         guard sortMode == self.sortMode else { return }
         isLoadingFirstPage = false
@@ -148,7 +148,7 @@ extension PostTextureListHostPresenter: PostTextureListHostInteractorOutput {
         }
     }
 
-    func didFailLoadMorePosts(error: String, page: Int, category: PostListCategory, sortMode: PostListSortMode) {
+    func didFailLoadMorePosts(error: String, page: Int, category: PostListCategoryItem, sortMode: PostListSortMode) {
         guard category == self.category else { return }
         guard sortMode == self.sortMode else { return }
         isLoadingMore = false

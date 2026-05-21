@@ -13,16 +13,25 @@ class PostListPresenter: PostListPresenterProtocol {
     private weak var view: PostListViewProtocol?
     private let router: PostListRouterProtocol
     private let visitedStore: VisitedPostStoreProtocol
-    private let categories = PostListCategory.allCases
-    private var currentCategory: PostListCategory = .all
+    private let categoryPreferenceStore: PostCategoryPreferenceStore
+    private var categoryPreferenceObserver: NSObjectProtocol?
+    private var currentCategory: PostListCategoryItem = .all
 
     // MARK: - Initialization
     init(
         router: PostListRouterProtocol,
-        visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore()
+        visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore(),
+        categoryPreferenceStore: PostCategoryPreferenceStore = .shared
     ) {
         self.router = router
         self.visitedStore = visitedStore
+        self.categoryPreferenceStore = categoryPreferenceStore
+    }
+
+    deinit {
+        if let categoryPreferenceObserver {
+            NotificationCenter.default.removeObserver(categoryPreferenceObserver)
+        }
     }
 
     // MARK: - Setup
@@ -32,16 +41,18 @@ class PostListPresenter: PostListPresenterProtocol {
 
     // MARK: - Methods
     func viewDidLoad() {
-        view?.renderCategories(categories, selected: currentCategory)
+        observeCategoryPreferencesIfNeeded()
+        renderCurrentCategories()
         view?.renderSortMode(.replyTime)
     }
 
-    func didSelectCategory(_ category: PostListCategory) {
+    func didSelectCategory(_ category: PostListCategoryItem) {
         guard category != currentCategory else { return }
+        guard categoryPreferenceStore.visibleCategoryItems.contains(category) else { return }
         currentCategory = category
     }
 
-    func didReselectCategory(_ category: PostListCategory) {
+    func didReselectCategory(_ category: PostListCategoryItem) {
         guard category == currentCategory else {
             didSelectCategory(category)
             return
@@ -112,6 +123,10 @@ class PostListPresenter: PostListPresenterProtocol {
         )
     }
 
+    func didTapCategoryPreferences() {
+        router.navigateToPostCategoryPreferences()
+    }
+
     func didTapLogFile() {
         router.navigateToLogFile()
     }
@@ -143,6 +158,29 @@ class PostListPresenter: PostListPresenterProtocol {
 }
 
 private extension PostListPresenter {
+    func observeCategoryPreferencesIfNeeded() {
+        guard categoryPreferenceObserver == nil else { return }
+        categoryPreferenceObserver = NotificationCenter.default.addObserver(
+            forName: PostCategoryPreferenceStore.didChangeNotification,
+            object: categoryPreferenceStore,
+            queue: nil
+        ) { [weak self] _ in
+            self?.categoryPreferencesDidChange()
+        }
+    }
+
+    func categoryPreferencesDidChange() {
+        renderCurrentCategories()
+    }
+
+    func renderCurrentCategories() {
+        let categories = categoryPreferenceStore.visibleCategoryItems
+        if !categories.contains(currentCategory) {
+            currentCategory = .all
+        }
+        view?.renderCategories(categories, selected: currentCategory)
+    }
+
     func routeToPostDetail(_ post: PostSummary) {
         if let route = NodeSeekPostRouteResolver.route(for: post.url, baseURL: NodeSeekSite.baseURL) {
             router.navigateToPostDetail(

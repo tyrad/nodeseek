@@ -42,7 +42,14 @@ final class AppTextSizeSettings {
         let nextValue = Self.normalizedPointOffset(rawValue)
         guard nextValue != pointOffset else { return }
         userDefaults.set(Double(nextValue), forKey: storageKey)
-        NotificationCenter.default.post(name: Self.didChangeNotification, object: self)
+        let postNotification = {
+            NotificationCenter.default.post(name: Self.didChangeNotification, object: self)
+        }
+        if Thread.isMainThread {
+            postNotification()
+        } else {
+            DispatchQueue.main.async(execute: postNotification)
+        }
     }
 
     func reset() {

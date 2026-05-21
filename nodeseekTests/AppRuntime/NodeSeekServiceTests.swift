@@ -320,6 +320,31 @@ struct NodeSeekServiceTests {
         #expect(requestedURLs.first?.path == "/categories/tech/page-3")
     }
 
+    @Test func loadsSupplementalCategoryURLsUsingSidebarCategoryCodes() async throws {
+        let html = try FixtureLoader.html(named: "post-list-basic")
+        let url = URL(string: "https://www.nodeseek.com/")!
+        let htmlClient = URLCapturingHTMLClient(response: HTMLResponse(
+            statusCode: 200,
+            headers: [:],
+            finalURL: url,
+            html: html
+        ))
+        let service = NodeSeekService(
+            baseURL: url,
+            htmlClient: htmlClient,
+            parser: KannaNodeSeekParser(baseURL: url)
+        )
+
+        _ = try await service.loadPostList(page: 2, category: .photoShare)
+        _ = try await service.loadPostList(page: 1, category: .meaningless)
+        let requestedURLs = await htmlClient.requestedURLs()
+
+        #expect(requestedURLs.map(\.path) == [
+            "/categories/photo-share/page-2",
+            "/categories/meaningless"
+        ])
+    }
+
     @Test func loadsAwardURLWhenRequestingRecommendedReadingFirstPage() async throws {
         let html = try FixtureLoader.html(named: "post-list-basic")
         let url = URL(string: "https://www.nodeseek.com/")!

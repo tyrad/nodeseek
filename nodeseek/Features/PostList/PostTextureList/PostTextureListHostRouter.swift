@@ -9,7 +9,7 @@ final class PostTextureListHostRouter: PostTextureListHostRouterProtocol {
     private init() {}
 
     static func createModule(
-        category: PostListCategory,
+        category: PostListCategoryItem,
         visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore(),
         delegate: PostTextureListHostPresenterDelegate? = nil
     ) -> PostTextureListHostViewController {

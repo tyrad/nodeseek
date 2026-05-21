@@ -25,15 +25,15 @@ final class PostTextureListInteractor: PostTextureListHostInteractorInput {
     }
     
     // MARK: - Methods
-    func loadPosts(category: PostListCategory, sortMode: PostListSortMode) {
+    func loadPosts(category: PostListCategoryItem, sortMode: PostListSortMode) {
         load(page: 1, category: category, sortMode: sortMode, isLoadMore: false)
     }
 
-    func loadMorePosts(page: Int, category: PostListCategory, sortMode: PostListSortMode) {
+    func loadMorePosts(page: Int, category: PostListCategoryItem, sortMode: PostListSortMode) {
         load(page: max(2, page), category: category, sortMode: sortMode, isLoadMore: true)
     }
 
-    private func load(page: Int, category: PostListCategory, sortMode: PostListSortMode, isLoadMore: Bool) {
+    private func load(page: Int, category: PostListCategoryItem, sortMode: PostListSortMode, isLoadMore: Bool) {
         Task {
             AppLog.info(.postList, "开始加载帖子列表，category=\(category.rawValue), sort=\(sortMode.rawValue), page=\(page), isLoadMore=\(isLoadMore)")
             do {
@@ -59,7 +59,7 @@ final class PostTextureListInteractor: PostTextureListHostInteractorInput {
         }
     }
 
-    private func loadPosts(page: Int, category: PostListCategory, sortMode: PostListSortMode) async throws -> [PostSummary] {
+    private func loadPosts(page: Int, category: PostListCategoryItem, sortMode: PostListSortMode) async throws -> [PostSummary] {
         AppLog.info(.postList, "列表请求开始，category=\(category.rawValue), sort=\(sortMode.rawValue), page=\(page)")
         let result = try await service.loadPostList(page: page, category: category, sortMode: sortMode)
         switch result {

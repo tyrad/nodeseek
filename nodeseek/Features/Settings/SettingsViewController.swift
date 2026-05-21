@@ -99,7 +99,7 @@ final class DefaultNodeImageAuthorizationPresenter: NodeImageAuthorizationPresen
     }
 }
 
-final class SettingsViewController: UITableViewController {
+class SettingsViewController: UITableViewController {
     private enum Section: Int, CaseIterable {
         case reading
         case features
@@ -110,6 +110,7 @@ final class SettingsViewController: UITableViewController {
     }
 
     private enum ReadingRow: Int, CaseIterable {
+        case categoryPreferences
         case adjustment
         case preview
         case signatureDisplay
@@ -158,6 +159,7 @@ final class SettingsViewController: UITableViewController {
     private let nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting
     private let textSizeSettings: AppTextSizeSettings
     private let signatureDisplaySettings: PostSignatureDisplaySettings
+    private let categoryPreferenceStore: PostCategoryPreferenceStore
     private let specialFollowKeywordStore: SpecialFollowKeywordStore
     private let confirmsActionsImmediately: Bool
     private let onLogout: @MainActor () -> Void
@@ -177,6 +179,7 @@ final class SettingsViewController: UITableViewController {
         nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting? = nil,
         textSizeSettings: AppTextSizeSettings = .shared,
         signatureDisplaySettings: PostSignatureDisplaySettings = .shared,
+        categoryPreferenceStore: PostCategoryPreferenceStore = .shared,
         specialFollowKeywordStore: SpecialFollowKeywordStore = .shared,
         confirmsActionsImmediately: Bool = false,
         onLogout: @escaping @MainActor () -> Void = {},
@@ -191,6 +194,7 @@ final class SettingsViewController: UITableViewController {
         self.nodeImageAuthorizationPresenter = nodeImageAuthorizationPresenter ?? DefaultNodeImageAuthorizationPresenter()
         self.textSizeSettings = textSizeSettings
         self.signatureDisplaySettings = signatureDisplaySettings
+        self.categoryPreferenceStore = categoryPreferenceStore
         self.specialFollowKeywordStore = specialFollowKeywordStore
         self.confirmsActionsImmediately = confirmsActionsImmediately
         self.onLogout = onLogout
@@ -225,6 +229,12 @@ final class SettingsViewController: UITableViewController {
             selector: #selector(specialFollowKeywordsDidChange(_:)),
             name: SpecialFollowKeywordStore.didChangeNotification,
             object: specialFollowKeywordStore
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(postCategoryPreferencesDidChange(_:)),
+            name: PostCategoryPreferenceStore.didChangeNotification,
+            object: categoryPreferenceStore
         )
     }
 
@@ -297,7 +307,7 @@ final class SettingsViewController: UITableViewController {
         tableView.deselectRow(at: indexPath, animated: true)
         switch Section(rawValue: indexPath.section) {
         case .reading:
-            break
+            handleReadingSelection(at: indexPath)
         case .features:
             handleFeatureSelection(at: indexPath)
         case .storage:
@@ -348,6 +358,8 @@ final class SettingsViewController: UITableViewController {
             }
             cell.configure(pointOffset: textSizeSettings.pointOffset)
             return cell
+        case .categoryPreferences:
+            return categoryPreferencesCell(for: indexPath)
         case .signatureDisplay:
             return signatureDisplayCell(for: indexPath)
         case .none:
@@ -394,6 +406,18 @@ final class SettingsViewController: UITableViewController {
         cell.accessoryView = signatureSwitch
         cell.selectionStyle = .none
         cell.accessibilityIdentifier = "settings-post-signature-cell"
+        return cell
+    }
+
+    private func categoryPreferencesCell(for indexPath: IndexPath) -> UITableViewCell {
+        let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+        cell.textLabel?.text = "首页分类"
+        cell.detailTextLabel?.text = categoryPreferenceDetailText
+        cell.detailTextLabel?.textColor = .secondaryLabel
+        cell.detailTextLabel?.numberOfLines = 2
+        cell.imageView?.image = UIImage(systemName: "list.bullet.rectangle")
+        cell.accessoryType = .disclosureIndicator
+        cell.accessibilityIdentifier = "settings-post-category-preferences-cell"
         return cell
     }
 
@@ -513,6 +537,20 @@ final class SettingsViewController: UITableViewController {
         return "帖子列表关键字高亮展示 · \(count) 个"
     }
 
+    private var categoryPreferenceDetailText: String {
+        let visible = categoryPreferenceStore.visibleCategoryItems
+        let hiddenCount = categoryPreferenceStore.hiddenCategoryItems.count
+        guard hiddenCount == 0 else {
+            return "显示 \(visible.count) 个，隐藏 \(hiddenCount) 个"
+        }
+
+        let prefix = visible.prefix(3).map(\.title).joined(separator: "、")
+        if visible.count > 3 {
+            return "\(prefix)等 \(visible.count) 个"
+        }
+        return prefix
+    }
+
     private func refreshCacheSize() {
         Task { @MainActor [weak self] in
             guard let self else { return }
@@ -555,6 +593,15 @@ final class SettingsViewController: UITableViewController {
         }
     }
 
+    private func handleReadingSelection(at indexPath: IndexPath) {
+        switch ReadingRow(rawValue: indexPath.row) {
+        case .categoryPreferences:
+            showPostCategoryPreferences()
+        case .adjustment, .preview, .signatureDisplay, .none:
+            break
+        }
+    }
+
     private func confirmClearCache() {
         guard !isClearingCache else { return }
         guard !confirmsActionsImmediately else {
@@ -584,6 +631,11 @@ final class SettingsViewController: UITableViewController {
 
     private func showSpecialFollowKeywords() {
         let viewController = SpecialFollowKeywordsViewController(store: specialFollowKeywordStore)
+        navigationController?.pushViewController(viewController, animated: true)
+    }
+
+    private func showPostCategoryPreferences() {
+        let viewController = PostCategoryPreferencesViewController(store: categoryPreferenceStore)
         navigationController?.pushViewController(viewController, animated: true)
     }
 
@@ -677,6 +729,11 @@ final class SettingsViewController: UITableViewController {
 
     @objc private func specialFollowKeywordsDidChange(_ notification: Notification) {
         tableView.reloadSections(IndexSet(integer: Section.features.rawValue), with: .none)
+    }
+
+    @objc private func postCategoryPreferencesDidChange(_ notification: Notification) {
+        let indexPath = IndexPath(row: ReadingRow.categoryPreferences.rawValue, section: Section.reading.rawValue)
+        tableView.reloadRows(at: [indexPath], with: .none)
     }
 
     private func performClearCache() {

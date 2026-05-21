@@ -51,18 +51,18 @@ private final class SpyPostTextureListHostInteractorOutput: PostTextureListHostI
     var loadedPosts: [PostSummary]?
     var errorMessage: String?
 
-    func didLoadPosts(_ posts: [PostSummary], category: PostListCategory, sortMode: PostListSortMode) {
+    func didLoadPosts(_ posts: [PostSummary], category: PostListCategoryItem, sortMode: PostListSortMode) {
         loadedPosts = posts
     }
 
-    func didLoadMorePosts(_ posts: [PostSummary], page: Int, category: PostListCategory, sortMode: PostListSortMode) {
+    func didLoadMorePosts(_ posts: [PostSummary], page: Int, category: PostListCategoryItem, sortMode: PostListSortMode) {
     }
 
-    func didFailLoadPosts(error: String, category: PostListCategory, sortMode: PostListSortMode) {
+    func didFailLoadPosts(error: String, category: PostListCategoryItem, sortMode: PostListSortMode) {
         errorMessage = error
     }
 
-    func didFailLoadMorePosts(error: String, page: Int, category: PostListCategory, sortMode: PostListSortMode) {
+    func didFailLoadMorePosts(error: String, page: Int, category: PostListCategoryItem, sortMode: PostListSortMode) {
         errorMessage = error
     }
 }

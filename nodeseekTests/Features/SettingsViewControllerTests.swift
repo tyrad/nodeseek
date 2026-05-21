@@ -18,12 +18,14 @@ struct SettingsViewControllerTests {
         let defaults = try #require(UserDefaults(suiteName: "settings-account-\(UUID().uuidString)"))
         let accountStore = CurrentAccountStore(userDefaults: defaults, storageKey: "account")
         await accountStore.save(AccountResponse(displayName: "mistj", isLoggedIn: true))
+        let categoryStore = makeCategoryPreferenceStore()
         let viewController = SettingsViewController(
             cacheManager: FakeSettingsCacheManager(cacheByteSize: 4_096),
             sessionManager: FakeSettingsSessionManager(),
             currentAccountStore: accountStore,
             buildInfo: .testFlightFixture,
-            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore()
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
+            categoryPreferenceStore: categoryStore
         )
         viewController.loadViewIfNeeded()
         viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
@@ -33,7 +35,7 @@ struct SettingsViewControllerTests {
         let tableView = try #require(viewController.tableView)
         #expect(viewController.title == "设置")
         #expect(tableView.numberOfSections == 6)
-        #expect(tableView.numberOfRows(inSection: 0) == 3)
+        #expect(tableView.numberOfRows(inSection: 0) == 4)
         #expect(tableView.numberOfRows(inSection: 1) == 2)
         #expect(tableView.numberOfRows(inSection: 2) == 1)
         #expect(tableView.numberOfRows(inSection: 3) == 4)
@@ -57,9 +59,13 @@ struct SettingsViewControllerTests {
             tableView,
             cellForRowAt: IndexPath(row: 1, section: 1)
         ))
+        let categoryPreferencesCell = try #require(tableView.dataSource?.tableView(
+            tableView,
+            cellForRowAt: IndexPath(row: 0, section: 0)
+        ))
         let signatureCell = try #require(tableView.dataSource?.tableView(
             tableView,
-            cellForRowAt: IndexPath(row: 2, section: 0)
+            cellForRowAt: IndexPath(row: 3, section: 0)
         ))
         let logCell = try #require(tableView.dataSource?.tableView(
             tableView,
@@ -112,6 +118,9 @@ struct SettingsViewControllerTests {
         #expect(nodeImageCell.accessoryType == .disclosureIndicator)
         #expect(specialFollowCell.textLabel?.text == "特别关注")
         #expect(specialFollowCell.detailTextLabel?.text == "帖子列表关键字高亮展示")
+        #expect(categoryPreferencesCell.textLabel?.text == "首页分类")
+        #expect(categoryPreferencesCell.detailTextLabel?.text == "全部、日常、技术等 10 个")
+        #expect(categoryPreferencesCell.accessoryType == .disclosureIndicator)
         #expect(signatureCell.textLabel?.text == "显示帖子签名")
         let signatureSwitch = try #require(signatureCell.accessoryView as? UISwitch)
         #expect(signatureSwitch.isOn == true)
@@ -169,7 +178,7 @@ struct SettingsViewControllerTests {
 
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 2, section: 0)
+            cellForRowAt: IndexPath(row: 3, section: 0)
         ))
         let signatureSwitch = try #require(cell.accessoryView as? UISwitch)
         #expect(signatureSwitch.isOn == true)
@@ -197,11 +206,11 @@ struct SettingsViewControllerTests {
 
         let adjustmentCell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 0, section: 0)
+            cellForRowAt: IndexPath(row: 1, section: 0)
         ) as? SettingsTextSizeAdjustmentCell)
         let previewCell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 1, section: 0)
+            cellForRowAt: IndexPath(row: 2, section: 0)
         ) as? SettingsTextSizePreviewCell)
 
         adjustmentCell.slider.value = 2
@@ -269,6 +278,75 @@ struct SettingsViewControllerTests {
         )
 
         #expect(navigationController.topViewController is SpecialFollowKeywordsViewController)
+    }
+
+    @Test func settingsPageShowsPostCategoryPreferencesSummaryAndPushesEditor() throws {
+        let categoryStore = makeCategoryPreferenceStore()
+        categoryStore.hideCategory(.tech)
+        let viewController = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager(),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
+            categoryPreferenceStore: categoryStore
+        )
+        let navigationController = UINavigationController(rootViewController: viewController)
+        viewController.loadViewIfNeeded()
+
+        let cell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: IndexPath(row: 0, section: 0)
+        ))
+        #expect(cell.textLabel?.text == "首页分类")
+        #expect(cell.detailTextLabel?.text == "显示 9 个，隐藏 1 个")
+        #expect(cell.accessoryType == .disclosureIndicator)
+
+        viewController.tableView.delegate?.tableView?(
+            viewController.tableView,
+            didSelectRowAt: IndexPath(row: 0, section: 0)
+        )
+
+        #expect(navigationController.topViewController is PostCategoryPreferencesViewController)
+    }
+
+    @Test func settingsPageRefreshesPostCategoryPreferencesSummaryWhenInjectedStoreChanges() async throws {
+        let categoryStore = makeCategoryPreferenceStore()
+        let otherCategoryStore = makeCategoryPreferenceStore()
+        let viewController = SpySettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager(),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
+            categoryPreferenceStore: categoryStore
+        )
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = viewController
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.view.layoutIfNeeded()
+        viewController.tableView.layoutIfNeeded()
+
+        let indexPath = IndexPath(row: 0, section: 0)
+        let initialCell = try #require(viewController.tableView.cellForRow(at: indexPath))
+        #expect(initialCell.detailTextLabel?.text == "全部、日常、技术等 10 个")
+        let initialRequestCount = viewController.categoryPreferencesCellRequestCount
+
+        otherCategoryStore.hideCategory(.tech)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        #expect(viewController.categoryPreferencesCellRequestCount == initialRequestCount)
+        #expect(viewController.tableView.cellForRow(at: indexPath)?.detailTextLabel?.text == "全部、日常、技术等 10 个")
+
+        let animationsEnabled = UIView.areAnimationsEnabled
+        UIView.setAnimationsEnabled(false)
+        defer { UIView.setAnimationsEnabled(animationsEnabled) }
+        categoryStore.hideCategory(.tech)
+        viewController.tableView.layoutIfNeeded()
+        try await waitUntil {
+            viewController.categoryPreferencesCellRequestCount > initialRequestCount
+                && viewController.tableView.cellForRow(at: indexPath)?.detailTextLabel?.text == "显示 9 个，隐藏 1 个"
+        }
+
+        #expect(viewController.categoryPreferencesCellRequestCount > initialRequestCount)
+        #expect(viewController.tableView.cellForRow(at: indexPath)?.detailTextLabel?.text == "显示 9 个，隐藏 1 个")
     }
 
     @Test func specialFollowKeywordListEditsAndDeletesKeywords() throws {
@@ -619,6 +697,26 @@ private func makeSpecialFollowStore() -> SpecialFollowKeywordStore {
     let defaults = UserDefaults(suiteName: suiteName)!
     defaults.removePersistentDomain(forName: suiteName)
     return SpecialFollowKeywordStore(userDefaults: defaults, storageKey: "keywords")
+}
+
+private func makeCategoryPreferenceStore() -> PostCategoryPreferenceStore {
+    let suiteName = "settings-category-preferences-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    return PostCategoryPreferenceStore(userDefaults: defaults, storageKey: "categories")
+}
+
+@MainActor
+private final class SpySettingsViewController: SettingsViewController {
+    private(set) var categoryPreferencesCellRequestCount = 0
+
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
+        if indexPath == IndexPath(row: 0, section: 0) {
+            categoryPreferencesCellRequestCount += 1
+        }
+        return cell
+    }
 }
 
 @MainActor
