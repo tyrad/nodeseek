@@ -6,13 +6,13 @@
 import UIKit
 
 final class PostTextureListHostViewController: UIViewController {
-    let category: PostListCategory
+    let category: PostListCategoryItem
 
     private let presenter: PostTextureListHostPresenterProtocol
     private let listView = PostTextureListView()
 
     init(
-        category: PostListCategory,
+        category: PostListCategoryItem,
         presenter: PostTextureListHostPresenterProtocol
     ) {
         self.category = category

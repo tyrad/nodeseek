@@ -23,6 +23,59 @@ struct PostListPresenterTests {
         #expect(view.renderedSortMode == .replyTime)
     }
 
+    @Test func viewDidLoadRendersVisibleCategoriesFromPreferences() {
+        let view = SpyPostListView()
+        let store = makeCategoryPreferenceStore()
+        store.hideCategory(.tech)
+        let presenter = makePresenter(view: view, categoryPreferenceStore: store)
+
+        presenter.viewDidLoad()
+
+        #expect(view.renderedCategories == store.visibleCategoryItems)
+        #expect(view.renderedCategories.contains(.tech) == false)
+        #expect(view.selectedCategory == .all)
+    }
+
+    @Test func categoryPreferenceChangeKeepsCurrentCategoryWhenStillVisible() {
+        let view = SpyPostListView()
+        let store = makeCategoryPreferenceStore()
+        let presenter = makePresenter(view: view, categoryPreferenceStore: store)
+        presenter.viewDidLoad()
+        presenter.didSelectCategory(.tech)
+
+        store.hideCategory(.daily)
+
+        #expect(view.selectedCategory == .tech)
+        #expect(view.renderedCategories.contains(.daily) == false)
+    }
+
+    @Test func categoryPreferenceChangeFallsBackToAllWhenCurrentCategoryIsHidden() {
+        let view = SpyPostListView()
+        let store = makeCategoryPreferenceStore()
+        let presenter = makePresenter(view: view, categoryPreferenceStore: store)
+        presenter.viewDidLoad()
+        presenter.didSelectCategory(.tech)
+
+        store.hideCategory(.tech)
+
+        #expect(view.selectedCategory == .all)
+        #expect(view.renderedCategories.contains(.tech) == false)
+    }
+
+    @Test func selectingHiddenCategoryIsIgnored() {
+        let view = SpyPostListView()
+        let store = makeCategoryPreferenceStore()
+        store.hideCategory(.tech)
+        let presenter = makePresenter(view: view, categoryPreferenceStore: store)
+        presenter.viewDidLoad()
+        view.events.removeAll()
+
+        presenter.didSelectCategory(.tech)
+        presenter.didReselectCategory(.all)
+
+        #expect(view.events == ["reloadSelectedCategory"])
+    }
+
     @Test func reselectingCurrentCategoryReloadsSelectedHost() {
         let view = SpyPostListView()
         let presenter = makePresenter(view: view)
@@ -148,6 +201,15 @@ struct PostListPresenterTests {
         #expect(router.navigateToSettingsCount == 1)
     }
 
+    @Test func tappingCategoryPreferencesRoutesDirectlyToEditor() {
+        let router = SpyPostListRouter()
+        let presenter = makePresenter(router: router)
+
+        presenter.didTapCategoryPreferences()
+
+        #expect(router.navigateToPostCategoryPreferencesCount == 1)
+    }
+
     @Test func settingsDebugCallbacksReuseExistingLogAndDetailActions() {
         let view = SpyPostListView()
         let router = SpyPostListRouter()
@@ -244,17 +306,26 @@ struct PostListPresenterTests {
 private func makePresenter(
     view: SpyPostListView? = nil,
     router: SpyPostListRouter? = nil,
-    visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore()
+    visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore(),
+    categoryPreferenceStore: PostCategoryPreferenceStore = makeCategoryPreferenceStore()
 ) -> PostListPresenter {
     let router = router ?? SpyPostListRouter()
     let presenter = PostListPresenter(
         router: router,
-        visitedStore: visitedStore
+        visitedStore: visitedStore,
+        categoryPreferenceStore: categoryPreferenceStore
     )
     if let view {
         presenter.setView(view)
     }
     return presenter
+}
+
+private func makeCategoryPreferenceStore() -> PostCategoryPreferenceStore {
+    let suiteName = "post-list-presenter-categories-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    return PostCategoryPreferenceStore(userDefaults: defaults, storageKey: "categories")
 }
 
 private func makePost(id: String, title: String) -> PostSummary {
@@ -272,8 +343,8 @@ private func makePost(id: String, title: String) -> PostSummary {
 @MainActor
 private final class SpyPostListView: PostListViewProtocol {
     var lastErrorMessage: String?
-    var renderedCategories: [PostListCategory] = []
-    var selectedCategory: PostListCategory = .all
+    var renderedCategories: [PostListCategoryItem] = []
+    var selectedCategory: PostListCategoryItem = .all
     var renderedSortMode: PostListSortMode?
     var events: [String] = []
 
@@ -285,7 +356,7 @@ private final class SpyPostListView: PostListViewProtocol {
         events.append("openDetailTestURLFromPasteboard")
     }
 
-    func renderCategories(_ categories: [PostListCategory], selected: PostListCategory) {
+    func renderCategories(_ categories: [PostListCategoryItem], selected: PostListCategoryItem) {
         renderedCategories = categories
         selectedCategory = selected
         events.append("renderCategories")
@@ -335,6 +406,7 @@ private final class SpyPostListRouter: PostListRouterProtocol {
     var navigateToNewDiscussionCount = 0
     var navigateToSearchCount = 0
     var navigateToSettingsCount = 0
+    var navigateToPostCategoryPreferencesCount = 0
     var navigateToLogFileCount = 0
     var navigateToUserDiscussionsCount = 0
     var navigateToUserCommentsCount = 0
@@ -409,6 +481,10 @@ private final class SpyPostListRouter: PostListRouterProtocol {
         onSettingsLogout = onLogout
         onSettingsLogFile = onLogFile
         onSettingsDetailTest = onDetailTest
+    }
+
+    func navigateToPostCategoryPreferences() {
+        navigateToPostCategoryPreferencesCount += 1
     }
 
     func navigateToLogFile() {

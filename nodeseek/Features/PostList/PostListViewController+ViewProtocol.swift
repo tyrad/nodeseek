@@ -19,7 +19,7 @@ extension PostListViewController: PostListViewProtocol {
     }
     #endif
 
-    func renderCategories(_ categories: [PostListCategory], selected: PostListCategory) {
+    func renderCategories(_ categories: [PostListCategoryItem], selected: PostListCategoryItem) {
         let categoriesChanged = categories != self.categories
         if categoriesChanged {
             self.categories = categories

@@ -68,6 +68,7 @@ struct PostListViewControllerTests {
         viewController.view.layoutIfNeeded()
 
         let menuButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-menu-button"))
+        let categoryEditButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-category-edit-button"))
         #expect(menuButton.bounds.width == 40)
         #expect(menuButton.bounds.height == 40)
         #expect(menuButton.backgroundColor == .clear)
@@ -75,6 +76,10 @@ struct PostListViewControllerTests {
         #expect(menuButton.layer.cornerRadius == 0)
         #expect(menuButton.configuration?.image != nil)
         #expect(menuButton.configuration?.image?.renderingMode == .alwaysTemplate)
+        #expect(categoryEditButton.bounds.width == 40)
+        #expect(categoryEditButton.bounds.height == 40)
+        #expect(categoryEditButton.configuration?.image != nil)
+        #expect(categoryEditButton.accessibilityLabel == "编辑首页分类")
 
         let selectedTab = try #require(viewController.view.firstButton(title: "全部"))
         let unselectedTab = try #require(viewController.view.firstButton(title: "日常"))
@@ -92,10 +97,21 @@ struct PostListViewControllerTests {
         #expect(unselectedTab.bounds.width <= unselectedTitleWidth + 8)
         let selectedTabFrame = selectedTab.convert(selectedTab.bounds, to: viewController.view)
         let menuButtonFrame = menuButton.convert(menuButton.bounds, to: viewController.view)
+        let categoryEditButtonFrame = categoryEditButton.convert(categoryEditButton.bounds, to: viewController.view)
         #expect(abs(selectedTabFrame.minY - menuButtonFrame.minY) < 1)
         #expect(abs(selectedTabFrame.height - menuButtonFrame.height) < 1)
         #expect(abs(menuButtonFrame.minY - (viewController.view.safeAreaInsets.top - 4)) < 1)
+        #expect(categoryEditButton.superview is UIStackView)
+        #expect(abs(categoryEditButtonFrame.minY - selectedTabFrame.minY) < 1)
+        #expect(selectedTabFrame.maxX < categoryEditButtonFrame.minX)
+        let lastTab = try #require(viewController.view.firstButton(title: "情报"))
+        let lastTabFrame = lastTab.convert(lastTab.bounds, to: viewController.view)
+        #expect(lastTabFrame.maxX < categoryEditButtonFrame.minX)
         #expect(abs(viewController.pageContainerViewController.view.frame.minY - selectedTabFrame.maxY - 2) < 1)
+
+        categoryEditButton.sendActions(for: .touchUpInside)
+
+        #expect(presenter.didTapCategoryPreferencesCount == 1)
     }
 
     @Test func sortToggleButtonIsHostedInDraggableFloatingContainer() throws {
@@ -197,6 +213,24 @@ struct PostListViewControllerTests {
 
         #expect(presenter.reselectedCategories == [.all])
         #expect(presenter.selectedCategories.isEmpty)
+    }
+
+    @Test func categoryPreferenceFallbackRemovesHiddenTabAndSelectsAllPage() throws {
+        let presenter = SpyPostListPresenter()
+        let viewController = makePostListViewController(presenter: presenter)
+        viewController.loadViewIfNeeded()
+
+        viewController.renderCategories([.all, .daily, .tech], selected: .tech)
+        #expect(viewController.selectedCategory == .tech)
+        #expect(viewController.pageContainerViewController.currentCategory == .tech)
+        #expect(viewController.pageContainerViewController.hostViewControllers[.tech] != nil)
+
+        viewController.renderCategories([.all, .daily], selected: .all)
+
+        #expect(viewController.view.firstButton(title: "技术") == nil)
+        #expect(viewController.selectedCategory == .all)
+        #expect(viewController.pageContainerViewController.currentCategory == .all)
+        #expect(viewController.pageContainerViewController.hostViewControllers[.tech] == nil)
     }
 
     @Test func detailTestSubmitsProvidedURL() throws {
@@ -637,22 +671,23 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
     private(set) var didTapUserCollectionsCount = 0
     private(set) var notificationURLs: [URL] = []
     private(set) var didTapSettingsCount = 0
+    private(set) var didTapCategoryPreferencesCount = 0
     private(set) var accountProfileURLs: [URL] = []
     private(set) var didTapLogFileCount = 0
     private(set) var didTapDetailTestCount = 0
     private(set) var submittedDetailTestURL: String?
-    private(set) var selectedCategories: [PostListCategory] = []
-    private(set) var reselectedCategories: [PostListCategory] = []
+    private(set) var selectedCategories: [PostListCategoryItem] = []
+    private(set) var reselectedCategories: [PostListCategoryItem] = []
 
     func viewDidLoad() {
         viewDidLoadCount += 1
     }
 
-    func didSelectCategory(_ category: PostListCategory) {
+    func didSelectCategory(_ category: PostListCategoryItem) {
         selectedCategories.append(category)
     }
 
-    func didReselectCategory(_ category: PostListCategory) {
+    func didReselectCategory(_ category: PostListCategoryItem) {
         reselectedCategories.append(category)
     }
 
@@ -670,6 +705,10 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
 
     func didTapSettings() {
         didTapSettingsCount += 1
+    }
+
+    func didTapCategoryPreferences() {
+        didTapCategoryPreferencesCount += 1
     }
 
     func didTapNewDiscussion() {

@@ -11,6 +11,17 @@ import UIKit
 
 @MainActor
 struct PostListRouterTests {
+    @Test func categoryPreferencesNavigationPushesEditor() throws {
+        let router = PostListRouter()
+        let rootViewController = UIViewController()
+        let navigationController = UINavigationController(rootViewController: rootViewController)
+        router.viewController = rootViewController
+
+        router.navigateToPostCategoryPreferences()
+
+        #expect(navigationController.topViewController is PostCategoryPreferencesViewController)
+    }
+
     @Test func recentVisitedSelectionAlwaysOpensFirstPageWithoutAnchor() throws {
         let router = PostListRouter()
         let rootViewController = UIViewController()
@@ -64,4 +75,3 @@ private final class RouterFakeVisitedPostStore: VisitedPostStoreProtocol {
 
     func clearAll() {}
 }
-

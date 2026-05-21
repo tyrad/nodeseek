@@ -8,9 +8,9 @@
 import UIKit
 
 protocol PostPageContainerViewControllerDelegate: AnyObject {
-    func postPageContainerViewController(_ viewController: PostPageContainerViewController, didSelectPost post: PostSummary, category: PostListCategory)
-    func postPageContainerViewController(_ viewController: PostPageContainerViewController, didChangeSortMode sortMode: PostListSortMode, category: PostListCategory)
-    func postPageContainerViewController(_ viewController: PostPageContainerViewController, didScrollTo category: PostListCategory)
+    func postPageContainerViewController(_ viewController: PostPageContainerViewController, didSelectPost post: PostSummary, category: PostListCategoryItem)
+    func postPageContainerViewController(_ viewController: PostPageContainerViewController, didChangeSortMode sortMode: PostListSortMode, category: PostListCategoryItem)
+    func postPageContainerViewController(_ viewController: PostPageContainerViewController, didScrollTo category: PostListCategoryItem)
     func postPageContainerViewControllerDidRequestLeadingSideMenu(_ viewController: PostPageContainerViewController)
 }
 
@@ -18,9 +18,9 @@ final class PostPageContainerViewController: UIPageViewController {
 
     weak var eventDelegate: PostPageContainerViewControllerDelegate?
 
-    var categories: [PostListCategory] = []
-    var hostViewControllers: [PostListCategory: PostTextureListHostViewController] = [:]
-    private(set) var currentCategory: PostListCategory?
+    var categories: [PostListCategoryItem] = []
+    var hostViewControllers: [PostListCategoryItem: PostTextureListHostViewController] = [:]
+    private(set) var currentCategory: PostListCategoryItem?
     weak var pagingScrollView: UIScrollView?
     var maximumLeadingBoundaryPullDistance: CGFloat = 0
     private let visitedStore: VisitedPostStoreProtocol
@@ -47,11 +47,11 @@ final class PostPageContainerViewController: UIPageViewController {
         showCurrentOrFirstPage()
     }
 
-    func configure(categories: [PostListCategory]) {
+    func configure(categories: [PostListCategoryItem]) {
         guard self.categories != categories else { return }
         self.categories = categories
 
-        var newHosts: [PostListCategory: PostTextureListHostViewController] = [:]
+        var newHosts: [PostListCategoryItem: PostTextureListHostViewController] = [:]
         for category in categories {
             if let existing = hostViewControllers[category] {
                 newHosts[category] = existing
@@ -72,27 +72,27 @@ final class PostPageContainerViewController: UIPageViewController {
         showCurrentOrFirstPage()
     }
 
-    func setCurrentCategory(_ category: PostListCategory, animated: Bool) {
+    func setCurrentCategory(_ category: PostListCategoryItem, animated: Bool) {
         guard categories.contains(category) else { return }
         guard currentCategory != category else { return }
         setCurrentCategory(category, animated: animated, notifyDelegate: false)
     }
 
-    func sortMode(for category: PostListCategory) -> PostListSortMode {
+    func sortMode(for category: PostListCategoryItem) -> PostListSortMode {
         hostViewControllers[category]?.currentSortMode ?? .replyTime
     }
 
     @discardableResult
-    func toggleSortMode(for category: PostListCategory) -> PostListSortMode {
+    func toggleSortMode(for category: PostListCategoryItem) -> PostListSortMode {
         guard let host = hostViewControllers[category] else { return .replyTime }
         return host.toggleSortMode()
     }
 
-    func reloadFirstPage(for category: PostListCategory) {
+    func reloadFirstPage(for category: PostListCategoryItem) {
         hostViewControllers[category]?.reloadFirstPage()
     }
 
-    func scrollToTop(for category: PostListCategory, animated: Bool) {
+    func scrollToTop(for category: PostListCategoryItem, animated: Bool) {
         hostViewControllers[category]?.scrollToTop(animated: animated)
     }
 
@@ -116,7 +116,7 @@ final class PostPageContainerViewController: UIPageViewController {
         setCurrentCategory(category, animated: false, notifyDelegate: false)
     }
 
-    private func setCurrentCategory(_ category: PostListCategory, animated: Bool, notifyDelegate: Bool) {
+    private func setCurrentCategory(_ category: PostListCategoryItem, animated: Bool, notifyDelegate: Bool) {
         guard let targetVC = hostViewControllers[category] else { return }
         if currentCategory == category,
            viewControllers?.first === targetVC {
@@ -141,17 +141,17 @@ final class PostPageContainerViewController: UIPageViewController {
         }
     }
 
-    func updateCurrentCategoryAfterPaging(_ category: PostListCategory) {
+    func updateCurrentCategoryAfterPaging(_ category: PostListCategoryItem) {
         currentCategory = category
     }
 }
 
 extension PostPageContainerViewController: PostTextureListHostPresenterDelegate {
-    func postTextureListHostDidSelectPost(_ post: PostSummary, category: PostListCategory) {
+    func postTextureListHostDidSelectPost(_ post: PostSummary, category: PostListCategoryItem) {
         eventDelegate?.postPageContainerViewController(self, didSelectPost: post, category: category)
     }
 
-    func postTextureListHostDidChangeSortMode(_ sortMode: PostListSortMode, category: PostListCategory) {
+    func postTextureListHostDidChangeSortMode(_ sortMode: PostListSortMode, category: PostListCategoryItem) {
         eventDelegate?.postPageContainerViewController(self, didChangeSortMode: sortMode, category: category)
     }
 }

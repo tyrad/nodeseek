@@ -9,7 +9,7 @@ extension PostListViewController: PostPageContainerViewControllerDelegate {
     func postPageContainerViewController(
         _ containerView: PostPageContainerViewController,
         didSelectPost post: PostSummary,
-        category: PostListCategory
+        category: PostListCategoryItem
     ) {
         syncSelectedCategoryFromPageContainerIfNeeded(category)
         presenter.didSelectPost(post)
@@ -18,7 +18,7 @@ extension PostListViewController: PostPageContainerViewControllerDelegate {
     func postPageContainerViewController(
         _ containerView: PostPageContainerViewController,
         didChangeSortMode sortMode: PostListSortMode,
-        category: PostListCategory
+        category: PostListCategoryItem
     ) {
         syncSelectedCategoryFromPageContainerIfNeeded(category)
         renderSortMode(sortMode)
@@ -26,7 +26,7 @@ extension PostListViewController: PostPageContainerViewControllerDelegate {
 
     func postPageContainerViewController(
         _ containerView: PostPageContainerViewController,
-        didScrollTo category: PostListCategory
+        didScrollTo category: PostListCategoryItem
     ) {
         syncSelectedCategoryFromPageContainerIfNeeded(category)
         renderSortMode(containerView.sortMode(for: category))
@@ -37,7 +37,7 @@ extension PostListViewController: PostPageContainerViewControllerDelegate {
         sideMenuViewController.show(animated: true)
     }
 
-    private func syncSelectedCategoryFromPageContainerIfNeeded(_ category: PostListCategory) {
+    private func syncSelectedCategoryFromPageContainerIfNeeded(_ category: PostListCategoryItem) {
         guard category != selectedCategory else { return }
         selectedCategory = category
         applySelectedCategory(category, syncPage: false, pageAnimated: false)

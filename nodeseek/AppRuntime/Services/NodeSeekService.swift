@@ -33,7 +33,7 @@ struct NodeSeekService: Sendable {
 
     func loadPostList(
         page: Int = 1,
-        category: PostListCategory = .all,
+        category: PostListCategoryItem = .all,
         sortMode: PostListSortMode = .replyTime
     ) async throws -> NodeSeekResult<[PostSummary]> {
         let targetURL = postListURL(page: page, category: category, sortMode: sortMode)
@@ -114,7 +114,7 @@ struct NodeSeekService: Sendable {
         return .value(detail)
     }
 
-    private func postListURL(page: Int, category: PostListCategory, sortMode: PostListSortMode) -> URL {
+    private func postListURL(page: Int, category: PostListCategoryItem, sortMode: PostListSortMode) -> URL {
         let url = category.pathComponents(page: page).reduce(baseURL) { partialURL, pathComponent in
             partialURL.appendingPathComponent(pathComponent)
         }

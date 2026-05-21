@@ -264,6 +264,12 @@ final class PostTextureListView: UIView {
     }
 
     @objc private func appTextSizeDidChange(_ notification: Notification) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.appTextSizeDidChange(notification)
+            }
+            return
+        }
         guard displayMode == .content else { return }
         tableNode.reloadData()
     }

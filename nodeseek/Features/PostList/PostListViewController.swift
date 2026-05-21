@@ -34,8 +34,8 @@ class PostListViewController: UIViewController {
     // MARK: - Properties
     let presenter: PostListPresenterProtocol
     let detailTestURLProvider: () -> String
-    var categories: [PostListCategory] = []
-    var selectedCategory: PostListCategory = .all
+    var categories: [PostListCategoryItem] = []
+    var selectedCategory: PostListCategoryItem = .all
     var currentSortMode: PostListSortMode = .replyTime
     var sortToggleWidthConstraint: NSLayoutConstraint?
     private var sortToggleTrailingConstraint: NSLayoutConstraint?
@@ -79,6 +79,35 @@ class PostListViewController: UIViewController {
         return button
     }()
 
+    private let categoryEditButton: UIButton = {
+        let button = UIButton(type: .system)
+        let symbolConfig = UIImage.SymbolConfiguration(
+            pointSize: PostListTopBarStyle.Menu.symbolPointSize,
+            weight: PostListTopBarStyle.Menu.symbolWeight
+        )
+        let image = UIImage(systemName: "gearshape", withConfiguration: symbolConfig)
+            ?? UIImage(systemName: "square.and.pencil", withConfiguration: symbolConfig)
+        var configuration = UIButton.Configuration.plain()
+        configuration.baseForegroundColor = .label
+        configuration.image = image?.withRenderingMode(.alwaysTemplate)
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
+        configuration.background.backgroundColor = .clear
+        configuration.background.cornerRadius = 0
+        configuration.cornerStyle = .fixed
+        button.configuration = configuration
+        button.tintColor = .label
+        button.backgroundColor = .clear
+        button.layer.cornerRadius = 0
+        button.layer.borderWidth = 0
+        button.accessibilityIdentifier = "post-list-category-edit-button"
+        button.accessibilityLabel = "编辑首页分类"
+        button.configurationUpdateHandler = { updateButton in
+            updateButton.alpha = updateButton.isHighlighted ? 0.72 : 1.0
+        }
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     private let sortToggleAnchorView: UIView = {
         let view = UIView()
         view.isHidden = true
@@ -106,7 +135,7 @@ class PostListViewController: UIViewController {
         return stack
     }()
 
-    private var tabButtons: [PostListCategory: CategoryTabButton] = [:]
+    private var tabButtons: [PostListCategoryItem: CategoryTabButton] = [:]
     
     // MARK: - Initialization
     init(
@@ -174,6 +203,7 @@ class PostListViewController: UIViewController {
         pageContainerView.translatesAutoresizingMaskIntoConstraints = false
         compactTopButton.addTarget(self, action: #selector(leftButtonTapped), for: .touchUpInside)
         compactTopButton.addTarget(self, action: #selector(prepareMenuButtonFeedback), for: .touchDown)
+        categoryEditButton.addTarget(self, action: #selector(categoryEditButtonTapped), for: .touchUpInside)
         sortToggleButton.addTarget(self, action: #selector(sortToggleButtonTapped), for: .touchUpInside)
         floatingSortToggleContainer.onAdsorbedEdgeChanged = { [weak self] edge in
             self?.sortToggleButton.applyDockedEdge(edge)
@@ -206,6 +236,9 @@ class PostListViewController: UIViewController {
             compactTopButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: TopBarLayout.topOffset),
             compactTopButton.widthAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
             compactTopButton.heightAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
+
+            categoryEditButton.widthAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
+            categoryEditButton.heightAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
 
             sortToggleTrailingConstraint,
             sortToggleAnchorView.bottomAnchor.constraint(
@@ -251,6 +284,10 @@ class PostListViewController: UIViewController {
         scheduleSortToggleCollapse()
     }
 
+    @objc private func categoryEditButtonTapped() {
+        presenter.didTapCategoryPreferences()
+    }
+
     @objc private func categoryButtonTapped(_ sender: CategoryTabButton) {
         guard let category = sender.category else { return }
         guard category != selectedCategory else {
@@ -280,9 +317,10 @@ class PostListViewController: UIViewController {
             tabStackView.addArrangedSubview(button)
             tabButtons[category] = button
         }
+        tabStackView.addArrangedSubview(categoryEditButton)
     }
 
-    func applySelectedCategory(_ selected: PostListCategory, syncPage: Bool, pageAnimated: Bool) {
+    func applySelectedCategory(_ selected: PostListCategoryItem, syncPage: Bool, pageAnimated: Bool) {
         for (category, button) in tabButtons {
             button.applySelectedStyle(isSelected: category == selected)
         }
@@ -341,6 +379,7 @@ class PostListViewController: UIViewController {
     private func refreshAppearanceForCurrentTraits() {
         view.backgroundColor = .systemBackground
         compactTopButton.tintColor = .label
+        categoryEditButton.tintColor = .label
         applySelectedCategory(selectedCategory, syncPage: false, pageAnimated: false)
         sortToggleButton.apply(sortMode: currentSortMode, expanded: isSortToggleExpanded)
         pageContainerViewController.refreshVisibleAppearanceForCurrentTraits()
