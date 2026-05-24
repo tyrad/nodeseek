@@ -31,6 +31,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
     private let onFavoriteTapped: () -> Void
     private let onReplyTapped: () -> Void
     private let onCommentTapped: () -> Void
+    private let onContentCopyTapped: (PostDetailHeaderContent) -> Void
     private let onTextLayoutInvalidated: () -> Void
     private let showsReplyActions: Bool
     private let avatarLoader = AvatarImageLoader.shared
@@ -99,6 +100,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         onFavoriteTapped: @escaping () -> Void = {},
         onReplyTapped: @escaping () -> Void = {},
         onCommentTapped: @escaping () -> Void = {},
+        onContentCopyTapped: @escaping (PostDetailHeaderContent) -> Void = { _ in },
         showsReplyActions: Bool = true,
         onTextLayoutInvalidated: @escaping () -> Void,
         imageSizeProvider: @escaping (URL) -> CGSize? = { _ in nil },
@@ -115,6 +117,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         self.onFavoriteTapped = onFavoriteTapped
         self.onReplyTapped = onReplyTapped
         self.onCommentTapped = onCommentTapped
+        self.onContentCopyTapped = onContentCopyTapped
         self.showsReplyActions = showsReplyActions
         self.onTextLayoutInvalidated = onTextLayoutInvalidated
         self.bodyNodes = DetailContentBlockNodeFactory.makeNodes(
@@ -136,6 +139,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
     override func didLoad() {
         super.didLoad()
         themeTraitObserver.install(on: self)
+        installBodyContextMenus()
         requestAvatarIfNeeded()
     }
 
@@ -272,6 +276,18 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         favoriteButtonNode.addTarget(self, action: #selector(favoriteTapped), forControlEvents: .touchUpInside)
         replyButtonNode.addTarget(self, action: #selector(replyTapped), forControlEvents: .touchUpInside)
         commentButtonNode.addTarget(self, action: #selector(commentTapped), forControlEvents: .touchUpInside)
+    }
+
+    private func installBodyContextMenus() {
+        for bodyNode in bodyNodes {
+            installBodyContextMenu(on: bodyNode.view)
+        }
+    }
+
+    private func installBodyContextMenu(on view: UIView) {
+        guard view.interactions.contains(where: { $0 is UIContextMenuInteraction }) == false else { return }
+        view.isUserInteractionEnabled = true
+        view.addInteraction(UIContextMenuInteraction(delegate: self))
     }
 
     private func makeFooterActionStack() -> ASLayoutSpec {
@@ -572,6 +588,14 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         content.isFavoriteSubmitting
     }
 
+    var debugBodyContextMenuActionTitles: [String] {
+        bodyContextMenuActions().map(\.title)
+    }
+
+    var debugBodyContextMenuHasPreview: Bool {
+        false
+    }
+
     func debugTapFavoriteAction() {
         favoriteTapped()
     }
@@ -594,6 +618,30 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
 
     func debugTapCommentAction() {
         commentTapped()
+    }
+}
+
+extension PostBodyCellNode: UIContextMenuInteractionDelegate {
+    func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        configurationForMenuAtLocation location: CGPoint
+    ) -> UIContextMenuConfiguration? {
+        UIContextMenuConfiguration(
+            identifier: "\(content.postID)-body-copy" as NSString,
+            previewProvider: nil,
+            actionProvider: { [weak self] _ in
+                UIMenu(children: self?.bodyContextMenuActions() ?? [])
+            }
+        )
+    }
+
+    private func bodyContextMenuActions() -> [UIAction] {
+        [
+            UIAction(title: "复制", image: UIImage(systemName: "doc.on.doc")) { [weak self] _ in
+                guard let self else { return }
+                self.onContentCopyTapped(self.content)
+            }
+        ]
     }
 }
 

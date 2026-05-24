@@ -42,10 +42,16 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         }
     }
 
+    private enum ContextMenuIdentifier {
+        static let avatarSuffix = "-avatar"
+        static let bodySuffix = "-body"
+    }
+
     private var comment: Comment
     private let onImageTapped: ([URL], Int) -> Void
     private let onLinkTapped: (URL) -> Void
     private let onAuthorTapped: (URL) -> Void
+    private let onAuthorCopyTapped: (Comment) -> Void
     private let onLikeTapped: (Comment) -> Void
     private let onChickenLegTapped: (Comment) -> Void
     private let onOpposeTapped: (Comment) -> Void
@@ -89,6 +95,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
             imageView.isUserInteractionEnabled = self?.hasAuthorProfileLink == true
             if self?.hasAuthorProfileLink == true {
                 imageView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(CommentCellNode.authorTapped)))
+                self?.installContextMenu(on: imageView)
             }
             self?.avatarImageView = imageView
             return imageView
@@ -106,6 +113,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         onImageTapped: @escaping ([URL], Int) -> Void,
         onLinkTapped: @escaping (URL) -> Void = { _ in },
         onAuthorTapped: @escaping (URL) -> Void = { _ in },
+        onAuthorCopyTapped: @escaping (Comment) -> Void = { _ in },
         onLikeTapped: @escaping (Comment) -> Void = { _ in },
         onChickenLegTapped: @escaping (Comment) -> Void = { _ in },
         onOpposeTapped: @escaping (Comment) -> Void = { _ in },
@@ -120,6 +128,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         self.onImageTapped = onImageTapped
         self.onLinkTapped = onLinkTapped
         self.onAuthorTapped = onAuthorTapped
+        self.onAuthorCopyTapped = onAuthorCopyTapped
         self.onLikeTapped = onLikeTapped
         self.onChickenLegTapped = onChickenLegTapped
         self.onOpposeTapped = onOpposeTapped
@@ -146,6 +155,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
     override func didLoad() {
         super.didLoad()
         themeTraitObserver.install(on: self)
+        installContextMenu(on: view)
         requestAvatarIfNeeded()
     }
 
@@ -331,6 +341,11 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         opposeButtonNode.addTarget(self, action: #selector(opposeTapped), forControlEvents: .touchUpInside)
         replyButtonNode.addTarget(self, action: #selector(replyTapped), forControlEvents: .touchUpInside)
         quoteButtonNode.addTarget(self, action: #selector(quoteTapped), forControlEvents: .touchUpInside)
+    }
+
+    private func installContextMenu(on view: UIView) {
+        guard view.interactions.contains(where: { $0 is UIContextMenuInteraction }) == false else { return }
+        view.addInteraction(UIContextMenuInteraction(delegate: self))
     }
 
     private static func makeAuthorBadgeNode(text: String) -> ASButtonNode {
@@ -593,6 +608,22 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         Self.opposeActionColor(isClicked: comment.isOpposeClicked)
     }
 
+    var debugAvatarContextMenuActionTitles: [String] {
+        []
+    }
+
+    var debugAvatarContextMenuHasPreview: Bool {
+        hasAuthorProfileLink
+    }
+
+    var debugBodyContextMenuActionTitles: [String] {
+        bodyContextMenuActions().map(\.title)
+    }
+
+    var debugBodyContextMenuHasPreview: Bool {
+        false
+    }
+
     @objc private func replyTapped() {
         onReplyTapped(comment)
     }
@@ -631,5 +662,54 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
     private func cancelAvatarLoad() {
         guard let avatarImageView else { return }
         avatarLoader.cancel(on: avatarImageView)
+    }
+}
+
+extension CommentCellNode: UIContextMenuInteractionDelegate {
+    func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        configurationForMenuAtLocation location: CGPoint
+    ) -> UIContextMenuConfiguration? {
+        if interaction.view === avatarImageView {
+            guard let authorProfileURL = comment.authorProfileURL, hasDisplayableAuthor else { return nil }
+            return UIContextMenuConfiguration(
+                identifier: "\(comment.id)\(ContextMenuIdentifier.avatarSuffix)" as NSString,
+                previewProvider: {
+                    UserInfoWebViewController(profileURL: authorProfileURL)
+                }
+            )
+        }
+
+        return UIContextMenuConfiguration(
+            identifier: "\(comment.id)\(ContextMenuIdentifier.bodySuffix)" as NSString,
+            previewProvider: nil,
+            actionProvider: { [weak self] _ in
+                UIMenu(children: self?.bodyContextMenuActions() ?? [])
+            }
+        )
+    }
+
+    func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        willPerformPreviewActionForMenuWith configuration: UIContextMenuConfiguration,
+        animator: UIContextMenuInteractionCommitAnimating
+    ) {
+        guard (configuration.identifier as? NSString)?.hasSuffix(ContextMenuIdentifier.avatarSuffix) == true else { return }
+        guard let authorProfileURL = comment.authorProfileURL else { return }
+        animator.addCompletion { [weak self] in
+            self?.onAuthorTapped(authorProfileURL)
+        }
+    }
+
+    private func bodyContextMenuActions() -> [UIAction] {
+        return [
+            UIAction(title: "复制", image: UIImage(systemName: "doc.on.doc")) { [weak self] _ in
+                guard let self else { return }
+                self.onAuthorCopyTapped(self.comment)
+            },
+            UIAction(title: "投放鸡腿", image: UIImage(systemName: "fork.knife")) { [weak self] _ in
+                self?.chickenLegTapped()
+            }
+        ]
     }
 }

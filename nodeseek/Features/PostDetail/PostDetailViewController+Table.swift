@@ -172,6 +172,9 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                     onCommentTapped: {
                         self?.presentCommentEditor()
                     },
+                    onContentCopyTapped: { content in
+                        self?.presentPostBodyCopySheet(for: content)
+                    },
                     showsReplyActions: self?.showsReplyEntry == true,
                     onTextLayoutInvalidated: {
                         self?.scheduleAttachmentLayoutRefresh()
@@ -220,6 +223,9 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                     },
                     onAuthorTapped: { url in
                         self?.openUserInfo(profileURL: url)
+                    },
+                    onAuthorCopyTapped: { comment in
+                        self?.presentCommentCopySheet(for: comment)
                     },
                     onLikeTapped: { comment in
                         self?.handleCommentLikeTap(comment)
