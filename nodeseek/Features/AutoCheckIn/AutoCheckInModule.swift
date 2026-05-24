@@ -10,8 +10,14 @@ enum AutoCheckInModule {
     private static let settingsStore = AutoCheckInSettingsStore.shared
     private static let coordinator = AutoCheckInCoordinator(settingsStore: settingsStore)
 
-    static func runIfNeeded(presentationContext: UIViewController?) async {
-        _ = await coordinator.runIfNeeded(presentationContext: presentationContext)
+    static func runIfNeeded(
+        presentationContext: UIViewController?,
+        trigger: AutoCheckInTrigger = .postListAllFirstPage
+    ) async {
+        _ = await coordinator.runIfNeeded(
+            presentationContext: presentationContext,
+            trigger: trigger
+        )
     }
 
     static func makeSettingsViewController() -> UIViewController {

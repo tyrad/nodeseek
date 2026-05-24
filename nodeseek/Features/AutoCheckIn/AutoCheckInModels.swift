@@ -35,6 +35,10 @@ enum AutoCheckInMode: String, Codable, CaseIterable, Sendable {
     }
 }
 
+enum AutoCheckInTrigger: String, Sendable {
+    case postListAllFirstPage
+}
+
 struct AutoCheckInState: Codable, Equatable, Sendable {
     var completedDayIdentifier: String?
     var lastSuccessfulAt: Date?

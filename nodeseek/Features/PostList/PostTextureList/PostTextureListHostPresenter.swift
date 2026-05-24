@@ -101,6 +101,7 @@ extension PostTextureListHostPresenter: PostTextureListHostInteractorOutput {
         view?.hideLoadingSkeleton()
         view?.hideRefreshing()
         view?.hideLoadingMore()
+        delegate?.postTextureListHostDidLoadFirstPage(category: category)
     }
 
     func didLoadMorePosts(

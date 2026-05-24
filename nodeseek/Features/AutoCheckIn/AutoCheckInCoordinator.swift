@@ -87,7 +87,10 @@ final class AutoCheckInCoordinator {
         self.cooldownInterval = cooldownInterval
     }
 
-    func runIfNeeded(presentationContext: UIViewController?) async -> AutoCheckInRunOutcome {
+    func runIfNeeded(
+        presentationContext: UIViewController?,
+        trigger: AutoCheckInTrigger = .postListAllFirstPage
+    ) async -> AutoCheckInRunOutcome {
         if let inFlightTask {
             AppLog.info(.autoCheckIn, "runID=\(activeRunID ?? "unknown") skip=in_flight")
             return await inFlightTask.value
@@ -96,7 +99,11 @@ final class AutoCheckInCoordinator {
         let runID = runIDProvider()
         let task: Task<AutoCheckInRunOutcome, Never> = Task { @MainActor [weak self] in
             guard let self else { return .failed("coordinator_released") }
-            return await self.performRun(runID: runID, presentationContext: presentationContext)
+            return await self.performRun(
+                runID: runID,
+                trigger: trigger,
+                presentationContext: presentationContext
+            )
         }
         activeRunID = runID
         inFlightTask = task
@@ -106,11 +113,15 @@ final class AutoCheckInCoordinator {
         return outcome
     }
 
-    private func performRun(runID: String, presentationContext: UIViewController?) async -> AutoCheckInRunOutcome {
+    private func performRun(
+        runID: String,
+        trigger: AutoCheckInTrigger,
+        presentationContext: UIViewController?
+    ) async -> AutoCheckInRunOutcome {
         let startedAt = now()
         let dayIdentifier = dayIdentifierProvider()
         let settings = settingsStore.settings
-        AppLog.info(.autoCheckIn, "runID=\(runID) start trigger=appLifecycle day=\(dayIdentifier) enabled=\(settings.isEnabled) mode=\(settings.mode.rawValue)")
+        AppLog.info(.autoCheckIn, "runID=\(runID) start trigger=\(trigger.rawValue) day=\(dayIdentifier) enabled=\(settings.isEnabled) mode=\(settings.mode.rawValue)")
 
         guard settings.isEnabled else {
             AppLog.info(.autoCheckIn, "runID=\(runID) skip=disabled")

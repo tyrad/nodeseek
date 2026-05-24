@@ -44,6 +44,32 @@ struct PostTextureListInteractorTests {
             return
         }
     }
+
+    @Test func successfulFirstPageLoadNotifiesHostDelegate() {
+        let interactor = SpyPostTextureListHostInteractor()
+        let view = SpyPostTextureListHostView()
+        let delegate = SpyPostTextureListHostPresenterDelegate()
+        let presenter = PostTextureListHostPresenter(
+            category: .all,
+            interactor: interactor,
+            visitedStore: EmptyVisitedPostStore()
+        )
+        presenter.setView(view)
+        presenter.delegate = delegate
+        let post = PostSummary(
+            id: "1",
+            title: "标题",
+            url: URL(string: "https://www.nodeseek.com/post-1-1")!,
+            authorName: "mist",
+            nodeName: "Dev",
+            replyCount: 0,
+            lastActivityText: "刚刚"
+        )
+
+        presenter.didLoadPosts([post], category: .all, sortMode: .replyTime)
+
+        #expect(delegate.loadedFirstPageCategories == [.all])
+    }
 }
 
 @MainActor
@@ -65,6 +91,41 @@ private final class SpyPostTextureListHostInteractorOutput: PostTextureListHostI
     func didFailLoadMorePosts(error: String, page: Int, category: PostListCategoryItem, sortMode: PostListSortMode) {
         errorMessage = error
     }
+}
+
+@MainActor
+private final class SpyPostTextureListHostInteractor: PostTextureListHostInteractorInput {
+    weak var presenter: PostTextureListHostInteractorOutput?
+
+    func loadPosts(category: PostListCategoryItem, sortMode: PostListSortMode) {}
+
+    func loadMorePosts(page: Int, category: PostListCategoryItem, sortMode: PostListSortMode) {}
+}
+
+@MainActor
+private final class SpyPostTextureListHostPresenterDelegate: PostTextureListHostPresenterDelegate {
+    private(set) var loadedFirstPageCategories: [PostListCategoryItem] = []
+
+    func postTextureListHostDidSelectPost(_ post: PostSummary, category: PostListCategoryItem) {}
+
+    func postTextureListHostDidChangeSortMode(_ sortMode: PostListSortMode, category: PostListCategoryItem) {}
+
+    func postTextureListHostDidLoadFirstPage(category: PostListCategoryItem) {
+        loadedFirstPageCategories.append(category)
+    }
+}
+
+@MainActor
+private final class SpyPostTextureListHostView: PostTextureListHostViewProtocol {
+    func setItems(_ items: [PostListItem]) {}
+    func showLoadingSkeleton() {}
+    func hideLoadingSkeleton() {}
+    func showFirstPageError(message: String) {}
+    func hideFirstPageError() {}
+    func hideRefreshing() {}
+    func showLoadingMore() {}
+    func hideLoadingMore() {}
+    func updateVisitedState(at index: Int, isVisited: Bool) {}
 }
 
 @MainActor

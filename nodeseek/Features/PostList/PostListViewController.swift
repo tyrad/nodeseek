@@ -34,6 +34,7 @@ class PostListViewController: UIViewController {
     // MARK: - Properties
     let presenter: PostListPresenterProtocol
     let detailTestURLProvider: () -> String
+    let autoCheckInRunner: @MainActor (UIViewController?) async -> Void
     var categories: [PostListCategoryItem] = []
     var selectedCategory: PostListCategoryItem = .all
     var currentSortMode: PostListSortMode = .replyTime
@@ -142,12 +143,19 @@ class PostListViewController: UIViewController {
         presenter: PostListPresenterProtocol,
         visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore(),
         floatingPositionStore: FloatingControlPositionStoring = UserDefaultsFloatingControlPositionStore(),
+        autoCheckInRunner: @escaping @MainActor (UIViewController?) async -> Void = { presentationContext in
+            await AutoCheckInModule.runIfNeeded(
+                presentationContext: presentationContext,
+                trigger: .postListAllFirstPage
+            )
+        },
         detailTestURLProvider: @escaping () -> String = {
             UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string ?? ""
         }
     ) {
         self.presenter = presenter
         self.detailTestURLProvider = detailTestURLProvider
+        self.autoCheckInRunner = autoCheckInRunner
         self.pageContainerViewController = PostPageContainerViewController(
             visitedStore: visitedStore
         )

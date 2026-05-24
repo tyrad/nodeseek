@@ -32,6 +32,17 @@ extension PostListViewController: PostPageContainerViewControllerDelegate {
         renderSortMode(containerView.sortMode(for: category))
     }
 
+    func postPageContainerViewController(
+        _ containerView: PostPageContainerViewController,
+        didLoadFirstPageFor category: PostListCategoryItem
+    ) {
+        guard category.isAll else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await autoCheckInRunner(self)
+        }
+    }
+
     func postPageContainerViewControllerDidRequestLeadingSideMenu(_ containerView: PostPageContainerViewController) {
         menuButtonFeedbackGenerator.impactOccurred()
         sideMenuViewController.show(animated: true)

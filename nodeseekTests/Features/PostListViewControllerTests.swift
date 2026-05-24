@@ -215,6 +215,49 @@ struct PostListViewControllerTests {
         #expect(presenter.selectedCategories.isEmpty)
     }
 
+    @Test func allTabFirstPageSuccessTriggersAutoCheckIn() async throws {
+        let presenter = SpyPostListPresenter()
+        let capturedContexts = AutoCheckInPresentationContexts()
+        let viewController = makePostListViewController(
+            presenter: presenter,
+            autoCheckInRunner: { context in
+                capturedContexts.append(context)
+            }
+        )
+        viewController.loadViewIfNeeded()
+
+        viewController.postPageContainerViewController(
+            viewController.pageContainerViewController,
+            didLoadFirstPageFor: .all
+        )
+
+        try await waitUntil {
+            capturedContexts.values.count == 1
+        }
+        let capturedContext = try #require(capturedContexts.values.first ?? nil)
+        #expect(capturedContext === viewController)
+    }
+
+    @Test func nonAllTabFirstPageSuccessDoesNotTriggerAutoCheckIn() async throws {
+        let presenter = SpyPostListPresenter()
+        let capturedContexts = AutoCheckInPresentationContexts()
+        let viewController = makePostListViewController(
+            presenter: presenter,
+            autoCheckInRunner: { context in
+                capturedContexts.append(context)
+            }
+        )
+        viewController.loadViewIfNeeded()
+
+        viewController.postPageContainerViewController(
+            viewController.pageContainerViewController,
+            didLoadFirstPageFor: .tech
+        )
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        #expect(capturedContexts.values.isEmpty)
+    }
+
     @Test func categoryPreferenceFallbackRemovesHiddenTabAndSelectsAllPage() throws {
         let presenter = SpyPostListPresenter()
         let viewController = makePostListViewController(presenter: presenter)
@@ -626,6 +669,7 @@ struct PostListViewControllerTests {
 private func makePostListViewController(
     presenter: SpyPostListPresenter,
     floatingPositionStore: FloatingControlPositionStoring = InMemoryFloatingControlPositionStore(),
+    autoCheckInRunner: @escaping @MainActor (UIViewController?) async -> Void = { _ in },
     detailTestURLProvider: @escaping () -> String = {
         UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string ?? ""
     }
@@ -633,8 +677,18 @@ private func makePostListViewController(
     PostListViewController(
         presenter: presenter,
         floatingPositionStore: floatingPositionStore,
+        autoCheckInRunner: autoCheckInRunner,
         detailTestURLProvider: detailTestURLProvider
     )
+}
+
+@MainActor
+private final class AutoCheckInPresentationContexts {
+    private(set) var values: [UIViewController?] = []
+
+    func append(_ value: UIViewController?) {
+        values.append(value)
+    }
 }
 
 private final class InMemoryFloatingControlPositionStore: FloatingControlPositionStoring {

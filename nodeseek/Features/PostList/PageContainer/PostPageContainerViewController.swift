@@ -11,6 +11,7 @@ protocol PostPageContainerViewControllerDelegate: AnyObject {
     func postPageContainerViewController(_ viewController: PostPageContainerViewController, didSelectPost post: PostSummary, category: PostListCategoryItem)
     func postPageContainerViewController(_ viewController: PostPageContainerViewController, didChangeSortMode sortMode: PostListSortMode, category: PostListCategoryItem)
     func postPageContainerViewController(_ viewController: PostPageContainerViewController, didScrollTo category: PostListCategoryItem)
+    func postPageContainerViewController(_ viewController: PostPageContainerViewController, didLoadFirstPageFor category: PostListCategoryItem)
     func postPageContainerViewControllerDidRequestLeadingSideMenu(_ viewController: PostPageContainerViewController)
 }
 
@@ -153,5 +154,9 @@ extension PostPageContainerViewController: PostTextureListHostPresenterDelegate 
 
     func postTextureListHostDidChangeSortMode(_ sortMode: PostListSortMode, category: PostListCategoryItem) {
         eventDelegate?.postPageContainerViewController(self, didChangeSortMode: sortMode, category: category)
+    }
+
+    func postTextureListHostDidLoadFirstPage(category: PostListCategoryItem) {
+        eventDelegate?.postPageContainerViewController(self, didLoadFirstPageFor: category)
     }
 }
