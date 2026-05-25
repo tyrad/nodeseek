@@ -134,6 +134,16 @@ struct SettingsViewControllerTests {
         #expect(viewController.tableView.numberOfRows(inSection: 5) == 0)
     }
 
+    @Test func postSignatureDisplayDefaultsToEnabledWhenUnset() throws {
+        let suiteName = "settings-signature-display-default-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let signatureSettings = PostSignatureDisplaySettings(userDefaults: defaults, storageKey: "show-signatures")
+
+        #expect(defaults.object(forKey: "show-signatures") == nil)
+        #expect(signatureSettings.showsSignatures == true)
+    }
+
     @Test func togglingSignatureDisplaySwitchPersistsPreference() throws {
         let suiteName = "settings-signature-display-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
