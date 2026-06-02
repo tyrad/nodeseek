@@ -48,6 +48,7 @@ nonisolated struct PostSummary: Equatable, Sendable {
     let lastActivityText: String?
     let isPinned: Bool
     let isLocked: Bool
+    let requiredReadingLevel: Int?
     let avatarURL: URL?
 
     init(
@@ -61,6 +62,7 @@ nonisolated struct PostSummary: Equatable, Sendable {
         lastActivityText: String?,
         isPinned: Bool = false,
         isLocked: Bool = false,
+        requiredReadingLevel: Int? = nil,
         avatarURL: URL? = nil
     ) {
         self.id = id
@@ -73,6 +75,7 @@ nonisolated struct PostSummary: Equatable, Sendable {
         self.lastActivityText = lastActivityText
         self.isPinned = isPinned
         self.isLocked = isLocked
+        self.requiredReadingLevel = requiredReadingLevel
         self.avatarURL = avatarURL
     }
 }

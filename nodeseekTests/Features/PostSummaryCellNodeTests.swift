@@ -186,6 +186,32 @@ struct PostSummaryCellNodeTests {
         #expect(titleText.string.contains(post.title))
     }
 
+    @Test func lockedPostTitleShowsRequiredReadingLevelAfterLockSymbol() throws {
+        let post = PostSummary(
+            id: "754777",
+            title: "溢价750收，改邮搬瓦工MEGABOX PRO，95段IP",
+            url: URL(string: "https://www.nodeseek.com/post-754777-1")!,
+            authorName: "Jams",
+            nodeName: "交易",
+            replyCount: 16,
+            viewCount: 257,
+            lastActivityText: "3s ago",
+            isLocked: true,
+            requiredReadingLevel: 3
+        )
+
+        let titleText = PostSummaryCellNode.titleAttributedText(for: post)
+        let attachmentIndex = titleText.string.count - 1
+        let lockAttachment = titleText.attribute(
+            NSAttributedString.Key.attachment,
+            at: attachmentIndex,
+            effectiveRange: nil
+        ) as? NSTextAttachment
+
+        #expect(lockAttachment?.image != nil)
+        #expect(titleText.string.hasSuffix(" 3"))
+    }
+
     @Test func cellRefreshAppearanceRebuildsAttributedText() {
         let post = PostSummary(
             id: "5",

@@ -262,6 +262,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
         let lastActivityText = firstText(in: item, xpaths: [XPathRules.lastActive, XPathRules.fallbackLastActive])
         let isPinned = item.at_xpath(XPathRules.postPinned) != nil
         let isLocked = item.at_xpath(XPathRules.postLocked) != nil
+        let requiredReadingLevel = requiredReadingLevelFromPostListLockBadge(in: item)
 
         return PostSummary(
             id: id,
@@ -274,8 +275,16 @@ struct KannaNodeSeekParser: NodeSeekParser {
             lastActivityText: lastActivityText,
             isPinned: isPinned,
             isLocked: isLocked,
+            requiredReadingLevel: requiredReadingLevel,
             avatarURL: avatarURL
         )
+    }
+
+    private func requiredReadingLevelFromPostListLockBadge(in item: Kanna.XMLElement) -> Int? {
+        item.at_xpath(XPathRules.postLockBadge)?
+            .text?
+            .normalizedNonEmpty
+            .flatMap(Self.firstInteger(in:))
     }
 
     private func firstText(in item: Kanna.XMLElement, xpaths: [String]) -> String? {

@@ -21,6 +21,7 @@ enum XPathRules {
     static let postTitle = ".//*[contains(@class, 'post-title') and self::a] | .//*[contains(@class, 'post-title')]//a[contains(@href, '/post-') or contains(@href, '/post/')]"
     static let postPinned = ".//*[contains(@class, 'post-title')]//*[@title='置顶' or contains(concat(' ', normalize-space(@class), ' '), ' pined ') or (local-name()='use' and @*[local-name()='href' and .='#pin'])]"
     static let postLocked = ".//*[contains(@class, 'post-title')]//*[local-name()='use' and @*[local-name()='href' and .='#lock']]"
+    static let postLockBadge = ".//*[contains(@class, 'post-title')]//*[local-name()='use' and @*[local-name()='href' and .='#lock']]/ancestor::*[self::span or self::a][1]"
     static let postAvatar = ".//img[contains(@class, 'avatar') or contains(@src, '/avatar/')]"
     static let postAuthor = ".//*[contains(@class, 'post-author')] | .//*[contains(@class, 'info-author')]//a"
     static let postNode = ".//*[contains(@class, 'post-node')] | .//*[contains(@class, 'post-category')]"

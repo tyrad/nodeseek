@@ -239,6 +239,16 @@ final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
             to: title
         )
 
+        if let requiredReadingLevel = post.requiredReadingLevel {
+            title.append(NSAttributedString(
+                string: " \(requiredReadingLevel)",
+                attributes: [
+                    .font: font,
+                    .foregroundColor: UIColor.systemRed
+                ]
+            ))
+        }
+
         return title
     }
 

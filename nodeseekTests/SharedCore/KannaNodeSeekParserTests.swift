@@ -604,6 +604,45 @@ struct KannaNodeSeekParserTests {
         #expect(post.lastActivityText == "7h 32min ago")
     }
 
+    @Test func parsesPostListRequiredReadingLevelFromLockBadge() throws {
+        let html = """
+        <ul class="post-list">
+            <li class="post-list-item">
+                <div class="post-list-content">
+                    <div role="heading" aria-level="3" class="post-title">
+                        <a href="/post-754777-1" target="">溢价750收，改邮搬瓦工MEGABOX PRO，95段IP</a>
+                        <span style="color: rgb(255 152 152); font-family: sans-serif;">
+                            <svg class="iconpark-icon" style="vertical-align: baseline"><use href="#lock"></use></svg>3
+                        </span>
+                    </div>
+                    <div class="post-info">
+                        <span class="info-item info-author"><a href="/space/48568">Jams</a></span>
+                        <span class="info-item info-views"><span title="257 views">257</span></span>
+                        <span title="16 comments" class="info-item info-comments-count"><span title="17 comments">16</span></span>
+                        <a href="/post-754777-2#16" class="info-item info-last-comment-time">
+                            <time title="2026-06-02 09:01:48" datetime="2026-06-02T01:01:48.000Z">3s ago</time>
+                        </a>
+                        <a href="/categories/trade" class="info-item post-category">交易</a>
+                    </div>
+                </div>
+            </li>
+        </ul>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let post = try #require(try parser.parsePostList(html: html).first)
+
+        #expect(post.id == "754777")
+        #expect(post.title == "溢价750收，改邮搬瓦工MEGABOX PRO，95段IP")
+        #expect(post.isLocked)
+        #expect(post.requiredReadingLevel == 3)
+        #expect(post.authorName == "Jams")
+        #expect(post.nodeName == "交易")
+        #expect(post.replyCount == 16)
+        #expect(post.viewCount == 257)
+        #expect(post.lastActivityText == "3s ago")
+    }
+
     @Test func parsesRealPageOneFixture() throws {
         let html = try FixtureLoader.html(named: "page-1")
         let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
@@ -619,6 +658,7 @@ struct KannaNodeSeekParserTests {
         #expect(first.replyCount == 4)
         #expect(first.viewCount == 39)
         #expect(first.isLocked)
+        #expect(first.requiredReadingLevel == 1)
         #expect(first.lastActivityText == "24s ago")
         #expect(first.avatarURL?.path == "/avatar/17843.png")
 
@@ -626,6 +666,7 @@ struct KannaNodeSeekParserTests {
         #expect(unlockedPost.id == "703691")
         #expect(unlockedPost.viewCount == 45)
         #expect(!unlockedPost.isLocked)
+        #expect(unlockedPost.requiredReadingLevel == nil)
     }
 
     @Test func parsesPostDetailFixture() throws {
