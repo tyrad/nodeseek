@@ -114,6 +114,77 @@ struct PostListViewControllerTests {
         #expect(presenter.didTapCategoryPreferencesCount == 1)
     }
 
+    @Test func topSearchEntryDefaultsHiddenAndCanRouteToSearchWhenEnabled() throws {
+        let presenter = SpyPostListPresenter()
+        let settings = makePostListSearchEntrySettings()
+        let viewController = makePostListViewController(
+            presenter: presenter,
+            searchEntrySettings: settings
+        )
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.renderCategories([.all, .daily, .tech, .info], selected: .all)
+        viewController.view.layoutIfNeeded()
+
+        let searchButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-top-search-button"))
+        let gradientView = try #require(viewController.view.firstView(accessibilityIdentifier: "post-list-top-search-gradient"))
+        let tabScrollView = try #require(viewController.view.firstView(accessibilityIdentifier: "post-list-tab-scroll-view"))
+        #expect(searchButton.isHidden == true)
+        #expect(gradientView.isHidden == true)
+
+        settings.setShowsTopSearchEntry(true)
+        viewController.view.layoutIfNeeded()
+
+        #expect(searchButton.isHidden == false)
+        #expect(searchButton.bounds.width == 40)
+        #expect(searchButton.bounds.height == 40)
+        #expect(searchButton.accessibilityLabel == "搜索")
+        #expect(searchButton.configuration?.image != nil)
+        #expect(searchButton.configuration?.baseForegroundColor == .label)
+        #expect(gradientView.isHidden == false)
+        #expect(gradientView.bounds.width == 40)
+        let searchButtonFrame = searchButton.convert(searchButton.bounds, to: viewController.view)
+        let gradientFrame = gradientView.convert(gradientView.bounds, to: viewController.view)
+        #expect(abs(searchButtonFrame.minY - (viewController.view.safeAreaInsets.top - 4)) < 1)
+        #expect(abs(searchButtonFrame.maxX - (viewController.view.safeAreaLayoutGuide.layoutFrame.maxX - 8)) < 1)
+        let tabScrollFrame = tabScrollView.convert(tabScrollView.bounds, to: viewController.view)
+        #expect(gradientFrame.minX < searchButtonFrame.minX)
+        #expect(abs(gradientFrame.maxX - searchButtonFrame.minX) < 1)
+        #expect(abs(tabScrollFrame.maxX - searchButtonFrame.minX) < 1)
+        #expect(gradientFrame.minX < tabScrollFrame.maxX)
+
+        searchButton.sendActions(for: .touchUpInside)
+
+        #expect(presenter.didTapSearchCount == 1)
+    }
+
+    @Test func topSearchEntryRefreshesFromNotificationAndViewWillAppear() throws {
+        let presenter = SpyPostListPresenter()
+        let settings = makePostListSearchEntrySettings()
+        let viewController = makePostListViewController(
+            presenter: presenter,
+            searchEntrySettings: settings
+        )
+        viewController.loadViewIfNeeded()
+        let searchButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-top-search-button"))
+        let gradientView = try #require(viewController.view.firstView(accessibilityIdentifier: "post-list-top-search-gradient"))
+
+        #expect(searchButton.isHidden == true)
+        settings.setShowsTopSearchEntry(true)
+        #expect(searchButton.isHidden == false)
+        #expect(gradientView.isHidden == false)
+
+        settings.setShowsTopSearchEntry(false)
+        #expect(searchButton.isHidden == true)
+        #expect(gradientView.isHidden == true)
+
+        settings.setShowsTopSearchEntry(true)
+        viewController.beginAppearanceTransition(true, animated: false)
+        viewController.endAppearanceTransition()
+        #expect(searchButton.isHidden == false)
+        #expect(gradientView.isHidden == false)
+    }
+
     @Test func sortToggleButtonIsHostedInDraggableFloatingContainer() throws {
         let presenter = SpyPostListPresenter()
         let viewController = makePostListViewController(presenter: presenter)
@@ -669,6 +740,7 @@ struct PostListViewControllerTests {
 private func makePostListViewController(
     presenter: SpyPostListPresenter,
     floatingPositionStore: FloatingControlPositionStoring = InMemoryFloatingControlPositionStore(),
+    searchEntrySettings: PostListSearchEntrySettings = makePostListSearchEntrySettings(),
     autoCheckInRunner: @escaping @MainActor (UIViewController?) async -> Void = { _ in },
     detailTestURLProvider: @escaping () -> String = {
         UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string ?? ""
@@ -677,9 +749,16 @@ private func makePostListViewController(
     PostListViewController(
         presenter: presenter,
         floatingPositionStore: floatingPositionStore,
+        searchEntrySettings: searchEntrySettings,
         autoCheckInRunner: autoCheckInRunner,
         detailTestURLProvider: detailTestURLProvider
     )
+}
+
+private func makePostListSearchEntrySettings() -> PostListSearchEntrySettings {
+    let suiteName = "post-list-search-entry-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    return PostListSearchEntrySettings(userDefaults: defaults, storageKey: "shows-top-search-entry")
 }
 
 @MainActor

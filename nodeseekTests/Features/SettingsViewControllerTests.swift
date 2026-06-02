@@ -20,6 +20,7 @@ struct SettingsViewControllerTests {
             let categoryStore = makeCategoryPreferenceStore()
             let textSizeDefaults = try #require(UserDefaults(suiteName: "settings-text-size-\(UUID().uuidString)"))
             let textSizeSettings = AppTextSizeSettings(userDefaults: textSizeDefaults, storageKey: "text-size")
+            let searchEntrySettings = makeSettingsPostListSearchEntrySettings()
             let viewController = SettingsViewController(
                 cacheManager: FakeSettingsCacheManager(cacheByteSize: 4_096),
                 sessionManager: FakeSettingsSessionManager(),
@@ -27,6 +28,7 @@ struct SettingsViewControllerTests {
                 buildInfo: .testFlightFixture,
                 nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
                 textSizeSettings: textSizeSettings,
+                searchEntrySettings: searchEntrySettings,
                 categoryPreferenceStore: categoryStore,
                 autoCheckInSummaryProvider: { "未开启" }
             )
@@ -38,7 +40,7 @@ struct SettingsViewControllerTests {
             let tableView = try #require(viewController.tableView)
             #expect(viewController.title == "设置")
             #expect(tableView.numberOfSections == 6)
-            #expect(tableView.numberOfRows(inSection: 0) == 3)
+            #expect(tableView.numberOfRows(inSection: 0) == 4)
             #expect(tableView.numberOfRows(inSection: 1) == 3)
             #expect(tableView.numberOfRows(inSection: 2) == 1)
             #expect(tableView.numberOfRows(inSection: 3) == 1)
@@ -72,11 +74,15 @@ struct SettingsViewControllerTests {
             ))
             let textSizeCell = try #require(tableView.dataSource?.tableView(
                 tableView,
+                cellForRowAt: IndexPath(row: 2, section: 0)
+            ))
+            let searchEntryCell = try #require(tableView.dataSource?.tableView(
+                tableView,
                 cellForRowAt: IndexPath(row: 1, section: 0)
             ))
             let signatureCell = try #require(tableView.dataSource?.tableView(
                 tableView,
-                cellForRowAt: IndexPath(row: 2, section: 0)
+                cellForRowAt: IndexPath(row: 3, section: 0)
             ))
             let debugCell = try #require(tableView.dataSource?.tableView(
                 tableView,
@@ -103,6 +109,9 @@ struct SettingsViewControllerTests {
             #expect(textSizeCell.textLabel?.text == "字体大小")
             #expect(textSizeCell.detailTextLabel?.text == "标准")
             #expect(textSizeCell.accessoryType == .disclosureIndicator)
+            #expect(searchEntryCell.textLabel?.text == "首页搜索入口")
+            let searchEntrySwitch = try #require(searchEntryCell.accessoryView as? UISwitch)
+            #expect(searchEntrySwitch.isOn == false)
             #expect(autoCheckInCell.textLabel?.text == "自动签到")
             #expect(autoCheckInCell.detailTextLabel?.text == "Beta · 未开启")
             #expect(autoCheckInCell.accessoryType == .disclosureIndicator)
@@ -159,7 +168,7 @@ struct SettingsViewControllerTests {
 
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 2, section: 0)
+            cellForRowAt: IndexPath(row: 3, section: 0)
         ))
         let signatureSwitch = try #require(cell.accessoryView as? UISwitch)
         #expect(signatureSwitch.isOn == true)
@@ -168,6 +177,53 @@ struct SettingsViewControllerTests {
         signatureSwitch.sendActions(for: .valueChanged)
 
         #expect(signatureSettings.showsSignatures == false)
+    }
+
+    @Test func postListSearchEntryDefaultsToDisabledWhenUnset() throws {
+        let suiteName = "settings-home-search-entry-default-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let searchEntrySettings = PostListSearchEntrySettings(userDefaults: defaults, storageKey: "home-search-entry")
+
+        #expect(defaults.object(forKey: "home-search-entry") == nil)
+        #expect(searchEntrySettings.showsTopSearchEntry == false)
+    }
+
+    @Test func togglingPostListSearchEntrySwitchPersistsPreferenceAndPostsNotification() throws {
+        let suiteName = "settings-home-search-entry-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let searchEntrySettings = PostListSearchEntrySettings(userDefaults: defaults, storageKey: "home-search-entry")
+        let viewController = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager(),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
+            searchEntrySettings: searchEntrySettings
+        )
+        var notificationCount = 0
+        let observer = NotificationCenter.default.addObserver(
+            forName: PostListSearchEntrySettings.didChangeNotification,
+            object: searchEntrySettings,
+            queue: nil
+        ) { _ in
+            notificationCount += 1
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+        viewController.loadViewIfNeeded()
+
+        let cell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: IndexPath(row: 1, section: 0)
+        ))
+        #expect(cell.textLabel?.text == "首页搜索入口")
+        let searchEntrySwitch = try #require(cell.accessoryView as? UISwitch)
+        #expect(searchEntrySwitch.isOn == false)
+
+        searchEntrySwitch.isOn = true
+        searchEntrySwitch.sendActions(for: .valueChanged)
+
+        #expect(searchEntrySettings.showsTopSearchEntry == true)
+        #expect(notificationCount == 1)
     }
 
     @Test func textSizeSliderPersistsOffsetAndUpdatesPreview() throws {
@@ -209,7 +265,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 1, section: 0)
+            didSelectRowAt: IndexPath(row: 2, section: 0)
         )
 
         #expect(navigationController.topViewController is SettingsTextSizeViewController)
@@ -833,6 +889,12 @@ private func withFileLoggingConfigIsolation(_ body: () async throws -> Void) asy
         }
         try await body()
     }
+}
+
+private func makeSettingsPostListSearchEntrySettings() -> PostListSearchEntrySettings {
+    let suiteName = "settings-post-list-search-entry-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    return PostListSearchEntrySettings(userDefaults: defaults, storageKey: "shows-top-search-entry")
 }
 
 @MainActor

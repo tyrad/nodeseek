@@ -111,6 +111,7 @@ class SettingsViewController: UITableViewController {
 
     private enum ReadingRow: Int, CaseIterable {
         case categoryPreferences
+        case homeSearchEntry
         case textSize
         case signatureDisplay
     }
@@ -129,6 +130,7 @@ class SettingsViewController: UITableViewController {
     private let nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting
     private let textSizeSettings: AppTextSizeSettings
     private let signatureDisplaySettings: PostSignatureDisplaySettings
+    private let searchEntrySettings: PostListSearchEntrySettings
     private let categoryPreferenceStore: PostCategoryPreferenceStore
     private let specialFollowKeywordStore: SpecialFollowKeywordStore
     private let autoCheckInSummaryProvider: @MainActor () -> String
@@ -151,6 +153,7 @@ class SettingsViewController: UITableViewController {
         nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting? = nil,
         textSizeSettings: AppTextSizeSettings = .shared,
         signatureDisplaySettings: PostSignatureDisplaySettings = .shared,
+        searchEntrySettings: PostListSearchEntrySettings = .shared,
         categoryPreferenceStore: PostCategoryPreferenceStore = .shared,
         specialFollowKeywordStore: SpecialFollowKeywordStore = .shared,
         autoCheckInSummaryProvider: @escaping @MainActor () -> String = { AutoCheckInModule.settingsSummary },
@@ -170,6 +173,7 @@ class SettingsViewController: UITableViewController {
         self.nodeImageAuthorizationPresenter = nodeImageAuthorizationPresenter ?? DefaultNodeImageAuthorizationPresenter()
         self.textSizeSettings = textSizeSettings
         self.signatureDisplaySettings = signatureDisplaySettings
+        self.searchEntrySettings = searchEntrySettings
         self.categoryPreferenceStore = categoryPreferenceStore
         self.specialFollowKeywordStore = specialFollowKeywordStore
         self.autoCheckInSummaryProvider = autoCheckInSummaryProvider
@@ -315,6 +319,8 @@ class SettingsViewController: UITableViewController {
         switch ReadingRow(rawValue: indexPath.row) {
         case .categoryPreferences:
             return categoryPreferencesCell(for: indexPath)
+        case .homeSearchEntry:
+            return homeSearchEntryCell(for: indexPath)
         case .textSize:
             return textSizeCell(for: indexPath)
         case .signatureDisplay:
@@ -365,6 +371,20 @@ class SettingsViewController: UITableViewController {
         cell.accessoryView = signatureSwitch
         cell.selectionStyle = .none
         cell.accessibilityIdentifier = "settings-post-signature-cell"
+        return cell
+    }
+
+    private func homeSearchEntryCell(for indexPath: IndexPath) -> UITableViewCell {
+        let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.text = "首页搜索入口"
+        cell.imageView?.image = UIImage(systemName: "magnifyingglass")
+        let searchEntrySwitch = UISwitch()
+        searchEntrySwitch.isOn = searchEntrySettings.showsTopSearchEntry
+        searchEntrySwitch.accessibilityIdentifier = "settings-home-search-entry-switch"
+        searchEntrySwitch.addTarget(self, action: #selector(homeSearchEntrySwitchChanged(_:)), for: .valueChanged)
+        cell.accessoryView = searchEntrySwitch
+        cell.selectionStyle = .none
+        cell.accessibilityIdentifier = "settings-home-search-entry-cell"
         return cell
     }
 
@@ -512,7 +532,7 @@ class SettingsViewController: UITableViewController {
             showPostCategoryPreferences()
         case .textSize:
             showTextSizeSettings()
-        case .signatureDisplay, .none:
+        case .homeSearchEntry, .signatureDisplay, .none:
             break
         }
     }
@@ -629,6 +649,10 @@ class SettingsViewController: UITableViewController {
 
     @objc private func signatureDisplaySwitchChanged(_ sender: UISwitch) {
         signatureDisplaySettings.setShowsSignatures(sender.isOn)
+    }
+
+    @objc private func homeSearchEntrySwitchChanged(_ sender: UISwitch) {
+        searchEntrySettings.setShowsTopSearchEntry(sender.isOn)
     }
 
     @objc private func specialFollowKeywordsDidChange(_ notification: Notification) {
