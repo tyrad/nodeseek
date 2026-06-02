@@ -11,12 +11,12 @@ on:
         required: true
         type: string
       build_number:
-        description: "Optional App Store build number override. Defaults to Asia/Shanghai yyyyMMddHHmm."
+        description: "Optional App Store build number override. Defaults to Asia/Shanghai yyyyMMddHHmmss."
         required: false
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: testflight-${{ github.ref }}
@@ -59,7 +59,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          generated_build_number="$(TZ=Asia/Shanghai date +%Y%m%d%H%M)"
+          generated_build_number="$(TZ=Asia/Shanghai date +%Y%m%d%H%M%S)"
 
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             tag="${GITHUB_REF_NAME}"
@@ -162,6 +162,66 @@ jobs:
 
           Open App Store Connect, add this build to the `Public Beta` external testing group, confirm the Test Information above, then submit it for Beta App Review.
           MARKDOWN
+
+      - name: Upload IPA to GitHub Release
+        if: success() && github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_BUILD_NUMBER: ${{ steps.release.outputs.build_number }}
+        run: |
+          set -euo pipefail
+
+          release_title="iOS v${RELEASE_VERSION} (${RELEASE_BUILD_NUMBER})"
+          release_tag="${GITHUB_REF_NAME}-build.${RELEASE_BUILD_NUMBER}"
+          release_notes="$(mktemp)"
+          previous_release_tag="$(
+            git tag --merged "${GITHUB_SHA}" --sort=-v:refname 'ios/v*' \
+              | grep -E '^ios/v[0-9]+(\.[0-9]+){1,2}$' \
+              | grep -v -x "${GITHUB_REF_NAME}" \
+              | head -n 1 || true
+          )"
+
+          generated_notes="$(mktemp)"
+          generate_notes_args=(
+            "repos/${GITHUB_REPOSITORY}/releases/generate-notes"
+            -f "tag_name=${release_tag}"
+            -f "target_commitish=${GITHUB_SHA}"
+          )
+          if [[ -n "${previous_release_tag}" ]]; then
+            generate_notes_args+=(-f "previous_tag_name=${previous_release_tag}")
+          fi
+          gh api "${generate_notes_args[@]}" --jq '.body // ""' > "${generated_notes}"
+
+          cat > "${release_notes}" <<MARKDOWN
+          ## Build
+
+          - Version: ${RELEASE_VERSION}
+          - Build number: ${RELEASE_BUILD_NUMBER}
+          - Source tag: ${GITHUB_REF_NAME}
+          - Previous source tag: ${previous_release_tag:-none}
+          - Commit: ${GITHUB_SHA}
+
+          ## Changes
+          MARKDOWN
+          cat "${generated_notes}" >> "${release_notes}"
+
+          if gh release view "${release_tag}" >/dev/null 2>&1; then
+            echo "Release ${release_tag} already exists. Refusing to replace existing release assets." >&2
+            exit 1
+          fi
+
+          gh release create "${release_tag}" \
+              --target "${GITHUB_SHA}" \
+              --title "${release_title}" \
+              --notes-file "${release_notes}"
+
+          gh release upload "${release_tag}" \
+            build/nodeseek.ipa \
+            build/*.dSYM.zip \
+            build/build-provenance.json
+
+          echo "Uploaded IPA and release metadata to GitHub Release ${release_tag}." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload build provenance
         if: always()

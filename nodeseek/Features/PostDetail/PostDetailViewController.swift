@@ -183,7 +183,7 @@ class PostDetailViewController: UIViewController {
 
     enum Layout {
         static let horizontalInset: CGFloat = PostDetailContentLayout.horizontalInset
-        static let replyButtonBottomInset: CGFloat = 204
+        static let replyButtonBottomInset: CGFloat = 112
     }
 
     let presenter: PostDetailPresenterProtocol
@@ -339,18 +339,22 @@ class PostDetailViewController: UIViewController {
     let replyButton: UIButton = {
         let button = UIButton(type: .system)
         var configuration = UIButton.Configuration.plain()
-        configuration.image = UIImage(systemName: "text.bubble.fill")
+        let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 17, weight: .regular)
+        configuration.image = UIImage(systemName: "text.bubble.fill", withConfiguration: symbolConfiguration)
         configuration.baseForegroundColor = .systemBackground
         configuration.background.backgroundColor = .clear
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 14)
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 12)
         button.configuration = configuration
         button.backgroundColor = .label
         button.accessibilityIdentifier = "post-detail-reply-button"
         button.accessibilityLabel = "评论"
         button.isHidden = true
-        button.layer.cornerRadius = 24
+        button.alpha = 0.48
+        button.layer.cornerRadius = 22
         button.layer.cornerCurve = .continuous
         button.layer.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+        button.layer.borderWidth = 0.5
+        button.layer.borderColor = UIColor.separator.cgColor
         button.clipsToBounds = true
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
@@ -726,8 +730,8 @@ class PostDetailViewController: UIViewController {
 
             replyButtonAnchorView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             replyButtonAnchorView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Layout.replyButtonBottomInset),
-            replyButtonAnchorView.widthAnchor.constraint(equalToConstant: 56),
-            replyButtonAnchorView.heightAnchor.constraint(equalToConstant: 48),
+            replyButtonAnchorView.widthAnchor.constraint(equalToConstant: 52),
+            replyButtonAnchorView.heightAnchor.constraint(equalToConstant: 44),
 
             replyEditorBackdrop.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             replyEditorBackdrop.trailingAnchor.constraint(equalTo: view.trailingAnchor),

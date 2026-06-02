@@ -1,4 +1,4 @@
-# NodeSeek iOS Agent Instructions
+# NodeSeek iOS 项目介绍与开发约定
 
 ## 1. 项目定位
 

@@ -2975,6 +2975,10 @@ struct PostDetailLoginViewControllerTests {
         #expect(panGesture.view === floatingReplyButton)
         #expect(panGesture.cancelsTouchesInView)
         #expect(floatingReplyButton.superview === floatingContainer)
+        #expect(floatingReplyButton.configuration?.baseForegroundColor == .systemBackground)
+        #expect(floatingReplyButton.backgroundColor == .label)
+        #expect(floatingReplyButton.alpha == 0.48)
+        #expect(floatingReplyButton.layer.borderWidth == 0.5)
         #expect(abs(replyButtonFrame.maxY - (viewController.view.safeAreaLayoutGuide.layoutFrame.maxY - PostDetailViewController.Layout.replyButtonBottomInset)) < 1)
 
         floatingContainer.frame.origin.x = 0
