@@ -151,6 +151,9 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                     onLinkTapped: { url in
                         self?.handleContentLinkTap(url)
                     },
+                    onSignatureLinkCandidatesTapped: { candidates in
+                        self?.handleSignatureLinkCandidatesTap(candidates)
+                    },
                     onAuthorTapped: { url in
                         self?.openUserInfo(profileURL: url)
                     },
@@ -220,6 +223,9 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                     },
                     onLinkTapped: { url in
                         self?.handleContentLinkTap(url)
+                    },
+                    onSignatureLinkCandidatesTapped: { candidates in
+                        self?.handleSignatureLinkCandidatesTap(candidates)
                     },
                     onAuthorTapped: { url in
                         self?.openUserInfo(profileURL: url)

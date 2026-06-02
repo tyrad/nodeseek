@@ -101,6 +101,33 @@ extension PostDetailViewController {
         }
     }
 
+    func handleSignatureLinkCandidatesTap(_ candidates: [DetailLinkCandidate]) {
+        let uniqueCandidates = Self.uniqueLinkCandidates(candidates)
+        guard uniqueCandidates.count > 1 else {
+            if let url = uniqueCandidates.first?.url {
+                handleContentLinkTap(url)
+            }
+            return
+        }
+
+        let sheet = LinkSelectionSheetViewController(
+            candidates: uniqueCandidates,
+            onSelect: { [weak self] url in
+                self?.handleContentLinkTap(url)
+            }
+        )
+        present(sheet, animated: true)
+    }
+
+    static func uniqueLinkCandidates(_ candidates: [DetailLinkCandidate]) -> [DetailLinkCandidate] {
+        var uniqueCandidates: [DetailLinkCandidate] = []
+        for candidate in candidates {
+            guard uniqueCandidates.contains(candidate) == false else { continue }
+            uniqueCandidates.append(candidate)
+        }
+        return uniqueCandidates
+    }
+
     func handleLoadedCommentAnchorIfNeeded(for url: URL) -> Bool {
         guard let anchorID = currentPostCommentAnchorID(from: url),
               anchorID != "0",

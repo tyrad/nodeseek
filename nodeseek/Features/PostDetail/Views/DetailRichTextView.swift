@@ -9,6 +9,12 @@ import DTCoreText
 import Kingfisher
 import UIKit
 
+struct DetailLinkCandidate: Equatable {
+    let title: String
+    let subtitle: String
+    let url: URL
+}
+
 /// 帖子详情正文和评论的富文本渲染视图。
 final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextContentViewDelegate {
     private enum QuoteStyle {
@@ -19,6 +25,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
 
     private var imageTapHandler: (([URL], Int) -> Void)?
     private var linkTapHandler: ((URL) -> Void)?
+    private var signatureLinkCandidatesTapHandler: (([DetailLinkCandidate]) -> Void)?
     private var layoutInvalidatedHandler: (() -> Void)?
     private var attachmentLayoutUpdatedHandler: ((URL, CGSize, CGSize) -> Void)?
     private var lastLayoutWidth: CGFloat = 0
@@ -90,12 +97,14 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         _ attributedText: NSAttributedString?,
         onImageTapped: (([URL], Int) -> Void)?,
         onLinkTapped: ((URL) -> Void)? = nil,
+        onSignatureLinkCandidatesTapped: (([DetailLinkCandidate]) -> Void)? = nil,
         onLayoutInvalidated: (() -> Void)?,
         onAttachmentLayoutUpdated: ((URL, CGSize, CGSize) -> Void)? = nil
     ) {
         pendingRelayoutWorkItem?.cancel()
         imageTapHandler = onImageTapped
         linkTapHandler = onLinkTapped
+        signatureLinkCandidatesTapHandler = onSignatureLinkCandidatesTapped
         layoutInvalidatedHandler = onLayoutInvalidated
         attachmentLayoutUpdatedHandler = onAttachmentLayoutUpdated
         attributedString = attributedText ?? NSAttributedString()
@@ -253,8 +262,17 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         identifier: String,
         frame: CGRect
     ) -> UIView? {
-        DetailLinkOverlayButton(frame: frame, url: url) { [weak self] tappedURL in
-            self?.linkTapHandler?(tappedURL)
+        DetailLinkOverlayButton(frame: frame, url: url) { [weak self] button, tappedURL, point in
+            self?.handleLinkTap(button: button, tappedURL: tappedURL, at: point)
+        }
+    }
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        if super.point(inside: point, with: event) {
+            return true
+        }
+        return signatureLinkOverlayButtons().contains { button in
+            button.expandedHitFrame.contains(point)
         }
     }
 
@@ -523,6 +541,118 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         onImageTapped(urls, index)
     }
 
+    private func handleLinkTap(button: DetailLinkOverlayButton, tappedURL: URL, at point: CGPoint) {
+        guard isSignatureLinkOverlay(button) else {
+            linkTapHandler?(tappedURL)
+            return
+        }
+
+        let candidates = signatureLinkCandidates(near: point)
+        if candidates.count > 1 {
+            if let signatureLinkCandidatesTapHandler {
+                signatureLinkCandidatesTapHandler(candidates)
+            } else {
+                linkTapHandler?(tappedURL)
+            }
+            return
+        }
+
+        linkTapHandler?(candidates.first?.url ?? tappedURL)
+    }
+
+    func debugSignatureLinkCandidates(near point: CGPoint) -> [DetailLinkCandidate] {
+        signatureLinkCandidates(near: point)
+    }
+
+    fileprivate func isSignatureLinkOverlay(_ button: DetailLinkOverlayButton) -> Bool {
+        let location = button.tag
+        guard location >= 0, location < attributedString.length else { return false }
+        guard (attributedString.attribute(
+            NodeSeekSignatureStyle.linkAttribute,
+            at: location,
+            effectiveRange: nil
+        ) as? Bool) == true else {
+            return false
+        }
+        return Self.linkURL(from: attributedString.attribute(.link, at: location, effectiveRange: nil)) == button.url
+    }
+
+    private func signatureLinkCandidates(near point: CGPoint) -> [DetailLinkCandidate] {
+        let buttons = signatureLinkOverlayButtons(near: point)
+        guard buttons.isEmpty == false else { return [] }
+
+        var candidates: [DetailLinkCandidate] = []
+        for button in buttons {
+            let candidate = DetailLinkCandidate(
+                title: title(for: button),
+                subtitle: button.url.absoluteString,
+                url: button.url
+            )
+            guard candidates.contains(candidate) == false else { continue }
+            candidates.append(candidate)
+        }
+        return candidates
+    }
+
+    private func signatureLinkOverlayButtons(near point: CGPoint? = nil) -> [DetailLinkOverlayButton] {
+        subviews
+            .compactMap { $0 as? DetailLinkOverlayButton }
+            .filter { button in
+                guard isSignatureLinkOverlay(button) else { return false }
+                guard let point else { return true }
+                return button.expandedHitFrame.contains(point)
+            }
+            .sorted { lhs, rhs in
+                if abs(lhs.frame.minY - rhs.frame.minY) > 0.5 {
+                    return lhs.frame.minY < rhs.frame.minY
+                }
+                return lhs.frame.minX < rhs.frame.minX
+            }
+    }
+
+    private func title(for button: DetailLinkOverlayButton) -> String {
+        let location = button.tag
+        guard location >= 0, location < attributedString.length else {
+            return Self.fallbackTitle(for: button.url)
+        }
+
+        var range = NSRange(location: 0, length: 0)
+        guard Self.linkURL(from: attributedString.attribute(.link, at: location, effectiveRange: &range)) == button.url,
+              range.location != NSNotFound,
+              range.length > 0 else {
+            return Self.fallbackTitle(for: button.url)
+        }
+
+        let rawTitle = (attributedString.string as NSString).substring(with: range)
+        return Self.nonEmptyTitle(rawTitle) ?? Self.fallbackTitle(for: button.url)
+    }
+
+    nonisolated private static func linkURL(from value: Any?) -> URL? {
+        if let url = value as? URL {
+            return url
+        }
+        if let string = value as? String {
+            return URL(string: string)
+        }
+        return nil
+    }
+
+    nonisolated private static func nonEmptyTitle(_ title: String?) -> String? {
+        guard let title else { return nil }
+        let normalized = title
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { $0.isEmpty == false }
+            .joined(separator: " ")
+        return normalized.isEmpty ? nil : normalized
+    }
+
+    nonisolated private static func fallbackTitle(for url: URL) -> String {
+        if let host = url.host, host.isEmpty == false {
+            return host
+        }
+        return url.absoluteString
+    }
+
     private func previewImageURLs() -> [URL] {
         guard attributedString.length > 0 else { return [] }
 
@@ -664,23 +794,61 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
 }
 
 private final class DetailLinkOverlayButton: UIButton {
-    private let url: URL
-    private let onTapped: (URL) -> Void
+    private enum HitArea {
+        static let minimumSize = CGSize(width: 72, height: 48)
+    }
 
-    init(frame: CGRect, url: URL, onTapped: @escaping (URL) -> Void) {
+    fileprivate let url: URL
+    private let onTapped: (DetailLinkOverlayButton, URL, CGPoint) -> Void
+
+    var expandedHitFrame: CGRect {
+        let insetX = min(0, (frame.width - HitArea.minimumSize.width) / 2)
+        let insetY = min(0, (frame.height - HitArea.minimumSize.height) / 2)
+        return frame.insetBy(dx: insetX, dy: insetY)
+    }
+
+    private var expandedHitBounds: CGRect {
+        let insetX = min(0, (bounds.width - HitArea.minimumSize.width) / 2)
+        let insetY = min(0, (bounds.height - HitArea.minimumSize.height) / 2)
+        return bounds.insetBy(dx: insetX, dy: insetY)
+    }
+
+    init(frame: CGRect, url: URL, onTapped: @escaping (DetailLinkOverlayButton, URL, CGPoint) -> Void) {
         self.url = url
         self.onTapped = onTapped
         super.init(frame: frame)
         backgroundColor = .clear
-        addTarget(self, action: #selector(handleTap), for: .touchUpInside)
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    @objc
-    private func handleTap() {
-        onTapped(url)
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        guard let richTextView = superview as? DetailRichTextView,
+              richTextView.isSignatureLinkOverlay(self) else {
+            return super.point(inside: point, with: event)
+        }
+        return expandedHitBounds.contains(point)
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = touches.first else {
+            super.touchesEnded(touches, with: event)
+            return
+        }
+        let localPoint = touch.location(in: self)
+        guard point(inside: localPoint, with: event) else {
+            super.touchesEnded(touches, with: event)
+            return
+        }
+        let parentPoint = superview.map { convert(localPoint, to: $0) } ?? frame.center
+        onTapped(self, url, parentPoint)
+    }
+}
+
+private extension CGRect {
+    var center: CGPoint {
+        CGPoint(x: midX, y: midY)
     }
 }

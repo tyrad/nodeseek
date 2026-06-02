@@ -43,6 +43,7 @@ enum DetailContentBlockNodeFactory {
         from blocks: [RenderedContentBlock],
         onImageTapped: @escaping ([URL], Int) -> Void,
         onLinkTapped: @escaping (URL) -> Void,
+        onSignatureLinkCandidatesTapped: @escaping ([DetailLinkCandidate]) -> Void = { _ in },
         onTextLayoutInvalidated: @escaping () -> Void,
         imageSizeProvider: @escaping (URL) -> CGSize? = { _ in nil },
         onImageSizeResolved: @escaping (URL, CGSize) -> Void = { _, _ in },
@@ -56,6 +57,7 @@ enum DetailContentBlockNodeFactory {
             imageIndex: &imageIndex,
             onImageTapped: onImageTapped,
             onLinkTapped: onLinkTapped,
+            onSignatureLinkCandidatesTapped: onSignatureLinkCandidatesTapped,
             onTextLayoutInvalidated: onTextLayoutInvalidated,
             imageSizeProvider: imageSizeProvider,
             onImageSizeResolved: onImageSizeResolved,
@@ -69,6 +71,7 @@ enum DetailContentBlockNodeFactory {
         imageIndex: inout Int,
         onImageTapped: @escaping ([URL], Int) -> Void,
         onLinkTapped: @escaping (URL) -> Void,
+        onSignatureLinkCandidatesTapped: @escaping ([DetailLinkCandidate]) -> Void,
         onTextLayoutInvalidated: @escaping () -> Void,
         imageSizeProvider: @escaping (URL) -> CGSize?,
         onImageSizeResolved: @escaping (URL, CGSize) -> Void,
@@ -84,6 +87,7 @@ enum DetailContentBlockNodeFactory {
                     onImageSizeResolved: onImageSizeResolved,
                     onImageTapped: onImageTapped,
                     onLinkTapped: onLinkTapped,
+                    onSignatureLinkCandidatesTapped: onSignatureLinkCandidatesTapped,
                     onLayoutInvalidated: onTextLayoutInvalidated
                 )
             case .table(let table):
@@ -127,6 +131,7 @@ enum DetailContentBlockNodeFactory {
                     imageIndex: &imageIndex,
                     onImageTapped: onImageTapped,
                     onLinkTapped: onLinkTapped,
+                    onSignatureLinkCandidatesTapped: onSignatureLinkCandidatesTapped,
                     onTextLayoutInvalidated: onTextLayoutInvalidated,
                     imageSizeProvider: imageSizeProvider,
                     onImageSizeResolved: onImageSizeResolved,

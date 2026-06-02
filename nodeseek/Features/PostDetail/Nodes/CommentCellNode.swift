@@ -50,6 +50,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
     private var comment: Comment
     private let onImageTapped: ([URL], Int) -> Void
     private let onLinkTapped: (URL) -> Void
+    private let onSignatureLinkCandidatesTapped: ([DetailLinkCandidate]) -> Void
     private let onAuthorTapped: (URL) -> Void
     private let onAuthorCopyTapped: (Comment) -> Void
     private let onLikeTapped: (Comment) -> Void
@@ -112,6 +113,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         renderedBody: [RenderedContentBlock]?,
         onImageTapped: @escaping ([URL], Int) -> Void,
         onLinkTapped: @escaping (URL) -> Void = { _ in },
+        onSignatureLinkCandidatesTapped: @escaping ([DetailLinkCandidate]) -> Void = { _ in },
         onAuthorTapped: @escaping (URL) -> Void = { _ in },
         onAuthorCopyTapped: @escaping (Comment) -> Void = { _ in },
         onLikeTapped: @escaping (Comment) -> Void = { _ in },
@@ -127,6 +129,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         self.comment = comment
         self.onImageTapped = onImageTapped
         self.onLinkTapped = onLinkTapped
+        self.onSignatureLinkCandidatesTapped = onSignatureLinkCandidatesTapped
         self.onAuthorTapped = onAuthorTapped
         self.onAuthorCopyTapped = onAuthorCopyTapped
         self.onLikeTapped = onLikeTapped
@@ -140,6 +143,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
             from: renderedBody ?? [],
             onImageTapped: onImageTapped,
             onLinkTapped: onLinkTapped,
+            onSignatureLinkCandidatesTapped: onSignatureLinkCandidatesTapped,
             onTextLayoutInvalidated: onTextLayoutInvalidated,
             imageSizeProvider: imageSizeProvider,
             onImageSizeResolved: onImageSizeResolved,

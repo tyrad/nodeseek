@@ -1066,6 +1066,39 @@ struct PostDetailViewControllerTests {
         #expect(linkColor != NodeSeekLinkStyle.color)
     }
 
+    @Test func mergedRendererMarksOnlySignatureLinksForExpandedSelection() throws {
+        let rendered = try #require(PostDetailViewController.makeRenderedContent(
+            html: "<p>正文 <a href=\"https://body.example.com\">正文链接</a></p>",
+            signatureHTML: "<p>签名 <a href=\"https://signature.example.com\">签名链接</a></p>",
+            baseURL: URL(string: "https://www.nodeseek.com")!,
+            maxImageWidth: 320
+        ))
+        let attributedText = try #require(rendered.compactMap { block -> NSAttributedString? in
+            if case .text(let text) = block {
+                return text
+            }
+            return nil
+        }.first)
+        let bodyLinkRange = (attributedText.string as NSString).range(of: "正文链接")
+        let signatureLinkRange = (attributedText.string as NSString).range(of: "签名链接")
+        #expect(bodyLinkRange.location != NSNotFound)
+        #expect(signatureLinkRange.location != NSNotFound)
+
+        let bodyMarker = attributedText.attribute(
+            NodeSeekSignatureStyle.linkAttribute,
+            at: bodyLinkRange.location,
+            effectiveRange: nil
+        ) as? Bool
+        let signatureMarker = attributedText.attribute(
+            NodeSeekSignatureStyle.linkAttribute,
+            at: signatureLinkRange.location,
+            effectiveRange: nil
+        ) as? Bool
+
+        #expect(bodyMarker == nil)
+        #expect(signatureMarker == true)
+    }
+
     @Test func mergedRendererNormalizesHeadingSignatureTypography() throws {
         let rendered = try #require(PostDetailViewController.makeRenderedContent(
             html: "<p>正文</p>",
@@ -2280,6 +2313,143 @@ struct PostDetailViewControllerTests {
             return
         }
         #expect(resolvedURL.absoluteString == "https://www.nodeseek.com/post-704174-1")
+    }
+
+    @Test func richTextViewExpandsHitAreaOnlyForSignatureLinks() throws {
+        let bodyURL = try #require(URL(string: "https://body.example.com"))
+        let signatureURL = try #require(URL(string: "https://signature.example.com"))
+        let attributedText = NSMutableAttributedString(string: "正文链接 签名链接")
+        attributedText.addAttributes(
+            NodeSeekLinkStyle.attributes(url: bodyURL),
+            range: NSRange(location: 0, length: 4)
+        )
+        attributedText.addAttributes(
+            NodeSeekSignatureStyle.linkAttributes(url: signatureURL),
+            range: NSRange(location: 5, length: 4)
+        )
+
+        let richTextView = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 320, height: 80))
+        richTextView.configure(
+            attributedText,
+            onImageTapped: nil,
+            onLinkTapped: nil,
+            onLayoutInvalidated: nil
+        )
+        let bodyOverlay = try #require(richTextView.attributedTextContentView(
+            richTextView,
+            viewForLink: bodyURL,
+            identifier: "body",
+            frame: CGRect(x: 0, y: 0, width: 24, height: 14)
+        ))
+        let signatureOverlay = try #require(richTextView.attributedTextContentView(
+            richTextView,
+            viewForLink: signatureURL,
+            identifier: "signature",
+            frame: CGRect(x: 80, y: 0, width: 24, height: 14)
+        ))
+        bodyOverlay.tag = 0
+        signatureOverlay.tag = 5
+        richTextView.addSubview(bodyOverlay)
+        richTextView.addSubview(signatureOverlay)
+
+        #expect(bodyOverlay.point(inside: CGPoint(x: -12, y: 6), with: nil) == false)
+        #expect(signatureOverlay.point(inside: CGPoint(x: -12, y: 6), with: nil))
+        #expect(richTextView.point(inside: CGPoint(x: 92, y: -12), with: nil))
+    }
+
+    @Test func richTextViewReturnsMultipleNearbySignatureLinkCandidatesOnly() throws {
+        let bodyURL = try #require(URL(string: "https://body.example.com"))
+        let firstSignatureURL = try #require(URL(string: "https://t.me/nodefans"))
+        let secondSignatureURL = try #require(URL(string: "https://blog.example.com"))
+        let attributedText = NSMutableAttributedString(string: "正文 TG 博客")
+        attributedText.addAttributes(
+            NodeSeekLinkStyle.attributes(url: bodyURL),
+            range: NSRange(location: 0, length: 2)
+        )
+        attributedText.addAttributes(
+            NodeSeekSignatureStyle.linkAttributes(url: firstSignatureURL),
+            range: NSRange(location: 3, length: 2)
+        )
+        attributedText.addAttributes(
+            NodeSeekSignatureStyle.linkAttributes(url: secondSignatureURL),
+            range: NSRange(location: 6, length: 2)
+        )
+
+        let richTextView = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 320, height: 80))
+        richTextView.configure(
+            attributedText,
+            onImageTapped: nil,
+            onLinkTapped: nil,
+            onLayoutInvalidated: nil
+        )
+        let bodyOverlay = try #require(richTextView.attributedTextContentView(
+            richTextView,
+            viewForLink: bodyURL,
+            identifier: "body",
+            frame: CGRect(x: 0, y: 0, width: 20, height: 14)
+        ))
+        let firstSignatureOverlay = try #require(richTextView.attributedTextContentView(
+            richTextView,
+            viewForLink: firstSignatureURL,
+            identifier: "signature-first",
+            frame: CGRect(x: 22, y: 0, width: 14, height: 14)
+        ))
+        let secondSignatureOverlay = try #require(richTextView.attributedTextContentView(
+            richTextView,
+            viewForLink: secondSignatureURL,
+            identifier: "signature-second",
+            frame: CGRect(x: 44, y: 0, width: 18, height: 14)
+        ))
+        bodyOverlay.tag = 0
+        firstSignatureOverlay.tag = 3
+        secondSignatureOverlay.tag = 6
+        richTextView.addSubview(bodyOverlay)
+        richTextView.addSubview(firstSignatureOverlay)
+        richTextView.addSubview(secondSignatureOverlay)
+
+        let candidates = richTextView.debugSignatureLinkCandidates(near: CGPoint(x: 34, y: 6))
+
+        #expect(candidates.map(\.title) == ["TG", "博客"])
+        #expect(candidates.map(\.url) == [firstSignatureURL, secondSignatureURL])
+    }
+
+    @Test func signatureLinkCandidatesAreDeduplicatedInOrder() throws {
+        let firstURL = try #require(URL(string: "https://t.me/nodefans"))
+        let secondURL = try #require(URL(string: "https://blog.example.com"))
+        let candidates = [
+            DetailLinkCandidate(title: "TG", subtitle: firstURL.absoluteString, url: firstURL),
+            DetailLinkCandidate(title: "TG", subtitle: firstURL.absoluteString, url: firstURL),
+            DetailLinkCandidate(title: "博客", subtitle: secondURL.absoluteString, url: secondURL)
+        ]
+
+        let uniqueCandidates = PostDetailViewController.uniqueLinkCandidates(candidates)
+
+        #expect(uniqueCandidates.map(\.url) == [firstURL, secondURL])
+    }
+
+    @Test func multipleSignatureLinkCandidatesPresentSelectionSheet() async throws {
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        window.rootViewController = viewController
+        window.makeKeyAndVisible()
+        defer {
+            window.isHidden = true
+        }
+        viewController.loadViewIfNeeded()
+
+        let firstURL = try #require(URL(string: "https://t.me/nodefans"))
+        let secondURL = try #require(URL(string: "https://blog.example.com"))
+        viewController.handleSignatureLinkCandidatesTap([
+            DetailLinkCandidate(title: "TG", subtitle: firstURL.absoluteString, url: firstURL),
+            DetailLinkCandidate(title: "博客", subtitle: secondURL.absoluteString, url: secondURL)
+        ])
+
+        let didPresentSheet = await waitUntil {
+            viewController.presentedViewController is LinkSelectionSheetViewController
+        }
+        #expect(didPresentSheet)
+        await tearDownPostDetailTextureViewController(viewController, window: window)
     }
 
     @Test func richTextNodeUpdatesMeasuredHeightAfterNormalImageLoads() throws {

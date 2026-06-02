@@ -21,13 +21,15 @@ enum NodeSeekLinkStyle {
 }
 
 enum NodeSeekSignatureStyle {
+    static let linkAttribute = NSAttributedString.Key("NodeSeekSignatureLinkAttribute")
     static let textColor = UIColor.secondaryLabel
     static let linkColor = UIColor(red: 111 / 255, green: 163 / 255, blue: 143 / 255, alpha: 0.76)
 
     static func linkAttributes(url: URL) -> [NSAttributedString.Key: Any] {
         [
             .foregroundColor: linkColor,
-            .link: url
+            .link: url,
+            linkAttribute: true
         ]
     }
 }
