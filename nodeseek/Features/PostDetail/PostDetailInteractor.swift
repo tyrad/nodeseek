@@ -38,6 +38,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
     private let sessionStore: NodeSeekSessionStore
     private let actionPagePreparer: PostDetailActionPagePreparing
     private var currentActionPageURL: URL?
+    private var didPrepareInitialActionPage = false
     
     // MARK: - Initialization
     init(
@@ -91,7 +92,10 @@ class PostDetailInteractor: PostDetailInteractorInput {
                 AppLog.info(.postDetail, "帖子详情加载成功，postID=\(detail.id), 评论数量: \(detail.comments.count)")
                 let actionPageURL = NodeSeekSite.postURL(id: detail.id, page: normalizedPage)
                 currentActionPageURL = actionPageURL
-                actionPagePreparer.prepareActionPage(pageURL: actionPageURL)
+                if didPrepareInitialActionPage == false {
+                    didPrepareInitialActionPage = true
+                    actionPagePreparer.prepareActionPage(pageURL: actionPageURL)
+                }
                 await MainActor.run {
                     presenter?.didLoadPostDetail(PostDetailResponse(detail: detail))
                 }

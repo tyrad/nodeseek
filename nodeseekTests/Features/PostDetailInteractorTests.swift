@@ -98,7 +98,7 @@ struct PostDetailInteractorTests {
         #expect(presenter.loginRequiredMessage == "本帖需要注册用户才能查看😭")
     }
 
-    @Test func loadPostDetailPreparesActionPageAfterSuccess() async throws {
+    @Test func loadPostDetailPreheatsOnlyFirstSuccessfulPage() async throws {
         let baseURL = URL(string: "https://www.nodeseek.com/")!
         let post = Self.makePost()
         let htmlClient = URLCapturingHTMLClient(response: HTMLResponse(
@@ -126,6 +126,11 @@ struct PostDetailInteractorTests {
         await waitForInteractorCallbacks()
 
         #expect(presenter.loadedResponse?.detail.id == post.id)
+        #expect(actionPagePreparer.preparedURLs == [post.url])
+
+        interactor.loadPostDetail(page: 2)
+        await waitForInteractorCallbacks()
+
         #expect(actionPagePreparer.preparedURLs == [post.url])
     }
 
