@@ -327,7 +327,7 @@ extension PostDetailViewController {
             return
         }
 
-        ensureNodeSeekLoggedIn(context: "sendReply") { [weak self] in
+        ensureNodeSeekLoggedIn(context: "sendReply", allowCachedLogin: true) { [weak self] in
             guard let self else { return }
             AppLog.info(.postDetail, "发送回复登录检查完成: elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
             let resolvedContent = resolvedReplyContent(from: content)

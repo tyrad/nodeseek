@@ -3335,6 +3335,23 @@ struct PostDetailLoginViewControllerTests {
         #expect(viewController.replyEditorContainer.isHidden == false)
     }
 
+    @Test func sendReplyUsesCachedLoginBeforeRefreshingAccount() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let accountRefresher = DelayedPostDetailAccountRefresher(isLoggedIn: true)
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            accountRefresher: accountRefresher
+        )
+
+        viewController.loadViewIfNeeded()
+        viewController.replyTextView.text = "  测试评论  "
+
+        viewController.sendReplyTapped()
+        await Task.yield()
+
+        #expect(presenter.sentReplyContent == "测试评论")
+    }
+
     @Test func replyAndQuoteActionsUpdateComposerState() async throws {
         let presenter = SpyPostDetailPresenter()
         let viewController = PostDetailViewController(
