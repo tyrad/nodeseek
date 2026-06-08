@@ -7,6 +7,7 @@
 
 import UIKit
 
+@MainActor
 final class PostListSideMenuViewController: UIViewController {
     private var sideMenuLeadingConstraint: NSLayoutConstraint?
     private var isSideMenuVisible = false
@@ -22,8 +23,11 @@ final class PostListSideMenuViewController: UIViewController {
     var onSearchTapped: (() -> Void)?
     var onSettingsTapped: (() -> Void)?
     private let accountController: PostListSideMenuAccountController
+    private let notificationClient: NodeSeekNotificationClientProtocol
     private let avatarLoader = AvatarImageLoader.shared
     private var notificationURL = NodeSeekSite.baseURL.appendingPathComponent("notification")
+    private var notificationUnreadCount: NodeSeekNotificationUnreadCount?
+    private var notificationUnreadRefreshTask: Task<Void, Never>?
 
     private static let defaultAvatarImage: UIImage? = {
         let configuration = UIImage.SymbolConfiguration(pointSize: 48, weight: .regular)
@@ -169,8 +173,10 @@ final class PostListSideMenuViewController: UIViewController {
     init(
         currentAccountStore: CurrentAccountStore = .shared,
         accountRefresher: (any CurrentAccountRefreshing)? = nil,
-        refreshMaxAge: TimeInterval = 60
+        refreshMaxAge: TimeInterval = 60,
+        notificationClient: NodeSeekNotificationClientProtocol? = nil
     ) {
+        self.notificationClient = notificationClient ?? NodeSeekNotificationClient()
         self.accountController = PostListSideMenuAccountController(
             currentAccountStore: currentAccountStore,
             accountRefresher: accountRefresher,
@@ -181,6 +187,10 @@ final class PostListSideMenuViewController: UIViewController {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        notificationUnreadRefreshTask?.cancel()
     }
 
     override func viewDidLoad() {
@@ -233,64 +243,9 @@ final class PostListSideMenuViewController: UIViewController {
         return button
     }
 
-    private static func color(fromCSSColor cssColor: String?) -> UIColor? {
-        guard let value = cssColor?.trimmingCharacters(in: .whitespacesAndNewlines), value.isEmpty == false else {
-            return nil
-        }
-
-        if value.hasPrefix("#") {
-            return color(fromHex: value)
-        }
-
-        let rgbPattern = #"(?i)^rgba?\s*\(([^)]+)\)$"#
-        guard let match = value.range(of: rgbPattern, options: .regularExpression) else {
-            return nil
-        }
-        let content = value[match]
-            .drop { $0 != "(" }
-            .dropFirst()
-            .dropLast()
-        let components = content
-            .split(separator: ",")
-            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-        guard components.count >= 3,
-              let red = cssColorComponent(components[0]),
-              let green = cssColorComponent(components[1]),
-              let blue = cssColorComponent(components[2]) else {
-            return nil
-        }
-        let alpha = components.count >= 4 ? (Double(components[3]) ?? 1) : 1
-        return UIColor(
-            red: red,
-            green: green,
-            blue: blue,
-            alpha: max(0, min(1, CGFloat(alpha)))
-        )
-    }
-
-    private static func color(fromHex value: String) -> UIColor? {
-        let hex = value.dropFirst()
-        guard hex.count == 6, let raw = Int(hex, radix: 16) else {
-            return nil
-        }
-        return UIColor(
-            red: CGFloat((raw >> 16) & 0xFF) / 255,
-            green: CGFloat((raw >> 8) & 0xFF) / 255,
-            blue: CGFloat(raw & 0xFF) / 255,
-            alpha: 1
-        )
-    }
-
-    private static func cssColorComponent(_ value: String) -> CGFloat? {
-        if value.hasSuffix("%"), let percent = Double(value.dropLast()) {
-            return CGFloat(max(0, min(100, percent)) / 100)
-        }
-        guard let raw = Double(value) else { return nil }
-        return CGFloat(max(0, min(255, raw)) / 255)
-    }
-
     func show(animated: Bool) {
         accountController.refreshIfNeeded()
+        refreshNotificationUnreadCount()
         setVisible(true, animated: animated)
     }
 
@@ -307,7 +262,10 @@ final class PostListSideMenuViewController: UIViewController {
         accountHeaderButton.isEnabled = !account.isLoggedIn || account.profileURL != nil
         setExtensionEntriesVisible(account.isLoggedIn)
         notificationURL = account.notification?.url ?? NodeSeekSite.baseURL.appendingPathComponent("notification")
-        applyNotificationColor(account.notification?.iconColorCSS)
+        if account.isLoggedIn == false {
+            notificationUnreadCount = .zero
+        }
+        applyNotificationColor()
 
         if account.isLoggedIn {
             ImageLoad.url(account.avatarURL)
@@ -317,6 +275,25 @@ final class PostListSideMenuViewController: UIViewController {
             avatarLoader.cancel(on: avatarImageView)
             avatarImageView.image = Self.defaultAvatarImage
             avatarImageView.tintColor = .tertiaryLabel
+        }
+    }
+
+    private func refreshNotificationUnreadCount() {
+        guard isViewLoaded, view.window != nil else { return }
+        notificationUnreadRefreshTask?.cancel()
+        notificationUnreadRefreshTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let unreadCount = try await notificationClient.loadUnreadCount()
+                guard Task.isCancelled == false else { return }
+                notificationUnreadCount = unreadCount
+                applyNotificationColor()
+            } catch {
+                guard Task.isCancelled == false else { return }
+                notificationUnreadCount = nil
+                applyNotificationColor()
+                AppLog.debug(.account, "侧边栏通知未读数加载失败: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -446,9 +423,9 @@ final class PostListSideMenuViewController: UIViewController {
         favoritesEntryButton.isHidden = !isVisible
     }
 
-    private func applyNotificationColor(_ cssColor: String?) {
+    private func applyNotificationColor() {
         var configuration = notificationButton.configuration
-        let iconColor = Self.color(fromCSSColor: cssColor) ?? .label
+        let iconColor: UIColor = (notificationUnreadCount?.all ?? 0) > 0 ? .systemRed : .label
         configuration?.baseForegroundColor = .label
         configuration?.imageColorTransformer = UIConfigurationColorTransformer { _ in iconColor }
         notificationButton.configuration = configuration

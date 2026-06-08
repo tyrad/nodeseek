@@ -69,7 +69,7 @@ class PostListRouter: PostListRouterProtocol {
     }
 
     func navigateToNotification(notificationURL: URL) {
-        show(UserInfoWebViewController(profileURL: notificationURL, title: "通知"))
+        show(NotificationViewController())
     }
 
     func navigateToSearch() {

@@ -13,6 +13,7 @@ protocol PostListViewProtocol: AnyObject {
     #if DEBUG
     func openDetailTestURLFromPasteboard()
     #endif
+    func renderNotificationUnreadBadge(isVisible: Bool)
     func renderCategories(_ categories: [PostListCategoryItem], selected: PostListCategoryItem)
     func renderSortMode(_ sortMode: PostListSortMode)
     func reloadSelectedCategory()
@@ -21,6 +22,9 @@ protocol PostListViewProtocol: AnyObject {
 // MARK: - Presenter Protocol (View -> Presenter)
 protocol PostListPresenterProtocol: AnyObject {
     func viewDidLoad()
+    func viewWillAppear()
+    func didEnterForeground()
+    func didReceiveNotificationReadStateChange()
     func didSelectCategory(_ category: PostListCategoryItem)
     func didReselectCategory(_ category: PostListCategoryItem)
     func didTapLogin()
@@ -41,6 +45,11 @@ protocol PostListPresenterProtocol: AnyObject {
     func didSubmitDetailTestURL(_ rawURL: String)
     #endif
     func didSelectPost(_ post: PostSummary)
+}
+
+// MARK: - Interactor Protocol (Presenter -> Interactor)
+protocol PostListNotificationUnreadCountInteractorProtocol {
+    func loadUnreadCount() async throws -> NodeSeekNotificationUnreadCount
 }
 
 // MARK: - Router Protocol (Presenter -> Router)

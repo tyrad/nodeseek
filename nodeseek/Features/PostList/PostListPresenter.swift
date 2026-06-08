@@ -8,30 +8,43 @@
 import Foundation
 
 class PostListPresenter: PostListPresenterProtocol {
+    private enum NotificationUnreadRefresh {
+        static let throttleInterval: TimeInterval = 10
+    }
 
     // MARK: - Properties
     private weak var view: PostListViewProtocol?
     private let router: PostListRouterProtocol
     private let visitedStore: VisitedPostStoreProtocol
     private let categoryPreferenceStore: PostCategoryPreferenceStore
+    private let notificationUnreadCountInteractor: PostListNotificationUnreadCountInteractorProtocol
+    private let currentDateProvider: () -> Date
     private var categoryPreferenceObserver: NSObjectProtocol?
+    private var notificationUnreadRefreshTask: Task<Void, Never>?
+    private var lastNotificationUnreadRefreshDate: Date?
     private var currentCategory: PostListCategoryItem = .all
 
     // MARK: - Initialization
     init(
         router: PostListRouterProtocol,
         visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore(),
-        categoryPreferenceStore: PostCategoryPreferenceStore = .shared
+        categoryPreferenceStore: PostCategoryPreferenceStore = .shared,
+        notificationUnreadCountInteractor: PostListNotificationUnreadCountInteractorProtocol? = nil,
+        currentDateProvider: @escaping () -> Date = Date.init
     ) {
         self.router = router
         self.visitedStore = visitedStore
         self.categoryPreferenceStore = categoryPreferenceStore
+        self.notificationUnreadCountInteractor = notificationUnreadCountInteractor
+            ?? PostListNotificationUnreadCountInteractor()
+        self.currentDateProvider = currentDateProvider
     }
 
     deinit {
         if let categoryPreferenceObserver {
             NotificationCenter.default.removeObserver(categoryPreferenceObserver)
         }
+        notificationUnreadRefreshTask?.cancel()
     }
 
     // MARK: - Setup
@@ -44,6 +57,18 @@ class PostListPresenter: PostListPresenterProtocol {
         observeCategoryPreferencesIfNeeded()
         renderCurrentCategories()
         view?.renderSortMode(.replyTime)
+    }
+
+    func viewWillAppear() {
+        refreshNotificationUnreadBadge()
+    }
+
+    func didEnterForeground() {
+        refreshNotificationUnreadBadge()
+    }
+
+    func didReceiveNotificationReadStateChange() {
+        refreshNotificationUnreadBadge(force: true)
     }
 
     func didSelectCategory(_ category: PostListCategoryItem) {
@@ -191,5 +216,33 @@ private extension PostListPresenter {
         } else {
             router.navigateToPostDetail(post: post)
         }
+    }
+
+    func refreshNotificationUnreadBadge(force: Bool = false) {
+        if force == false, shouldThrottleNotificationUnreadRefresh() {
+            return
+        }
+        lastNotificationUnreadRefreshDate = currentDateProvider()
+        notificationUnreadRefreshTask?.cancel()
+        notificationUnreadRefreshTask = Task { [weak self, notificationUnreadCountInteractor] in
+            do {
+                let unreadCount = try await notificationUnreadCountInteractor.loadUnreadCount()
+                guard Task.isCancelled == false else { return }
+                await MainActor.run { [weak self] in
+                    self?.view?.renderNotificationUnreadBadge(isVisible: unreadCount.all > 0)
+                }
+            } catch {
+                guard Task.isCancelled == false else { return }
+                await MainActor.run { [weak self] in
+                    self?.view?.renderNotificationUnreadBadge(isVisible: false)
+                }
+                AppLog.debug(.account, "首页通知未读数加载失败: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func shouldThrottleNotificationUnreadRefresh() -> Bool {
+        guard let lastNotificationUnreadRefreshDate else { return false }
+        return currentDateProvider().timeIntervalSince(lastNotificationUnreadRefreshDate) < NotificationUnreadRefresh.throttleInterval
     }
 }

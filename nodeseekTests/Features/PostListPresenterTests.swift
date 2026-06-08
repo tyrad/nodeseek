@@ -36,6 +36,54 @@ struct PostListPresenterTests {
         #expect(view.selectedCategory == .all)
     }
 
+    @Test func notificationUnreadBadgeRefreshesWithThrottleForegroundAndForcedReadEvent() async throws {
+        let view = SpyPostListView()
+        let notificationInteractor = StubNotificationUnreadCountInteractor(
+            unreadCount: NodeSeekNotificationUnreadCount(message: 0, atMe: 1, reply: 0, all: 1)
+        )
+        var now = Date(timeIntervalSince1970: 1_000)
+        let presenter = makePresenter(
+            view: view,
+            notificationUnreadCountInteractor: notificationInteractor,
+            currentDateProvider: { now }
+        )
+
+        presenter.viewWillAppear()
+
+        try await waitUntil {
+            view.notificationUnreadBadgeStates.last == true
+        }
+        var loadCount = await notificationInteractor.loadUnreadCountCallCount()
+        #expect(loadCount == 1)
+
+        presenter.viewWillAppear()
+        presenter.didEnterForeground()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        loadCount = await notificationInteractor.loadUnreadCountCallCount()
+        #expect(loadCount == 1)
+
+        await notificationInteractor.setUnreadCount(.zero)
+        presenter.didReceiveNotificationReadStateChange()
+
+        try await waitUntil {
+            view.notificationUnreadBadgeStates.last == false
+        }
+        loadCount = await notificationInteractor.loadUnreadCountCallCount()
+        #expect(loadCount == 2)
+
+        now = now.addingTimeInterval(11)
+        await notificationInteractor.setUnreadCount(
+            NodeSeekNotificationUnreadCount(message: 1, atMe: 0, reply: 0, all: 1)
+        )
+        presenter.didEnterForeground()
+
+        try await waitUntil {
+            view.notificationUnreadBadgeStates.last == true
+        }
+        loadCount = await notificationInteractor.loadUnreadCountCallCount()
+        #expect(loadCount == 3)
+    }
+
     @Test func categoryPreferenceChangeKeepsCurrentCategoryWhenStillVisible() {
         let view = SpyPostListView()
         let store = makeCategoryPreferenceStore()
@@ -307,13 +355,17 @@ private func makePresenter(
     view: SpyPostListView? = nil,
     router: SpyPostListRouter? = nil,
     visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore(),
-    categoryPreferenceStore: PostCategoryPreferenceStore = makeCategoryPreferenceStore()
+    categoryPreferenceStore: PostCategoryPreferenceStore = makeCategoryPreferenceStore(),
+    notificationUnreadCountInteractor: PostListNotificationUnreadCountInteractorProtocol? = nil,
+    currentDateProvider: @escaping () -> Date = Date.init
 ) -> PostListPresenter {
     let router = router ?? SpyPostListRouter()
     let presenter = PostListPresenter(
         router: router,
         visitedStore: visitedStore,
-        categoryPreferenceStore: categoryPreferenceStore
+        categoryPreferenceStore: categoryPreferenceStore,
+        notificationUnreadCountInteractor: notificationUnreadCountInteractor,
+        currentDateProvider: currentDateProvider
     )
     if let view {
         presenter.setView(view)
@@ -346,6 +398,7 @@ private final class SpyPostListView: PostListViewProtocol {
     var renderedCategories: [PostListCategoryItem] = []
     var selectedCategory: PostListCategoryItem = .all
     var renderedSortMode: PostListSortMode?
+    var notificationUnreadBadgeStates: [Bool] = []
     var events: [String] = []
 
     func showError(message: String) {
@@ -354,6 +407,11 @@ private final class SpyPostListView: PostListViewProtocol {
 
     func openDetailTestURLFromPasteboard() {
         events.append("openDetailTestURLFromPasteboard")
+    }
+
+    func renderNotificationUnreadBadge(isVisible: Bool) {
+        notificationUnreadBadgeStates.append(isVisible)
+        events.append("renderNotificationUnreadBadge")
     }
 
     func renderCategories(_ categories: [PostListCategoryItem], selected: PostListCategoryItem) {
@@ -390,6 +448,31 @@ private final class FakeVisitedPostStore: VisitedPostStoreProtocol {
     }
 
     func clearAll() {
+    }
+}
+
+private actor StubNotificationUnreadCountInteractor: PostListNotificationUnreadCountInteractorProtocol {
+    private var unreadCount: NodeSeekNotificationUnreadCount?
+    private var unreadCountLoadCount = 0
+
+    init(unreadCount: NodeSeekNotificationUnreadCount? = .zero) {
+        self.unreadCount = unreadCount
+    }
+
+    func setUnreadCount(_ unreadCount: NodeSeekNotificationUnreadCount?) {
+        self.unreadCount = unreadCount
+    }
+
+    func loadUnreadCountCallCount() -> Int {
+        unreadCountLoadCount
+    }
+
+    func loadUnreadCount() async throws -> NodeSeekNotificationUnreadCount {
+        unreadCountLoadCount += 1
+        guard let unreadCount else {
+            throw URLError(.notConnectedToInternet)
+        }
+        return unreadCount
     }
 }
 
@@ -489,5 +572,21 @@ private final class SpyPostListRouter: PostListRouterProtocol {
 
     func navigateToLogFile() {
         navigateToLogFileCount += 1
+    }
+}
+
+@MainActor
+private func waitUntil(
+    timeoutNanoseconds: UInt64 = 1_000_000_000,
+    condition: @escaping @MainActor () -> Bool
+) async throws {
+    let step: UInt64 = 25_000_000
+    var waited: UInt64 = 0
+    while waited < timeoutNanoseconds {
+        if condition() {
+            return
+        }
+        try await Task.sleep(nanoseconds: step)
+        waited += step
     }
 }

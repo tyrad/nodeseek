@@ -114,6 +114,34 @@ struct PostListViewControllerTests {
         #expect(presenter.didTapCategoryPreferencesCount == 1)
     }
 
+    @Test func topMenuUnreadBadgeForwardsRefreshEventsToPresenterAndRendersBadge() throws {
+        let presenter = SpyPostListPresenter()
+        let viewController = makePostListViewController(presenter: presenter)
+        viewController.loadViewIfNeeded()
+
+        let menuButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-menu-button"))
+        let badgeView = try #require(viewController.view.firstView(accessibilityIdentifier: "post-list-menu-button-unread-badge"))
+        #expect(badgeView.isHidden == true)
+
+        viewController.beginAppearanceTransition(true, animated: false)
+        viewController.endAppearanceTransition()
+
+        #expect(presenter.viewWillAppearCount == 1)
+        viewController.renderNotificationUnreadBadge(isVisible: true)
+        #expect(badgeView.isHidden == false)
+        #expect(menuButton.accessibilityValue == "有未读通知")
+
+        NotificationCenter.default.post(name: UIApplication.willEnterForegroundNotification, object: nil)
+        #expect(presenter.didEnterForegroundCount == 1)
+
+        NotificationCenter.default.post(name: .nodeSeekNotificationReadStateDidChange, object: nil)
+        #expect(presenter.didReceiveNotificationReadStateChangeCount == 1)
+
+        viewController.renderNotificationUnreadBadge(isVisible: false)
+        #expect(badgeView.isHidden == true)
+        #expect(menuButton.accessibilityValue == nil)
+    }
+
     @Test func topSearchEntryDefaultsHiddenAndCanRouteToSearchWhenEnabled() throws {
         let presenter = SpyPostListPresenter()
         let settings = makePostListSearchEntrySettings()
@@ -697,7 +725,7 @@ struct PostListViewControllerTests {
         #expect(loginTapCount == 0)
     }
 
-    @Test func loggedInSideMenuNotificationButtonUsesUnreadIconColorAndRoutesToNotificationPage() async throws {
+    @Test func loggedInSideMenuNotificationButtonUsesUnreadCountAndRoutesToNotificationPage() async throws {
         let defaults = try #require(UserDefaults(suiteName: "post-list-side-menu-\(UUID().uuidString)"))
         let store = CurrentAccountStore(userDefaults: defaults, storageKey: "account")
         let notificationURL = try #require(URL(string: "https://www.nodeseek.com/notification"))
@@ -711,25 +739,46 @@ struct PostListViewControllerTests {
                 )
             )
         )
+        let notificationClient = StubNotificationClient(
+            unreadCount: NodeSeekNotificationUnreadCount(message: 0, atMe: 1, reply: 0, all: 1)
+        )
         let viewController = PostListSideMenuViewController(
             currentAccountStore: store,
-            accountRefresher: StubCurrentAccountRefresher()
+            accountRefresher: StubCurrentAccountRefresher(),
+            notificationClient: notificationClient
         )
         var routedNotificationURL: URL?
         viewController.onNotificationTapped = { url in
             routedNotificationURL = url
         }
 
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = viewController
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
         viewController.loadViewIfNeeded()
         try await waitUntil {
             viewController.view.firstLabel(accessibilityIdentifier: "post-list-side-menu-name-label")?.text == "mistj"
         }
 
         let button = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-notification-button"))
+        viewController.show(animated: false)
         #expect(button.configuration?.title == "通知")
         #expect(button.configuration?.baseForegroundColor == .label)
-        let iconColor = button.configuration?.imageColorTransformer?(UIColor.label)
-        #expect(iconColor?.isClose(to: UIColor(red: 243 / 255, green: 17 / 255, blue: 17 / 255, alpha: 1)) == true)
+        let lightTrait = UITraitCollection(userInterfaceStyle: .light)
+        try await waitUntil {
+            guard let transformer = button.configuration?.imageColorTransformer else { return false }
+            let iconColor = transformer(UIColor.label).resolvedColor(with: lightTrait)
+            return iconColor.isClose(to: UIColor.systemRed.resolvedColor(with: lightTrait))
+        }
+
+        await notificationClient.setUnreadCount(.zero)
+        viewController.show(animated: false)
+        try await waitUntil {
+            guard let transformer = button.configuration?.imageColorTransformer else { return false }
+            let iconColor = transformer(UIColor.label).resolvedColor(with: lightTrait)
+            return iconColor.isClose(to: UIColor.label.resolvedColor(with: lightTrait))
+        }
 
         button.sendActions(for: .touchUpInside)
 
@@ -792,8 +841,52 @@ private final class StubCurrentAccountRefresher: CurrentAccountRefreshing, @unch
     }
 }
 
+private actor StubNotificationClient: NodeSeekNotificationClientProtocol {
+    private var unreadCount: NodeSeekNotificationUnreadCount?
+    private var unreadCountLoadCount = 0
+
+    init(unreadCount: NodeSeekNotificationUnreadCount? = .zero) {
+        self.unreadCount = unreadCount
+    }
+
+    func setUnreadCount(_ unreadCount: NodeSeekNotificationUnreadCount?) {
+        self.unreadCount = unreadCount
+    }
+
+    func loadUnreadCountCallCount() -> Int {
+        unreadCountLoadCount
+    }
+
+    func loadUnreadCount() async throws -> NodeSeekNotificationUnreadCount {
+        unreadCountLoadCount += 1
+        guard let unreadCount else {
+            throw URLError(.notConnectedToInternet)
+        }
+        return unreadCount
+    }
+
+    func loadAtMe() async throws -> [NodeSeekNotificationRecord] {
+        []
+    }
+
+    func loadReplies() async throws -> [NodeSeekNotificationRecord] {
+        []
+    }
+
+    func loadMessageConversations() async throws -> [NodeSeekMessageConversationRecord] {
+        []
+    }
+
+    func markViewed(ids: [Int], tab: NodeSeekNotificationTab) async throws {}
+
+    func markAllViewed(tab: NodeSeekNotificationTab) async throws {}
+}
+
 private final class SpyPostListPresenter: PostListPresenterProtocol {
     private(set) var viewDidLoadCount = 0
+    private(set) var viewWillAppearCount = 0
+    private(set) var didEnterForegroundCount = 0
+    private(set) var didReceiveNotificationReadStateChangeCount = 0
     private(set) var didTapLoginCount = 0
     private(set) var didTapRecentVisitedCount = 0
     private(set) var didTapSearchCount = 0
@@ -814,6 +907,18 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
 
     func viewDidLoad() {
         viewDidLoadCount += 1
+    }
+
+    func viewWillAppear() {
+        viewWillAppearCount += 1
+    }
+
+    func didEnterForeground() {
+        didEnterForegroundCount += 1
+    }
+
+    func didReceiveNotificationReadStateChange() {
+        didReceiveNotificationReadStateChangeCount += 1
     }
 
     func didSelectCategory(_ category: PostListCategoryItem) {

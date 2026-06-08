@@ -44,10 +44,12 @@ class PostListViewController: UIViewController {
     private var sortToggleTrailingConstraint: NSLayoutConstraint?
     private var sortToggleCollapseWorkItem: DispatchWorkItem?
     private var searchEntryObserver: NSObjectProtocol?
+    private var notificationReadStateObserver: NSObjectProtocol?
+    private var appForegroundObserver: NSObjectProtocol?
     private var tabScrollTrailingToSafeAreaConstraint: NSLayoutConstraint?
     private var tabScrollTrailingToSearchButtonConstraint: NSLayoutConstraint?
     var isSortToggleExpanded = false
-    let sideMenuViewController = PostListSideMenuViewController()
+    let sideMenuViewController: PostListSideMenuViewController
     let menuButtonFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
     private let categoryReselectFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
     
@@ -83,6 +85,16 @@ class PostListViewController: UIViewController {
         }
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
+    }()
+
+    private let compactTopButtonUnreadBadgeView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .systemRed
+        view.layer.cornerRadius = 4
+        view.isHidden = true
+        view.accessibilityIdentifier = "post-list-menu-button-unread-badge"
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
     }()
 
     private let categoryEditButton: UIButton = {
@@ -199,6 +211,7 @@ class PostListViewController: UIViewController {
         self.searchEntrySettings = searchEntrySettings
         self.detailTestURLProvider = detailTestURLProvider
         self.autoCheckInRunner = autoCheckInRunner
+        self.sideMenuViewController = PostListSideMenuViewController()
         self.pageContainerViewController = PostPageContainerViewController(
             visitedStore: visitedStore
         )
@@ -218,6 +231,12 @@ class PostListViewController: UIViewController {
         if let searchEntryObserver {
             NotificationCenter.default.removeObserver(searchEntryObserver)
         }
+        if let notificationReadStateObserver {
+            NotificationCenter.default.removeObserver(notificationReadStateObserver)
+        }
+        if let appForegroundObserver {
+            NotificationCenter.default.removeObserver(appForegroundObserver)
+        }
     }
     
     // MARK: - Lifecycle
@@ -232,6 +251,7 @@ class PostListViewController: UIViewController {
         navigationController?.setNavigationBarHidden(true, animated: animated)
         refreshAppearanceForCurrentTraits()
         applySearchEntryVisibility(animated: false)
+        presenter.viewWillAppear()
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -261,6 +281,7 @@ class PostListViewController: UIViewController {
         pageContainerView.translatesAutoresizingMaskIntoConstraints = false
         compactTopButton.addTarget(self, action: #selector(leftButtonTapped), for: .touchUpInside)
         compactTopButton.addTarget(self, action: #selector(prepareMenuButtonFeedback), for: .touchDown)
+        compactTopButton.addSubview(compactTopButtonUnreadBadgeView)
         categoryEditButton.addTarget(self, action: #selector(categoryEditButtonTapped), for: .touchUpInside)
         topSearchButton.addTarget(self, action: #selector(topSearchButtonTapped), for: .touchUpInside)
         sortToggleButton.addTarget(self, action: #selector(sortToggleButtonTapped), for: .touchUpInside)
@@ -308,6 +329,11 @@ class PostListViewController: UIViewController {
             compactTopButton.widthAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
             compactTopButton.heightAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
 
+            compactTopButtonUnreadBadgeView.widthAnchor.constraint(equalToConstant: 8),
+            compactTopButtonUnreadBadgeView.heightAnchor.constraint(equalToConstant: 8),
+            compactTopButtonUnreadBadgeView.topAnchor.constraint(equalTo: compactTopButton.topAnchor, constant: 8),
+            compactTopButtonUnreadBadgeView.trailingAnchor.constraint(equalTo: compactTopButton.trailingAnchor, constant: -8),
+
             categoryEditButton.widthAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
             categoryEditButton.heightAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
 
@@ -344,6 +370,8 @@ class PostListViewController: UIViewController {
 
         installSideMenuController()
         observeSearchEntrySettings()
+        observeNotificationReadState()
+        observeAppForeground()
         sortToggleButton.apply(sortMode: currentSortMode, expanded: false)
         sortToggleButton.applyAlpha(expanded: false)
         applySearchEntryVisibility(animated: false)
@@ -483,6 +511,33 @@ class PostListViewController: UIViewController {
         ) { [weak self] _ in
             self?.applySearchEntryVisibility(animated: true)
         }
+    }
+
+    private func observeNotificationReadState() {
+        guard notificationReadStateObserver == nil else { return }
+        notificationReadStateObserver = NotificationCenter.default.addObserver(
+            forName: .nodeSeekNotificationReadStateDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.presenter.didReceiveNotificationReadStateChange()
+        }
+    }
+
+    private func observeAppForeground() {
+        guard appForegroundObserver == nil else { return }
+        appForegroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.presenter.didEnterForeground()
+        }
+    }
+
+    func applyNotificationUnreadBadge(isVisible: Bool) {
+        compactTopButtonUnreadBadgeView.isHidden = !isVisible
+        compactTopButton.accessibilityValue = isVisible ? "有未读通知" : nil
     }
 
     private func applySearchEntryVisibility(animated: Bool) {
