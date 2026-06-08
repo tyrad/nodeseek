@@ -25,6 +25,7 @@ protocol PostListPresenterProtocol: AnyObject {
     func viewWillAppear()
     func didEnterForeground()
     func didReceiveNotificationReadStateChange()
+    func didReceiveNotificationUnreadCountUpdate(_ unreadCount: NodeSeekNotificationUnreadCount)
     func didSelectCategory(_ category: PostListCategoryItem)
     func didReselectCategory(_ category: PostListCategoryItem)
     func didTapLogin()

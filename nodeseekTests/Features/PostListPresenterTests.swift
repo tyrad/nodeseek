@@ -84,6 +84,23 @@ struct PostListPresenterTests {
         #expect(loadCount == 3)
     }
 
+    @Test func notificationUnreadCountUpdateRendersBadgeWithoutCallingInteractor() async {
+        let view = SpyPostListView()
+        let notificationInteractor = StubNotificationUnreadCountInteractor(
+            unreadCount: NodeSeekNotificationUnreadCount(message: 0, atMe: 1, reply: 0, all: 1)
+        )
+        let presenter = makePresenter(
+            view: view,
+            notificationUnreadCountInteractor: notificationInteractor
+        )
+
+        presenter.didReceiveNotificationUnreadCountUpdate(.zero)
+
+        #expect(view.notificationUnreadBadgeStates.last == false)
+        let loadCount = await notificationInteractor.loadUnreadCountCallCount()
+        #expect(loadCount == 0)
+    }
+
     @Test func categoryPreferenceChangeKeepsCurrentCategoryWhenStillVisible() {
         let view = SpyPostListView()
         let store = makeCategoryPreferenceStore()

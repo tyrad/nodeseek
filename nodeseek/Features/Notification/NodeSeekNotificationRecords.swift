@@ -72,6 +72,22 @@ nonisolated struct NodeSeekNotificationUnreadCount: Equatable, Sendable {
     }
 }
 
+enum NodeSeekNotificationUnreadCountEvent {
+    private static let unreadCountKey = "unreadCount"
+
+    static func post(_ unreadCount: NodeSeekNotificationUnreadCount) {
+        NotificationCenter.default.post(
+            name: .nodeSeekNotificationUnreadCountDidUpdate,
+            object: nil,
+            userInfo: [unreadCountKey: unreadCount]
+        )
+    }
+
+    static func unreadCount(from notification: Notification) -> NodeSeekNotificationUnreadCount? {
+        notification.userInfo?[unreadCountKey] as? NodeSeekNotificationUnreadCount
+    }
+}
+
 nonisolated struct NodeSeekNotificationRecord: Decodable, Equatable, Sendable {
     let id: Int
     var viewed: Int

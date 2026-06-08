@@ -45,6 +45,7 @@ class PostListViewController: UIViewController {
     private var sortToggleCollapseWorkItem: DispatchWorkItem?
     private var searchEntryObserver: NSObjectProtocol?
     private var notificationReadStateObserver: NSObjectProtocol?
+    private var notificationUnreadCountObserver: NSObjectProtocol?
     private var appForegroundObserver: NSObjectProtocol?
     private var tabScrollTrailingToSafeAreaConstraint: NSLayoutConstraint?
     private var tabScrollTrailingToSearchButtonConstraint: NSLayoutConstraint?
@@ -234,6 +235,9 @@ class PostListViewController: UIViewController {
         if let notificationReadStateObserver {
             NotificationCenter.default.removeObserver(notificationReadStateObserver)
         }
+        if let notificationUnreadCountObserver {
+            NotificationCenter.default.removeObserver(notificationUnreadCountObserver)
+        }
         if let appForegroundObserver {
             NotificationCenter.default.removeObserver(appForegroundObserver)
         }
@@ -371,6 +375,7 @@ class PostListViewController: UIViewController {
         installSideMenuController()
         observeSearchEntrySettings()
         observeNotificationReadState()
+        observeNotificationUnreadCount()
         observeAppForeground()
         sortToggleButton.apply(sortMode: currentSortMode, expanded: false)
         sortToggleButton.applyAlpha(expanded: false)
@@ -521,6 +526,18 @@ class PostListViewController: UIViewController {
             queue: .main
         ) { [weak self] _ in
             self?.presenter.didReceiveNotificationReadStateChange()
+        }
+    }
+
+    private func observeNotificationUnreadCount() {
+        guard notificationUnreadCountObserver == nil else { return }
+        notificationUnreadCountObserver = NotificationCenter.default.addObserver(
+            forName: .nodeSeekNotificationUnreadCountDidUpdate,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let unreadCount = NodeSeekNotificationUnreadCountEvent.unreadCount(from: notification) else { return }
+            self?.presenter.didReceiveNotificationUnreadCountUpdate(unreadCount)
         }
     }
 

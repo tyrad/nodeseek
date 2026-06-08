@@ -71,6 +71,12 @@ class PostListPresenter: PostListPresenterProtocol {
         refreshNotificationUnreadBadge(force: true)
     }
 
+    func didReceiveNotificationUnreadCountUpdate(_ unreadCount: NodeSeekNotificationUnreadCount) {
+        notificationUnreadRefreshTask?.cancel()
+        lastNotificationUnreadRefreshDate = currentDateProvider()
+        view?.renderNotificationUnreadBadge(isVisible: unreadCount.all > 0)
+    }
+
     func didSelectCategory(_ category: PostListCategoryItem) {
         guard category != currentCategory else { return }
         guard categoryPreferenceStore.visibleCategoryItems.contains(category) else { return }

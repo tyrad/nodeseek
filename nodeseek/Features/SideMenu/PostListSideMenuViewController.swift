@@ -28,6 +28,7 @@ final class PostListSideMenuViewController: UIViewController {
     private var notificationURL = NodeSeekSite.baseURL.appendingPathComponent("notification")
     private var notificationUnreadCount: NodeSeekNotificationUnreadCount?
     private var notificationUnreadRefreshTask: Task<Void, Never>?
+    private var notificationUnreadCountObserver: NSObjectProtocol?
 
     private static let defaultAvatarImage: UIImage? = {
         let configuration = UIImage.SymbolConfiguration(pointSize: 48, weight: .regular)
@@ -190,6 +191,9 @@ final class PostListSideMenuViewController: UIViewController {
     }
 
     deinit {
+        if let notificationUnreadCountObserver {
+            NotificationCenter.default.removeObserver(notificationUnreadCountObserver)
+        }
         notificationUnreadRefreshTask?.cancel()
     }
 
@@ -197,6 +201,7 @@ final class PostListSideMenuViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         configureAccountController()
+        observeNotificationUnreadCount()
         accountController.start()
     }
 
@@ -293,6 +298,23 @@ final class PostListSideMenuViewController: UIViewController {
                 notificationUnreadCount = nil
                 applyNotificationColor()
                 AppLog.debug(.account, "侧边栏通知未读数加载失败: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func observeNotificationUnreadCount() {
+        guard notificationUnreadCountObserver == nil else { return }
+        notificationUnreadCountObserver = NotificationCenter.default.addObserver(
+            forName: .nodeSeekNotificationUnreadCountDidUpdate,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let unreadCount = NodeSeekNotificationUnreadCountEvent.unreadCount(from: notification) else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                notificationUnreadRefreshTask?.cancel()
+                notificationUnreadCount = unreadCount
+                applyNotificationColor()
             }
         }
     }

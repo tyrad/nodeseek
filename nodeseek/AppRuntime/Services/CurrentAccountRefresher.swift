@@ -77,6 +77,7 @@ actor CurrentAccountRefresher: CurrentAccountRefreshing {
 extension Notification.Name {
     static let nodeSeekLoginSessionDidClose = Notification.Name("nodeSeekLoginSessionDidClose")
     static let nodeSeekNotificationReadStateDidChange = Notification.Name("nodeSeekNotificationReadStateDidChange")
+    static let nodeSeekNotificationUnreadCountDidUpdate = Notification.Name("nodeSeekNotificationUnreadCountDidUpdate")
 }
 
 private extension Optional where Wrapped == AccountResponse {

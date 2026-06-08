@@ -169,17 +169,45 @@ final class NotificationViewController: UIViewController {
         }
     }
 
-    private func loadUnreadCount() {
+    private func loadUnreadCount(
+        publishUpdate: Bool = false,
+        postReadStateChangeOnFailure: Bool = false
+    ) {
         Task { [weak self] in
             guard let self else { return }
-            do {
-                unreadCount = try await client.loadUnreadCount()
-                updateSegmentTitles()
-                updateMarkAllButton()
-            } catch {
-                AppLog.debug(.account, "通知未读数加载失败: \(error.localizedDescription)")
-            }
+            await refreshUnreadCount(
+                publishUpdate: publishUpdate,
+                postReadStateChangeOnFailure: postReadStateChangeOnFailure
+            )
         }
+    }
+
+    private func refreshUnreadCount(
+        publishUpdate: Bool,
+        postReadStateChangeOnFailure: Bool
+    ) async {
+        do {
+            let loadedUnreadCount = try await client.loadUnreadCount()
+            unreadCount = loadedUnreadCount
+            updateSegmentTitles()
+            updateMarkAllButton()
+            if publishUpdate {
+                NodeSeekNotificationUnreadCountEvent.post(loadedUnreadCount)
+            }
+        } catch {
+            if postReadStateChangeOnFailure {
+                postNotificationReadStateChange()
+            }
+            AppLog.debug(.account, "通知未读数加载失败: \(error.localizedDescription)")
+        }
+    }
+
+    private func refreshUnreadCountAfterReadStateChange() {
+        markCurrentAccountNotificationStateStale()
+        loadUnreadCount(
+            publishUpdate: true,
+            postReadStateChangeOnFailure: true
+        )
     }
 
     private func loadSelectedTab(showLoading: Bool) {
@@ -338,8 +366,7 @@ final class NotificationViewController: UIViewController {
             guard let self else { return }
             do {
                 try await client.markAllViewed(tab: tab)
-                markAccountNotificationStateStale()
-                loadUnreadCount()
+                refreshUnreadCountAfterReadStateChange()
             } catch {
                 unreadCount = previousUnreadCount
                 atMeRecords = previousAtMeRecords
@@ -396,8 +423,7 @@ final class NotificationViewController: UIViewController {
             guard let self else { return }
             do {
                 try await client.markViewed(ids: [id], tab: tab)
-                markAccountNotificationStateStale()
-                loadUnreadCount()
+                refreshUnreadCountAfterReadStateChange()
             } catch {
                 if rollbackOnFailure {
                     unmarkRecordLocally(id: id, tab: tab)
@@ -504,8 +530,11 @@ final class NotificationViewController: UIViewController {
         present(alert, animated: true)
     }
 
-    private func markAccountNotificationStateStale() {
+    private func postNotificationReadStateChange() {
         NotificationCenter.default.post(name: .nodeSeekNotificationReadStateDidChange, object: nil)
+    }
+
+    private func markCurrentAccountNotificationStateStale() {
         Task { [currentAccountStore] in
             await currentAccountStore.markStale()
         }

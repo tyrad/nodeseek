@@ -137,6 +137,10 @@ struct PostListViewControllerTests {
         NotificationCenter.default.post(name: .nodeSeekNotificationReadStateDidChange, object: nil)
         #expect(presenter.didReceiveNotificationReadStateChangeCount == 1)
 
+        let unreadCount = NodeSeekNotificationUnreadCount(message: 0, atMe: 2, reply: 1, all: 3)
+        NodeSeekNotificationUnreadCountEvent.post(unreadCount)
+        #expect(presenter.notificationUnreadCountUpdates == [unreadCount])
+
         viewController.renderNotificationUnreadBadge(isVisible: false)
         #expect(badgeView.isHidden == true)
         #expect(menuButton.accessibilityValue == nil)
@@ -772,7 +776,23 @@ struct PostListViewControllerTests {
             return iconColor.isClose(to: UIColor.systemRed.resolvedColor(with: lightTrait))
         }
 
+        NodeSeekNotificationUnreadCountEvent.post(.zero)
+        try await waitUntil {
+            guard let transformer = button.configuration?.imageColorTransformer else { return false }
+            let iconColor = transformer(UIColor.label).resolvedColor(with: lightTrait)
+            return iconColor.isClose(to: UIColor.label.resolvedColor(with: lightTrait))
+        }
+
         await notificationClient.setUnreadCount(.zero)
+        NodeSeekNotificationUnreadCountEvent.post(
+            NodeSeekNotificationUnreadCount(message: 1, atMe: 0, reply: 0, all: 1)
+        )
+        try await waitUntil {
+            guard let transformer = button.configuration?.imageColorTransformer else { return false }
+            let iconColor = transformer(UIColor.label).resolvedColor(with: lightTrait)
+            return iconColor.isClose(to: UIColor.systemRed.resolvedColor(with: lightTrait))
+        }
+
         viewController.show(animated: false)
         try await waitUntil {
             guard let transformer = button.configuration?.imageColorTransformer else { return false }
@@ -887,6 +907,7 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
     private(set) var viewWillAppearCount = 0
     private(set) var didEnterForegroundCount = 0
     private(set) var didReceiveNotificationReadStateChangeCount = 0
+    private(set) var notificationUnreadCountUpdates: [NodeSeekNotificationUnreadCount] = []
     private(set) var didTapLoginCount = 0
     private(set) var didTapRecentVisitedCount = 0
     private(set) var didTapSearchCount = 0
@@ -919,6 +940,10 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
 
     func didReceiveNotificationReadStateChange() {
         didReceiveNotificationReadStateChangeCount += 1
+    }
+
+    func didReceiveNotificationUnreadCountUpdate(_ unreadCount: NodeSeekNotificationUnreadCount) {
+        notificationUnreadCountUpdates.append(unreadCount)
     }
 
     func didSelectCategory(_ category: PostListCategoryItem) {

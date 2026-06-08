@@ -64,6 +64,20 @@ struct NotificationViewControllerTests {
                 )
             ]
         )
+        let publishedUnreadCounts = PublishedUnreadCounts()
+        let observer = NotificationCenter.default.addObserver(
+            forName: .nodeSeekNotificationUnreadCountDidUpdate,
+            object: nil,
+            queue: .main
+        ) { notification in
+            guard let unreadCount = NodeSeekNotificationUnreadCountEvent.unreadCount(from: notification) else { return }
+            Task { @MainActor in
+                publishedUnreadCounts.append(unreadCount)
+            }
+        }
+        defer {
+            NotificationCenter.default.removeObserver(observer)
+        }
         let viewController = NotificationViewController(client: client, currentAccountStore: makeCurrentAccountStore())
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         let navigationController = UINavigationController(rootViewController: viewController)
@@ -92,7 +106,19 @@ struct NotificationViewControllerTests {
         try await waitUntil {
             segmentedControl.titleForSegment(at: NodeSeekNotificationTab.message.rawValue) == "私信"
         }
+        try await waitUntil {
+            publishedUnreadCounts.values.last == .zero
+        }
         #expect(navigationController.topViewController is NodeSeekWebViewController)
+    }
+}
+
+@MainActor
+private final class PublishedUnreadCounts {
+    private(set) var values: [NodeSeekNotificationUnreadCount] = []
+
+    func append(_ unreadCount: NodeSeekNotificationUnreadCount) {
+        values.append(unreadCount)
     }
 }
 
