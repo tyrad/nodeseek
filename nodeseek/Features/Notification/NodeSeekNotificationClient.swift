@@ -20,19 +20,21 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
     private let session: URLSession
     private let baseURL: URL
     private let decoder = JSONDecoder()
-    private let encoder = JSONEncoder()
     private let cookiePreparer: @Sendable () async -> Void
+    private let markViewedSubmitter: NodeSeekNotificationMarkViewedSubmitting
 
     init(
         session: URLSession = .shared,
         baseURL: URL = NodeSeekSite.baseURL,
         cookiePreparer: @escaping @Sendable () async -> Void = {
             await NodeSeekNotificationClient.prepareDefaultHTTPLoad()
-        }
+        },
+        markViewedSubmitter: NodeSeekNotificationMarkViewedSubmitting = WebViewNodeSeekNotificationMarkViewedSubmitter()
     ) {
         self.session = session
         self.baseURL = baseURL
         self.cookiePreparer = cookiePreparer
+        self.markViewedSubmitter = markViewedSubmitter
     }
 
     func loadUnreadCount() async throws -> NodeSeekNotificationUnreadCount {
@@ -91,41 +93,13 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
         let normalizedIDs = ids.filter { $0 > 0 }
         guard normalizedIDs.isEmpty == false else { return }
 
-        let body: Data
-        switch tab {
-        case .atMe:
-            body = try encoder.encode(NotificationMarkBody(atMe: normalizedIDs))
-        case .reply:
-            body = try encoder.encode(NotificationMarkBody(replys: normalizedIDs))
-        case .message:
-            body = try encoder.encode(NotificationMarkBody(messages: normalizedIDs))
-        }
-
-        let request = makeRequest(
-            path: tab.markViewedPath,
-            method: "POST",
-            body: body,
-            referer: tab.webURL
-        )
-        try await validateActionResponse(from: request)
+        let request = try NodeSeekNotificationMarkViewedRequest.single(ids: normalizedIDs, tab: tab)
+        try await markViewedSubmitter.submit(request, referer: tab.webURL)
     }
 
     func markAllViewed(tab: NodeSeekNotificationTab) async throws {
-        let request = makeRequest(
-            path: tab.markViewedPath,
-            queryItems: [URLQueryItem(name: "all", value: "true")],
-            method: "POST",
-            referer: tab.webURL
-        )
-        try await validateActionResponse(from: request)
-    }
-
-    private func validateActionResponse(from request: URLRequest) async throws {
-        let response = try await decode(ActionResponse.self, from: request)
-        guard response.success else {
-            logBusinessFailure(for: request, message: response.message)
-            throw NodeSeekNotificationClientError.unsuccessfulResponse(response.message)
-        }
+        let request = NodeSeekNotificationMarkViewedRequest.all(tab: tab)
+        try await markViewedSubmitter.submit(request, referer: tab.webURL)
     }
 
     private func makeRequest(
@@ -235,7 +209,7 @@ enum NodeSeekNotificationClientError: LocalizedError, Equatable {
 }
 
 private extension NodeSeekNotificationTab {
-    var markViewedPath: String {
+    nonisolated var markViewedPath: String {
         switch self {
         case .atMe:
             return "/api/notification/at-me/markViewed"
@@ -307,7 +281,40 @@ extension NodeSeekNotificationUnreadCount: Decodable {
     }
 }
 
-private struct NotificationMarkBody: Encodable {
+nonisolated struct NodeSeekNotificationMarkViewedRequest: Equatable {
+    let apiPath: String
+    let bodyJSON: String?
+
+    static func single(
+        ids: [Int],
+        tab: NodeSeekNotificationTab,
+        encoder: JSONEncoder = JSONEncoder()
+    ) throws -> NodeSeekNotificationMarkViewedRequest {
+        let body: NotificationMarkBody
+        switch tab {
+        case .atMe:
+            body = NotificationMarkBody(atMe: ids)
+        case .reply:
+            body = NotificationMarkBody(replys: ids)
+        case .message:
+            body = NotificationMarkBody(messages: ids)
+        }
+        let data = try encoder.encode(body)
+        return NodeSeekNotificationMarkViewedRequest(
+            apiPath: tab.markViewedPath,
+            bodyJSON: String(data: data, encoding: .utf8)
+        )
+    }
+
+    static func all(tab: NodeSeekNotificationTab) -> NodeSeekNotificationMarkViewedRequest {
+        NodeSeekNotificationMarkViewedRequest(
+            apiPath: "\(tab.markViewedPath)?all=true",
+            bodyJSON: nil
+        )
+    }
+}
+
+nonisolated private struct NotificationMarkBody: Encodable {
     let atMe: [Int]?
     let replys: [Int]?
     let messages: [Int]?
@@ -317,9 +324,4 @@ private struct NotificationMarkBody: Encodable {
         self.replys = replys
         self.messages = messages
     }
-}
-
-private struct ActionResponse: Decodable {
-    let success: Bool
-    let message: String?
 }

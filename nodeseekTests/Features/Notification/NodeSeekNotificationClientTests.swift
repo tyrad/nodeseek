@@ -105,28 +105,42 @@ struct NodeSeekNotificationClientTests {
     }
 
     @Test func marksAtMeNotificationViewedWithNotificationIDBody() async throws {
-        let client = makeClient(responseBody: #"{"success":true}"#)
+        let submitter = SpyNotificationMarkViewedSubmitter()
+        let client = makeClient(responseBody: #"{"success":true}"#, markViewedSubmitter: submitter)
 
-        try await client.markViewed(ids: [3056861], tab: .atMe)
+        try await client.markViewed(ids: [0, 3056861], tab: .atMe)
 
-        let request = try #require(MockNotificationURLProtocol.lastRequest)
-        #expect(request.url?.absoluteString == "https://www.nodeseek.com/api/notification/at-me/markViewed")
-        #expect(request.httpMethod == "POST")
-        #expect(request.value(forHTTPHeaderField: "Referer") == "https://www.nodeseek.com/notification#/atMe")
-        let body = try #require(requestBodyData(request))
-        let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: [Int]])
+        let submissions = await submitter.submissions()
+        let submission = try #require(submissions.first)
+        #expect(submission.request.apiPath == "/api/notification/at-me/markViewed")
+        #expect(submission.referer.absoluteString == "https://www.nodeseek.com/notification#/atMe")
+        let bodyJSON = try #require(submission.request.bodyJSON)
+        let bodyData = Data(bodyJSON.utf8)
+        let json = try #require(JSONSerialization.jsonObject(with: bodyData) as? [String: [Int]])
         #expect(json["atMe"] == [3056861])
     }
 
+    @Test func skipsMarkViewedWhenNotificationIDsAreInvalid() async throws {
+        let submitter = SpyNotificationMarkViewedSubmitter()
+        let client = makeClient(responseBody: #"{"success":true}"#, markViewedSubmitter: submitter)
+
+        try await client.markViewed(ids: [0, -1], tab: .atMe)
+
+        let submissions = await submitter.submissions()
+        #expect(submissions.isEmpty)
+    }
+
     @Test func marksAllRepliesViewed() async throws {
-        let client = makeClient(responseBody: #"{"success":true}"#)
+        let submitter = SpyNotificationMarkViewedSubmitter()
+        let client = makeClient(responseBody: #"{"success":true}"#, markViewedSubmitter: submitter)
 
         try await client.markAllViewed(tab: .reply)
 
-        let request = try #require(MockNotificationURLProtocol.lastRequest)
-        #expect(request.url?.absoluteString == "https://www.nodeseek.com/api/notification/reply-to-me/markViewed?all=true")
-        #expect(request.httpMethod == "POST")
-        #expect(request.value(forHTTPHeaderField: "Referer") == "https://www.nodeseek.com/notification#/reply")
+        let submissions = await submitter.submissions()
+        let submission = try #require(submissions.first)
+        #expect(submission.request.apiPath == "/api/notification/reply-to-me/markViewed?all=true")
+        #expect(submission.request.bodyJSON == nil)
+        #expect(submission.referer.absoluteString == "https://www.nodeseek.com/notification#/reply")
     }
 
     @Test func loadsMessageConversationsAndResolvesParticipant() async throws {
@@ -162,7 +176,8 @@ struct NodeSeekNotificationClientTests {
 
 private func makeClient(
     responseBody: String,
-    counter: CookiePrepareCounter = CookiePrepareCounter()
+    counter: CookiePrepareCounter = CookiePrepareCounter(),
+    markViewedSubmitter: NodeSeekNotificationMarkViewedSubmitting = SpyNotificationMarkViewedSubmitter()
 ) -> NodeSeekNotificationClient {
     MockNotificationURLProtocol.responseData = Data(responseBody.utf8)
     MockNotificationURLProtocol.lastRequest = nil
@@ -173,7 +188,8 @@ private func makeClient(
         session: session,
         cookiePreparer: {
             counter.increment()
-        }
+        },
+        markViewedSubmitter: markViewedSubmitter
     )
 }
 
@@ -196,25 +212,6 @@ private func withTemporaryFileLogging(_ body: () async throws -> Void) async thr
     }
 }
 
-private func requestBodyData(_ request: URLRequest) -> Data? {
-    if let httpBody = request.httpBody {
-        return httpBody
-    }
-    guard let stream = request.httpBodyStream else { return nil }
-    stream.open()
-    defer { stream.close() }
-    var data = Data()
-    let bufferSize = 1024
-    let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
-    defer { buffer.deallocate() }
-    while stream.hasBytesAvailable {
-        let readCount = stream.read(buffer, maxLength: bufferSize)
-        if readCount <= 0 { break }
-        data.append(buffer, count: readCount)
-    }
-    return data
-}
-
 private final class CookiePrepareCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var value = 0
@@ -229,6 +226,23 @@ private final class CookiePrepareCounter: @unchecked Sendable {
         lock.lock()
         value += 1
         lock.unlock()
+    }
+}
+
+private actor SpyNotificationMarkViewedSubmitter: NodeSeekNotificationMarkViewedSubmitting {
+    struct Submission {
+        let request: NodeSeekNotificationMarkViewedRequest
+        let referer: URL
+    }
+
+    private var values: [Submission] = []
+
+    func submit(_ request: NodeSeekNotificationMarkViewedRequest, referer: URL) async throws {
+        values.append(Submission(request: request, referer: referer))
+    }
+
+    func submissions() -> [Submission] {
+        values
     }
 }
 
