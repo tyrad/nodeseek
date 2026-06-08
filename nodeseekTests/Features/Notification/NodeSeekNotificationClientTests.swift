@@ -76,6 +76,34 @@ struct NodeSeekNotificationClientTests {
         #expect(count.all == 9)
     }
 
+    @Test func writesNotificationAPIRequestLogs() async throws {
+        try await withTemporaryFileLogging {
+            let client = makeClient(
+                responseBody: """
+                {
+                  "success": true,
+                  "unreadCount": {
+                    "message": 2,
+                    "atMe": 3,
+                    "reply": 4,
+                    "all": 9
+                  }
+                }
+                """
+            )
+
+            _ = try await client.loadUnreadCount()
+            AppLog.flushFileLogsForTesting()
+
+            let content = try AppLog.fileLogContent()
+            #expect(content.contains("[info] [Service] ["))
+            #expect(content.contains("通知接口请求开始 method=GET, url=https://www.nodeseek.com/api/notification/unread-count"))
+            #expect(content.contains("通知接口响应成功 method=GET, url=https://www.nodeseek.com/api/notification/unread-count"))
+            #expect(content.contains("status=200"))
+            #expect(content.contains("responseType=UnreadCountResponse"))
+        }
+    }
+
     @Test func marksAtMeNotificationViewedWithNotificationIDBody() async throws {
         let client = makeClient(responseBody: #"{"success":true}"#)
 
@@ -147,6 +175,25 @@ private func makeClient(
             counter.increment()
         }
     )
+}
+
+private func withTemporaryFileLogging(_ body: () async throws -> Void) async throws {
+    try await FileLoggingTestGate.shared.withExclusiveAccess {
+        let previousFileLoggingEnabled = NodeSeekDebugConfig.enableFileLogging
+        let previousAvatarLoggingEnabled = NodeSeekDebugConfig.enableAvatarImageLogs
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+            NodeSeekDebugConfig.enableFileLogging = previousFileLoggingEnabled
+            NodeSeekDebugConfig.enableAvatarImageLogs = previousAvatarLoggingEnabled
+            AppLog.setFileLogDirectoryForTesting(nil)
+        }
+
+        AppLog.setFileLogDirectoryForTesting(directory)
+        NodeSeekDebugConfig.enableFileLogging = true
+        try await body()
+    }
 }
 
 private func requestBodyData(_ request: URLRequest) -> Data? {

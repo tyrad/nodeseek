@@ -41,7 +41,10 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
             referer: NodeSeekNotificationTab.atMe.webURL
         )
         let response = try await decode(UnreadCountResponse.self, from: request)
-        guard response.success else { throw NodeSeekNotificationClientError.unsuccessfulResponse(nil) }
+        guard response.success else {
+            logBusinessFailure(for: request, message: nil)
+            throw NodeSeekNotificationClientError.unsuccessfulResponse(nil)
+        }
         return response.unreadCount
     }
 
@@ -52,6 +55,7 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
         )
         let response = try await decode(NotificationListResponse.self, from: request)
         guard response.success else {
+            logBusinessFailure(for: request, message: response.message)
             throw NodeSeekNotificationClientError.unsuccessfulResponse(response.message)
         }
         return response.data
@@ -64,6 +68,7 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
         )
         let response = try await decode(NotificationListResponse.self, from: request)
         guard response.success else {
+            logBusinessFailure(for: request, message: response.message)
             throw NodeSeekNotificationClientError.unsuccessfulResponse(response.message)
         }
         return response.data
@@ -76,6 +81,7 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
         )
         let response = try await decode(MessageListResponse.self, from: request)
         guard response.success else {
+            logBusinessFailure(for: request, message: response.message)
             throw NodeSeekNotificationClientError.unsuccessfulResponse(response.message)
         }
         return response.msgArray
@@ -117,6 +123,7 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
     private func validateActionResponse(from request: URLRequest) async throws {
         let response = try await decode(ActionResponse.self, from: request)
         guard response.success else {
+            logBusinessFailure(for: request, message: response.message)
             throw NodeSeekNotificationClientError.unsuccessfulResponse(response.message)
         }
     }
@@ -140,18 +147,76 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
     }
 
     private func decode<Response: Decodable>(_ type: Response.Type, from request: URLRequest) async throws -> Response {
+        let startedAt = Date()
+        let method = request.notificationLogMethod
+        let target = request.notificationLogURL
+        AppLog.info(.service, "通知接口请求开始 method=\(method), url=\(target)")
+
         await cookiePreparer()
-        let (data, urlResponse) = try await session.data(for: request)
+        let data: Data
+        let urlResponse: URLResponse
+        do {
+            (data, urlResponse) = try await session.data(for: request)
+        } catch {
+            AppLog.error(
+                .service,
+                "通知接口请求失败 method=\(method), url=\(target), error=\(error.localizedDescription), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))"
+            )
+            throw error
+        }
+
         if let httpResponse = urlResponse as? HTTPURLResponse,
            (200..<300).contains(httpResponse.statusCode) == false {
+            AppLog.warning(
+                .service,
+                "通知接口响应异常 method=\(method), url=\(target), status=\(httpResponse.statusCode), bytes=\(data.count), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))"
+            )
             throw NodeSeekNotificationClientError.httpStatus(httpResponse.statusCode)
         }
-        return try decoder.decode(Response.self, from: data)
+
+        do {
+            let decoded = try decoder.decode(Response.self, from: data)
+            let status = httpStatusDescription(from: urlResponse)
+            AppLog.info(
+                .service,
+                "通知接口响应成功 method=\(method), url=\(target), status=\(status), bytes=\(data.count), responseType=\(Response.self), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))"
+            )
+            return decoded
+        } catch {
+            let status = httpStatusDescription(from: urlResponse)
+            AppLog.error(
+                .service,
+                "通知接口解析失败 method=\(method), url=\(target), status=\(status), bytes=\(data.count), responseType=\(Response.self), error=\(error.localizedDescription), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))"
+            )
+            throw error
+        }
+    }
+
+    private func logBusinessFailure(for request: URLRequest, message: String?) {
+        AppLog.warning(
+            .service,
+            "通知接口业务失败 method=\(request.notificationLogMethod), url=\(request.notificationLogURL), message=\(message ?? "nil")"
+        )
+    }
+
+    private func httpStatusDescription(from response: URLResponse) -> String {
+        guard let httpResponse = response as? HTTPURLResponse else { return "nil" }
+        return String(httpResponse.statusCode)
     }
 
     @MainActor
     private static func prepareDefaultHTTPLoad() async {
         await NodeSeekCookieSession().prepareHTTPLoad()
+    }
+}
+
+private extension URLRequest {
+    var notificationLogMethod: String {
+        httpMethod ?? "GET"
+    }
+
+    var notificationLogURL: String {
+        url?.absoluteString ?? "nil"
     }
 }
 
