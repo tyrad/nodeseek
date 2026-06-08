@@ -61,24 +61,6 @@ make xcode-test-full
 make xcode-test-class TEST=NodeSeekServiceTests SIMULATOR_ID=<simulator-udid>
 ```
 
-## 发布配置
-
-仓库不会包含 Apple 账号、证书、profile、App Store Connect API key 或 NodeImage API key。TestFlight / App Store 发布通过 GitHub Actions + fastlane 完成，所需值通过 repository secrets、environment secrets 或 variables 注入。
-
-本地发布前需要自行配置：
-
-- `APP_IDENTIFIER`
-- `APPLE_TEAM_ID`
-- `APP_STORE_CONNECT_APP_ID`
-- `MATCH_GIT_URL`
-- `MATCH_PASSWORD`
-- `MATCH_GIT_PRIVATE_KEY`
-- `APP_STORE_CONNECT_KEY_ID`
-- `APP_STORE_CONNECT_ISSUER_ID`
-- `APP_STORE_CONNECT_KEY_CONTENT`
-
-`fastlane/metadata`、`fastlane/screenshots` 和 App Privacy JSON 属于本地发布材料，默认不纳入仓库。
-
 ## 隐私与安全
 
 应用不在源码仓库中保存用户 Cookie、NodeSeek 凭据或 NodeImage API Key。运行时授权信息保存在系统 Cookie/Keychain 等本机存储中，退出登录会清除本机 NodeImage 授权。
