@@ -21,6 +21,23 @@ struct AutoCheckInCoordinatorTests {
         #expect(harness.web.submitModes.isEmpty)
     }
 
+    @Test func waitsConfiguredTriggerDelayBeforeRequestingBoardState() async throws {
+        var delays: [TimeInterval] = []
+        let harness = try Harness(
+            settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg),
+            triggerDelayInterval: 3
+        ) { seconds in
+            delays.append(seconds)
+        }
+
+        let outcome = await harness.coordinator.runIfNeeded(presentationContext: nil)
+
+        #expect(outcome == .submitted(message: "ok"))
+        #expect(delays == [3])
+        #expect(harness.web.boardCalls == 1)
+        #expect(harness.web.submitModes == [.fixedChickenLeg])
+    }
+
     @Test func skipsWhenLocalDayAlreadyCompleted() async throws {
         let harness = try Harness(settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg))
         harness.stateStore.markCompleted(dayIdentifier: harness.dayIdentifier, at: harness.now)
@@ -31,7 +48,7 @@ struct AutoCheckInCoordinatorTests {
         #expect(harness.web.boardCalls == 0)
     }
 
-    @Test func marksCompletedWithoutAlertWhenBoardSaysAlreadyCheckedIn() async throws {
+    @Test func marksCompletedWithoutToastWhenBoardSaysAlreadyCheckedIn() async throws {
         let harness = try Harness(settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg))
         harness.web.boardState = AutoCheckInBoardState(
             ok: true,
@@ -48,11 +65,11 @@ struct AutoCheckInCoordinatorTests {
 
         #expect(outcome == .alreadyCheckedIn)
         #expect(harness.stateStore.isCompleted(on: harness.dayIdentifier) == true)
-        #expect(harness.alerter.alerts.isEmpty)
+        #expect(harness.toastPresenter.toasts.isEmpty)
         #expect(harness.web.submitModes.isEmpty)
     }
 
-    @Test func submitsChickenLegModeAndShowsSuccessAlert() async throws {
+    @Test func submitsChickenLegModeAndShowsSuccessToast() async throws {
         let harness = try Harness(settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg))
         harness.web.submitResult = AutoCheckInSubmitResult(
             ok: true,
@@ -68,10 +85,10 @@ struct AutoCheckInCoordinatorTests {
         #expect(outcome == .submitted(message: "签到成功"))
         #expect(harness.web.submitModes == [.fixedChickenLeg])
         #expect(harness.stateStore.isCompleted(on: harness.dayIdentifier) == true)
-        #expect(harness.alerter.alerts == [AutoCheckInAlert(title: "自动签到成功", message: "签到成功")])
+        #expect(harness.toastPresenter.toasts == [AutoCheckInToast(title: "自动签到成功", message: "签到成功")])
     }
 
-    @Test func submitsRandomModeWithNoAlertWhenPresentationContextIsMissing() async throws {
+    @Test func submitsRandomModeWithNoToastWhenPresentationContextIsMissing() async throws {
         let harness = try Harness(settings: AutoCheckInSettings(isEnabled: true, mode: .random))
         harness.web.submitResult = AutoCheckInSubmitResult(
             ok: true,
@@ -86,7 +103,7 @@ struct AutoCheckInCoordinatorTests {
 
         #expect(outcome == .submitted(message: nil))
         #expect(harness.web.submitModes == [.random])
-        #expect(harness.alerter.alerts.isEmpty)
+        #expect(harness.toastPresenter.toasts.isEmpty)
     }
 
     @Test func returnsSilentlyWhenGuest() async throws {
@@ -106,7 +123,7 @@ struct AutoCheckInCoordinatorTests {
 
         #expect(outcome == .skipped("not_logged_in"))
         #expect(harness.web.submitModes.isEmpty)
-        #expect(harness.alerter.alerts.isEmpty)
+        #expect(harness.toastPresenter.toasts.isEmpty)
     }
 
     @Test func failedBoardStateDoesNotSubmitAndStartsCooldown() async throws {
@@ -130,7 +147,7 @@ struct AutoCheckInCoordinatorTests {
         #expect(harness.stateStore.isCompleted(on: harness.dayIdentifier) == false)
         #expect(harness.web.boardCalls == 1)
         #expect(harness.web.submitModes.isEmpty)
-        #expect(harness.alerter.alerts.isEmpty)
+        #expect(harness.toastPresenter.toasts.isEmpty)
     }
 
     @Test func failedSubmitDoesNotMarkCompletedAndStartsCooldown() async throws {
@@ -153,7 +170,7 @@ struct AutoCheckInCoordinatorTests {
         #expect(harness.web.submitModes.count == 1)
     }
 
-    @Test func alreadyCheckedInSubmitMarksCompletedWithoutAlertOrCooldown() async throws {
+    @Test func alreadyCheckedInSubmitMarksCompletedWithoutToastOrCooldown() async throws {
         let harness = try Harness(settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg))
         harness.web.submitResult = AutoCheckInSubmitResult(
             ok: false,
@@ -171,12 +188,12 @@ struct AutoCheckInCoordinatorTests {
         #expect(second == .skipped("completed_today"))
         #expect(harness.stateStore.isCompleted(on: harness.dayIdentifier) == true)
         #expect(harness.web.submitModes.count == 1)
-        #expect(harness.alerter.alerts.isEmpty)
+        #expect(harness.toastPresenter.toasts.isEmpty)
     }
 
     @Test func unavailablePresentationStillCompletesSubmittedRun() async throws {
         let harness = try Harness(settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg))
-        harness.alerter.shouldShow = false
+        harness.toastPresenter.shouldShow = false
         harness.web.submitResult = AutoCheckInSubmitResult(
             ok: true,
             statusCode: 200,
@@ -190,8 +207,8 @@ struct AutoCheckInCoordinatorTests {
 
         #expect(outcome == .submitted(message: "签到成功"))
         #expect(harness.stateStore.isCompleted(on: harness.dayIdentifier) == true)
-        #expect(harness.alerter.alerts.isEmpty)
-        #expect(harness.alerter.showCalls == 1)
+        #expect(harness.toastPresenter.toasts.isEmpty)
+        #expect(harness.toastPresenter.showCalls == 1)
     }
 
     @Test func concurrentRunsJoinInFlightWork() async throws {
@@ -243,7 +260,7 @@ struct AutoCheckInCoordinatorTests {
         )
 
         let first = await harness.coordinator.runIfNeeded(presentationContext: nil)
-        harness.currentNow = harness.now.addingTimeInterval(601)
+        harness.currentNow = harness.now.addingTimeInterval(121)
         harness.web.submitResult = AutoCheckInSubmitResult(
             ok: true,
             statusCode: 200,
@@ -260,7 +277,7 @@ struct AutoCheckInCoordinatorTests {
         #expect(harness.stateStore.isCompleted(on: harness.dayIdentifier) == true)
     }
 
-    @Test func sanitizesSubmittedMessageForOutcomeAndAlert() async throws {
+    @Test func sanitizesSubmittedMessageForOutcomeAndToast() async throws {
         let harness = try Harness(settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg))
         harness.web.submitResult = AutoCheckInSubmitResult(
             ok: true,
@@ -274,7 +291,7 @@ struct AutoCheckInCoordinatorTests {
         let outcome = await harness.coordinator.runIfNeeded(presentationContext: UIViewController())
 
         #expect(outcome == .submitted(message: "签到 成功"))
-        #expect(harness.alerter.alerts == [AutoCheckInAlert(title: "自动签到成功", message: "签到 成功")])
+        #expect(harness.toastPresenter.toasts == [AutoCheckInToast(title: "自动签到成功", message: "签到 成功")])
     }
 
     @Test func failedSubmitLogIncludesElapsedStatusAndSanitizedMessage() async throws {
@@ -379,10 +396,15 @@ struct AutoCheckInCoordinatorTests {
         let settingsStore: AutoCheckInSettingsStore
         let stateStore: AutoCheckInStateStore
         let web = FakeAutoCheckInWebAutomator()
-        let alerter = CapturingAutoCheckInAlerter()
+        let toastPresenter = CapturingAutoCheckInToastPresenter()
         let coordinator: AutoCheckInCoordinator
 
-        init(settings: AutoCheckInSettings) throws {
+        init(
+            settings: AutoCheckInSettings,
+            cooldownInterval: TimeInterval = 120,
+            triggerDelayInterval: TimeInterval = 0,
+            delay: @escaping @MainActor (TimeInterval) async -> Void = { _ in }
+        ) throws {
             clock = MutableClock(now)
             let settingsDefaults = try #require(UserDefaults(suiteName: "auto-check-in-coordinator-settings-\(UUID().uuidString)"))
             let stateDefaults = try #require(UserDefaults(suiteName: "auto-check-in-coordinator-state-\(UUID().uuidString)"))
@@ -401,11 +423,13 @@ struct AutoCheckInCoordinatorTests {
                 settingsStore: settingsStore,
                 stateStore: stateStore,
                 webAutomator: web,
-                alerter: alerter,
+                toastPresenter: toastPresenter,
                 now: { runClock.now },
                 dayIdentifierProvider: { runDayIdentifier },
                 runIDProvider: { "test1234" },
-                cooldownInterval: 600
+                cooldownInterval: cooldownInterval,
+                triggerDelayInterval: triggerDelayInterval,
+                delay: delay
             )
         }
     }
@@ -463,15 +487,15 @@ private final class FakeAutoCheckInWebAutomator: AutoCheckInWebAutomating {
 }
 
 @MainActor
-private final class CapturingAutoCheckInAlerter: AutoCheckInAlertPresenting {
-    var alerts: [AutoCheckInAlert] = []
+private final class CapturingAutoCheckInToastPresenter: AutoCheckInToastPresenting {
+    var toasts: [AutoCheckInToast] = []
     var shouldShow = true
     var showCalls = 0
 
-    func show(_ alert: AutoCheckInAlert, from presentationContext: UIViewController) -> Bool {
+    func show(_ toast: AutoCheckInToast, from presentationContext: UIViewController) -> Bool {
         showCalls += 1
         guard shouldShow else { return false }
-        alerts.append(alert)
+        toasts.append(toast)
         return true
     }
 }

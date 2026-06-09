@@ -6,50 +6,122 @@
 import Foundation
 import UIKit
 
-struct AutoCheckInAlert: Equatable, Sendable {
+struct AutoCheckInToast: Equatable, Sendable {
     let title: String
     let message: String
 }
 
 @MainActor
-protocol AutoCheckInAlertPresenting: AnyObject {
-    func show(_ alert: AutoCheckInAlert, from presentationContext: UIViewController) -> Bool
+protocol AutoCheckInToastPresenting: AnyObject {
+    func show(_ toast: AutoCheckInToast, from presentationContext: UIViewController) -> Bool
 }
 
 @MainActor
-final class DefaultAutoCheckInAlertPresenter: AutoCheckInAlertPresenting {
-    func show(_ alert: AutoCheckInAlert, from presentationContext: UIViewController) -> Bool {
-        guard let presenter = availablePresenter(from: presentationContext) else {
+final class DefaultAutoCheckInToastPresenter: AutoCheckInToastPresenting {
+    private let displayDuration: TimeInterval
+
+    init(displayDuration: TimeInterval = 5) {
+        self.displayDuration = displayDuration
+    }
+
+    func show(_ toast: AutoCheckInToast, from presentationContext: UIViewController) -> Bool {
+        guard let window = availableWindow(from: presentationContext) else {
             return false
         }
-        let alertController = UIAlertController(title: alert.title, message: alert.message, preferredStyle: .alert)
-        alertController.addAction(UIAlertAction(title: "确定", style: .default))
-        presenter.present(alertController, animated: true)
+
+        window.subviews
+            .filter { $0.accessibilityIdentifier == "auto-check-in-toast" }
+            .forEach { $0.removeFromSuperview() }
+
+        let toastView = makeToastView(toast)
+        window.addSubview(toastView)
+        NSLayoutConstraint.activate([
+            toastView.leadingAnchor.constraint(greaterThanOrEqualTo: window.safeAreaLayoutGuide.leadingAnchor, constant: 20),
+            toastView.trailingAnchor.constraint(lessThanOrEqualTo: window.safeAreaLayoutGuide.trailingAnchor, constant: -20),
+            toastView.centerXAnchor.constraint(equalTo: window.centerXAnchor),
+            toastView.bottomAnchor.constraint(equalTo: window.safeAreaLayoutGuide.bottomAnchor, constant: -24)
+        ])
+
+        window.layoutIfNeeded()
+        toastView.alpha = 0
+        toastView.transform = CGAffineTransform(translationX: 0, y: 10)
+        UIView.animate(withDuration: 0.24, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
+            toastView.alpha = 1
+            toastView.transform = .identity
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + displayDuration) { [weak toastView] in
+            guard let toastView, toastView.superview != nil else { return }
+            UIView.animate(withDuration: 0.24, delay: 0, options: [.curveEaseIn, .allowUserInteraction]) {
+                toastView.alpha = 0
+                toastView.transform = CGAffineTransform(translationX: 0, y: 10)
+            } completion: { _ in
+                toastView.removeFromSuperview()
+            }
+        }
         return true
     }
 
-    private func availablePresenter(from presentationContext: UIViewController) -> UIViewController? {
-        guard presentationContext.isViewLoaded, presentationContext.view.window != nil else {
-            return nil
-        }
+    private func availableWindow(from presentationContext: UIViewController) -> UIWindow? {
+        let activeWindow = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .filter { $0.activationState == .foregroundActive || $0.activationState == .foregroundInactive }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }
+        return activeWindow ?? presentationContext.view.window
+    }
 
-        var presenter = presentationContext
-        while let presented = presenter.presentedViewController {
-            presenter = presented
-        }
+    private func makeToastView(_ toast: AutoCheckInToast) -> UIView {
+        let container = UIView()
+        container.accessibilityIdentifier = "auto-check-in-toast"
+        container.backgroundColor = UIColor.label.withAlphaComponent(0.94)
+        container.layer.cornerRadius = 14
+        container.layer.cornerCurve = .continuous
+        container.layer.shadowColor = UIColor.black.cgColor
+        container.layer.shadowOpacity = 0.18
+        container.layer.shadowRadius = 14
+        container.layer.shadowOffset = CGSize(width: 0, height: 8)
+        container.translatesAutoresizingMaskIntoConstraints = false
 
-        guard presenter.isViewLoaded, presenter.view.window != nil else {
-            return nil
-        }
-        guard (presenter is UIAlertController) == false else {
-            return nil
-        }
-        guard presenter.isBeingDismissed == false,
-              presenter.isBeingPresented == false,
-              presenter.transitionCoordinator == nil else {
-            return nil
-        }
-        return presenter
+        let iconView = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
+        iconView.tintColor = .systemGreen
+        iconView.contentMode = .scaleAspectFit
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+
+        let titleLabel = UILabel()
+        titleLabel.text = toast.title
+        titleLabel.font = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 15, weight: .semibold))
+        titleLabel.textColor = .systemBackground
+        titleLabel.numberOfLines = 1
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let messageLabel = UILabel()
+        messageLabel.text = toast.message
+        messageLabel.font = .preferredFont(forTextStyle: .footnote)
+        messageLabel.textColor = UIColor.systemBackground.withAlphaComponent(0.84)
+        messageLabel.numberOfLines = 2
+        messageLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let stack = UIStackView(arrangedSubviews: [titleLabel, messageLabel])
+        stack.axis = .vertical
+        stack.spacing = 2
+        stack.alignment = .fill
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        container.addSubview(iconView)
+        container.addSubview(stack)
+        NSLayoutConstraint.activate([
+            iconView.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 14),
+            iconView.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            iconView.widthAnchor.constraint(equalToConstant: 20),
+            iconView.heightAnchor.constraint(equalToConstant: 20),
+
+            stack.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 10),
+            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
+            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 12),
+            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -12)
+        ])
+        return container
     }
 }
 
@@ -58,11 +130,13 @@ final class AutoCheckInCoordinator {
     private let settingsStore: AutoCheckInSettingsStore
     private let stateStore: AutoCheckInStateStore
     private let webAutomator: AutoCheckInWebAutomating
-    private let alerter: AutoCheckInAlertPresenting
+    private let toastPresenter: AutoCheckInToastPresenting
     private let now: () -> Date
     private let dayIdentifierProvider: () -> String
     private let runIDProvider: () -> String
     private let cooldownInterval: TimeInterval
+    private let triggerDelayInterval: TimeInterval
+    private let delay: @MainActor (TimeInterval) async -> Void
     private var inFlightTask: Task<AutoCheckInRunOutcome, Never>?
     private var activeRunID: String?
     private var cooldownUntil: Date?
@@ -71,20 +145,27 @@ final class AutoCheckInCoordinator {
         settingsStore: AutoCheckInSettingsStore? = nil,
         stateStore: AutoCheckInStateStore? = nil,
         webAutomator: AutoCheckInWebAutomating? = nil,
-        alerter: AutoCheckInAlertPresenting? = nil,
+        toastPresenter: AutoCheckInToastPresenting? = nil,
         now: @escaping () -> Date = Date.init,
         dayIdentifierProvider: (() -> String)? = nil,
         runIDProvider: @escaping () -> String = { String(UUID().uuidString.prefix(8)) },
-        cooldownInterval: TimeInterval = 600
+        cooldownInterval: TimeInterval = 120,
+        triggerDelayInterval: TimeInterval = 3,
+        delay: @escaping @MainActor (TimeInterval) async -> Void = { seconds in
+            guard seconds > 0 else { return }
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+        }
     ) {
         self.settingsStore = settingsStore ?? .shared
         self.stateStore = stateStore ?? .shared
         self.webAutomator = webAutomator ?? WebViewAutoCheckInAutomator()
-        self.alerter = alerter ?? DefaultAutoCheckInAlertPresenter()
+        self.toastPresenter = toastPresenter ?? DefaultAutoCheckInToastPresenter()
         self.now = now
         self.dayIdentifierProvider = dayIdentifierProvider ?? { AutoCheckInDayIdentifier.current() }
         self.runIDProvider = runIDProvider
         self.cooldownInterval = cooldownInterval
+        self.triggerDelayInterval = triggerDelayInterval
+        self.delay = delay
     }
 
     func runIfNeeded(
@@ -138,6 +219,11 @@ final class AutoCheckInCoordinator {
             return finish(.skipped("cooldown"), runID: runID, startedAt: startedAt, detail: "reason=cooldown")
         }
 
+        if triggerDelayInterval > 0 {
+            AppLog.info(.autoCheckIn, "runID=\(runID) trigger_delay seconds=\(Int(triggerDelayInterval))")
+            await delay(triggerDelayInterval)
+        }
+
         do {
             AppLog.info(.autoCheckIn, "runID=\(runID) board_state_start endpoint=/api/attendance/board?page=1")
             let boardStartedAt = now()
@@ -159,7 +245,7 @@ final class AutoCheckInCoordinator {
             if boardState.isCheckedIn {
                 stateStore.markCompleted(dayIdentifier: dayIdentifier, at: now())
                 AppLog.info(.autoCheckIn, "runID=\(runID) state_write day=\(dayIdentifier) source=board_state")
-                AppLog.info(.autoCheckIn, "runID=\(runID) alert=skipped reason=already_checked_in")
+                AppLog.info(.autoCheckIn, "runID=\(runID) toast=skipped reason=already_checked_in")
                 return finish(.alreadyCheckedIn, runID: runID, startedAt: startedAt, detail: "source=board_state")
             }
 
@@ -172,7 +258,7 @@ final class AutoCheckInCoordinator {
             if submit.ok == false, isAlreadyCheckedInSubmitMessage(sanitizedMessage) {
                 stateStore.markCompleted(dayIdentifier: dayIdentifier, at: now())
                 AppLog.info(.autoCheckIn, "runID=\(runID) state_write day=\(dayIdentifier) source=submit_already_checked_in")
-                AppLog.info(.autoCheckIn, "runID=\(runID) alert=skipped reason=already_checked_in")
+                AppLog.info(.autoCheckIn, "runID=\(runID) toast=skipped reason=already_checked_in")
                 return finish(.alreadyCheckedIn, runID: runID, startedAt: startedAt, detail: "source=submit_already_checked_in")
             }
 
@@ -184,16 +270,19 @@ final class AutoCheckInCoordinator {
 
             stateStore.markCompleted(dayIdentifier: dayIdentifier, at: now())
             AppLog.info(.autoCheckIn, "runID=\(runID) state_write day=\(dayIdentifier) source=submit_success")
-            let alertMessage = sanitizedMessage?.isEmpty == false ? sanitizedMessage! : "已完成今日签到。"
+            let toastMessage = sanitizedMessage?.isEmpty == false ? sanitizedMessage! : "已完成今日签到。"
             if let presentationContext {
-                let didShow = alerter.show(AutoCheckInAlert(title: "自动签到成功", message: alertMessage), from: presentationContext)
+                let didShow = toastPresenter.show(
+                    AutoCheckInToast(title: "自动签到成功", message: toastMessage),
+                    from: presentationContext
+                )
                 if didShow {
-                    AppLog.notice(.autoCheckIn, "runID=\(runID) alert=shown title=自动签到成功")
+                    AppLog.notice(.autoCheckIn, "runID=\(runID) toast=shown title=自动签到成功")
                 } else {
-                    AppLog.info(.autoCheckIn, "runID=\(runID) alert=skipped reason=presentation_unavailable")
+                    AppLog.info(.autoCheckIn, "runID=\(runID) toast=skipped reason=presentation_unavailable")
                 }
             } else {
-                AppLog.info(.autoCheckIn, "runID=\(runID) alert=skipped reason=no_presentation_context")
+                AppLog.info(.autoCheckIn, "runID=\(runID) toast=skipped reason=no_presentation_context")
             }
             return finish(.submitted(message: sanitizedMessage), runID: runID, startedAt: startedAt, detail: "source=submit_success")
         } catch {
