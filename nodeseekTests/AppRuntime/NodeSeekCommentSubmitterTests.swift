@@ -212,6 +212,16 @@ struct NodeSeekCommentSubmitterTests {
         #expect(source.contains("postId: postID") == false)
     }
 
+    @Test func commentUpvoteScriptSubmitsWithoutReadingRenderedCommentNode() {
+        let source = CommentUpvoteAutomationScript.source
+
+        #expect(source.contains("commentId: commentID"))
+        #expect(source.contains("locateCommentRoot") == false)
+        #expect(source.contains("data-comment-id") == false)
+        #expect(source.contains("already_clicked") == false)
+        #expect(source.contains("reason: \"comment_not_found\"") == false)
+    }
+
     @Test func addCommentChickenLegUsesPageAutomation() async throws {
         let automation = CapturingCommentChickenLegAutomation(response: .init(
             ok: true,
@@ -275,6 +285,16 @@ struct NodeSeekCommentSubmitterTests {
         #expect(source.contains("postId: postID") == false)
     }
 
+    @Test func commentChickenLegScriptSubmitsWithoutReadingRenderedCommentNode() {
+        let source = CommentChickenLegAutomationScript.source
+
+        #expect(source.contains("commentId: commentID"))
+        #expect(source.contains("locateCommentRoot") == false)
+        #expect(source.contains("data-comment-id") == false)
+        #expect(source.contains("already_clicked") == false)
+        #expect(source.contains("reason: \"comment_not_found\"") == false)
+    }
+
     @Test func addCommentDislikeUsesPageAutomation() async throws {
         let automation = CapturingCommentDislikeAutomation(response: .init(
             ok: true,
@@ -336,6 +356,16 @@ struct NodeSeekCommentSubmitterTests {
         #expect(source.contains("data-comment-id"))
         #expect(source.contains("commentId: commentID"))
         #expect(source.contains("postId: postID") == false)
+    }
+
+    @Test func commentDislikeScriptSubmitsWithoutReadingRenderedCommentNode() {
+        let source = CommentDislikeAutomationScript.source
+
+        #expect(source.contains("commentId: commentID"))
+        #expect(source.contains("locateCommentRoot") == false)
+        #expect(source.contains("data-comment-id") == false)
+        #expect(source.contains("already_clicked") == false)
+        #expect(source.contains("reason: \"comment_not_found\"") == false)
     }
 }
 

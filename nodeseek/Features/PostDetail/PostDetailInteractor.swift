@@ -194,7 +194,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
             return
         }
 
-        let referer = actionReferer(for: post)
+        let referer = commentReactionReferer(for: post)
         Task {
             AppLog.info(.postDetail, "开始点赞评论，postID=\(post.id), commentID=\(commentID)")
             do {
@@ -242,7 +242,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
             return
         }
 
-        let referer = actionReferer(for: post)
+        let referer = commentReactionReferer(for: post)
         Task {
             AppLog.info(.postDetail, "开始给评论投放鸡腿，postID=\(post.id), commentID=\(commentID)")
             do {
@@ -290,7 +290,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
             return
         }
 
-        let referer = actionReferer(for: post)
+        let referer = commentReactionReferer(for: post)
         Task {
             AppLog.info(.postDetail, "开始反对评论，postID=\(post.id), commentID=\(commentID)")
             do {
@@ -383,6 +383,10 @@ class PostDetailInteractor: PostDetailInteractorInput {
 
     private func actionReferer(for post: PostSummary) -> URL {
         currentActionPageURL ?? post.url
+    }
+
+    private func commentReactionReferer(for post: PostSummary) -> URL {
+        NodeSeekSite.postURL(id: post.id, page: 1)
     }
 
     private static func isCancelledLoad(_ error: Error) -> Bool {

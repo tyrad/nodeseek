@@ -134,9 +134,9 @@ struct PostDetailInteractorTests {
         #expect(actionPagePreparer.preparedURLs == [post.url])
     }
 
-    @Test func commentActionsUseCurrentDetailPageAfterLoadingNonFirstPage() async throws {
+    @Test func commentActionsUseFirstPostPageAfterLoadingNonFirstPage() async throws {
         let baseURL = URL(string: "https://www.nodeseek.com/")!
-        let post = Self.makePost()
+        let post = Self.makePost(url: URL(string: "https://www.nodeseek.com/post-703863-9")!)
         let pageURL = URL(string: "https://www.nodeseek.com/post-703863-4")!
         let htmlClient = URLCapturingHTMLClient(response: HTMLResponse(
             statusCode: 200,
@@ -167,7 +167,7 @@ struct PostDetailInteractorTests {
         await waitForInteractorCallbacks()
 
         #expect(actionPagePreparer.preparedURLs == [pageURL])
-        #expect(upvoteSubmitter.submittedReferer == pageURL)
+        #expect(upvoteSubmitter.submittedReferer?.absoluteString == "https://www.nodeseek.com/post-703863-1")
     }
 
     @Test func submitReplyUsesCommentSubmitterAndReportsSuccess() async throws {
@@ -464,11 +464,11 @@ struct PostDetailInteractorTests {
         #expect(presenter.postOpposeErrorMessage == nil)
     }
 
-    private static func makePost() -> PostSummary {
+    private static func makePost(url: URL = URL(string: "https://www.nodeseek.com/post-703863-1")!) -> PostSummary {
         PostSummary(
             id: "703863",
             title: "标题",
-            url: URL(string: "https://www.nodeseek.com/post-703863-1")!,
+            url: url,
             authorName: "mist",
             nodeName: "日常",
             replyCount: 0,

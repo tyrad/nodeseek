@@ -26,68 +26,7 @@ enum CommentDislikeAutomationScript {
         }
       };
 
-      const readCount = (root) => {
-        if (!root) return null;
-        const countText = root.querySelector("span")?.textContent || root.textContent || "";
-        const matched = String(countText).match(/\\d+/);
-        if (!matched) return null;
-        return Number(matched[0]);
-      };
-
-      const pickDislikeElement = (commentRoot) => {
-        if (!commentRoot) return null;
-        const direct = commentRoot.querySelector(".menu-item[title='反对']");
-        if (direct) return direct;
-        const candidates = Array.from(commentRoot.querySelectorAll(".menu-item"));
-        return candidates.find((node) => {
-          const title = String(node.getAttribute("title") || "").trim();
-          const text = String(node.textContent || "").trim();
-          const className = String(node.className || "");
-          const source = `${title} ${text} ${className}`.toLowerCase();
-          return /反对|点踩|dislike|downvote|oppose/.test(source);
-        }) || null;
-      };
-
-      const locateCommentRoot = (id) => {
-        const normalizedID = String(id);
-        return document.querySelector(`[data-comment-id='${normalizedID}']`) ||
-          document.getElementById(normalizedID) ||
-          document.querySelector(`#comment-${normalizedID}`);
-      };
-
       try {
-        const commentRoot = locateCommentRoot(commentID);
-        const dislikeElement = pickDislikeElement(commentRoot);
-        if (!commentRoot || !dislikeElement) {
-          finish({
-            ok: false,
-            statusCode: 404,
-            response: {
-              success: false,
-              message: "未找到可反对的评论节点",
-              current: null
-            },
-            reason: "comment_not_found",
-            body: ""
-          });
-          return;
-        }
-
-        if (dislikeElement.classList.contains("clicked")) {
-          finish({
-            ok: false,
-            statusCode: 200,
-            response: {
-              success: false,
-              message: "该评论已反对",
-              current: readCount(dislikeElement)
-            },
-            reason: "already_clicked",
-            body: ""
-          });
-          return;
-        }
-
         timer = window.setTimeout(() => {
           finish({ ok: false, reason: "submit_timeout" });
         }, timeoutMs);
