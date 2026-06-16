@@ -46,6 +46,29 @@ struct AppLogTests {
         }
     }
 
+    @Test func fileLoggingSwitchPersistsPreferenceToUserDefaults() async throws {
+        await FileLoggingTestGate.shared.withExclusiveAccess {
+            let defaults = UserDefaults.standard
+            let storageKey = NodeSeekDebugConfig.fileLoggingStorageKeyForTesting
+            let previousValue = defaults.object(forKey: storageKey)
+            let previousFileLoggingEnabled = NodeSeekDebugConfig.enableFileLogging
+            defer {
+                if let previousValue {
+                    defaults.set(previousValue, forKey: storageKey)
+                } else {
+                    defaults.removeObject(forKey: storageKey)
+                }
+                NodeSeekDebugConfig.enableFileLogging = previousFileLoggingEnabled
+            }
+
+            defaults.removeObject(forKey: storageKey)
+            NodeSeekDebugConfig.resetRuntimeLoggingForTesting()
+            NodeSeekDebugConfig.enableFileLogging = true
+
+            #expect(defaults.bool(forKey: storageKey) == true)
+        }
+    }
+
     @Test func readsCurrentFileLogContent() async throws {
         try await withTemporaryFileLogging { _ in
             AppLog.info(.postDetail, "detail log message")

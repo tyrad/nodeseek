@@ -8,9 +8,12 @@
 import UIKit
 
 struct NodeSeekDebugConfig {
+    nonisolated private static let fileLoggingStorageKey = "nodeSeekDebug.fileLoggingEnabled"
     private nonisolated static let storage = NodeSeekDebugConfigStorage(
         fileLoggingEnabled: false,
-        avatarImageLoggingEnabled: false
+        avatarImageLoggingEnabled: false,
+        userDefaults: .standard,
+        fileLoggingStorageKey: fileLoggingStorageKey
     )
 
     #if DEBUG
@@ -37,6 +40,10 @@ struct NodeSeekDebugConfig {
         storage.fileLoggingEnabled = false
         storage.avatarImageLoggingEnabled = false
     }
+
+    nonisolated static var fileLoggingStorageKeyForTesting: String {
+        fileLoggingStorageKey
+    }
     #endif
 
     static let webViewDebugOverlaySize = CGSize(width: 180, height: 120)
@@ -46,12 +53,25 @@ struct NodeSeekDebugConfig {
 
 private final class NodeSeekDebugConfigStorage: @unchecked Sendable {
     private let lock = NSLock()
+    nonisolated(unsafe) private let userDefaults: UserDefaults
+    private let fileLoggingStorageKey: String
     // 只允许通过下方属性访问，NSLock 负责同步测试和后台日志线程。
     nonisolated(unsafe) private var _fileLoggingEnabled: Bool
     nonisolated(unsafe) private var _avatarImageLoggingEnabled: Bool
 
-    init(fileLoggingEnabled: Bool, avatarImageLoggingEnabled: Bool) {
-        _fileLoggingEnabled = fileLoggingEnabled
+    init(
+        fileLoggingEnabled: Bool,
+        avatarImageLoggingEnabled: Bool,
+        userDefaults: UserDefaults,
+        fileLoggingStorageKey: String
+    ) {
+        self.userDefaults = userDefaults
+        self.fileLoggingStorageKey = fileLoggingStorageKey
+        _fileLoggingEnabled = Self.boolValue(
+            in: userDefaults,
+            key: fileLoggingStorageKey,
+            defaultValue: fileLoggingEnabled
+        )
         _avatarImageLoggingEnabled = avatarImageLoggingEnabled
     }
 
@@ -60,7 +80,10 @@ private final class NodeSeekDebugConfigStorage: @unchecked Sendable {
             withLock { _fileLoggingEnabled }
         }
         set {
-            withLock { _fileLoggingEnabled = newValue }
+            withLock {
+                _fileLoggingEnabled = newValue
+                userDefaults.set(newValue, forKey: fileLoggingStorageKey)
+            }
         }
     }
 
@@ -77,5 +100,12 @@ private final class NodeSeekDebugConfigStorage: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return try body()
+    }
+
+    private static func boolValue(in userDefaults: UserDefaults, key: String, defaultValue: Bool) -> Bool {
+        guard userDefaults.object(forKey: key) != nil else {
+            return defaultValue
+        }
+        return userDefaults.bool(forKey: key)
     }
 }
