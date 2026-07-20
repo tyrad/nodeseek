@@ -9,6 +9,8 @@ NodeSeek iOS 是一个非官方三方 iOS 客户端，使用 UIKit 构建，通�
 
 本项目不隶属于 NodeSeek，也不代表 NodeSeek 官方。用户登录、授权和内容访问均发生在用户自己的 NodeSeek / NodeImage 账号上下文中。
 
+testflight : https://testflight.apple.com/join/T2YSXzFs
+
 ## 功能
 
 - 浏览 NodeSeek 主题列表、帖子详情和评论。
