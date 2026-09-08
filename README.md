@@ -5,6 +5,12 @@
 ![iOS](https://img.shields.io/badge/iOS-15%2B-000000?logo=apple&logoColor=white)
 ![License](https://img.shields.io/github/license/tyrad/nodeseek)
 
+[![TestFlight · 加入测试](https://img.shields.io/badge/TestFlight-加入测试-0D96F6?logo=appstore&logoColor=white)](https://testflight.apple.com/join/T2YSXzFs)
+![Texture · Async UI](https://img.shields.io/badge/Texture-Async_UI-6C5CE7)
+![Dark Mode · Supported](https://img.shields.io/badge/Dark_Mode-Supported-333333)
+[![Latest Release · 查看发布](https://img.shields.io/badge/Latest_Release-查看发布-2EA44F?logo=github&logoColor=white)](https://github.com/tyrad/nodeseek/releases)
+[![GitHub Stars](https://img.shields.io/github/stars/tyrad/nodeseek?style=flat&logo=github)](https://github.com/tyrad/nodeseek/stargazers)
+
 NS Connect 是一个开源、非官方的 NodeSeek iOS 客户端，基于 Texture 的异步布局与渲染能力，打造高性能的原生列表与帖子阅读体验。支持浏览、搜索、回复、收藏、投票和图片上传，并适配系统浅色与深色模式。
 
 通过 **GitHub Actions + fastlane 自动构建并上传 TestFlight**，在 App 内即可查看当前版本的 **Git hash 和构建记录**，方便核对源码、定位问题。
