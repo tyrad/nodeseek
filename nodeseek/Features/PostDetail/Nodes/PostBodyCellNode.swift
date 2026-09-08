@@ -322,7 +322,8 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
 
     private func configureActionButton(
         _ button: ASButtonNode,
-        systemImageName: String,
+        systemImageName: String? = nil,
+        image: UIImage? = nil,
         accessibilityLabel: String,
         count: Int? = nil,
         color: UIColor = UIColor.secondaryLabel.withAlphaComponent(PostDetailContentLayout.inactiveReactionAlpha)
@@ -331,7 +332,8 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
             pointSize: PostDetailContentLayout.reactionSymbolPointSize,
             weight: .regular
         )
-        let image = UIImage(systemName: systemImageName, withConfiguration: configuration)?
+        let image = (image?.applyingSymbolConfiguration(configuration)
+            ?? systemImageName.flatMap { UIImage(systemName: $0, withConfiguration: configuration) })?
             .withTintColor(color, renderingMode: .alwaysOriginal)
         button.setImage(image, for: .normal)
         let displayCount = count.flatMap { $0 > 0 ? $0 : nil }
@@ -437,7 +439,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
     private func configureChickenLegActionButton(count: Int?, isClicked: Bool) {
         configureActionButton(
             chickenLegButtonNode,
-            systemImageName: "fork.knife",
+            image: UIImage(named: "ChickenLeg"),
             accessibilityLabel: "加鸡腿",
             count: count,
             color: Self.chickenLegActionColor(isClicked: isClicked)
