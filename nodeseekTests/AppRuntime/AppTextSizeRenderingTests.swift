@@ -37,7 +37,7 @@ struct AppTextSizeRenderingTests {
                 if let font = renderedFont(in: quoteBlock.children, matching: text) {
                     return font
                 }
-            case .vote, .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
+            case .vote, .terminal, .tabs, .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
                 continue
             }
         }

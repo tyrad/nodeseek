@@ -14,6 +14,33 @@ import UIKit
 @MainActor
 @Suite(.serialized)
 struct DetailImageLoaderTests {
+    @Test func localReportSupportsPreviewAndOriginalPayloadWithoutNetwork() async throws {
+        let directory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("report.jpg")
+        let data = try Self.makeNoisyJPEGData(width: 240, height: 180, quality: 0.9)
+        try data.write(to: url)
+        DetailImageURLProtocol.reset()
+        let session = URLSession(configuration: Self.urlSessionConfiguration(protocolType: DetailImageURLProtocol.self))
+        let loader = DetailImageLoader(session: session, cacheDirectory: directory.appendingPathComponent("cache"))
+
+        let image = try #require(await Self.loadPreviewImage(loader: loader, url: url))
+        #expect(image.size == CGSize(width: 240, height: 180))
+        let payload = try await Self.loadOriginalImagePayload(loader: loader, url: url)
+        #expect(payload.data == data)
+        #expect(payload.suggestedFileExtension == "jpg")
+        #expect(DetailImageURLProtocol.totalRequestCount() == 0)
+
+        try FileManager.default.removeItem(at: url)
+        do {
+            _ = try await Self.loadOriginalImagePayload(loader: loader, url: url)
+            Issue.record("本地文件删除后不应返回旧文件或发起网络请求")
+        } catch {
+            #expect(error as? DetailOriginalFileError == .unavailable)
+        }
+        #expect(DetailImageURLProtocol.totalRequestCount() == 0)
+    }
+
     @Test func defaultOptimizationConfigEnablesThumbnailCache() {
         #expect(DetailImageConfig.optimizationMode == .enabled(
             maxThumbnailBytes: 300 * 1024,

@@ -33,6 +33,13 @@ final class VoteIntegrationTests: XCTestCase {
               case .vote(3108) = quote.children.first else { return XCTFail("投票不应破坏引用") }
     }
 
+    func testVotesInsideTabsAndQuotesKeepTheirContainers() throws {
+        let blocks = DTCoreTextHTMLContentRenderer().render(fragment: #"<div class="nsk-magic-tabs"><div class="nsk-magic-tab-title">投票</div><div class="nsk-magic-tab-body"><blockquote><a href="nsapp://vote?id=3108">投票</a></blockquote></div></div>"#, baseURL: baseURL)
+        guard case .tabs(let tabs) = blocks.first,
+              case .quote(let quote) = tabs.sections.first?.blocks.first,
+              case .vote(3108) = quote.children.first else { return XCTFail("投票不应破坏分栏和引用") }
+    }
+
     func testSignedSubmissionPreflightsAndSendsOnlySelectedIDs() async throws {
         let web = try await mockWebView()
         let result = try await web.callAsyncJavaScript(VoteAutomationScript.source, arguments: ["voteID": 3108, "operation": "submit", "ids": [14131], "timeoutMs": 1000], in: nil, contentWorld: .page) as? [String: Any]

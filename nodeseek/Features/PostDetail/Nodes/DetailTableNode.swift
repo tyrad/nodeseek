@@ -48,7 +48,8 @@ enum DetailContentBlockNodeFactory {
         onTextLayoutInvalidated: @escaping () -> Void,
         imageSizeProvider: @escaping (URL) -> CGSize? = { _ in nil },
         onImageSizeResolved: @escaping (URL, CGSize) -> Void = { _, _ in },
-        onImageHeightReduced: @escaping () -> Void = {}
+        onImageHeightReduced: @escaping () -> Void = {},
+        imageKind: DetailImageKind? = nil
     ) -> [ASDisplayNode] {
         let imageURLs = imageURLs(in: blocks)
         var imageIndex = 0
@@ -63,7 +64,8 @@ enum DetailContentBlockNodeFactory {
             onTextLayoutInvalidated: onTextLayoutInvalidated,
             imageSizeProvider: imageSizeProvider,
             onImageSizeResolved: onImageSizeResolved,
-            onImageHeightReduced: onImageHeightReduced
+            onImageHeightReduced: onImageHeightReduced,
+            imageKind: imageKind
         )
     }
 
@@ -78,7 +80,8 @@ enum DetailContentBlockNodeFactory {
         onTextLayoutInvalidated: @escaping () -> Void,
         imageSizeProvider: @escaping (URL) -> CGSize?,
         onImageSizeResolved: @escaping (URL, CGSize) -> Void,
-        onImageHeightReduced: @escaping () -> Void
+        onImageHeightReduced: @escaping () -> Void,
+        imageKind: DetailImageKind?
     ) -> [ASDisplayNode] {
         return blocks.compactMap { block -> ASDisplayNode? in
             switch block {
@@ -107,6 +110,16 @@ enum DetailContentBlockNodeFactory {
                     return nil
                 }
                 return DetailCodeBlockNode(codeBlock: codeBlock)
+            case .terminal(let terminal):
+                return DetailTerminalNode(terminal: terminal, onImageTapped: onImageTapped, onLayoutInvalidated: onTextLayoutInvalidated)
+            case .tabs(let tabs):
+                return DetailMagicTabsNode(tabs: tabs, makeContent: { blocks, onTabImageTapped, onTabLayoutInvalidated in
+                    makeNodes(from: blocks, voteService: voteService, onImageTapped: onTabImageTapped, onLinkTapped: onLinkTapped,
+                              onSignatureLinkCandidatesTapped: onSignatureLinkCandidatesTapped,
+                              onTextLayoutInvalidated: onTabLayoutInvalidated,
+                              imageSizeProvider: imageSizeProvider, onImageSizeResolved: onImageSizeResolved,
+                              onImageHeightReduced: onTabLayoutInvalidated, imageKind: .report)
+                }, onImageTapped: onImageTapped, onLayoutInvalidated: onTextLayoutInvalidated)
             case .image(let imageBlock):
                 let index = imageIndex
                 imageIndex += 1
@@ -115,6 +128,7 @@ enum DetailContentBlockNodeFactory {
                     imageURLs: imageURLs,
                     imageIndex: index,
                     initialImageSize: imageSizeProvider(imageBlock.url) ?? .zero,
+                    imageKind: imageKind,
                     onImageTapped: onImageTapped,
                     onImageSizeResolved: onImageSizeResolved,
                     onImageHeightReduced: onImageHeightReduced,
@@ -141,7 +155,8 @@ enum DetailContentBlockNodeFactory {
                     onTextLayoutInvalidated: onTextLayoutInvalidated,
                     imageSizeProvider: imageSizeProvider,
                     onImageSizeResolved: onImageSizeResolved,
-                    onImageHeightReduced: onImageHeightReduced
+                    onImageHeightReduced: onImageHeightReduced,
+                    imageKind: imageKind
                 )
                 guard childNodes.isEmpty == false else { return nil }
                 return DetailQuoteBlockNode(children: childNodes)
@@ -156,7 +171,7 @@ enum DetailContentBlockNodeFactory {
                 return [imageBlock.url]
             case .quote(let quoteBlock):
                 return imageURLs(in: quoteBlock.children)
-            case .vote, .text, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
+            case .vote, .text, .table, .codeBlock, .terminal, .tabs, .iframeLink, .imagePlaceholder, .unsupported:
                 return []
             }
         }

@@ -376,6 +376,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     private override init() {
         WebViewCacheTuner.tuneIfNeeded()
         let configuration = WKWebViewConfiguration()
+        TerminalSourceCaptureScript.install(on: configuration)
         configuration.websiteDataStore = .default()
         self.webView = NoBounceWebView(frame: .zero, configuration: configuration)
         self.webView.customUserAgent = WebRequestFingerprint.userAgent

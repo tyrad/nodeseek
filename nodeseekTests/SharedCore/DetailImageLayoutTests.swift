@@ -101,6 +101,13 @@ struct DetailImageLayoutTests {
         #expect(presentation.targetPointSide == 800)
     }
 
+    @Test func reportThumbnailResolutionDoesNotChangeDisplaySize() {
+        let original = DetailImageLayout.presentation(for: CGSize(width: 1312, height: 1782), maxWidth: 368, kind: .report)
+        let thumbnail = DetailImageLayout.presentation(for: CGSize(width: 164, height: 222.75), maxWidth: 368, kind: .report)
+        #expect(thumbnail == original)
+        #expect(thumbnail.size.width == 368)
+    }
+
     @Test func checkPlaceReportURLIsRecognized() throws {
         let reportURL = try #require(URL(string: "https://report.check.place/ip/NPR7IUKQC.svg"))
         let hardwareURL = try #require(URL(string: "https://report.check.place/hardware/abc_123.svg"))
@@ -120,10 +127,27 @@ struct DetailImageLayoutTests {
         #expect(DetailImageURLRules.imageURLs(in: "汇率图：\(url.absoluteString)。") == [url])
     }
 
-    @Test func imageKindResolutionDoesNotClassifyReportsByURLPath() throws {
+    @Test func checkPlaceSVGClassificationStillDependsOnContent() throws {
         let reportURL = try #require(URL(string: "https://report.check.place/ip/NPR7IUKQC.svg"))
 
         #expect(DetailImageKind.resolved(isSticker: false, imageURL: reportURL) == .normal)
+    }
+
+    @Test func tcpQualitySectionPNGsUseFullReportLayout() throws {
+        for section in ["ipv4", "large4", "ipv6", "intl", "speedtest"] {
+            let url = try #require(URL(string: "https://tcpquality.ibsgss.uk/r/3iPKrBIrCR.png?section=\(section)"))
+            #expect(DetailImageKind.resolved(isSticker: false, imageURL: url) == .report)
+            #expect(DetailImageKind.resolved(isSticker: true, imageURL: url) == .sticker)
+        }
+        for value in [
+            "https://example.com/r/3iPKrBIrCR.png?section=ipv4",
+            "https://tcpquality.ibsgss.uk.example.com/r/3iPKrBIrCR.png?section=ipv4",
+            "https://tcpquality.ibsgss.uk/logo.png?section=ipv4",
+            "https://tcpquality.ibsgss.uk/r/3iPKrBIrCR.png?section=avatar",
+            "https://tcpquality.ibsgss.uk/r/3iPKrBIrCR.png?section=ipv4&section=ipv6"
+        ] {
+            #expect(DetailImageKind.resolved(isSticker: false, imageURL: URL(string: value)) == .normal)
+        }
     }
 
     @Test func stickerURLRulesUsePathNotQueryText() throws {

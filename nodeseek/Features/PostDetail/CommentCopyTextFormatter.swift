@@ -41,6 +41,10 @@ enum CommentCopyTextFormatter {
             return rows.joined(separator: "\n")
         case .codeBlock(let codeBlock):
             return codeBlock.text
+        case .terminal(let terminal):
+            return DTCoreTextHTMLContentRenderer().stripANSICodes(from: terminal.ansi)
+        case .tabs(let tabs):
+            return tabs.sections.map { $0.title + "\n" + plainText(from: $0.blocks) }.joined(separator: "\n")
         case .quote(let quoteBlock):
             return plainText(from: quoteBlock.children)
         case .iframeLink(let iframe):
