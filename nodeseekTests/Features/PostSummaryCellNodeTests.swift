@@ -201,10 +201,11 @@ struct PostSummaryCellNodeTests {
         )
 
         let titleText = PostSummaryCellNode.titleAttributedText(for: post)
-        let attachmentIndex = titleText.string.count - 1
+        let attachmentRange = (titleText.string as NSString).range(of: "\u{FFFC}", options: .backwards)
+        try #require(attachmentRange.location != NSNotFound)
         let lockAttachment = titleText.attribute(
             NSAttributedString.Key.attachment,
-            at: attachmentIndex,
+            at: attachmentRange.location,
             effectiveRange: nil
         ) as? NSTextAttachment
 

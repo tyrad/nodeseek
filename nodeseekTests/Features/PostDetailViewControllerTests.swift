@@ -3147,7 +3147,7 @@ struct PostDetailLoginViewControllerTests {
         #expect(floatingReplyButton.superview === floatingContainer)
         #expect(floatingReplyButton.configuration?.baseForegroundColor == .systemBackground)
         #expect(floatingReplyButton.backgroundColor == .label)
-        #expect(floatingReplyButton.alpha == 0.48)
+        #expect(abs(floatingReplyButton.alpha - 0.48) < 0.0001)
         #expect(floatingReplyButton.layer.borderWidth == 0.5)
         #expect(abs(replyButtonFrame.maxY - (viewController.view.safeAreaLayoutGuide.layoutFrame.maxY - PostDetailViewController.Layout.replyButtonBottomInset)) < 1)
 
