@@ -27,6 +27,7 @@ final class LoadedCommentPreviewViewController: UIViewController {
     private let showsFullPostButton: Bool
     private let onOpenFullPost: () -> Void
     private let onReveal: () -> Void
+    private let onVoteLinkTapped: (URL) -> Void
     private let tableNode = ASTableNode(style: .plain)
     private let headerView = UIView()
     private let headerSeparator = UIView()
@@ -39,13 +40,15 @@ final class LoadedCommentPreviewViewController: UIViewController {
         renderedContent: [RenderedContentBlock]?,
         showsFullPostButton: Bool,
         onOpenFullPost: @escaping () -> Void,
-        onReveal: @escaping () -> Void
+        onReveal: @escaping () -> Void,
+        onVoteLinkTapped: @escaping (URL) -> Void = { _ in }
     ) {
         self.comment = comment
         self.renderedContent = renderedContent
         self.showsFullPostButton = showsFullPostButton
         self.onOpenFullPost = onOpenFullPost
         self.onReveal = onReveal
+        self.onVoteLinkTapped = onVoteLinkTapped
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -90,7 +93,7 @@ final class LoadedCommentPreviewViewController: UIViewController {
                 switch block {
                 case .text(let attributedText):
                     textHeight += estimatedTextHeight(attributedText.string, width: width, font: bodyFont)
-                case .image, .iframeLink, .imagePlaceholder, .table, .codeBlock, .unsupported, .quote:
+                case .vote, .image, .iframeLink, .imagePlaceholder, .table, .codeBlock, .unsupported, .quote:
                     extraBlockHeight += Layout.estimatedNonTextBlockHeight
                 }
             }
@@ -256,7 +259,9 @@ extension LoadedCommentPreviewViewController: ASTableDataSource, ASTableDelegate
                 comment: comment,
                 renderedBody: renderedContent,
                 onImageTapped: { _, _ in },
-                onLinkTapped: { _ in },
+                onLinkTapped: { url in
+                    if NodeSeekVoteParser.voteID(in: url) != nil { self?.onVoteLinkTapped(url) }
+                },
                 onAuthorTapped: { _ in },
                 onLikeTapped: { _ in },
                 onChickenLegTapped: { _ in },

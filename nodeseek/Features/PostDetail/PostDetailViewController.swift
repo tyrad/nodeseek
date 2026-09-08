@@ -9,6 +9,7 @@ import UIKit
 import AsyncDisplayKit
 
 enum PostDetailLinkDestination {
+    case vote(Int)
     case currentPageAnchor(String)
     case nativePost(postID: String, page: Int, url: URL)
     case userProfile(URL)
@@ -96,6 +97,10 @@ enum PostDetailLinkResolver {
     ) -> PostDetailLinkDestination? {
         guard let resolvedURL = URL(string: url.relativeString, relativeTo: baseURL)?.absoluteURL else {
             return nil
+        }
+
+        if resolvedURL.scheme?.lowercased() == "nsapp", resolvedURL.host?.lowercased() == "vote" {
+            return NodeSeekVoteParser.voteID(in: resolvedURL).map(PostDetailLinkDestination.vote)
         }
 
         guard isNodeSeekHost(resolvedURL) else {

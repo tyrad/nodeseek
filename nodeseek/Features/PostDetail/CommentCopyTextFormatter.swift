@@ -25,11 +25,13 @@ enum CommentCopyTextFormatter {
     }
 
     static func plainText(from blocks: [RenderedContentBlock]) -> String {
-        normalizedText(blocks.compactMap(text).joined(separator: "\n"))
+        normalizedText(blocks.compactMap { text(from: $0) }.joined(separator: "\n"))
     }
 
     private static func text(from block: RenderedContentBlock) -> String? {
         switch block {
+        case .vote(let id):
+            return "nsapp://vote?id=\(id)"
         case .text(let attributedText):
             return attributedText.string
         case .table(let table):

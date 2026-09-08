@@ -16,6 +16,9 @@ extension DTCoreTextHTMLContentRenderer {
         baseURL: URL,
         maxImageWidth: CGFloat
     ) -> [RenderedContentBlock] {
+        if let parts = NodeSeekVoteParser.parts(in: fragment) {
+            return renderVoteParts(parts, baseURL: baseURL, maxImageWidth: maxImageWidth)
+        }
         if containsNestedBlockquote(in: fragment),
            let quoteAwareBlocks = renderQuoteAwareContentBlocks(
             fragment: fragment,

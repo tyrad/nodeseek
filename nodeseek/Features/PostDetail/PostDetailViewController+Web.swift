@@ -66,6 +66,15 @@ extension PostDetailViewController {
         ) else { return }
 
         switch destination {
+        case .vote(let id):
+            let postURL = resolvedDetailURL() ?? baseURL
+            let opensWeb = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+                .contains { $0.name == "open" && $0.value == "web" } == true
+            if opensWeb {
+                showDetailDestination(NodeSeekWebViewController(url: postURL))
+            } else {
+                showDetailDestination(VoteViewController(voteID: id))
+            }
         case .currentPageAnchor(let anchorID):
             scrollToCurrentPageAnchor(anchorID)
         case .nativePost(let postID, let page, let url):
@@ -223,6 +232,11 @@ extension PostDetailViewController {
             onReveal: { [weak self] in
                 self?.dismiss(animated: true) {
                     self?.scrollToCurrentPageAnchor(anchorID)
+                }
+            },
+            onVoteLinkTapped: { [weak self] url in
+                self?.dismiss(animated: true) {
+                    self?.handleContentLinkTap(url)
                 }
             }
         )

@@ -66,6 +66,7 @@ struct HTMLContainerShell: Equatable {
 }
 
 enum RenderedContentBlock {
+    case vote(Int)
     case text(NSAttributedString)
     case table(RenderedTableBlock)
     case codeBlock(RenderedCodeBlock)

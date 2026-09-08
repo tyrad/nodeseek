@@ -92,6 +92,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
     init(
         content: PostDetailHeaderContent,
         renderedContent: [RenderedContentBlock]?,
+        voteService: NodeSeekVoteServing? = nil,
         onImageTapped: @escaping ([URL], Int) -> Void,
         onLinkTapped: @escaping (URL) -> Void = { _ in },
         onSignatureLinkCandidatesTapped: @escaping ([DetailLinkCandidate]) -> Void = { _ in },
@@ -125,6 +126,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         self.onTextLayoutInvalidated = onTextLayoutInvalidated
         self.bodyNodes = DetailContentBlockNodeFactory.makeNodes(
             from: renderedContent ?? [],
+            voteService: voteService,
             onImageTapped: onImageTapped,
             onLinkTapped: onLinkTapped,
             onSignatureLinkCandidatesTapped: onSignatureLinkCandidatesTapped,

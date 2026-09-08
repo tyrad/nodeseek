@@ -1417,7 +1417,7 @@ struct DTCoreTextHTMLContentRendererTests {
                 if let font = font(in: quoteBlock.children, matching: text) {
                     return font
                 }
-            case .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
+            case .vote, .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
                 continue
             }
         }
@@ -1433,7 +1433,7 @@ struct DTCoreTextHTMLContentRendererTests {
                 if let attributed = attributedText(in: quoteBlock.children, matching: text) {
                     return attributed
                 }
-            case .text, .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
+            case .vote, .text, .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
                 continue
             }
         }
@@ -1462,7 +1462,7 @@ struct DTCoreTextHTMLContentRendererTests {
                 return [codeBlock]
             case .quote(let quoteBlock):
                 return codeBlocks(in: quoteBlock.children)
-            case .text, .table, .image, .iframeLink, .imagePlaceholder, .unsupported:
+            case .vote, .text, .table, .image, .iframeLink, .imagePlaceholder, .unsupported:
                 return []
             }
         }
@@ -1482,7 +1482,7 @@ struct DTCoreTextHTMLContentRendererTests {
                 return [imageBlock]
             case .quote(let quoteBlock):
                 return imageBlocks(in: quoteBlock.children)
-            case .text, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
+            case .vote, .text, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
                 return []
             }
         }
@@ -1507,7 +1507,7 @@ struct DTCoreTextHTMLContentRendererTests {
                     }
                     urls.append(contentURL)
                 }
-            case .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
+            case .vote, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
                 continue
             }
         }

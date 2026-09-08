@@ -41,6 +41,7 @@ final class DetailTableNode: ASDisplayNode {
 enum DetailContentBlockNodeFactory {
     static func makeNodes(
         from blocks: [RenderedContentBlock],
+        voteService: NodeSeekVoteServing? = nil,
         onImageTapped: @escaping ([URL], Int) -> Void,
         onLinkTapped: @escaping (URL) -> Void,
         onSignatureLinkCandidatesTapped: @escaping ([DetailLinkCandidate]) -> Void = { _ in },
@@ -53,6 +54,7 @@ enum DetailContentBlockNodeFactory {
         var imageIndex = 0
         return makeNodes(
             from: blocks,
+            voteService: voteService,
             imageURLs: imageURLs,
             imageIndex: &imageIndex,
             onImageTapped: onImageTapped,
@@ -67,6 +69,7 @@ enum DetailContentBlockNodeFactory {
 
     private static func makeNodes(
         from blocks: [RenderedContentBlock],
+        voteService: NodeSeekVoteServing?,
         imageURLs: [URL],
         imageIndex: inout Int,
         onImageTapped: @escaping ([URL], Int) -> Void,
@@ -79,6 +82,8 @@ enum DetailContentBlockNodeFactory {
     ) -> [ASDisplayNode] {
         return blocks.compactMap { block -> ASDisplayNode? in
             switch block {
+            case .vote(let id):
+                return DetailVoteNode(id: id, service: voteService, onLayoutInvalidated: onTextLayoutInvalidated)
             case .text(let attributedText):
                 guard attributedText.length > 0 else { return nil }
                 return DetailRichTextNode(
@@ -127,6 +132,7 @@ enum DetailContentBlockNodeFactory {
             case .quote(let quoteBlock):
                 let childNodes = makeNodes(
                     from: quoteBlock.children,
+                    voteService: voteService,
                     imageURLs: imageURLs,
                     imageIndex: &imageIndex,
                     onImageTapped: onImageTapped,
@@ -150,7 +156,7 @@ enum DetailContentBlockNodeFactory {
                 return [imageBlock.url]
             case .quote(let quoteBlock):
                 return imageURLs(in: quoteBlock.children)
-            case .text, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
+            case .vote, .text, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
                 return []
             }
         }
