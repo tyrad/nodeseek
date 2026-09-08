@@ -376,6 +376,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     private override init() {
         WebViewCacheTuner.tuneIfNeeded()
         let configuration = WKWebViewConfiguration()
+        TerminalSourceCaptureScript.install(on: configuration)
         configuration.websiteDataStore = .default()
         self.webView = NoBounceWebView(frame: .zero, configuration: configuration)
         self.webView.customUserAgent = WebRequestFingerprint.userAgent
@@ -681,6 +682,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
             ]
         }
 
+        try Task.checkCancellation()
         var scriptArguments = arguments
         scriptArguments["timeoutMs"] = max(5_000, Int(timeoutInterval * 1_000))
         let result: Any?

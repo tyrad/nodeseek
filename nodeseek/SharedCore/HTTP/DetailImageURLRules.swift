@@ -35,6 +35,18 @@ enum DetailSVGContentRules {
 }
 
 enum DetailImageURLRules {
+    /// TQ 导出的分栏 PNG 已是完整报告，应按长图展示。
+    static func isTCPQualityReportImage(_ url: URL) -> Bool {
+        guard ["http", "https"].contains(url.scheme?.lowercased()),
+              url.host?.lowercased() == "tcpquality.ibsgss.uk",
+              url.pathExtension.lowercased() == "png" else { return false }
+        let path = url.pathComponents.filter { $0 != "/" }
+        guard path.count == 2, path[0] == "r", path[1].count > 4 else { return false }
+        let sections = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.filter { $0.name == "section" } ?? []
+        guard sections.count == 1, let section = sections[0].value else { return false }
+        return ["ipv4", "large4", "ipv6", "intl", "speedtest"].contains(section)
+    }
+
     static func isLikelyImageURL(_ url: URL) -> Bool {
         guard ["http", "https"].contains(url.scheme?.lowercased()) else {
             return false
@@ -145,9 +157,12 @@ enum DetailImageURLRules {
 }
 
 extension DetailImageKind {
-    static func resolved(isSticker: Bool, imageURL _: URL?) -> DetailImageKind {
+    static func resolved(isSticker: Bool, imageURL: URL?) -> DetailImageKind {
         if isSticker {
             return .sticker
+        }
+        if let imageURL, DetailImageURLRules.isTCPQualityReportImage(imageURL) {
+            return .report
         }
         return .normal
     }

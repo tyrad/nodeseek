@@ -44,6 +44,19 @@ struct RenderedCodeBlock: Equatable {
     let text: String
 }
 
+struct RenderedTerminalBlock: Equatable, Sendable {
+    let ansi: String
+}
+
+struct RenderedMagicTabsBlock {
+    struct Section {
+        let title: String
+        let blocks: [RenderedContentBlock]
+    }
+    let id: String
+    let sections: [Section]
+}
+
 struct RenderedImageBlock: Equatable {
     let url: URL
     let altText: String?
@@ -66,9 +79,12 @@ struct HTMLContainerShell: Equatable {
 }
 
 enum RenderedContentBlock {
+    case vote(Int)
     case text(NSAttributedString)
     case table(RenderedTableBlock)
     case codeBlock(RenderedCodeBlock)
+    case terminal(RenderedTerminalBlock)
+    indirect case tabs(RenderedMagicTabsBlock)
     case image(RenderedImageBlock)
     case iframeLink(RenderedIFrameLinkBlock)
     case imagePlaceholder(URL?)

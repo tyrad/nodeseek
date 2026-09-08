@@ -1161,7 +1161,6 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(renderedText.contains("[4m") == false)
         #expect(renderedText.contains("[0m") == false)
         #expect(imageURLs(in: blocks).map(\.absoluteString) == [
-            "https://Report.Check.Place/ip/demo.svg",
             "https://i.111666.best/image/network.webp",
         ])
     }
@@ -1223,12 +1222,10 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(renderedText.contains("[36m") == false)
         #expect(renderedText.contains("[0m") == false)
         #expect(images.map { $0.url.absoluteString } == [
-            "https://Report.Check.Place/hardware/3RZVJ2JUX.svg",
-            "https://Report.Check.Place/ip/1TZZHW387.svg",
             "https://i.111666.best/image/G9D5ncG5qndySgQtNwvFq4.webp",
             "https://i.111666.best/image/noEhdCSyuAeuREqqSWgdY5.webp",
         ])
-        #expect(images.count == 4)
+        #expect(images.count == 2)
     }
 
     @Test func splitsStandaloneImageParagraphIntoImageBlocks() throws {
@@ -1417,7 +1414,7 @@ struct DTCoreTextHTMLContentRendererTests {
                 if let font = font(in: quoteBlock.children, matching: text) {
                     return font
                 }
-            case .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
+            case .vote, .terminal, .tabs, .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
                 continue
             }
         }
@@ -1433,7 +1430,7 @@ struct DTCoreTextHTMLContentRendererTests {
                 if let attributed = attributedText(in: quoteBlock.children, matching: text) {
                     return attributed
                 }
-            case .text, .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
+            case .vote, .terminal, .tabs, .text, .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
                 continue
             }
         }
@@ -1447,6 +1444,10 @@ struct DTCoreTextHTMLContentRendererTests {
                 return text.string
             case let .codeBlock(codeBlock):
                 return codeBlock.text
+            case .terminal(let terminal):
+                return DTCoreTextHTMLContentRenderer().stripANSICodes(from: terminal.ansi)
+            case .tabs(let tabs):
+                return tabs.sections.map { $0.title + "\n" + combinedText(in: $0.blocks) }.joined(separator: "\n")
             case .quote(let quoteBlock):
                 return combinedText(in: quoteBlock.children)
             default:
@@ -1462,16 +1463,20 @@ struct DTCoreTextHTMLContentRendererTests {
                 return [codeBlock]
             case .quote(let quoteBlock):
                 return codeBlocks(in: quoteBlock.children)
-            case .text, .table, .image, .iframeLink, .imagePlaceholder, .unsupported:
+            case .vote, .terminal, .tabs, .text, .table, .image, .iframeLink, .imagePlaceholder, .unsupported:
                 return []
             }
         }
     }
 
     private func unsupportedReasons(in blocks: [RenderedContentBlock]) -> [String] {
-        blocks.compactMap { block in
-            guard case let .unsupported(reason) = block else { return nil }
-            return reason
+        blocks.flatMap { block -> [String] in
+            switch block {
+            case .unsupported(let reason): return [reason]
+            case .tabs(let tabs): return tabs.sections.flatMap { unsupportedReasons(in: $0.blocks) }
+            case .quote(let quote): return unsupportedReasons(in: quote.children)
+            default: return []
+            }
         }
     }
 
@@ -1482,7 +1487,9 @@ struct DTCoreTextHTMLContentRendererTests {
                 return [imageBlock]
             case .quote(let quoteBlock):
                 return imageBlocks(in: quoteBlock.children)
-            case .text, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
+            case .tabs(let tabs):
+                return tabs.sections.flatMap { imageBlocks(in: $0.blocks) }
+            case .vote, .terminal, .text, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
                 return []
             }
         }
@@ -1507,7 +1514,9 @@ struct DTCoreTextHTMLContentRendererTests {
                     }
                     urls.append(contentURL)
                 }
-            case .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
+            case .tabs(let tabs):
+                urls.append(contentsOf: tabs.sections.flatMap { imageURLs(in: $0.blocks) })
+            case .vote, .terminal, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
                 continue
             }
         }

@@ -22,6 +22,7 @@ final class DetailImageBlockNode: ASDisplayNode {
         imageURLs: [URL],
         imageIndex: Int,
         initialImageSize: CGSize = .zero,
+        imageKind: DetailImageKind? = nil,
         onImageTapped: @escaping ([URL], Int) -> Void,
         onImageSizeResolved: @escaping (URL, CGSize) -> Void = { _, _ in },
         onImageHeightReduced: @escaping () -> Void = {},
@@ -31,12 +32,14 @@ final class DetailImageBlockNode: ASDisplayNode {
         self.onImageHeightReduced = onImageHeightReduced
         self.onImageSizeResolved = onImageSizeResolved
         self.imageURL = imageBlock.url
-        self.imageKind = DetailImageKind.resolved(isSticker: false, imageURL: imageBlock.url)
+        let resolvedImageKind = imageKind ?? DetailImageKind.resolved(isSticker: false, imageURL: imageBlock.url)
+        self.imageKind = resolvedImageKind
         self.loadedImageSize = initialImageSize.width > 0 && initialImageSize.height > 0 ? initialImageSize : .zero
         super.init()
         setViewBlock { [weak self] in
             DetailImageBlockView(
                 imageBlock: imageBlock,
+                imageKind: resolvedImageKind,
                 onImageLoaded: { imageSize, resolvedKind in
                     self?.updateLoadedImageSize(imageSize, resolvedKind: resolvedKind)
                 },
@@ -97,13 +100,14 @@ private final class DetailImageBlockView: UIView {
 
     init(
         imageBlock: RenderedImageBlock,
+        imageKind: DetailImageKind,
         onImageLoaded: @escaping (CGSize, DetailImageKind?) -> Void,
         onImageTapped: @escaping () -> Void
     ) {
         self.imageBlock = imageBlock
         self.onImageLoaded = onImageLoaded
         self.onImageTapped = onImageTapped
-        self.resolvedImageKind = DetailImageKind.resolved(isSticker: false, imageURL: nil)
+        self.resolvedImageKind = imageKind
         super.init(frame: .zero)
         configureView()
     }

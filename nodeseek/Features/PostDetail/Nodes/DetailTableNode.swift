@@ -41,18 +41,21 @@ final class DetailTableNode: ASDisplayNode {
 enum DetailContentBlockNodeFactory {
     static func makeNodes(
         from blocks: [RenderedContentBlock],
+        voteService: NodeSeekVoteServing? = nil,
         onImageTapped: @escaping ([URL], Int) -> Void,
         onLinkTapped: @escaping (URL) -> Void,
         onSignatureLinkCandidatesTapped: @escaping ([DetailLinkCandidate]) -> Void = { _ in },
         onTextLayoutInvalidated: @escaping () -> Void,
         imageSizeProvider: @escaping (URL) -> CGSize? = { _ in nil },
         onImageSizeResolved: @escaping (URL, CGSize) -> Void = { _, _ in },
-        onImageHeightReduced: @escaping () -> Void = {}
+        onImageHeightReduced: @escaping () -> Void = {},
+        imageKind: DetailImageKind? = nil
     ) -> [ASDisplayNode] {
         let imageURLs = imageURLs(in: blocks)
         var imageIndex = 0
         return makeNodes(
             from: blocks,
+            voteService: voteService,
             imageURLs: imageURLs,
             imageIndex: &imageIndex,
             onImageTapped: onImageTapped,
@@ -61,12 +64,14 @@ enum DetailContentBlockNodeFactory {
             onTextLayoutInvalidated: onTextLayoutInvalidated,
             imageSizeProvider: imageSizeProvider,
             onImageSizeResolved: onImageSizeResolved,
-            onImageHeightReduced: onImageHeightReduced
+            onImageHeightReduced: onImageHeightReduced,
+            imageKind: imageKind
         )
     }
 
     private static func makeNodes(
         from blocks: [RenderedContentBlock],
+        voteService: NodeSeekVoteServing?,
         imageURLs: [URL],
         imageIndex: inout Int,
         onImageTapped: @escaping ([URL], Int) -> Void,
@@ -75,10 +80,13 @@ enum DetailContentBlockNodeFactory {
         onTextLayoutInvalidated: @escaping () -> Void,
         imageSizeProvider: @escaping (URL) -> CGSize?,
         onImageSizeResolved: @escaping (URL, CGSize) -> Void,
-        onImageHeightReduced: @escaping () -> Void
+        onImageHeightReduced: @escaping () -> Void,
+        imageKind: DetailImageKind?
     ) -> [ASDisplayNode] {
         return blocks.compactMap { block -> ASDisplayNode? in
             switch block {
+            case .vote(let id):
+                return DetailVoteNode(id: id, service: voteService, onLayoutInvalidated: onTextLayoutInvalidated)
             case .text(let attributedText):
                 guard attributedText.length > 0 else { return nil }
                 return DetailRichTextNode(
@@ -102,6 +110,16 @@ enum DetailContentBlockNodeFactory {
                     return nil
                 }
                 return DetailCodeBlockNode(codeBlock: codeBlock)
+            case .terminal(let terminal):
+                return DetailTerminalNode(terminal: terminal, onImageTapped: onImageTapped, onLayoutInvalidated: onTextLayoutInvalidated)
+            case .tabs(let tabs):
+                return DetailMagicTabsNode(tabs: tabs, makeContent: { blocks, onTabImageTapped, onTabLayoutInvalidated in
+                    makeNodes(from: blocks, voteService: voteService, onImageTapped: onTabImageTapped, onLinkTapped: onLinkTapped,
+                              onSignatureLinkCandidatesTapped: onSignatureLinkCandidatesTapped,
+                              onTextLayoutInvalidated: onTabLayoutInvalidated,
+                              imageSizeProvider: imageSizeProvider, onImageSizeResolved: onImageSizeResolved,
+                              onImageHeightReduced: onTabLayoutInvalidated, imageKind: .report)
+                }, onImageTapped: onImageTapped, onLayoutInvalidated: onTextLayoutInvalidated)
             case .image(let imageBlock):
                 let index = imageIndex
                 imageIndex += 1
@@ -110,6 +128,7 @@ enum DetailContentBlockNodeFactory {
                     imageURLs: imageURLs,
                     imageIndex: index,
                     initialImageSize: imageSizeProvider(imageBlock.url) ?? .zero,
+                    imageKind: imageKind,
                     onImageTapped: onImageTapped,
                     onImageSizeResolved: onImageSizeResolved,
                     onImageHeightReduced: onImageHeightReduced,
@@ -127,6 +146,7 @@ enum DetailContentBlockNodeFactory {
             case .quote(let quoteBlock):
                 let childNodes = makeNodes(
                     from: quoteBlock.children,
+                    voteService: voteService,
                     imageURLs: imageURLs,
                     imageIndex: &imageIndex,
                     onImageTapped: onImageTapped,
@@ -135,7 +155,8 @@ enum DetailContentBlockNodeFactory {
                     onTextLayoutInvalidated: onTextLayoutInvalidated,
                     imageSizeProvider: imageSizeProvider,
                     onImageSizeResolved: onImageSizeResolved,
-                    onImageHeightReduced: onImageHeightReduced
+                    onImageHeightReduced: onImageHeightReduced,
+                    imageKind: imageKind
                 )
                 guard childNodes.isEmpty == false else { return nil }
                 return DetailQuoteBlockNode(children: childNodes)
@@ -150,7 +171,7 @@ enum DetailContentBlockNodeFactory {
                 return [imageBlock.url]
             case .quote(let quoteBlock):
                 return imageURLs(in: quoteBlock.children)
-            case .text, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
+            case .vote, .text, .table, .codeBlock, .terminal, .tabs, .iframeLink, .imagePlaceholder, .unsupported:
                 return []
             }
         }

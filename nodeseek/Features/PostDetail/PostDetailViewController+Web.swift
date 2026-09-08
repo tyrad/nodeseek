@@ -66,6 +66,8 @@ extension PostDetailViewController {
         ) else { return }
 
         switch destination {
+        case .vote(let id):
+            showDetailDestination(VoteViewController(voteID: id))
         case .currentPageAnchor(let anchorID):
             scrollToCurrentPageAnchor(anchorID)
         case .nativePost(let postID, let page, let url):

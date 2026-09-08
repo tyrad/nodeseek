@@ -55,6 +55,19 @@ final class ImageDataLoader {
     }
 
     func loadData(for imageURL: URL, completion: @escaping Completion) {
+        // 本地生成的报告复用预览、保存和分享链路，不交给 URLSession 下载。
+        if imageURL.isFileURL {
+            DispatchQueue.global(qos: .userInitiated).async {
+                guard let data = try? Data(contentsOf: imageURL),
+                      !HTMLPayloadInspector.looksLikeHTMLPayload(data) else {
+                    completion(.failure(.unavailable))
+                    return
+                }
+                completion(.success(ImageDataPayload(data: data, mimeType: nil, resolvedURL: imageURL, source: .disk)))
+            }
+            return
+        }
+
         if let dataURLPayload = Self.decodeDataURL(imageURL) {
             completion(.success(ImageDataPayload(
                 data: dataURLPayload.data,

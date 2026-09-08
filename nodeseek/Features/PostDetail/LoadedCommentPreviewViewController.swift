@@ -90,7 +90,7 @@ final class LoadedCommentPreviewViewController: UIViewController {
                 switch block {
                 case .text(let attributedText):
                     textHeight += estimatedTextHeight(attributedText.string, width: width, font: bodyFont)
-                case .image, .iframeLink, .imagePlaceholder, .table, .codeBlock, .unsupported, .quote:
+                case .vote, .image, .iframeLink, .imagePlaceholder, .table, .codeBlock, .terminal, .tabs, .unsupported, .quote:
                     extraBlockHeight += Layout.estimatedNonTextBlockHeight
                 }
             }

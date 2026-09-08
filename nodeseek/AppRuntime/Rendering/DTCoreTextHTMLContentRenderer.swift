@@ -150,6 +150,10 @@ struct DTCoreTextHTMLContentRenderer {
     func render(fragment: String, baseURL: URL, maxImageWidth: CGFloat) -> [RenderedContentBlock] {
         guard fragment.isEmpty == false else { return [] }
 
+        if let tabs = renderMagicTabs(in: fragment, baseURL: baseURL, maxImageWidth: maxImageWidth) {
+            return tabs
+        }
+
         logDiagnostics(
             "render start fragmentLength=\(fragment.count) hasMagicTabs=\(fragment.contains("nsk-magic-tabs")) maxImageWidth=\(numberString(maxImageWidth))"
         )

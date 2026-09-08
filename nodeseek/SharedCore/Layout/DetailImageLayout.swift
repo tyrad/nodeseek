@@ -136,8 +136,9 @@ nonisolated enum DetailImageLayout {
         guard originalSize.width > 0, originalSize.height > 0 else {
             return DetailImagePresentation(size: reportPlaceholderSize(maxWidth: maxWidth), mode: .aspectFit)
         }
+        // 报告缩略图仅影响清晰度，显示尺寸始终由栏宽和宽高比决定。
         return DetailImagePresentation(
-            size: scaledSize(for: originalSize, maxWidth: maxWidth, maxHeight: nil),
+            size: CGSize(width: maxWidth, height: max(1, maxWidth * (originalSize.height / originalSize.width))),
             mode: .aspectFit
         )
     }
