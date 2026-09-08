@@ -11,10 +11,41 @@ final class VoteViewModel {
     private(set) var requiresRefresh = false
     var onChange: (() -> Void)?
     private var generation = 0
+    private var isVisible = false
 
     init(id: Int, service: NodeSeekVoteServing) {
         self.id = id
         self.service = service
+        NotificationCenter.default.addObserver(self, selector: #selector(sessionChanged), name: .nodeSeekLoginSessionDidClose, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(voteChanged(_:)), name: .nodeSeekVoteDidChange, object: nil)
+    }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
+
+    func setVisible(_ visible: Bool) {
+        guard visible != isVisible else { return }
+        isVisible = visible
+        if visible { refreshIfIdle() }
+    }
+
+    private func refreshIfIdle() {
+        guard isVisible, !busy else { return }
+        Task { [weak self] in
+            guard let self, self.isVisible else { return }
+            await self.refresh()
+        }
+    }
+
+    @objc private func sessionChanged() {
+        resetSession()
+        refreshIfIdle()
+    }
+
+    @objc private func voteChanged(_ notification: Notification) {
+        guard notification.object as AnyObject? === service,
+              notification.userInfo?["voteID"] as? Int == id else { return }
+        // 读取中由服务处理失效；提交中本来就会回读，无需再排一次刷新。
+        refreshIfIdle()
     }
 
     var canSubmit: Bool { !busy && !requiresRefresh && vote?.accepts(selected) == true }

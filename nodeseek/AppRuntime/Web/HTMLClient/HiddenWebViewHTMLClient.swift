@@ -681,6 +681,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
             ]
         }
 
+        try Task.checkCancellation()
         var scriptArguments = arguments
         scriptArguments["timeoutMs"] = max(5_000, Int(timeoutInterval * 1_000))
         let result: Any?

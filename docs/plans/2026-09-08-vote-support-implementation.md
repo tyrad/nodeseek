@@ -10,7 +10,7 @@
 
 - SharedCore：`NodeSeekVoteParser` 同时识别原始 data-href/href 和已挂载的 vote-panel，保留前后正文与引用层级，排除代码示例和无效编号；`NodeSeekVote` 保留未知票数，不将缺失值显示为零。
 - 渲染：新增 `.vote` 内容块，经既有节点工厂创建 `DetailVoteNode`。UIKit 视图按实际内容测量高度，再通知 Texture 更新布局；创建节点时不提前创建 UIKit 视图。
-- 请求：`NodeSeekVoteService` 同步登录 Cookie 后优先用 URLSession 读取投票，按官网规则计算 x-dynamic-sign；遇到 Cloudflare/403/503 回退隐藏 WebView。提交仍复用网页动作通道。同一投票的并发读取合并，投票与登录变化后失效相关状态。
+- 请求：`NodeSeekVoteAPIClient` 负责 Cookie、签名、接口响应和 WebView 回退；`NodeSeekVoteService` 依赖投票接口管理共享读取、提交互斥与会话失效。读取优先 URLSession，遇到 Cloudflare/403/503 回退隐藏 WebView；提交仍执行网页预校验和单次写入。
 - 交互：支持单选、多选、公开/匿名提示、已锁定与已投票状态。提交前列出所选项并提示不可修改；实际 POST 前重新读取并检查服务端状态。
 - 提交结果：不自动重试 POST。无论成功还是超时，都重新读取状态；读取失败时禁用再次提交，直到刷新成功。
 - 导航：nsapp 投票链接打开原生投票页，楼层预览也可使用。卡片不展示“打开网页参与投票”和“刷新状态”按钮。重新进入卡片时刷新服务端状态。
@@ -61,3 +61,5 @@ WebKit 的提交测试使用本地模拟响应；未向真实投票提交选项�
 此次提交只包含原生投票及其集成、布局修正、接口读取优化与测试；终端、分栏和图片的其他工作区改动未纳入。
 
 已将暂存内容导出至 `.build/vote-commit-review/`，独立构建通过；投票解析、请求、状态、集成、混排和详情控制器共 138 项测试通过（`.build/vote-commit-check.xcresult`），验证提交不依赖其他工作区改动。已检查删除刷新按钮后的正文截图。
+
+后续职责拆分、重复请求和会话任务治理详见 [复查记录](2026-09-08-vote-review.md)。

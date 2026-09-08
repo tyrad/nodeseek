@@ -64,6 +64,21 @@ final class VoteIntegrationTests: XCTestCase {
         }
     }
 
+    func testSubmissionNotificationDoesNotDuplicateResultRead() async throws {
+        let service = VoteTestService()
+        service.notifiesChanges = true
+        let controller = VoteViewController(voteID: 3108, service: service)
+        let window = makeWindow(controller: controller)
+        defer { window.isHidden = true }
+        let card = try XCTUnwrap(descendants(controller.view).compactMap { $0 as? DetailVoteView }.first)
+        await waitUntil { card.model.vote != nil }
+        card.model.select(14131)
+        await card.model.submit()
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(service.loadCount, 2, "首次读取和提交后确认各一次，通知不应额外读取")
+        XCTAssertEqual(card.model.vote?.hasVoted, true)
+    }
+
     func testCardSelectionRequiresConfirmationWithoutUtilityButtons() async throws {
         let service = VoteTestService()
         let controller = UIViewController()

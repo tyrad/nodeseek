@@ -78,6 +78,28 @@ final class VoteViewModelTests: XCTestCase {
         XCTAssertFalse(model.canSubmit)
     }
 
+    func testVisibilityAndServiceIdentityControlAutomaticRefresh() async {
+        let service = VoteTestService()
+        let otherService = VoteTestService()
+        let model = VoteViewModel(id: 3108, service: service)
+        model.setVisible(true)
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(service.loadCount, 1)
+        NotificationCenter.default.post(name: .nodeSeekVoteDidChange, object: otherService, userInfo: ["voteID": 3108])
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(service.loadCount, 1)
+        NotificationCenter.default.post(name: .nodeSeekVoteDidChange, object: service, userInfo: ["voteID": 3108])
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(service.loadCount, 2)
+        model.setVisible(false)
+        NotificationCenter.default.post(name: .nodeSeekVoteDidChange, object: service, userInfo: ["voteID": 3108])
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(service.loadCount, 2)
+        model.setVisible(true)
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(service.loadCount, 3)
+    }
+
     func testAccountChangeDiscardsInFlightResult() async {
         let service = VoteTestService()
         let model = VoteViewModel(id: 3108, service: service)
@@ -97,8 +119,11 @@ final class VoteTestService: NodeSeekVoteServing {
     var failsReloadAfterSubmit = false
     var onLoad: (() -> Void)?
     var loadDelayNanoseconds: UInt64 = 0
+    var loadCount = 0
+    var notifiesChanges = false
 
     func load(id: Int) async throws -> NodeSeekVote {
+        loadCount += 1
         if loadDelayNanoseconds > 0 { try await Task.sleep(nanoseconds: loadDelayNanoseconds) }
         onLoad?()
         if let loadError { throw loadError }
@@ -108,6 +133,7 @@ final class VoteTestService: NodeSeekVoteServing {
     func submit(id: Int, ids: Set<Int>) async throws {
         submitted.append(ids)
         vote = Self.makeVote(voted: true)
+        if notifiesChanges { NotificationCenter.default.post(name: .nodeSeekVoteDidChange, object: self, userInfo: ["voteID": id]) }
         if failsReloadAfterSubmit { loadError = URLError(.timedOut) }
         if let submitError { throw submitError }
     }

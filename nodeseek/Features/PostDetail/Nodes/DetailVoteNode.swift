@@ -43,10 +43,8 @@ final class DetailVoteView: UIView {
     let model: VoteViewModel
     private let stack = UIStackView()
     private let onHeightChanged: (CGFloat) -> Void
-    private var started = false
     private var lastHeight: CGFloat = 0
     private var confirming = false
-    private var pendingRefresh = false
 
     init(id: Int, service: NodeSeekVoteServing? = nil, onHeightChanged: @escaping (CGFloat) -> Void) {
         model = VoteViewModel(id: id, service: service ?? NodeSeekVoteService.shared)
@@ -59,28 +57,15 @@ final class DetailVoteView: UIView {
         stack.spacing = 10
         addSubview(stack)
         accessibilityIdentifier = "detail-vote-\(id)"
-        model.onChange = { [weak self] in
-            guard let self else { return }
-            self.updateContent()
-            if self.pendingRefresh && !self.model.busy {
-                self.pendingRefresh = false
-                self.refresh()
-            }
-        }
-        NotificationCenter.default.addObserver(self, selector: #selector(sessionChanged), name: .nodeSeekLoginSessionDidClose, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(voteChanged(_:)), name: .nodeSeekVoteDidChange, object: nil)
+        model.onChange = { [weak self] in self?.updateContent() }
         updateContent()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-    deinit { NotificationCenter.default.removeObserver(self) }
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
-        if window == nil { started = false; return }
-        guard window != nil, !started else { return }
-        started = true
-        refresh()
+        model.setVisible(window != nil)
     }
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -205,17 +190,4 @@ final class DetailVoteView: UIView {
         return nil
     }
 
-    private func refresh() { Task { [weak self] in await self?.model.refresh() } }
-
-    @objc private func sessionChanged() {
-        model.resetSession()
-        started = window != nil
-        if started { refresh() }
-    }
-
-    @objc private func voteChanged(_ notification: Notification) {
-        guard notification.object as? Int == model.id else { return }
-        if model.busy { pendingRefresh = true; return }
-        if window != nil { refresh() } else { started = false }
-    }
 }
