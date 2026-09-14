@@ -213,6 +213,62 @@ struct PostSummaryCellNodeTests {
         #expect(titleText.string.hasSuffix(" 3"))
     }
 
+    @Test func listSymbolAttachmentsUseRasterizedBitmaps() {
+        // 附件必须是位图。矢量系统符号在 Texture 后台绘制时会闪退。
+        let post = PostSummary(
+            id: "9",
+            title: "栅格化符号",
+            url: URL(string: "https://www.nodeseek.com/post-9")!,
+            authorName: "mist",
+            nodeName: "NodeSeek",
+            replyCount: 4,
+            viewCount: 34,
+            lastActivityText: "just now",
+            isPinned: true,
+            isLocked: true,
+            requiredReadingLevel: 3
+        )
+
+        let images = attachmentImages(
+            in: PostSummaryCellNode.titleAttributedText(for: post)
+        ) + attachmentImages(
+            in: PostSummaryCellNode.metadataAttributedText(for: post)
+        )
+
+        #expect(images.count == 4)
+        for image in images {
+            #expect(image.cgImage != nil)
+            #expect(image.isSymbolImage == false)
+        }
+    }
+
+    @Test func listSymbolRasterizationIsSafeUnderConcurrentAccess() {
+        // 模拟列表分页时多线程同时构建 cell，栅格化必须可并发复用缓存。
+        let post = PostSummary(
+            id: "10",
+            title: "并发栅格化",
+            url: URL(string: "https://www.nodeseek.com/post-10")!,
+            authorName: "mist",
+            nodeName: "NodeSeek",
+            replyCount: 8,
+            viewCount: 88,
+            lastActivityText: "just now",
+            isPinned: true,
+            isLocked: true
+        )
+
+        DispatchQueue.concurrentPerform(iterations: 32) { _ in
+            let titleImages = attachmentImages(in: PostSummaryCellNode.titleAttributedText(for: post))
+            let metadataImages = attachmentImages(in: PostSummaryCellNode.metadataAttributedText(for: post))
+            #expect(titleImages.count == 2)
+            #expect(metadataImages.count == 2)
+            for image in titleImages + metadataImages {
+                #expect(image.cgImage != nil)
+                #expect(image.isSymbolImage == false)
+            }
+        }
+    }
+
     @Test func cellRefreshAppearanceRebuildsAttributedText() {
         let post = PostSummary(
             id: "5",
@@ -236,4 +292,18 @@ struct PostSummaryCellNodeTests {
         #expect(node.debugTitleAttributedText !== initialTitle)
         #expect(node.debugMetadataAttributedText !== initialMetadata)
     }
+}
+
+private func attachmentImages(in text: NSAttributedString) -> [UIImage] {
+    var images: [UIImage] = []
+    text.enumerateAttribute(
+        .attachment,
+        in: NSRange(location: 0, length: text.length)
+    ) { value, _, _ in
+        guard let attachment = value as? NSTextAttachment, let image = attachment.image else {
+            return
+        }
+        images.append(image)
+    }
+    return images
 }

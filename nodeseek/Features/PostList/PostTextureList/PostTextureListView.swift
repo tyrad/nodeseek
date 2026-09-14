@@ -207,6 +207,8 @@ final class PostTextureListView: UIView {
     }
 
     private func setupUI() {
+        // 主线程预热列表符号位图，避免首屏 cell 后台构建时第一次画矢量符号。
+        PostSummaryCellNode.prewarmSymbolImages()
         tableNode.dataSource = self
         tableNode.delegate = self
         tableNode.leadingScreensForBatching = leadingScreensForBatching
@@ -271,6 +273,8 @@ final class PostTextureListView: UIView {
             return
         }
         guard displayMode == .content else { return }
+        // 字号变了缓存键会变，先预热再刷新，避免后台构建时第一次栅格化。
+        PostSummaryCellNode.prewarmSymbolImages()
         tableNode.reloadData()
     }
 
