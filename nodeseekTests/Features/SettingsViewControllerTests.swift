@@ -7,6 +7,7 @@
 
 import Testing
 import UIKit
+import UserNotifications
 @testable import nodeseek
 
 @MainActor
@@ -30,31 +31,34 @@ struct SettingsViewControllerTests {
                 textSizeSettings: textSizeSettings,
                 searchEntrySettings: searchEntrySettings,
                 categoryPreferenceStore: categoryStore,
+                pushAuthorizationStatusProvider: { .notDetermined },
                 autoCheckInSummaryProvider: { "未开启" }
             )
             viewController.loadViewIfNeeded()
             viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
             viewController.view.layoutIfNeeded()
-            try await waitUntil { viewController.tableView.numberOfRows(inSection: 5) == 1 }
+            try await waitUntil { viewController.tableView.numberOfRows(inSection: 6) == 1 }
 
             let tableView = try #require(viewController.tableView)
             #expect(viewController.title == "设置")
-            #expect(tableView.numberOfSections == 6)
+            #expect(tableView.numberOfSections == 7)
             #expect(tableView.numberOfRows(inSection: 0) == 4)
             #expect(tableView.numberOfRows(inSection: 1) == 3)
             #expect(tableView.numberOfRows(inSection: 2) == 1)
             #expect(tableView.numberOfRows(inSection: 3) == 1)
             #expect(tableView.numberOfRows(inSection: 4) == 1)
             #expect(tableView.numberOfRows(inSection: 5) == 1)
+            #expect(tableView.numberOfRows(inSection: 6) == 1)
             #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 0) == "阅读")
             #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 1) == "功能")
-            #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 2) == "存储")
-            #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 3) == nil)
+            #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 2) == "通知")
+            #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 3) == "存储")
             #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 4) == nil)
+            #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 5) == nil)
 
             let cacheCell = try #require(tableView.dataSource?.tableView(
                 tableView,
-                cellForRowAt: IndexPath(row: 0, section: 2)
+                cellForRowAt: IndexPath(row: 0, section: 3)
             ))
             let nodeImageCell = try #require(tableView.dataSource?.tableView(
                 tableView,
@@ -67,6 +71,10 @@ struct SettingsViewControllerTests {
             let autoCheckInCell = try #require(tableView.dataSource?.tableView(
                 tableView,
                 cellForRowAt: IndexPath(row: 2, section: 1)
+            ))
+            let pushNotificationCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 0, section: 2)
             ))
             let categoryPreferencesCell = try #require(tableView.dataSource?.tableView(
                 tableView,
@@ -86,15 +94,15 @@ struct SettingsViewControllerTests {
             ))
             let debugCell = try #require(tableView.dataSource?.tableView(
                 tableView,
-                cellForRowAt: IndexPath(row: 0, section: 3)
+                cellForRowAt: IndexPath(row: 0, section: 4)
             ))
             let aboutCell = try #require(tableView.dataSource?.tableView(
                 tableView,
-                cellForRowAt: IndexPath(row: 0, section: 4)
+                cellForRowAt: IndexPath(row: 0, section: 5)
             ))
             let logoutCell = try #require(tableView.dataSource?.tableView(
                 tableView,
-                cellForRowAt: IndexPath(row: 0, section: 5)
+                cellForRowAt: IndexPath(row: 0, section: 6)
             ))
 
             #expect(cacheCell.textLabel?.text == "清除缓存")
@@ -115,6 +123,9 @@ struct SettingsViewControllerTests {
             #expect(autoCheckInCell.textLabel?.text == "自动签到")
             #expect(autoCheckInCell.detailTextLabel?.text == "Beta · 未开启")
             #expect(autoCheckInCell.accessoryType == .disclosureIndicator)
+            #expect(pushNotificationCell.textLabel?.text == "推送通知")
+            #expect(pushNotificationCell.detailTextLabel?.text == "未开启")
+            #expect(pushNotificationCell.accessoryType == .disclosureIndicator)
             #expect(signatureCell.textLabel?.text == "显示帖子签名")
             let signatureSwitch = try #require(signatureCell.accessoryView as? UISwitch)
             #expect(signatureSwitch.isOn == true)
@@ -138,9 +149,9 @@ struct SettingsViewControllerTests {
         )
 
         viewController.loadViewIfNeeded()
-        try await waitUntil { viewController.tableView.numberOfRows(inSection: 5) == 0 }
+        try await waitUntil { viewController.tableView.numberOfRows(inSection: 6) == 0 }
 
-        #expect(viewController.tableView.numberOfRows(inSection: 5) == 0)
+        #expect(viewController.tableView.numberOfRows(inSection: 6) == 0)
     }
 
     @Test func postSignatureDisplayDefaultsToEnabledWhenUnset() throws {
@@ -410,7 +421,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 4)
+            didSelectRowAt: IndexPath(row: 0, section: 5)
         )
 
         #expect(navigationController.topViewController is SettingsAboutViewController)
@@ -478,6 +489,39 @@ struct SettingsViewControllerTests {
         )
 
         #expect(navigationController.topViewController is AutoCheckInSettingsViewController)
+    }
+
+    @Test func selectingPushNotificationPushesSettingsScreen() throws {
+        let viewController = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager(),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore()
+        )
+        let navigationController = UINavigationController(rootViewController: viewController)
+        viewController.loadViewIfNeeded()
+
+        viewController.tableView.delegate?.tableView?(
+            viewController.tableView,
+            didSelectRowAt: IndexPath(row: 0, section: 2)
+        )
+
+        #expect(navigationController.topViewController is PushNotificationSettingsViewController)
+    }
+
+    @Test func settingsPageShowsClosedPushNotificationSummaryWhenDenied() async throws {
+        let viewController = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager(),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
+            pushAuthorizationStatusProvider: { .denied }
+        )
+        viewController.loadViewIfNeeded()
+        try await waitUntil {
+            viewController.tableView.dataSource?.tableView(
+                viewController.tableView,
+                cellForRowAt: IndexPath(row: 0, section: 2)
+            ).detailTextLabel?.text == "系统已关闭"
+        }
     }
 
     @Test func returningToSettingsRefreshesAutoCheckInSummary() throws {
@@ -558,7 +602,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 2)
+            didSelectRowAt: IndexPath(row: 0, section: 3)
         )
         try await Task.sleep(nanoseconds: 100_000_000)
 
@@ -584,11 +628,11 @@ struct SettingsViewControllerTests {
             }
         )
         viewController.loadViewIfNeeded()
-        try await waitUntil { viewController.tableView.numberOfRows(inSection: 5) == 1 }
+        try await waitUntil { viewController.tableView.numberOfRows(inSection: 6) == 1 }
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 5)
+            didSelectRowAt: IndexPath(row: 0, section: 6)
         )
         try await Task.sleep(nanoseconds: 100_000_000)
 
@@ -608,7 +652,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 3)
+            didSelectRowAt: IndexPath(row: 0, section: 4)
         )
 
         #expect(navigationController.topViewController is SettingsDebugViewController)

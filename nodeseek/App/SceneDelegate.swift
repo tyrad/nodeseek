@@ -10,21 +10,30 @@ import UIKit
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
+    private let appRouter = AppRouter()
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         let window = UIWindow(windowScene: windowScene)
-        let appRouter = AppRouter()
-        window.rootViewController = NodeSeekSplashViewController { [weak window] in
-            guard let window else { return }
-            UIView.performWithoutAnimation {
-                window.rootViewController = appRouter.makeRootViewController()
-                window.layoutIfNeeded()
+        let launchedFromPush = connectionOptions.notificationResponse != nil
+        if launchedFromPush {
+            window.rootViewController = appRouter.makeRootViewController()
+        } else {
+            window.rootViewController = NodeSeekSplashViewController { [weak window, appRouter] in
+                guard let window else { return }
+                UIView.performWithoutAnimation {
+                    window.rootViewController = appRouter.makeRootViewController()
+                    window.layoutIfNeeded()
+                }
             }
         }
         window.makeKeyAndVisible()
         self.window = window
+
+        if let response = connectionOptions.notificationResponse {
+            PushNotificationDeepLink.handle(userInfo: response.notification.request.content.userInfo)
+        }
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {

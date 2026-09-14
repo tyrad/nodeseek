@@ -6,13 +6,22 @@
 //
 
 import UIKit
+import UserNotifications
 
 @main
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        UNUserNotificationCenter.current().delegate = self
         return true
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        PushNotificationTokenStore.shared.update(deviceToken: deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        PushNotificationTokenStore.shared.updateRegistrationError(error)
     }
 
     // MARK: UISceneSession Lifecycle
@@ -21,6 +30,36 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Called when a new scene session is being created.
         // Use this method to select a configuration to create the new scene with.
         return UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        let userInfo = notification.request.content.userInfo
+        if PushNotificationForegroundEcho.isEcho(userInfo) {
+            completionHandler([.banner, .sound, .list])
+            return
+        }
+        if UIApplication.shared.applicationState == .active {
+            PushNotificationForegroundEcho.schedule(from: notification)
+            completionHandler([])
+            return
+        }
+        completionHandler([.banner, .sound, .list])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = response.notification.request.content.userInfo
+        Task { @MainActor in
+            PushNotificationDeepLink.handle(userInfo: userInfo)
+            completionHandler()
+        }
     }
 
     func application(_ application: UIApplication, didDiscardSceneSessions sceneSessions: Set<UISceneSession>) {

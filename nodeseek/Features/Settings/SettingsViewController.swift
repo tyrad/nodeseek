@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import UserNotifications
 
 struct SettingsBuildInfo: Equatable {
     let appVersion: String
@@ -103,6 +104,7 @@ class SettingsViewController: UITableViewController {
     private enum Section: Int, CaseIterable {
         case reading
         case features
+        case notifications
         case storage
         case debug
         case about
@@ -122,6 +124,10 @@ class SettingsViewController: UITableViewController {
         case autoCheckIn
     }
 
+    private enum NotificationRow: Int, CaseIterable {
+        case pushNotification
+    }
+
     private let cacheManager: SettingsCacheManaging
     private let sessionManager: SettingsSessionManaging
     private let currentAccountStore: CurrentAccountStore
@@ -133,6 +139,7 @@ class SettingsViewController: UITableViewController {
     private let searchEntrySettings: PostListSearchEntrySettings
     private let categoryPreferenceStore: PostCategoryPreferenceStore
     private let specialFollowKeywordStore: SpecialFollowKeywordStore
+    private let pushAuthorizationStatusProvider: @MainActor () async -> UNAuthorizationStatus
     private let autoCheckInSummaryProvider: @MainActor () -> String
     private let autoCheckInSettingsViewControllerFactory: @MainActor () -> UIViewController
     private let confirmsActionsImmediately: Bool
@@ -140,6 +147,7 @@ class SettingsViewController: UITableViewController {
     private let onLogFile: @MainActor () -> Void
     private let onDetailTest: (@MainActor () -> Void)?
     private var cacheByteSize: UInt64?
+    private var pushAuthorizationStatus: UNAuthorizationStatus = .notDetermined
     private var isLoggedIn = false
     private var isClearingCache = false
     private var isLoggingOut = false
@@ -156,6 +164,9 @@ class SettingsViewController: UITableViewController {
         searchEntrySettings: PostListSearchEntrySettings = .shared,
         categoryPreferenceStore: PostCategoryPreferenceStore = .shared,
         specialFollowKeywordStore: SpecialFollowKeywordStore = .shared,
+        pushAuthorizationStatusProvider: @escaping @MainActor () async -> UNAuthorizationStatus = {
+            await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        },
         autoCheckInSummaryProvider: @escaping @MainActor () -> String = { AutoCheckInModule.settingsSummary },
         autoCheckInSettingsViewControllerFactory: @escaping @MainActor () -> UIViewController = {
             AutoCheckInModule.makeSettingsViewController()
@@ -176,6 +187,7 @@ class SettingsViewController: UITableViewController {
         self.searchEntrySettings = searchEntrySettings
         self.categoryPreferenceStore = categoryPreferenceStore
         self.specialFollowKeywordStore = specialFollowKeywordStore
+        self.pushAuthorizationStatusProvider = pushAuthorizationStatusProvider
         self.autoCheckInSummaryProvider = autoCheckInSummaryProvider
         self.autoCheckInSettingsViewControllerFactory = autoCheckInSettingsViewControllerFactory
         self.confirmsActionsImmediately = confirmsActionsImmediately
@@ -198,6 +210,7 @@ class SettingsViewController: UITableViewController {
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "SettingsCell")
         refreshCacheSize()
         refreshAccountState()
+        refreshPushAuthorizationStatus()
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(specialFollowKeywordsDidChange(_:)),
@@ -216,6 +229,7 @@ class SettingsViewController: UITableViewController {
         super.viewWillAppear(animated)
         tableView.reloadSections(IndexSet(integer: Section.reading.rawValue), with: .none)
         tableView.reloadSections(IndexSet(integer: Section.features.rawValue), with: .none)
+        refreshPushAuthorizationStatus()
     }
 
     deinit {
@@ -232,6 +246,8 @@ class SettingsViewController: UITableViewController {
             return ReadingRow.allCases.count
         case .features:
             return FeatureRow.allCases.count
+        case .notifications:
+            return NotificationRow.allCases.count
         case .storage:
             return 1
         case .debug:
@@ -251,6 +267,8 @@ class SettingsViewController: UITableViewController {
             return "阅读"
         case .features:
             return "功能"
+        case .notifications:
+            return "通知"
         case .storage:
             return "存储"
         case .debug:
@@ -270,6 +288,8 @@ class SettingsViewController: UITableViewController {
             return readingCell(for: indexPath)
         case .features:
             return featureCell(for: indexPath)
+        case .notifications:
+            return notificationCell(for: indexPath)
         case .storage:
             return cacheCell(for: indexPath)
         case .debug:
@@ -290,6 +310,8 @@ class SettingsViewController: UITableViewController {
             handleReadingSelection(at: indexPath)
         case .features:
             handleFeatureSelection(at: indexPath)
+        case .notifications:
+            handleNotificationSelection(at: indexPath)
         case .storage:
             confirmClearCache()
         case .debug:
@@ -338,6 +360,15 @@ class SettingsViewController: UITableViewController {
             return specialFollowCell(for: indexPath)
         case .autoCheckIn:
             return autoCheckInCell(for: indexPath)
+        case .none:
+            return UITableViewCell()
+        }
+    }
+
+    private func notificationCell(for indexPath: IndexPath) -> UITableViewCell {
+        switch NotificationRow(rawValue: indexPath.row) {
+        case .pushNotification:
+            return pushNotificationCell(for: indexPath)
         case .none:
             return UITableViewCell()
         }
@@ -434,6 +465,17 @@ class SettingsViewController: UITableViewController {
         return cell
     }
 
+    private func pushNotificationCell(for indexPath: IndexPath) -> UITableViewCell {
+        let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+        cell.textLabel?.text = "推送通知"
+        cell.detailTextLabel?.text = PushNotificationSettingsCopy.listSummary(for: pushAuthorizationStatus)
+        cell.detailTextLabel?.textColor = .secondaryLabel
+        cell.imageView?.image = UIImage(systemName: "bell")
+        cell.accessoryType = .disclosureIndicator
+        cell.accessibilityIdentifier = "settings-push-notification-cell"
+        return cell
+    }
+
     private func logoutCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
         cell.textLabel?.text = isLoggingOut ? "正在退出登录..." : "退出登录"
@@ -504,6 +546,14 @@ class SettingsViewController: UITableViewController {
         }
     }
 
+    private func refreshPushAuthorizationStatus() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            pushAuthorizationStatus = await pushAuthorizationStatusProvider()
+            tableView.reloadSections(IndexSet(integer: Section.notifications.rawValue), with: .none)
+        }
+    }
+
     private func refreshAccountState() {
         Task { @MainActor [weak self] in
             guard let self else { return }
@@ -521,6 +571,15 @@ class SettingsViewController: UITableViewController {
             showSpecialFollowKeywords()
         case .autoCheckIn:
             showAutoCheckInSettings()
+        case .none:
+            break
+        }
+    }
+
+    private func handleNotificationSelection(at indexPath: IndexPath) {
+        switch NotificationRow(rawValue: indexPath.row) {
+        case .pushNotification:
+            showPushNotificationSettings()
         case .none:
             break
         }
@@ -581,6 +640,10 @@ class SettingsViewController: UITableViewController {
 
     private func showAutoCheckInSettings() {
         navigationController?.pushViewController(autoCheckInSettingsViewControllerFactory(), animated: true)
+    }
+
+    private func showPushNotificationSettings() {
+        navigationController?.pushViewController(PushNotificationSettingsViewController(), animated: true)
     }
 
     private func showAboutSettings() {
