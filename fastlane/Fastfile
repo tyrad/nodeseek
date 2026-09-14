@@ -253,6 +253,24 @@ def app_store_profile_name
   "match AppStore #{APP_IDENTIFIER}"
 end
 
+def fetch_appstore_signing
+  match(
+    type: "appstore",
+    readonly: true,
+    skip_provisioning_profiles: true
+  )
+
+  api_key = app_store_api_key_from_env
+  UI.user_error!("Missing App Store Connect API key to fetch the provisioning profile") unless api_key
+
+  get_provisioning_profile(
+    api_key: api_key,
+    app_identifier: APP_IDENTIFIER,
+    provisioning_name: app_store_profile_name,
+    ignore_profiles_with_different_name: true
+  )
+end
+
 platform :ios do
   desc "Run the CI test subset"
   lane :tests do
@@ -267,7 +285,7 @@ platform :ios do
   lane :build do |options|
     setup_ci
     write_build_metadata(options)
-    match(type: "appstore", readonly: true)
+    fetch_appstore_signing
     build_app(
       project: PROJECT,
       scheme: SCHEME,
@@ -290,7 +308,7 @@ platform :ios do
   lane :beta do |options|
     setup_ci
     write_build_metadata(options)
-    match(type: "appstore", readonly: true)
+    fetch_appstore_signing
     build_app(
       project: PROJECT,
       scheme: SCHEME,
