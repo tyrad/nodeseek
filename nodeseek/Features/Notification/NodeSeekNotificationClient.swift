@@ -47,7 +47,9 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
             logBusinessFailure(for: request, message: nil)
             throw NodeSeekNotificationClientError.unsuccessfulResponse(nil)
         }
-        return response.unreadCount
+        let unreadCount = response.unreadCount
+        AppLog.info(.service, "通知未读数 \(unreadCount.debugSummary)")
+        return unreadCount
     }
 
     func loadAtMe() async throws -> [NodeSeekNotificationRecord] {
@@ -94,12 +96,71 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
         guard normalizedIDs.isEmpty == false else { return }
 
         let request = try NodeSeekNotificationMarkViewedRequest.single(ids: normalizedIDs, tab: tab)
-        try await markViewedSubmitter.submit(request, referer: tab.webURL)
+        try await submitMarkViewed(request, referer: tab.webURL)
     }
 
     func markAllViewed(tab: NodeSeekNotificationTab) async throws {
         let request = NodeSeekNotificationMarkViewedRequest.all(tab: tab)
-        try await markViewedSubmitter.submit(request, referer: tab.webURL)
+        try await submitMarkViewed(request, referer: tab.webURL)
+    }
+
+    private func submitMarkViewed(
+        _ request: NodeSeekNotificationMarkViewedRequest,
+        referer: URL
+    ) async throws {
+        do {
+            try await submitMarkViewedOverHTTP(request, referer: referer)
+            AppLog.info(.service, "通知标记已读 HTTP 成功: path=\(request.apiPath)")
+        } catch let error as NodeSeekNotificationClientError {
+            switch error {
+            case .unsuccessfulResponse:
+                throw error
+            case .httpStatus:
+                AppLog.warning(
+                    .service,
+                    "通知标记已读 HTTP 失败，回退 WebView: path=\(request.apiPath), error=\(error.localizedDescription)"
+                )
+                try await markViewedSubmitter.submit(request, referer: referer)
+            }
+        } catch {
+            AppLog.warning(
+                .service,
+                "通知标记已读 HTTP 失败，回退 WebView: path=\(request.apiPath), error=\(error.localizedDescription)"
+            )
+            try await markViewedSubmitter.submit(request, referer: referer)
+        }
+    }
+
+    private func submitMarkViewedOverHTTP(
+        _ request: NodeSeekNotificationMarkViewedRequest,
+        referer: URL
+    ) async throws {
+        let urlRequest = makeHTTPMarkViewedRequest(request, referer: referer)
+        let response = try await decode(ActionResponse.self, from: urlRequest)
+        guard response.success else {
+            logBusinessFailure(for: urlRequest, message: response.message)
+            throw NodeSeekNotificationClientError.unsuccessfulResponse(response.message)
+        }
+    }
+
+    private func makeHTTPMarkViewedRequest(
+        _ request: NodeSeekNotificationMarkViewedRequest,
+        referer: URL
+    ) -> URLRequest {
+        var path = request.apiPath
+        var queryItems: [URLQueryItem]?
+        if let queryStart = path.firstIndex(of: "?") {
+            let query = String(path[path.index(after: queryStart)...])
+            path = String(path[..<queryStart])
+            queryItems = URLComponents(string: "https://nodeseek.invalid?\(query)")?.queryItems
+        }
+        return makeRequest(
+            path: path,
+            queryItems: queryItems,
+            method: "POST",
+            body: request.bodyJSON.flatMap { $0.data(using: .utf8) },
+            referer: referer
+        )
     }
 
     private func makeRequest(
@@ -262,6 +323,11 @@ private struct MessageListResponse: Decodable {
 private struct UnreadCountResponse: Decodable {
     let success: Bool
     let unreadCount: NodeSeekNotificationUnreadCount
+}
+
+private struct ActionResponse: Decodable {
+    let success: Bool
+    let message: String?
 }
 
 extension NodeSeekNotificationUnreadCount: Decodable {

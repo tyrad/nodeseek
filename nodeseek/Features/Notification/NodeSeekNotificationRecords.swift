@@ -70,6 +70,10 @@ nonisolated struct NodeSeekNotificationUnreadCount: Equatable, Sendable {
     mutating func decrement(for tab: NodeSeekNotificationTab, by amount: Int = 1) {
         setCount(count(for: tab) - max(0, amount), for: tab)
     }
+
+    var debugSummary: String {
+        "message=\(message), atMe=\(atMe), reply=\(reply), all=\(all)"
+    }
 }
 
 enum NodeSeekNotificationUnreadCountEvent {
