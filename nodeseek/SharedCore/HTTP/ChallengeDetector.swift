@@ -60,5 +60,10 @@ struct ChallengeDetector: Sendable {
             || html.contains("class=\"nsk-post\"")
             || html.contains("class=\"post-content\"")
             || html.contains("class=\"comments\"")
+            // 通知中心是独立 SPA，没有帖子页内容节点。只认通知页专属入口，
+            // 不能把通用外框 nsk-head/nsk-frame 当成可用页，否则 403/验证页会被放过。
+            || html.contains("href=\"#/atMe\"")
+            || html.contains("href=\"#/reply\"")
+            || html.contains("全部标为已读")
     }
 }
