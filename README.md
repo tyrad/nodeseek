@@ -4,7 +4,6 @@
 ![Swift](https://img.shields.io/badge/Swift-F05138?logo=swift&logoColor=white)
 ![iOS](https://img.shields.io/badge/iOS-15%2B-000000?logo=apple&logoColor=white)
 ![License](https://img.shields.io/github/license/tyrad/nodeseek)
-
 [![TestFlight · 加入测试](https://img.shields.io/badge/TestFlight-加入测试-0D96F6?logo=appstore&logoColor=white)](https://testflight.apple.com/join/T2YSXzFs)
 ![Texture · Async UI](https://img.shields.io/badge/Texture-Async_UI-6C5CE7)
 ![Dark Mode · Supported](https://img.shields.io/badge/Dark_Mode-Supported-333333)
