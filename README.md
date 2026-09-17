@@ -1,5 +1,6 @@
 # NS Connect · NodeSeek iOS
 
+[![App Store](https://img.shields.io/badge/App_Store-免费下载-0D96F6?logo=appstore&logoColor=white)](https://apps.apple.com/cn/app/ns-connect/id6766863710)
 [![TestFlight 构建](https://github.com/tyrad/nodeseek/actions/workflows/testflight.yml/badge.svg)](https://github.com/tyrad/nodeseek/actions/workflows/testflight.yml)
 ![Swift](https://img.shields.io/badge/Swift-F05138?logo=swift&logoColor=white)
 ![iOS](https://img.shields.io/badge/iOS-15%2B-000000?logo=apple&logoColor=white)
@@ -10,17 +11,16 @@
 [![Latest Release · 查看发布](https://img.shields.io/badge/Latest_Release-查看发布-2EA44F?logo=github&logoColor=white)](https://github.com/tyrad/nodeseek/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/tyrad/nodeseek?style=flat&logo=github)](https://github.com/tyrad/nodeseek/stargazers)
 
-NS Connect 是一个开源、非官方的 NodeSeek iOS 客户端，基于 Texture 的异步布局与渲染能力，打造高性能的原生列表与帖子阅读体验。支持浏览、搜索、回复、收藏、投票和图片上传，并适配系统浅色与深色模式。
+NS Connect 是一个开源、非官方的 NodeSeek iOS 客户端，基于 Texture 的异步布局与渲染能力，打造高性能的原生列表与帖子阅读体验。支持浏览、搜索、回复、收藏、投票和图片上传，并适配系统浅色与深色模式。现已上架 App Store。
 
 通过 **GitHub Actions + fastlane 自动构建并上传 TestFlight**，在 App 内即可查看当前版本的 **Git hash 和构建记录**，方便核对源码、定位问题。
 
 ## 安装体验
 
+**[从 App Store 下载](https://apps.apple.com/cn/app/ns-connect/id6766863710)**
 **[加入 TestFlight 测试](https://testflight.apple.com/join/T2YSXzFs)**
 
-支持 iOS 15 及以上版本。TestFlight 可安装版本以测试页面实际提供的构建为准。
-
-> 接入通知能力,自行部署 https://github.com/tyrad/ns-apns 
+> 接入通知能力，自行部署 https://github.com/tyrad/ns-apns
 
 ## 支持的功能
 
@@ -73,16 +73,16 @@ NS Connect 是一个开源、非官方的 NodeSeek iOS 客户端，基于 Textur
 
 ## 截图
 
-| 首页浏览 | 图文详情 | 图片预览与分享 |
-| --- | --- | --- |
+| 首页浏览                                                                                                    | 图文详情                                                                                                                  | 图片预览与分享                                                                                                                      |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | <a href="screenshots/home.jpg"><img src="screenshots/home.jpg" width="250" alt="NS Connect 首页浏览" /></a> | <a href="screenshots/post-detail.jpg"><img src="screenshots/post-detail.jpg" width="250" alt="NS Connect 图文详情" /></a> | <a href="screenshots/image-preview.jpg"><img src="screenshots/image-preview.jpg" width="250" alt="NS Connect 图片预览与分享" /></a> |
 
-| NQ 基本信息 | NQ IP 质量 | NQ 网络质量 |
-| --- | --- | --- |
+| NQ 基本信息                                                                                                              | NQ IP 质量                                                                                                      | NQ 网络质量                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | <a href="screenshots/nq-report.jpg"><img src="screenshots/nq-report.jpg" width="250" alt="NS Connect NQ 基本信息" /></a> | <a href="screenshots/nq-ip.jpg"><img src="screenshots/nq-ip.jpg" width="250" alt="NS Connect NQ IP 质量" /></a> | <a href="screenshots/nq-network.jpg"><img src="screenshots/nq-network.jpg" width="250" alt="NS Connect NQ 网络质量" /></a> |
 
-| 阅读与功能设置 | 首页分类管理 | 字体大小与预览 |
-| --- | --- | --- |
+| 阅读与功能设置                                                                                                            | 首页分类管理                                                                                                                | 字体大小与预览                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | <a href="screenshots/settings.jpg"><img src="screenshots/settings.jpg" width="250" alt="NS Connect 阅读与功能设置" /></a> | <a href="screenshots/categories.jpg"><img src="screenshots/categories.jpg" width="250" alt="NS Connect 首页分类管理" /></a> | <a href="screenshots/text-size.jpg"><img src="screenshots/text-size.jpg" width="250" alt="NS Connect 字体大小与预览" /></a> |
 
 ## 许可证
