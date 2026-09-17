@@ -216,7 +216,16 @@ struct KannaNodeSeekParser: NodeSeekParser {
             append(post, to: &posts, seenIDs: &seenIDs)
         }
 
+        // 标准列表已命中时不再扫全页 /post- 链接，避免页脚「商业推广」等入口混进列表。
+        guard posts.isEmpty else {
+            return posts
+        }
+
         for titleNode in document.xpath(XPathRules.fallbackPostLinks) {
+            guard titleNode.at_xpath("./ancestor::footer") == nil else {
+                continue
+            }
+
             let container = titleNode.at_xpath(XPathRules.fallbackPostContainer) ?? titleNode
             guard let post = parsePostListItem(container, titleNode: titleNode) else {
                 continue

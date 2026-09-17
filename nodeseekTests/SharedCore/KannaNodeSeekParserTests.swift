@@ -237,6 +237,62 @@ struct KannaNodeSeekParserTests {
         #expect(post.avatarURL == nil)
     }
 
+    @Test func ignoresFooterPromotionLinksWhenStandardPostListExists() throws {
+        let html = """
+        <main>
+            <article class="post-item">
+                <a class="post-title" href="/post-123">测试帖子</a>
+                <a class="post-author" href="/user/mist">mist</a>
+                <a class="post-node" href="/go/vps">VPS</a>
+                <span class="reply-count">2</span>
+                <span class="last-active">1 分钟前</span>
+            </article>
+        </main>
+        <footer>
+            <div class="group-head-link">商业推广</div>
+            <ul>
+                <a href="/post-6797-1"><li>商家申请规则</li></a>
+                <a href="/post-6800-1"><li>Premium Provider</li></a>
+                <a href="/post-361666-1"><li>广告合作</li></a>
+            </ul>
+        </footer>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let posts = try parser.parsePostList(html: html)
+
+        #expect(posts.map(\.id) == ["123"])
+        #expect(posts.map(\.title) == ["测试帖子"])
+    }
+
+    @Test func ignoresFooterPromotionLinksWhenUsingPostLinkFallback() throws {
+        let html = """
+        <section class="topic-list">
+            <div class="topic-row">
+                <a href="/post-456">没有标准 class 的标题</a>
+                <a href="/space/alice">alice</a>
+                <a href="/go/daily">日常</a>
+                <span>12 回复</span>
+                <time>2 小时前</time>
+            </div>
+        </section>
+        <footer>
+            <div class="group-head-link">商业推广</div>
+            <ul>
+                <a href="/post-6797-1"><li>商家申请规则</li></a>
+                <a href="/post-6800-1"><li>Premium Provider</li></a>
+                <a href="/post-361666-1"><li>广告合作</li></a>
+            </ul>
+        </footer>
+        """
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+
+        let posts = try parser.parsePostList(html: html)
+
+        #expect(posts.map(\.id) == ["456"])
+        #expect(posts.map(\.title) == ["没有标准 class 的标题"])
+    }
+
     @Test func parsesCommentReactionCountsFromDetailCommentMenuDOM() throws {
         let html = """
         <div class="nsk-post">
@@ -667,6 +723,12 @@ struct KannaNodeSeekParserTests {
         #expect(unlockedPost.viewCount == 45)
         #expect(!unlockedPost.isLocked)
         #expect(unlockedPost.requiredReadingLevel == nil)
+
+        let titles = Set(posts.map(\.title))
+        #expect(!titles.contains("商家申请规则"))
+        #expect(!titles.contains("Premium Provider"))
+        #expect(!titles.contains("广告合作"))
+        #expect(!posts.contains { $0.id == "6797" || $0.id == "6800" || $0.id == "361666" })
     }
 
     @Test func parsesPostDetailFixture() throws {
