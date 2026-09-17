@@ -12,9 +12,20 @@ final class AutoCheckInSettingsViewController: UITableViewController {
     }
 
     private let settingsStore: AutoCheckInSettingsStore
+    private let onEnabledChanged: @MainActor (Bool, UIViewController) async -> Void
 
-    init(settingsStore: AutoCheckInSettingsStore = .shared) {
+    init(
+        settingsStore: AutoCheckInSettingsStore = .shared,
+        onEnabledChanged: @escaping @MainActor (Bool, UIViewController) async -> Void = { enabled, context in
+            guard enabled else { return }
+            await AutoCheckInModule.runIfNeeded(
+                presentationContext: context,
+                trigger: .settingsEnabled
+            )
+        }
+    ) {
         self.settingsStore = settingsStore
+        self.onEnabledChanged = onEnabledChanged
         super.init(style: .insetGrouped)
     }
 
@@ -96,5 +107,9 @@ final class AutoCheckInSettingsViewController: UITableViewController {
 
     @objc private func enabledSwitchChanged(_ sender: UISwitch) {
         settingsStore.setEnabled(sender.isOn)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.onEnabledChanged(sender.isOn, self)
+        }
     }
 }

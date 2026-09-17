@@ -11,7 +11,7 @@ import UIKit
 struct AutoCheckInSettingsViewControllerTests {
     @Test func settingsScreenShowsSwitchAndModeRows() throws {
         let store = makeStore()
-        let viewController = AutoCheckInSettingsViewController(settingsStore: store)
+        let viewController = AutoCheckInSettingsViewController(settingsStore: store, onEnabledChanged: { _, _ in })
         viewController.loadViewIfNeeded()
 
         #expect(viewController.title == "自动签到")
@@ -51,7 +51,7 @@ struct AutoCheckInSettingsViewControllerTests {
 
     @Test func togglingSwitchPersistsEnabledSetting() throws {
         let store = makeStore()
-        let viewController = AutoCheckInSettingsViewController(settingsStore: store)
+        let viewController = AutoCheckInSettingsViewController(settingsStore: store, onEnabledChanged: { _, _ in })
         viewController.loadViewIfNeeded()
 
         let enableCell = try #require(viewController.tableView.dataSource?.tableView(
@@ -65,9 +65,30 @@ struct AutoCheckInSettingsViewControllerTests {
         #expect(store.settings.isEnabled == true)
     }
 
+    @Test func turningSwitchOnRequestsImmediateCheckIn() async throws {
+        let store = makeStore()
+        var enabledValues: [Bool] = []
+        let viewController = AutoCheckInSettingsViewController(settingsStore: store) { enabled, context in
+            enabledValues.append(enabled)
+            #expect(context === viewController)
+        }
+        viewController.loadViewIfNeeded()
+
+        let enableCell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: IndexPath(row: 0, section: 0)
+        ))
+        let enableSwitch = try #require(enableCell.accessoryView as? UISwitch)
+        enableSwitch.isOn = true
+        enableSwitch.sendActions(for: .valueChanged)
+
+        try await waitUntil { enabledValues == [true] }
+        #expect(store.settings.isEnabled == true)
+    }
+
     @Test func selectingRandomModePersistsSettingAndMovesCheckmark() throws {
         let store = makeStore()
-        let viewController = AutoCheckInSettingsViewController(settingsStore: store)
+        let viewController = AutoCheckInSettingsViewController(settingsStore: store, onEnabledChanged: { _, _ in })
         viewController.loadViewIfNeeded()
 
         viewController.tableView.delegate?.tableView?(
@@ -93,5 +114,16 @@ struct AutoCheckInSettingsViewControllerTests {
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         return AutoCheckInSettingsStore(userDefaults: defaults, storageKey: "settings")
+    }
+
+    private func waitUntil(_ condition: @escaping @MainActor () -> Bool) async throws {
+        let step: UInt64 = 25_000_000
+        var waited: UInt64 = 0
+        while waited < 1_000_000_000 {
+            if condition() { return }
+            try await Task.sleep(nanoseconds: step)
+            waited += step
+        }
+        Issue.record("waitUntil timed out")
     }
 }

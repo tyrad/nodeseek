@@ -323,7 +323,7 @@ struct PostListViewControllerTests {
         let capturedContexts = AutoCheckInPresentationContexts()
         let viewController = makePostListViewController(
             presenter: presenter,
-            autoCheckInRunner: { context in
+            autoCheckInRunner: { context, _ in
                 capturedContexts.append(context)
             }
         )
@@ -341,12 +341,12 @@ struct PostListViewControllerTests {
         #expect(capturedContext === viewController)
     }
 
-    @Test func nonAllTabFirstPageSuccessDoesNotTriggerAutoCheckIn() async throws {
+    @Test func nonAllTabFirstPageSuccessTriggersAutoCheckIn() async throws {
         let presenter = SpyPostListPresenter()
         let capturedContexts = AutoCheckInPresentationContexts()
         let viewController = makePostListViewController(
             presenter: presenter,
-            autoCheckInRunner: { context in
+            autoCheckInRunner: { context, _ in
                 capturedContexts.append(context)
             }
         )
@@ -356,9 +356,40 @@ struct PostListViewControllerTests {
             viewController.pageContainerViewController,
             didLoadFirstPageFor: .tech
         )
-        try await Task.sleep(nanoseconds: 50_000_000)
 
-        #expect(capturedContexts.values.isEmpty)
+        try await waitUntil {
+            capturedContexts.values.count == 1
+        }
+        let capturedContext = try #require(capturedContexts.values.first ?? nil)
+        #expect(capturedContext === viewController)
+    }
+
+    @Test func returningToPostListTriggersAutoCheckIn() async throws {
+        let presenter = SpyPostListPresenter()
+        let capturedContexts = AutoCheckInPresentationContexts()
+        let capturedTriggers = AutoCheckInTriggers()
+        let viewController = makePostListViewController(
+            presenter: presenter,
+            autoCheckInRunner: { context, trigger in
+                capturedContexts.append(context)
+                capturedTriggers.append(trigger)
+            }
+        )
+        viewController.loadViewIfNeeded()
+        viewController.beginAppearanceTransition(true, animated: false)
+        viewController.endAppearanceTransition()
+        try await Task.sleep(nanoseconds: 50_000_000)
+        #expect(capturedTriggers.values.isEmpty)
+
+        viewController.beginAppearanceTransition(false, animated: false)
+        viewController.endAppearanceTransition()
+        viewController.beginAppearanceTransition(true, animated: false)
+        viewController.endAppearanceTransition()
+
+        try await waitUntil {
+            capturedTriggers.values.contains(.postListAppear)
+        }
+        #expect(capturedContexts.values.contains { $0 === viewController })
     }
 
     @Test func categoryPreferenceFallbackRemovesHiddenTabAndSelectsAllPage() throws {
@@ -810,7 +841,7 @@ private func makePostListViewController(
     presenter: SpyPostListPresenter,
     floatingPositionStore: FloatingControlPositionStoring = InMemoryFloatingControlPositionStore(),
     searchEntrySettings: PostListSearchEntrySettings = makePostListSearchEntrySettings(),
-    autoCheckInRunner: @escaping @MainActor (UIViewController?) async -> Void = { _ in },
+    autoCheckInRunner: @escaping @MainActor (UIViewController?, AutoCheckInTrigger) async -> Void = { _, _ in },
     detailTestURLProvider: @escaping () -> String = {
         UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string ?? ""
     }
@@ -835,6 +866,15 @@ private final class AutoCheckInPresentationContexts {
     private(set) var values: [UIViewController?] = []
 
     func append(_ value: UIViewController?) {
+        values.append(value)
+    }
+}
+
+@MainActor
+private final class AutoCheckInTriggers {
+    private(set) var values: [AutoCheckInTrigger] = []
+
+    func append(_ value: AutoCheckInTrigger) {
         values.append(value)
     }
 }

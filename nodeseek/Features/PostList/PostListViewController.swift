@@ -36,7 +36,8 @@ class PostListViewController: UIViewController {
     let presenter: PostListPresenterProtocol
     private let searchEntrySettings: PostListSearchEntrySettings
     let detailTestURLProvider: () -> String
-    let autoCheckInRunner: @MainActor (UIViewController?) async -> Void
+    let autoCheckInRunner: @MainActor (UIViewController?, AutoCheckInTrigger) async -> Void
+    private var hasAppeared = false
     var categories: [PostListCategoryItem] = []
     var selectedCategory: PostListCategoryItem = .all
     var currentSortMode: PostListSortMode = .replyTime
@@ -198,10 +199,10 @@ class PostListViewController: UIViewController {
         visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore(),
         floatingPositionStore: FloatingControlPositionStoring = UserDefaultsFloatingControlPositionStore(),
         searchEntrySettings: PostListSearchEntrySettings = .shared,
-        autoCheckInRunner: @escaping @MainActor (UIViewController?) async -> Void = { presentationContext in
+        autoCheckInRunner: @escaping @MainActor (UIViewController?, AutoCheckInTrigger) async -> Void = { presentationContext, trigger in
             await AutoCheckInModule.runIfNeeded(
                 presentationContext: presentationContext,
-                trigger: .postListAllFirstPage
+                trigger: trigger
             )
         },
         detailTestURLProvider: @escaping () -> String = {
@@ -256,6 +257,13 @@ class PostListViewController: UIViewController {
         refreshAppearanceForCurrentTraits()
         applySearchEntryVisibility(animated: false)
         presenter.viewWillAppear()
+        if hasAppeared {
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                await autoCheckInRunner(self, .postListAppear)
+            }
+        }
+        hasAppeared = true
     }
     
     override func viewWillDisappear(_ animated: Bool) {

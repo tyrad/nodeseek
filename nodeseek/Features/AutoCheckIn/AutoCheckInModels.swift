@@ -37,6 +37,9 @@ enum AutoCheckInMode: String, Codable, CaseIterable, Sendable {
 
 enum AutoCheckInTrigger: String, Sendable {
     case postListAllFirstPage
+    case postListAppear
+    case settingsEnabled
+    case sceneBecomeActive
 }
 
 struct AutoCheckInState: Codable, Equatable, Sendable {
@@ -47,7 +50,12 @@ struct AutoCheckInState: Codable, Equatable, Sendable {
 }
 
 enum AutoCheckInDayIdentifier {
-    static func current(calendar: Calendar = .current, timeZone: TimeZone = .current) -> String {
+    static let shanghaiTimeZone = TimeZone(identifier: "Asia/Shanghai") ?? TimeZone(secondsFromGMT: 8 * 3600)!
+
+    static func current(
+        calendar: Calendar = Calendar(identifier: .gregorian),
+        timeZone: TimeZone = shanghaiTimeZone
+    ) -> String {
         string(for: Date(), calendar: calendar, timeZone: timeZone)
     }
 
@@ -61,10 +69,8 @@ enum AutoCheckInDayIdentifier {
 
 struct AutoCheckInBoardState: Equatable, Sendable {
     let ok: Bool
-    let isLoggedIn: Bool
     let isCheckedIn: Bool
     let message: String?
-    let detectionSource: String
     let reason: String
     let statusCode: Int?
     let responseKeys: [String]

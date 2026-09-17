@@ -52,10 +52,8 @@ struct AutoCheckInCoordinatorTests {
         let harness = try Harness(settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg))
         harness.web.boardState = AutoCheckInBoardState(
             ok: true,
-            isLoggedIn: true,
             isCheckedIn: true,
             message: "今日已签到",
-            detectionSource: "board_api",
             reason: "loaded",
             statusCode: 200,
             responseKeys: ["record"]
@@ -108,20 +106,12 @@ struct AutoCheckInCoordinatorTests {
 
     @Test func returnsSilentlyWhenGuest() async throws {
         let harness = try Harness(settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg))
-        harness.web.boardState = AutoCheckInBoardState(
-            ok: true,
-            isLoggedIn: false,
-            isCheckedIn: false,
-            message: "登录后签到",
-            detectionSource: "guest_hint",
-            reason: "loaded",
-            statusCode: 200,
-            responseKeys: []
-        )
+        harness.accountStatus.isLoggedInValue = false
 
         let outcome = await harness.coordinator.runIfNeeded(presentationContext: UIViewController())
 
         #expect(outcome == .skipped("not_logged_in"))
+        #expect(harness.web.boardCalls == 0)
         #expect(harness.web.submitModes.isEmpty)
         #expect(harness.toastPresenter.toasts.isEmpty)
     }
@@ -130,10 +120,8 @@ struct AutoCheckInCoordinatorTests {
         let harness = try Harness(settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg))
         harness.web.boardState = AutoCheckInBoardState(
             ok: false,
-            isLoggedIn: true,
             isCheckedIn: false,
             message: "board\nstate failed",
-            detectionSource: "javascript_exception",
             reason: "javascript_exception",
             statusCode: nil,
             responseKeys: []
@@ -277,6 +265,97 @@ struct AutoCheckInCoordinatorTests {
         #expect(harness.stateStore.isCompleted(on: harness.dayIdentifier) == true)
     }
 
+    @Test func settingsAndForegroundTriggersSkipStartupDelay() async throws {
+        var delays: [TimeInterval] = []
+        let harness = try Harness(
+            settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg),
+            triggerDelayInterval: 3
+        ) { seconds in
+            delays.append(seconds)
+        }
+
+        let settingsOutcome = await harness.coordinator.runIfNeeded(
+            presentationContext: nil,
+            trigger: .settingsEnabled
+        )
+
+        #expect(settingsOutcome == .submitted(message: "ok"))
+        #expect(delays.isEmpty)
+
+        delays.removeAll()
+        harness.stateStore.markCompleted(dayIdentifier: harness.dayIdentifier, at: harness.now)
+        let appearOutcome = await harness.coordinator.runIfNeeded(
+            presentationContext: nil,
+            trigger: .postListAppear
+        )
+        #expect(appearOutcome == .skipped("completed_today"))
+        #expect(delays.isEmpty)
+
+        delays.removeAll()
+        let foregroundOutcome = await harness.coordinator.runIfNeeded(
+            presentationContext: nil,
+            trigger: .sceneBecomeActive
+        )
+        #expect(foregroundOutcome == .skipped("completed_today"))
+        #expect(delays.isEmpty)
+    }
+
+    @Test func challengeUsesLongerCooldownThanOtherFailures() async throws {
+        let harness = try Harness(
+            settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg),
+            cooldownInterval: 120,
+            failureCooldownInterval: 30
+        )
+        harness.web.boardState = AutoCheckInBoardState(
+            ok: false,
+            isCheckedIn: false,
+            message: "challenge",
+            reason: "challenge",
+            statusCode: 200,
+            responseKeys: []
+        )
+
+        let first = await harness.coordinator.runIfNeeded(presentationContext: nil)
+        harness.currentNow = harness.now.addingTimeInterval(31)
+        let second = await harness.coordinator.runIfNeeded(presentationContext: nil)
+
+        #expect(first == .failed("challenge"))
+        #expect(second == .skipped("cooldown"))
+        #expect(harness.web.boardCalls == 1)
+    }
+
+    @Test func nonChallengeFailureCanRetryAfterShortCooldown() async throws {
+        let harness = try Harness(
+            settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg),
+            cooldownInterval: 120,
+            failureCooldownInterval: 30
+        )
+        harness.web.submitResult = AutoCheckInSubmitResult(
+            ok: false,
+            statusCode: 500,
+            success: false,
+            message: "server down",
+            current: nil,
+            reason: "server_error"
+        )
+
+        let first = await harness.coordinator.runIfNeeded(presentationContext: nil)
+        harness.currentNow = harness.now.addingTimeInterval(31)
+        harness.web.submitResult = AutoCheckInSubmitResult(
+            ok: true,
+            statusCode: 200,
+            success: true,
+            message: "ok",
+            current: 5,
+            reason: "submitted"
+        )
+        let second = await harness.coordinator.runIfNeeded(presentationContext: nil)
+
+        #expect(first == .failed("server_error"))
+        #expect(second == .submitted(message: "ok"))
+        #expect(harness.web.submitModes == [.fixedChickenLeg, .fixedChickenLeg])
+    }
+
     @Test func sanitizesSubmittedMessageForOutcomeAndToast() async throws {
         let harness = try Harness(settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg))
         harness.web.submitResult = AutoCheckInSubmitResult(
@@ -323,10 +402,8 @@ struct AutoCheckInCoordinatorTests {
             let harness = try Harness(settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg))
             harness.web.boardState = AutoCheckInBoardState(
                 ok: false,
-                isLoggedIn: true,
                 isCheckedIn: false,
                 message: "board\nstate failed",
-                detectionSource: "javascript_exception",
                 reason: "javascript_exception",
                 statusCode: nil,
                 responseKeys: []
@@ -396,12 +473,14 @@ struct AutoCheckInCoordinatorTests {
         let settingsStore: AutoCheckInSettingsStore
         let stateStore: AutoCheckInStateStore
         let web = FakeAutoCheckInWebAutomator()
+        let accountStatus = FakeAutoCheckInAccountStatus()
         let toastPresenter = CapturingAutoCheckInToastPresenter()
         let coordinator: AutoCheckInCoordinator
 
         init(
             settings: AutoCheckInSettings,
             cooldownInterval: TimeInterval = 120,
+            failureCooldownInterval: TimeInterval = 30,
             triggerDelayInterval: TimeInterval = 0,
             delay: @escaping @MainActor (TimeInterval) async -> Void = { _ in }
         ) throws {
@@ -423,15 +502,26 @@ struct AutoCheckInCoordinatorTests {
                 settingsStore: settingsStore,
                 stateStore: stateStore,
                 webAutomator: web,
+                accountStatus: accountStatus,
                 toastPresenter: toastPresenter,
                 now: { runClock.now },
                 dayIdentifierProvider: { runDayIdentifier },
                 runIDProvider: { "test1234" },
                 cooldownInterval: cooldownInterval,
+                failureCooldownInterval: failureCooldownInterval,
                 triggerDelayInterval: triggerDelayInterval,
                 delay: delay
             )
         }
+    }
+}
+
+@MainActor
+private final class FakeAutoCheckInAccountStatus: AutoCheckInAccountStatusProviding {
+    var isLoggedInValue: Bool? = true
+
+    func isLoggedIn() async -> Bool? {
+        isLoggedInValue
     }
 }
 
@@ -444,10 +534,8 @@ private final class FakeAutoCheckInWebAutomator: AutoCheckInWebAutomating {
     var submitError: Error?
     var boardState = AutoCheckInBoardState(
         ok: true,
-        isLoggedIn: true,
         isCheckedIn: false,
         message: nil,
-        detectionSource: "board_api",
         reason: "loaded",
         statusCode: 200,
         responseKeys: ["record"]

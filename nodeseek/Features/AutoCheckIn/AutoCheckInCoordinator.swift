@@ -126,15 +126,35 @@ final class DefaultAutoCheckInToastPresenter: AutoCheckInToastPresenting {
 }
 
 @MainActor
+protocol AutoCheckInAccountStatusProviding: AnyObject {
+    func isLoggedIn() async -> Bool?
+}
+
+@MainActor
+final class CurrentAccountAutoCheckInStatusProvider: AutoCheckInAccountStatusProviding {
+    private let store: CurrentAccountStore
+
+    init(store: CurrentAccountStore = .shared) {
+        self.store = store
+    }
+
+    func isLoggedIn() async -> Bool? {
+        await store.snapshot()?.account.isLoggedIn
+    }
+}
+
+@MainActor
 final class AutoCheckInCoordinator {
     private let settingsStore: AutoCheckInSettingsStore
     private let stateStore: AutoCheckInStateStore
     private let webAutomator: AutoCheckInWebAutomating
+    private let accountStatus: AutoCheckInAccountStatusProviding
     private let toastPresenter: AutoCheckInToastPresenting
     private let now: () -> Date
     private let dayIdentifierProvider: () -> String
     private let runIDProvider: () -> String
-    private let cooldownInterval: TimeInterval
+    private let challengeCooldownInterval: TimeInterval
+    private let failureCooldownInterval: TimeInterval
     private let triggerDelayInterval: TimeInterval
     private let delay: @MainActor (TimeInterval) async -> Void
     private var inFlightTask: Task<AutoCheckInRunOutcome, Never>?
@@ -145,11 +165,13 @@ final class AutoCheckInCoordinator {
         settingsStore: AutoCheckInSettingsStore? = nil,
         stateStore: AutoCheckInStateStore? = nil,
         webAutomator: AutoCheckInWebAutomating? = nil,
+        accountStatus: AutoCheckInAccountStatusProviding? = nil,
         toastPresenter: AutoCheckInToastPresenting? = nil,
         now: @escaping () -> Date = Date.init,
         dayIdentifierProvider: (() -> String)? = nil,
         runIDProvider: @escaping () -> String = { String(UUID().uuidString.prefix(8)) },
         cooldownInterval: TimeInterval = 120,
+        failureCooldownInterval: TimeInterval = 30,
         triggerDelayInterval: TimeInterval = 3,
         delay: @escaping @MainActor (TimeInterval) async -> Void = { seconds in
             guard seconds > 0 else { return }
@@ -159,11 +181,13 @@ final class AutoCheckInCoordinator {
         self.settingsStore = settingsStore ?? .shared
         self.stateStore = stateStore ?? .shared
         self.webAutomator = webAutomator ?? WebViewAutoCheckInAutomator()
+        self.accountStatus = accountStatus ?? CurrentAccountAutoCheckInStatusProvider()
         self.toastPresenter = toastPresenter ?? DefaultAutoCheckInToastPresenter()
         self.now = now
         self.dayIdentifierProvider = dayIdentifierProvider ?? { AutoCheckInDayIdentifier.current() }
         self.runIDProvider = runIDProvider
-        self.cooldownInterval = cooldownInterval
+        self.challengeCooldownInterval = cooldownInterval
+        self.failureCooldownInterval = failureCooldownInterval
         self.triggerDelayInterval = triggerDelayInterval
         self.delay = delay
     }
@@ -173,7 +197,7 @@ final class AutoCheckInCoordinator {
         trigger: AutoCheckInTrigger = .postListAllFirstPage
     ) async -> AutoCheckInRunOutcome {
         if let inFlightTask {
-            AppLog.info(.autoCheckIn, "runID=\(activeRunID ?? "unknown") skip=in_flight")
+            AppLog.notice(.autoCheckIn, "runID=\(activeRunID ?? "unknown") skip=in_flight")
             return await inFlightTask.value
         }
 
@@ -202,74 +226,77 @@ final class AutoCheckInCoordinator {
         let startedAt = now()
         let dayIdentifier = dayIdentifierProvider()
         let settings = settingsStore.settings
-        AppLog.info(.autoCheckIn, "runID=\(runID) start trigger=\(trigger.rawValue) day=\(dayIdentifier) enabled=\(settings.isEnabled) mode=\(settings.mode.rawValue)")
+        let loggedIn = await accountStatus.isLoggedIn()
+        AppLog.notice(
+            .autoCheckIn,
+            "runID=\(runID) start trigger=\(trigger.rawValue) day=\(dayIdentifier) timezone=Asia/Shanghai enabled=\(settings.isEnabled) mode=\(settings.mode.rawValue) random=\(settings.mode.randomQueryValue) loggedIn=\(Self.describeLoggedIn(loggedIn)) hasPresentationContext=\(presentationContext != nil) presentation=\(presentationContext.map { String(describing: type(of: $0)) } ?? "nil") lastCompletedDay=\(stateStore.state.completedDayIdentifier ?? "nil")"
+        )
 
         guard settings.isEnabled else {
-            AppLog.info(.autoCheckIn, "runID=\(runID) skip=disabled")
+            AppLog.notice(.autoCheckIn, "runID=\(runID) skip=disabled")
             return finish(.skipped("disabled"), runID: runID, startedAt: startedAt, detail: "reason=disabled")
         }
 
         guard stateStore.isCompleted(on: dayIdentifier) == false else {
-            AppLog.info(.autoCheckIn, "runID=\(runID) skip=completed_today day=\(dayIdentifier)")
+            AppLog.notice(.autoCheckIn, "runID=\(runID) skip=completed_today day=\(dayIdentifier)")
             return finish(.skipped("completed_today"), runID: runID, startedAt: startedAt, detail: "reason=completed_today")
         }
 
         if let cooldownUntil, cooldownUntil > startedAt {
-            AppLog.info(.autoCheckIn, "runID=\(runID) skip=cooldown until=\(cooldownUntil.timeIntervalSince1970)")
+            let remaining = Int(ceil(cooldownUntil.timeIntervalSince(startedAt)))
+            AppLog.notice(.autoCheckIn, "runID=\(runID) skip=cooldown remainingSeconds=\(remaining)")
             return finish(.skipped("cooldown"), runID: runID, startedAt: startedAt, detail: "reason=cooldown")
         }
 
-        if triggerDelayInterval > 0 {
-            AppLog.info(.autoCheckIn, "runID=\(runID) trigger_delay seconds=\(Int(triggerDelayInterval))")
-            await delay(triggerDelayInterval)
+        if loggedIn == false {
+            AppLog.notice(.autoCheckIn, "runID=\(runID) skip=not_logged_in source=account_store")
+            return finish(.skipped("not_logged_in"), runID: runID, startedAt: startedAt, detail: "reason=not_logged_in")
+        }
+
+        let delaySeconds = Self.triggerDelaySeconds(for: trigger, configured: triggerDelayInterval)
+        if delaySeconds > 0 {
+            AppLog.notice(.autoCheckIn, "runID=\(runID) trigger_delay seconds=\(Int(delaySeconds)) trigger=\(trigger.rawValue)")
+            await delay(delaySeconds)
+            AppLog.notice(.autoCheckIn, "runID=\(runID) trigger_delay_done elapsedMs=\(elapsedMilliseconds(since: startedAt))")
+        } else {
+            AppLog.notice(.autoCheckIn, "runID=\(runID) trigger_delay skipped trigger=\(trigger.rawValue)")
         }
 
         do {
-            AppLog.info(.autoCheckIn, "runID=\(runID) board_state_start endpoint=/api/attendance/board?page=1")
-            let boardStartedAt = now()
             let boardState = try await webAutomator.fetchBoardState(runID: runID)
             let sanitizedBoardMessage = sanitize(boardState.message)
-            AppLog.info(.autoCheckIn, "runID=\(runID) board_state_finish status=\(boardState.statusCode.map(String.init) ?? "nil") elapsedMs=\(elapsedMilliseconds(since: boardStartedAt)) ok=\(boardState.ok) reason=\(boardState.reason) loggedIn=\(boardState.isLoggedIn) checkedIn=\(boardState.isCheckedIn) source=\(boardState.detectionSource) keys=\(boardState.responseKeys.joined(separator: ",")) message=\(sanitizedBoardMessage ?? "nil")")
 
             guard boardState.ok else {
-                cooldownUntil = now().addingTimeInterval(cooldownInterval)
+                startCooldown(reason: boardState.reason, runID: runID)
                 AppLog.warning(.autoCheckIn, "runID=\(runID) failure reason=\(boardState.reason) status=\(boardState.statusCode.map(String.init) ?? "nil") elapsedMs=\(elapsedMilliseconds(since: startedAt)) message=\(sanitizedBoardMessage ?? "nil")")
                 return finish(.failed(boardState.reason), runID: runID, startedAt: startedAt, detail: "reason=\(boardState.reason)")
             }
 
-            guard boardState.isLoggedIn else {
-                AppLog.info(.autoCheckIn, "runID=\(runID) skip=not_logged_in source=\(boardState.detectionSource)")
-                return finish(.skipped("not_logged_in"), runID: runID, startedAt: startedAt, detail: "reason=not_logged_in")
-            }
-
             if boardState.isCheckedIn {
                 stateStore.markCompleted(dayIdentifier: dayIdentifier, at: now())
-                AppLog.info(.autoCheckIn, "runID=\(runID) state_write day=\(dayIdentifier) source=board_state")
-                AppLog.info(.autoCheckIn, "runID=\(runID) toast=skipped reason=already_checked_in")
+                AppLog.notice(.autoCheckIn, "runID=\(runID) state_write day=\(dayIdentifier) source=board_state")
+                AppLog.notice(.autoCheckIn, "runID=\(runID) toast=skipped reason=already_checked_in")
                 return finish(.alreadyCheckedIn, runID: runID, startedAt: startedAt, detail: "source=board_state")
             }
 
-            AppLog.info(.autoCheckIn, "runID=\(runID) submit_start mode=\(settings.mode.rawValue) random=\(settings.mode.randomQueryValue)")
-            let submitStartedAt = now()
             let submit = try await webAutomator.submit(mode: settings.mode, runID: runID)
             let sanitizedMessage = sanitize(submit.message)
-            AppLog.info(.autoCheckIn, "runID=\(runID) submit_finish status=\(submit.statusCode.map(String.init) ?? "nil") elapsedMs=\(elapsedMilliseconds(since: submitStartedAt)) ok=\(submit.ok) success=\(submit.success.map(String.init) ?? "nil") current=\(submit.current.map(String.init) ?? "nil") reason=\(submit.reason) message=\(sanitizedMessage ?? "nil")")
 
             if submit.ok == false, isAlreadyCheckedInSubmitMessage(sanitizedMessage) {
                 stateStore.markCompleted(dayIdentifier: dayIdentifier, at: now())
-                AppLog.info(.autoCheckIn, "runID=\(runID) state_write day=\(dayIdentifier) source=submit_already_checked_in")
-                AppLog.info(.autoCheckIn, "runID=\(runID) toast=skipped reason=already_checked_in")
+                AppLog.notice(.autoCheckIn, "runID=\(runID) state_write day=\(dayIdentifier) source=submit_already_checked_in")
+                AppLog.notice(.autoCheckIn, "runID=\(runID) toast=skipped reason=already_checked_in")
                 return finish(.alreadyCheckedIn, runID: runID, startedAt: startedAt, detail: "source=submit_already_checked_in")
             }
 
             guard submit.ok else {
-                cooldownUntil = now().addingTimeInterval(cooldownInterval)
+                startCooldown(reason: submit.reason, runID: runID)
                 AppLog.warning(.autoCheckIn, "runID=\(runID) failure reason=\(submit.reason) status=\(submit.statusCode.map(String.init) ?? "nil") elapsedMs=\(elapsedMilliseconds(since: startedAt)) message=\(sanitizedMessage ?? "nil")")
                 return finish(.failed(submit.reason), runID: runID, startedAt: startedAt, detail: "reason=\(submit.reason)")
             }
 
             stateStore.markCompleted(dayIdentifier: dayIdentifier, at: now())
-            AppLog.info(.autoCheckIn, "runID=\(runID) state_write day=\(dayIdentifier) source=submit_success")
+            AppLog.notice(.autoCheckIn, "runID=\(runID) state_write day=\(dayIdentifier) source=submit_success")
             let toastMessage = sanitizedMessage?.isEmpty == false ? sanitizedMessage! : "已完成今日签到。"
             if let presentationContext {
                 let didShow = toastPresenter.show(
@@ -279,14 +306,14 @@ final class AutoCheckInCoordinator {
                 if didShow {
                     AppLog.notice(.autoCheckIn, "runID=\(runID) toast=shown title=自动签到成功")
                 } else {
-                    AppLog.info(.autoCheckIn, "runID=\(runID) toast=skipped reason=presentation_unavailable")
+                    AppLog.notice(.autoCheckIn, "runID=\(runID) toast=skipped reason=presentation_unavailable")
                 }
             } else {
-                AppLog.info(.autoCheckIn, "runID=\(runID) toast=skipped reason=no_presentation_context")
+                AppLog.notice(.autoCheckIn, "runID=\(runID) toast=skipped reason=no_presentation_context")
             }
             return finish(.submitted(message: sanitizedMessage), runID: runID, startedAt: startedAt, detail: "source=submit_success")
         } catch {
-            cooldownUntil = now().addingTimeInterval(cooldownInterval)
+            startCooldown(reason: "exception", runID: runID)
             AppLog.warning(.autoCheckIn, "runID=\(runID) failure reason=exception elapsedMs=\(elapsedMilliseconds(since: startedAt)) message=\(sanitize(error.localizedDescription) ?? "nil")")
             return finish(.failed("exception"), runID: runID, startedAt: startedAt, detail: "reason=exception")
         }
@@ -298,8 +325,34 @@ final class AutoCheckInCoordinator {
         startedAt: Date,
         detail: String
     ) -> AutoCheckInRunOutcome {
-        AppLog.info(.autoCheckIn, "runID=\(runID) finish outcome=\(outcome.logValue) elapsedMs=\(elapsedMilliseconds(since: startedAt)) \(detail)")
+        AppLog.notice(.autoCheckIn, "runID=\(runID) finish outcome=\(outcome.logValue) elapsedMs=\(elapsedMilliseconds(since: startedAt)) \(detail)")
         return outcome
+    }
+
+    private func startCooldown(reason: String, runID: String) {
+        let interval = reason == "challenge" ? challengeCooldownInterval : failureCooldownInterval
+        cooldownUntil = now().addingTimeInterval(interval)
+        AppLog.notice(.autoCheckIn, "runID=\(runID) cooldown_start reason=\(reason) seconds=\(Int(interval))")
+    }
+
+    private static func triggerDelaySeconds(for trigger: AutoCheckInTrigger, configured: TimeInterval) -> TimeInterval {
+        switch trigger {
+        case .postListAllFirstPage:
+            return configured
+        case .postListAppear, .settingsEnabled, .sceneBecomeActive:
+            return 0
+        }
+    }
+
+    private static func describeLoggedIn(_ value: Bool?) -> String {
+        switch value {
+        case true:
+            return "true"
+        case false:
+            return "false"
+        case nil:
+            return "unknown"
+        }
     }
 
     private func elapsedMilliseconds(since startDate: Date) -> Int {

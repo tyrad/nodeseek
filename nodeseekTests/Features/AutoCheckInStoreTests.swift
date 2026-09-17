@@ -87,7 +87,11 @@ struct AutoCheckInStoreTests {
         let store = AutoCheckInStateStore(userDefaults: defaults, storageKey: "state")
         let calendar = Calendar(identifier: .gregorian)
         let date = Date(timeIntervalSince1970: 1_777_777_777)
-        let day = AutoCheckInDayIdentifier.string(for: date, calendar: calendar, timeZone: TimeZone(secondsFromGMT: 8 * 3600)!)
+        let day = AutoCheckInDayIdentifier.string(
+            for: date,
+            calendar: calendar,
+            timeZone: AutoCheckInDayIdentifier.shanghaiTimeZone
+        )
 
         #expect(store.isCompleted(on: day) == false)
 
@@ -95,6 +99,26 @@ struct AutoCheckInStoreTests {
 
         #expect(store.isCompleted(on: day) == true)
         #expect(store.state.lastSuccessfulAt == date)
+    }
+
+    @Test func dayIdentifierUsesShanghaiCalendarDate() {
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let date = utcCalendar.date(from: DateComponents(year: 2026, month: 9, day: 16, hour: 20))!
+
+        let shanghai = AutoCheckInDayIdentifier.string(
+            for: date,
+            calendar: Calendar(identifier: .gregorian),
+            timeZone: AutoCheckInDayIdentifier.shanghaiTimeZone
+        )
+        let utc = AutoCheckInDayIdentifier.string(
+            for: date,
+            calendar: Calendar(identifier: .gregorian),
+            timeZone: TimeZone(secondsFromGMT: 0)!
+        )
+
+        #expect(shanghai == "2026-09-17")
+        #expect(utc == "2026-09-16")
     }
 
     @Test func appLogIncludesAutoCheckInCategory() throws {

@@ -36,10 +36,13 @@ extension PostListViewController: PostPageContainerViewControllerDelegate {
         _ containerView: PostPageContainerViewController,
         didLoadFirstPageFor category: PostListCategoryItem
     ) {
-        guard category.isAll else { return }
+        AppLog.notice(
+            .autoCheckIn,
+            "trigger=post_list_first_page category=\(category.rawValue) title=\(category.title) isAll=\(category.isAll)"
+        )
         Task { @MainActor [weak self] in
             guard let self else { return }
-            await autoCheckInRunner(self)
+            await autoCheckInRunner(self, .postListAllFirstPage)
         }
     }
 

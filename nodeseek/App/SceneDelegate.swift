@@ -44,6 +44,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            guard let presentationContext = self.autoCheckInPresentationContext() else { return }
+            await AutoCheckInModule.runIfNeeded(
+                presentationContext: presentationContext,
+                trigger: .sceneBecomeActive
+            )
+        }
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
@@ -56,5 +64,16 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneDidEnterBackground(_ scene: UIScene) {
         VisitedPostStore.shared.flush()
+    }
+
+    private func autoCheckInPresentationContext() -> UIViewController? {
+        var controller = window?.rootViewController
+        guard let root = controller, (root is NodeSeekSplashViewController) == false else {
+            return nil
+        }
+        while let presented = controller?.presentedViewController {
+            controller = presented
+        }
+        return controller
     }
 }

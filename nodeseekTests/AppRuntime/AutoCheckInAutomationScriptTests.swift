@@ -14,18 +14,27 @@ struct AutoCheckInAutomationScriptTests {
         #expect(source.contains("/api/attendance?random="))
         #expect(source.contains("method: \"POST\""))
         #expect(source.contains("credentials: \"include\""))
-        #expect(source.contains("success"))
+        #expect(source.contains("json.success === true"))
         #expect(source.contains("current"))
+        #expect(source.contains("diagnostics"))
+        #expect(!source.contains("x-dynamic-sign"))
     }
 
-    @Test func boardStateScriptUsesAttendanceBoardEndpointAndStableLoginSignals() {
+    @Test func boardStateScriptFetchesOfficialBoardEndpointWithoutDOMHeuristics() {
         let source = AutoCheckInAutomationScript.boardStateSource
 
         #expect(source.contains("/api/attendance/board?page=1"))
-        #expect(source.contains("window.__config__"))
-        #expect(source.contains("登录后签到"))
-        #expect(source.contains("memberList"))
-        #expect(source.contains("record"))
+        #expect(source.contains("credentials: \"include\""))
+        #expect(source.contains("response: json"))
+        #expect(source.contains("diagnostics"))
+        #expect(source.contains("recordType"))
+        #expect(source.contains("bodyLength"))
+        #expect(source.contains("hasConfigUser"))
+        #expect(!source.contains("登录后签到"))
+        #expect(!source.contains("memberList"))
+        #expect(!source.contains("hasCurrentMarker"))
+        #expect(!source.contains("isSelf"))
+        #expect(!source.contains("mine"))
     }
 
     @Test func boardStateTimeoutUsesBoardStateReason() {
@@ -38,7 +47,7 @@ struct AutoCheckInAutomationScriptTests {
     @Test func boardStateNetworkErrorUsesNormalizedPayload() {
         let source = AutoCheckInAutomationScript.boardStateSource
 
-        #expect(source.contains("statusCode: null,\n      reason: \"network_error\""))
+        #expect(source.contains("statusCode: null,\n          reason: \"network_error\""))
     }
 
     @Test func boardStateInvalidJSONDoesNotReportSuccessfulLoad() {
@@ -48,7 +57,6 @@ struct AutoCheckInAutomationScriptTests {
         #expect(source.contains("ok: false"))
         #expect(source.contains("body.trim().length === 0"))
         #expect(!source.contains("body || \"{}\""))
-        #expect(!source.contains("return {};"))
     }
 
     @Test func submitFailureBranchesUseNormalizedPayload() {
@@ -72,33 +80,6 @@ struct AutoCheckInAutomationScriptTests {
         #expect(!source.contains("success !== false ? \"submitted\""))
     }
 
-    @Test func boardStateScriptAvoidsAmbiguousListSignals() {
-        let source = AutoCheckInAutomationScript.boardStateSource
-
-        #expect(!source.contains("record.length > 0"))
-        #expect(!source.contains("Boolean(json.record)"))
-        #expect(!source.contains("Boolean(json.memberList)"))
-        #expect(source.contains("hasCurrentMarker"))
-        #expect(source.contains("isSelf"))
-        #expect(source.contains("mine"))
-    }
-
-    @Test func boardStateCheckedInRequiresSuccessfulStatus() {
-        let source = AutoCheckInAutomationScript.boardStateSource
-
-        #expect(source.contains("const isSuccessfulStatus = response.status >= 200 && response.status < 300"))
-        #expect(source.contains("isSuccessfulStatus && hasCurrentRecord"))
-        #expect(!source.contains("const isCheckedIn = hasCurrentRecord;"))
-    }
-
-    @Test func boardStateScriptRejectsMalformedSuccessfulPayload() {
-        let source = AutoCheckInAutomationScript.boardStateSource
-
-        #expect(source.contains("hasBoardPayload"))
-        #expect(source.contains("invalid_board_payload"))
-        #expect(source.contains("!hasGuestSignInHint && !hasBoardPayload"))
-    }
-
     @Test func hiddenWebViewScriptExceptionLogsDoNotIncludeUserInfo() throws {
         let testFile = URL(fileURLWithPath: #filePath)
         let projectRoot = testFile
@@ -113,14 +94,16 @@ struct AutoCheckInAutomationScriptTests {
     }
 
     @MainActor
-    @Test func automatorParsesNSNumberBooleans() {
+    @Test func automatorParsesOfficialRecordObjectAsCheckedIn() {
         let boardState = WebViewAutoCheckInAutomator.parseBoardState([
+            "ok": NSNumber(value: true),
             "statusCode": NSNumber(value: 200),
+            "reason": "loaded",
             "response": [
-                "isLoggedIn": NSNumber(value: true),
-                "isCheckedIn": NSNumber(value: true),
-                "detectionSource": "test",
-                "responseKeys": ["record"]
+                "list": [],
+                "record": ["gain": NSNumber(value: 5)],
+                "order": NSNumber(value: 3),
+                "total": NSNumber(value: 10)
             ]
         ])
         let submitResult = WebViewAutoCheckInAutomator.parseSubmitResult([
@@ -131,10 +114,29 @@ struct AutoCheckInAutomationScriptTests {
             "reason": "submitted"
         ])
 
-        #expect(boardState.isLoggedIn)
+        #expect(boardState.ok)
         #expect(boardState.isCheckedIn)
         #expect(submitResult.ok)
         #expect(submitResult.success == true)
+    }
+
+    @MainActor
+    @Test func automatorParsesNullRecordAsNotCheckedIn() {
+        let boardState = WebViewAutoCheckInAutomator.parseBoardState([
+            "ok": NSNumber(value: true),
+            "statusCode": NSNumber(value: 200),
+            "reason": "loaded",
+            "response": [
+                "list": [],
+                "record": NSNull(),
+                "order": NSNull(),
+                "total": NSNumber(value: 10)
+            ]
+        ])
+
+        #expect(boardState.ok)
+        #expect(boardState.isCheckedIn == false)
+        #expect(boardState.responseKeys.contains("record"))
     }
 
     @MainActor
@@ -148,7 +150,7 @@ struct AutoCheckInAutomationScriptTests {
 
         #expect(submitResult.ok == false)
         #expect(submitResult.statusCode == nil)
-        #expect(submitResult.success == nil)
+        #expect(submitResult.success == false)
         #expect(submitResult.reason == "javascript_exception")
     }
 
@@ -159,19 +161,52 @@ struct AutoCheckInAutomationScriptTests {
             "statusCode": NSNull(),
             "reason": "javascript_exception",
             "message": "script\nfailed",
-            "response": [
-                "isLoggedIn": NSNumber(value: true),
-                "isCheckedIn": NSNumber(value: false),
-                "detectionSource": "javascript_exception",
-                "responseKeys": []
-            ]
+            "response": [:]
         ])
 
         #expect(boardState.ok == false)
         #expect(boardState.statusCode == nil)
         #expect(boardState.reason == "javascript_exception")
         #expect(boardState.message == "script\nfailed")
-        #expect(boardState.isLoggedIn)
         #expect(boardState.isCheckedIn == false)
+    }
+
+    @MainActor
+    @Test func automatorLogsBoardDiagnosticsWithoutMemberNames() {
+        let boardState = WebViewAutoCheckInAutomator.parseBoardState([
+            "ok": NSNumber(value: true),
+            "statusCode": NSNumber(value: 200),
+            "reason": "loaded",
+            "response": [
+                "list": [],
+                "record": NSNull(),
+                "order": NSNull(),
+                "total": NSNumber(value: 10)
+            ],
+            "diagnostics": [
+                "pageHref": "https://www.nodeseek.com/",
+                "hasConfigUser": NSNumber(value: true),
+                "recordType": "null",
+                "keys": ["list", "order", "record", "total"],
+                "listLength": NSNumber(value: 50),
+                "bodyLength": NSNumber(value: 1234)
+            ]
+        ])
+
+        #expect(boardState.ok)
+        #expect(boardState.isCheckedIn == false)
+    }
+
+    @MainActor
+    @Test func automatorUsesHomepageForAutomationContext() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("nodeseek/Features/AutoCheckIn/WebViewAutoCheckInAutomator.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        #expect(source.contains("NodeSeekSite.baseURL"))
+        #expect(!source.contains("NodeSeekSite.boardURL"))
     }
 }
