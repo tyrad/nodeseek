@@ -21,7 +21,12 @@ enum PushNotificationRoute: Equatable, Sendable {
 
         switch type {
         case "other", "unknown":
-            self = .bannerOnly
+            // 旧 ns-apns 把私信标成 other，有对话链接时仍应打开。
+            if let url, NodeSeekSite.isNodeSeekHost(url), Self.isTalkURL(url) {
+                self = .webPage(url: url, title: Self.webTitle(for: url))
+            } else {
+                self = .bannerOnly
+            }
         case "checkin":
             self = .checkin
         case "reply":
@@ -70,6 +75,10 @@ enum PushNotificationRoute: Equatable, Sendable {
         if fragment.contains("mode=talk") { return "私信" }
         if fragment.contains("atMe") { return "提到我" }
         return "系统提醒"
+    }
+
+    private nonisolated static func isTalkURL(_ url: URL) -> Bool {
+        (url.fragment ?? "").contains("mode=talk")
     }
 
     private nonisolated static func page(forFloor floor: String?) -> Int {

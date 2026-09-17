@@ -73,4 +73,32 @@ struct PushNotificationRouteTests {
         #expect(PushNotificationRoute(userInfo: ["type": "other", "raw_text": "奇怪的通知"]) == .bannerOnly)
         #expect(PushNotificationRoute(userInfo: ["type": "unknown"]) == .bannerOnly)
     }
+
+    @Test func mapsOfficialPrivateMessage() throws {
+        let route = try #require(PushNotificationRoute(userInfo: [
+            "type": "message",
+            "author": "ICMP不可达喵",
+            "url": "https://www.nodeseek.com/notification#/message?mode=talk&to=28302",
+        ]))
+        guard case let .webPage(url, title) = route else {
+            Issue.record("expected webPage for private message")
+            return
+        }
+        #expect(url.absoluteString == "https://www.nodeseek.com/notification#/message?mode=talk&to=28302")
+        #expect(title == "私信")
+    }
+
+    @Test func mapsLegacyOtherPrivateMessageByTalkURL() throws {
+        let route = try #require(PushNotificationRoute(userInfo: [
+            "type": "other",
+            "url": "https://www.nodeseek.com/notification#/message?mode=talk&to=28302",
+            "raw_text": "ICMP不可达喵给你发了一条私信，点击查看",
+        ]))
+        guard case let .webPage(url, title) = route else {
+            Issue.record("expected webPage for legacy other private message")
+            return
+        }
+        #expect(url.absoluteString == "https://www.nodeseek.com/notification#/message?mode=talk&to=28302")
+        #expect(title == "私信")
+    }
 }
