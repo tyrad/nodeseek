@@ -84,6 +84,50 @@ struct PostListPresenterTests {
         #expect(loadCount == 3)
     }
 
+    @Test func successfulUnreadRefreshPublishesCountForSideMenu() async throws {
+        let expected = NodeSeekNotificationUnreadCount(message: 0, atMe: 2, reply: 0, all: 2)
+        let view = SpyPostListView()
+        let presenter = makePresenter(
+            view: view,
+            notificationUnreadCountInteractor: StubNotificationUnreadCountInteractor(unreadCount: expected)
+        )
+        let counts = CapturedUnreadCounts()
+        let observer = NotificationCenter.default.addObserver(
+            forName: .nodeSeekNotificationUnreadCountDidUpdate, object: nil, queue: .main
+        ) { notification in
+            MainActor.assumeIsolated {
+                if let count = NodeSeekNotificationUnreadCountEvent.unreadCount(from: notification) {
+                    counts.values.append(count)
+                }
+            }
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        presenter.viewWillAppear()
+
+        try await waitUntil { view.notificationUnreadBadgeStates.last == true }
+        #expect(counts.values.contains(expected))
+    }
+
+    @Test func failedUnreadRefreshPreservesBadgeAndAllowsImmediateRetry() async throws {
+        let view = SpyPostListView()
+        let interactor = StubNotificationUnreadCountInteractor(unreadCount: nil)
+        let presenter = makePresenter(view: view, notificationUnreadCountInteractor: interactor)
+        presenter.didReceiveNotificationUnreadCountUpdate(
+            NodeSeekNotificationUnreadCount(message: 1, atMe: 0, reply: 0, all: 1)
+        )
+
+        presenter.didReceiveNotificationReadStateChange()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        #expect(await interactor.loadUnreadCountCallCount() == 1)
+        #expect(view.notificationUnreadBadgeStates == [true])
+
+        await interactor.setUnreadCount(.zero)
+        presenter.viewWillAppear()
+        try await waitUntil { view.notificationUnreadBadgeStates.last == false }
+        #expect(await interactor.loadUnreadCountCallCount() == 2)
+    }
+
     @Test func notificationUnreadCountUpdateRendersBadgeWithoutCallingInteractor() async {
         let view = SpyPostListView()
         let notificationInteractor = StubNotificationUnreadCountInteractor(
@@ -157,23 +201,35 @@ struct PostListPresenterTests {
         let router = SpyPostListRouter()
         let presenter = makePresenter(view: view, router: router)
 
+        presenter.didReceiveNotificationUnreadCountUpdate(
+            NodeSeekNotificationUnreadCount(message: 1, atMe: 0, reply: 0, all: 1)
+        )
+        view.events.removeAll()
         presenter.didTapSettings()
         router.onSettingsLogout?()
 
         #expect(router.navigateToSettingsCount == 1)
-        #expect(view.events == ["reloadSelectedCategory"])
+        #expect(view.events == ["renderNotificationUnreadBadge", "reloadSelectedCategory"])
+        #expect(view.notificationUnreadBadgeStates == [true, false])
     }
 
-    @Test func loginCloseReloadsSelectedHost() {
+    @Test func loginCloseReloadsSelectedHostAndRefreshesUnreadCountWithinThrottle() async throws {
         let view = SpyPostListView()
         let router = SpyPostListRouter()
-        let presenter = makePresenter(view: view, router: router)
+        let interactor = StubNotificationUnreadCountInteractor(
+            unreadCount: NodeSeekNotificationUnreadCount(message: 1, atMe: 0, reply: 0, all: 1)
+        )
+        let presenter = makePresenter(view: view, router: router, notificationUnreadCountInteractor: interactor)
+        presenter.didReceiveNotificationUnreadCountUpdate(.zero)
+        view.events.removeAll()
 
         presenter.didTapLogin()
         router.onLoginClose?()
 
         #expect(router.navigateToLoginCount == 1)
         #expect(view.events == ["reloadSelectedCategory"])
+        try await waitUntil { view.notificationUnreadBadgeStates.last == true }
+        #expect(await interactor.loadUnreadCountCallCount() == 1)
     }
 
     @Test func selectingPostNavigatesToDetail() {
@@ -606,4 +662,9 @@ private func waitUntil(
         try await Task.sleep(nanoseconds: step)
         waited += step
     }
+}
+
+@MainActor
+private final class CapturedUnreadCounts {
+    var values: [NodeSeekNotificationUnreadCount] = []
 }

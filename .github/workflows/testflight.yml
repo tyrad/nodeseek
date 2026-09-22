@@ -14,6 +14,10 @@ on:
         description: "Optional App Store build number override. Defaults to Asia/Shanghai yyyyMMddHHmmss."
         required: false
         type: string
+      changelog:
+        description: "Optional TestFlight What to Test text. Falls back to the app-store environment variable."
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -112,7 +116,7 @@ jobs:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           MATCH_GIT_PRIVATE_KEY: ${{ secrets.MATCH_GIT_PRIVATE_KEY }}
           TESTFLIGHT_GROUPS: ${{ vars.TESTFLIGHT_GROUPS || '' }}
-          TESTFLIGHT_CHANGELOG: ${{ vars.TESTFLIGHT_CHANGELOG || 'Please test browsing discussion lists, opening post details, signing in with a NodeSeek account, replying to posts, loading images, viewing user information, and general navigation stability.' }}
+          TESTFLIGHT_CHANGELOG: ${{ inputs.changelog || vars.TESTFLIGHT_CHANGELOG || 'Please test browsing discussion lists, opening post details, signing in with a NodeSeek account, replying to posts, loading images, viewing user information, and general navigation stability.' }}
           TESTFLIGHT_DISTRIBUTE_EXTERNAL: ${{ vars.TESTFLIGHT_DISTRIBUTE_EXTERNAL || 'false' }}
           TESTFLIGHT_SUBMIT_BETA_REVIEW: ${{ vars.TESTFLIGHT_SUBMIT_BETA_REVIEW || 'false' }}
           TESTFLIGHT_NOTIFY_EXTERNAL_TESTERS: ${{ vars.TESTFLIGHT_NOTIFY_EXTERNAL_TESTERS || 'false' }}

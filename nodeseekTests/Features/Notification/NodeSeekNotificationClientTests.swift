@@ -9,6 +9,7 @@ import Foundation
 import Testing
 @testable import nodeseek
 
+@MainActor
 @Suite(.serialized)
 struct NodeSeekNotificationClientTests {
     @Test func loadsAtMeNotificationsFromJSONAPI() async throws {
@@ -219,6 +220,7 @@ struct NodeSeekNotificationClientTests {
     }
 }
 
+@MainActor
 private func makeClient(
     responseBody: String,
     counter: CookiePrepareCounter = CookiePrepareCounter(),
@@ -275,7 +277,7 @@ private final class CookiePrepareCounter: @unchecked Sendable {
     }
 }
 
-private actor SpyNotificationMarkViewedSubmitter: NodeSeekNotificationMarkViewedSubmitting {
+private actor SpyNotificationMarkViewedSubmitter {
     struct Submission {
         let request: NodeSeekNotificationMarkViewedRequest
         let referer: URL
@@ -291,6 +293,9 @@ private actor SpyNotificationMarkViewedSubmitter: NodeSeekNotificationMarkViewed
         values
     }
 }
+
+// 避免编译器将协议的 nonisolated 隔离推断到 actor 声明。
+extension SpyNotificationMarkViewedSubmitter: NodeSeekNotificationMarkViewedSubmitting {}
 
 private final class MockNotificationURLProtocol: URLProtocol, @unchecked Sendable {
     static var responseData = Data()

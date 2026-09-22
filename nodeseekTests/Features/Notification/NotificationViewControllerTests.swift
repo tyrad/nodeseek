@@ -86,6 +86,11 @@ struct NotificationViewControllerTests {
         defer { window.isHidden = true }
 
         viewController.loadViewIfNeeded()
+        try await waitUntil {
+            publishedUnreadCounts.values.contains(
+                NodeSeekNotificationUnreadCount(message: 1, atMe: 0, reply: 0, all: 1)
+            )
+        }
         let tableView = try #require(viewController.view.firstSubview(of: UITableView.self))
         let segmentedControl = try #require(viewController.view.firstSubview(of: UISegmentedControl.self))
         segmentedControl.selectedSegmentIndex = NodeSeekNotificationTab.message.rawValue

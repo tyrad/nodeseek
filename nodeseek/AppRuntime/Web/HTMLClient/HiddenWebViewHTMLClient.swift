@@ -97,12 +97,13 @@ enum HiddenWebViewChannel: Hashable, Sendable {
     case isolated(UUID)
 }
 
+@MainActor
 struct HiddenWebViewHTMLClient: HTMLClient {
     private let timeoutInterval: TimeInterval
     private let requestLock: HiddenWebViewRequestLock
     private let channel: HiddenWebViewChannel
 
-    init(
+    nonisolated init(
         timeoutInterval: TimeInterval = 20,
         requestLock: HiddenWebViewRequestLock = .shared,
         channel: HiddenWebViewChannel = .shared
@@ -120,6 +121,7 @@ struct HiddenWebViewHTMLClient: HTMLClient {
         )
     }
 
+    @MainActor
     func get(_ url: URL) async throws -> HTMLResponse {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -132,6 +134,7 @@ struct HiddenWebViewHTMLClient: HTMLClient {
         return try await load(request: request)
     }
 
+    @MainActor
     func post(_ url: URL, formFields: [String: String]) async throws -> HTMLResponse {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

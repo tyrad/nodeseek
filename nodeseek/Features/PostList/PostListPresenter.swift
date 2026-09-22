@@ -93,6 +93,7 @@ class PostListPresenter: PostListPresenterProtocol {
 
     func didTapLogin() {
         router.navigateToLogin { [weak self] in
+            self?.refreshNotificationUnreadBadge(force: true)
             self?.view?.reloadSelectedCategory()
         }
     }
@@ -145,6 +146,8 @@ class PostListPresenter: PostListPresenterProtocol {
 
         router.navigateToSettings(
             onLogout: { [weak self] in
+                self?.didReceiveNotificationUnreadCountUpdate(.zero)
+                NodeSeekNotificationUnreadCountEvent.post(.zero)
                 self?.view?.reloadSelectedCategory()
             },
             onLogFile: { [weak self] in
@@ -235,12 +238,18 @@ private extension PostListPresenter {
                 let unreadCount = try await notificationUnreadCountInteractor.loadUnreadCount()
                 guard Task.isCancelled == false else { return }
                 await MainActor.run { [weak self] in
-                    self?.view?.renderNotificationUnreadBadge(isVisible: unreadCount.all > 0)
+                    guard Task.isCancelled == false, let self else { return }
+                    self.notificationUnreadRefreshTask = nil
+                    self.lastNotificationUnreadRefreshDate = self.currentDateProvider()
+                    self.view?.renderNotificationUnreadBadge(isVisible: unreadCount.all > 0)
+                    NodeSeekNotificationUnreadCountEvent.post(unreadCount)
                 }
             } catch {
                 guard Task.isCancelled == false else { return }
                 await MainActor.run { [weak self] in
-                    self?.view?.renderNotificationUnreadBadge(isVisible: false)
+                    guard Task.isCancelled == false else { return }
+                    // 请求失败不代表没有未读，保留已有提示，并允许下次出现时重试。
+                    self?.lastNotificationUnreadRefreshDate = nil
                 }
                 AppLog.debug(.account, "首页通知未读数加载失败: \(error.localizedDescription)")
             }

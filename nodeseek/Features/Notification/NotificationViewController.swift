@@ -170,7 +170,7 @@ final class NotificationViewController: UIViewController {
     }
 
     private func loadUnreadCount(
-        publishUpdate: Bool = false,
+        publishUpdate: Bool = true,
         postReadStateChangeOnFailure: Bool = false
     ) {
         Task { [weak self] in

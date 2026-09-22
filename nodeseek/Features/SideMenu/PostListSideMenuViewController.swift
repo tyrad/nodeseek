@@ -291,12 +291,13 @@ final class PostListSideMenuViewController: UIViewController {
             do {
                 let unreadCount = try await notificationClient.loadUnreadCount()
                 guard Task.isCancelled == false else { return }
+                notificationUnreadRefreshTask = nil
                 notificationUnreadCount = unreadCount
                 applyNotificationColor()
+                NodeSeekNotificationUnreadCountEvent.post(unreadCount)
             } catch {
                 guard Task.isCancelled == false else { return }
-                notificationUnreadCount = nil
-                applyNotificationColor()
+                // 保留最近一次成功获取的状态，避免网络错误清掉未读提示。
                 AppLog.debug(.account, "侧边栏通知未读数加载失败: \(error.localizedDescription)")
             }
         }
@@ -310,11 +311,11 @@ final class PostListSideMenuViewController: UIViewController {
             queue: .main
         ) { [weak self] notification in
             guard let unreadCount = NodeSeekNotificationUnreadCountEvent.unreadCount(from: notification) else { return }
-            Task { @MainActor [weak self] in
+            MainActor.assumeIsolated {
                 guard let self else { return }
-                notificationUnreadRefreshTask?.cancel()
-                notificationUnreadCount = unreadCount
-                applyNotificationColor()
+                self.notificationUnreadRefreshTask?.cancel()
+                self.notificationUnreadCount = unreadCount
+                self.applyNotificationColor()
             }
         }
     }

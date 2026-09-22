@@ -49,7 +49,7 @@ protocol PostListPresenterProtocol: AnyObject {
 }
 
 // MARK: - Interactor Protocol (Presenter -> Interactor)
-protocol PostListNotificationUnreadCountInteractorProtocol {
+nonisolated protocol PostListNotificationUnreadCountInteractorProtocol {
     func loadUnreadCount() async throws -> NodeSeekNotificationUnreadCount
 }
 

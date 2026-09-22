@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor
 final class PostListNotificationUnreadCountInteractor: PostListNotificationUnreadCountInteractorProtocol {
     private let client: NodeSeekNotificationClientProtocol
 
@@ -14,6 +15,7 @@ final class PostListNotificationUnreadCountInteractor: PostListNotificationUnrea
         self.client = client ?? NodeSeekNotificationClient()
     }
 
+    @MainActor
     func loadUnreadCount() async throws -> NodeSeekNotificationUnreadCount {
         try await client.loadUnreadCount()
     }

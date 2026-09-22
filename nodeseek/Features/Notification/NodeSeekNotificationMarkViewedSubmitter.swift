@@ -7,10 +7,11 @@
 
 import Foundation
 
-protocol NodeSeekNotificationMarkViewedSubmitting {
+nonisolated protocol NodeSeekNotificationMarkViewedSubmitting {
     func submit(_ request: NodeSeekNotificationMarkViewedRequest, referer: URL) async throws
 }
 
+@MainActor
 struct WebViewNodeSeekNotificationMarkViewedSubmitter: NodeSeekNotificationMarkViewedSubmitting {
     private let timeoutInterval: TimeInterval
 
@@ -18,6 +19,7 @@ struct WebViewNodeSeekNotificationMarkViewedSubmitter: NodeSeekNotificationMarkV
         self.timeoutInterval = timeoutInterval
     }
 
+    @MainActor
     func submit(_ request: NodeSeekNotificationMarkViewedRequest, referer: URL) async throws {
         let startedAt = Date()
         AppLog.info(.webView, "通知标记已读 WebView 请求开始: path=\(request.apiPath), hasBody=\(request.bodyJSON != nil), referer=\(referer.absoluteString)")

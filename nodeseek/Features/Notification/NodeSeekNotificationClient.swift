@@ -7,7 +7,7 @@
 
 import Foundation
 
-protocol NodeSeekNotificationClientProtocol {
+nonisolated protocol NodeSeekNotificationClientProtocol {
     func loadUnreadCount() async throws -> NodeSeekNotificationUnreadCount
     func loadAtMe() async throws -> [NodeSeekNotificationRecord]
     func loadReplies() async throws -> [NodeSeekNotificationRecord]
@@ -16,6 +16,7 @@ protocol NodeSeekNotificationClientProtocol {
     func markAllViewed(tab: NodeSeekNotificationTab) async throws
 }
 
+@MainActor
 final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
     private let session: URLSession
     private let baseURL: URL
@@ -29,14 +30,15 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
         cookiePreparer: @escaping @Sendable () async -> Void = {
             await NodeSeekNotificationClient.prepareDefaultHTTPLoad()
         },
-        markViewedSubmitter: NodeSeekNotificationMarkViewedSubmitting = WebViewNodeSeekNotificationMarkViewedSubmitter()
+        markViewedSubmitter: NodeSeekNotificationMarkViewedSubmitting? = nil
     ) {
         self.session = session
         self.baseURL = baseURL
         self.cookiePreparer = cookiePreparer
-        self.markViewedSubmitter = markViewedSubmitter
+        self.markViewedSubmitter = markViewedSubmitter ?? WebViewNodeSeekNotificationMarkViewedSubmitter()
     }
 
+    @MainActor
     func loadUnreadCount() async throws -> NodeSeekNotificationUnreadCount {
         let request = makeRequest(
             path: "/api/notification/unread-count",
@@ -52,6 +54,7 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
         return unreadCount
     }
 
+    @MainActor
     func loadAtMe() async throws -> [NodeSeekNotificationRecord] {
         let request = makeRequest(
             path: "/api/notification/at-me/list",
@@ -65,6 +68,7 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
         return response.data
     }
 
+    @MainActor
     func loadReplies() async throws -> [NodeSeekNotificationRecord] {
         let request = makeRequest(
             path: "/api/notification/reply-to-me/list",
@@ -78,6 +82,7 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
         return response.data
     }
 
+    @MainActor
     func loadMessageConversations() async throws -> [NodeSeekMessageConversationRecord] {
         let request = makeRequest(
             path: "/api/notification/message/list",
@@ -91,6 +96,7 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
         return response.msgArray
     }
 
+    @MainActor
     func markViewed(ids: [Int], tab: NodeSeekNotificationTab) async throws {
         let normalizedIDs = ids.filter { $0 > 0 }
         guard normalizedIDs.isEmpty == false else { return }
@@ -99,6 +105,7 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
         try await submitMarkViewed(request, referer: tab.webURL)
     }
 
+    @MainActor
     func markAllViewed(tab: NodeSeekNotificationTab) async throws {
         let request = NodeSeekNotificationMarkViewedRequest.all(tab: tab)
         try await submitMarkViewed(request, referer: tab.webURL)

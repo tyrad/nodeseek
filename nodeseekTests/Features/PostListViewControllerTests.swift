@@ -782,6 +782,9 @@ struct PostListViewControllerTests {
             accountRefresher: StubCurrentAccountRefresher(),
             notificationClient: notificationClient
         )
+        let homePresenter = SpyPostListPresenter()
+        let homeViewController = makePostListViewController(presenter: homePresenter)
+        homeViewController.loadViewIfNeeded()
         var routedNotificationURL: URL?
         viewController.onNotificationTapped = { url in
             routedNotificationURL = url
@@ -807,6 +810,17 @@ struct PostListViewControllerTests {
             return iconColor.isClose(to: UIColor.systemRed.resolvedColor(with: lightTrait))
         }
 
+        #expect(homePresenter.notificationUnreadCountUpdates.last?.all == 1)
+
+        await notificationClient.setUnreadCount(nil)
+        viewController.show(animated: false)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        #expect(await notificationClient.loadUnreadCountCallCount() == 2)
+        let retainedTransformer = try #require(button.configuration?.imageColorTransformer)
+        let retainedColor = retainedTransformer(UIColor.label)
+        #expect(retainedColor.resolvedColor(with: lightTrait).isClose(to: UIColor.systemRed.resolvedColor(with: lightTrait)))
+        #expect(homePresenter.notificationUnreadCountUpdates.last?.all == 1)
+
         NodeSeekNotificationUnreadCountEvent.post(.zero)
         try await waitUntil {
             guard let transformer = button.configuration?.imageColorTransformer else { return false }
@@ -831,6 +845,7 @@ struct PostListViewControllerTests {
             return iconColor.isClose(to: UIColor.label.resolvedColor(with: lightTrait))
         }
 
+        #expect(homePresenter.notificationUnreadCountUpdates.last == .zero)
         button.sendActions(for: .touchUpInside)
 
         #expect(routedNotificationURL == notificationURL)

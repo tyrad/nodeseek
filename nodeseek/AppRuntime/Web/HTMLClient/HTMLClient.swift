@@ -7,7 +7,7 @@
 
 import Foundation
 
-protocol HTMLClient: Sendable {
+nonisolated protocol HTMLClient: Sendable {
     func get(_ url: URL) async throws -> HTMLResponse
     func post(_ url: URL, formFields: [String: String]) async throws -> HTMLResponse
 }

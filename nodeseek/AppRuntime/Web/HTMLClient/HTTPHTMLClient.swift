@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor
 struct HTTPHTMLClient: HTMLClient {
     private let session: URLSession
 
@@ -14,6 +15,7 @@ struct HTTPHTMLClient: HTMLClient {
         self.session = session
     }
 
+    @MainActor
     func get(_ url: URL) async throws -> HTMLResponse {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -21,6 +23,7 @@ struct HTTPHTMLClient: HTMLClient {
         return try await perform(request)
     }
 
+    @MainActor
     func post(_ url: URL, formFields: [String: String]) async throws -> HTMLResponse {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

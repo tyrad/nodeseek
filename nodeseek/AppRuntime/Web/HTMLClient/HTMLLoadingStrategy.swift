@@ -37,6 +37,7 @@ enum HTMLLoadingStrategyFactory {
     }
 }
 
+@MainActor
 struct WebViewFallbackHTMLClient: HTMLClient {
     private let primaryClient: any HTMLClient
     private let fallbackClient: any HTMLClient
@@ -47,14 +48,15 @@ struct WebViewFallbackHTMLClient: HTMLClient {
         primaryClient: any HTMLClient,
         fallbackClient: any HTMLClient,
         cookieSession: NodeSeekCookieSessionManaging?,
-        challengeDetector: ChallengeDetector = ChallengeDetector()
+        challengeDetector: ChallengeDetector? = nil
     ) {
         self.primaryClient = primaryClient
         self.fallbackClient = fallbackClient
         self.cookieSession = cookieSession
-        self.challengeDetector = challengeDetector
+        self.challengeDetector = challengeDetector ?? ChallengeDetector()
     }
 
+    @MainActor
     func get(_ url: URL) async throws -> HTMLResponse {
         await prepareCookiesForHTTPLoad(reason: "primary-before-get", url: url)
         AppLog.info(.service, "HTTP优先加载开始 method=GET url=\(url.absoluteString)")
@@ -68,6 +70,7 @@ struct WebViewFallbackHTMLClient: HTMLClient {
         return try await fallbackAndRetryGet(url: url, primaryResponse: primaryResponse)
     }
 
+    @MainActor
     func post(_ url: URL, formFields: [String: String]) async throws -> HTMLResponse {
         await prepareCookiesForHTTPLoad(reason: "primary-before-post", url: url)
         AppLog.info(.service, "HTTP优先加载开始 method=POST url=\(url.absoluteString)")
