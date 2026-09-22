@@ -68,10 +68,12 @@ struct AutoCheckInSettingsViewControllerTests {
     @Test func turningSwitchOnRequestsImmediateCheckIn() async throws {
         let store = makeStore()
         var enabledValues: [Bool] = []
+        weak var expectedContext: AutoCheckInSettingsViewController?
         let viewController = AutoCheckInSettingsViewController(settingsStore: store) { enabled, context in
             enabledValues.append(enabled)
-            #expect(context === viewController)
+            #expect(context === expectedContext)
         }
+        expectedContext = viewController
         viewController.loadViewIfNeeded()
 
         let enableCell = try #require(viewController.tableView.dataSource?.tableView(
