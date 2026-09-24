@@ -17,7 +17,7 @@ NS Connect 是一个开源、非官方的 NodeSeek iOS 客户端，基于 Textur
 
 ## 安装体验
 
-**[从 App Store 下载](https://apps.apple.com/cn/app/ns-connect/id6766863710)**
+**[从 App Store 下载](https://apps.apple.com/cn/app/ns-connect/id6766863710)**   
 **[加入 TestFlight 测试](https://testflight.apple.com/join/T2YSXzFs)**
 
 > 接入通知能力，自行部署 https://github.com/tyrad/ns-apns
