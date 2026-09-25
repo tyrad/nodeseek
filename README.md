@@ -1,6 +1,6 @@
 # NS Connect · NodeSeek iOS
 
-[![App Store](https://img.shields.io/badge/App_Store-免费下载-0D96F6?logo=appstore&logoColor=white)](https://apps.apple.com/cn/app/ns-connect/id6766863710)
+[![App Store](https://img.shields.io/badge/App_Store-0D96F6?logo=appstore&logoColor=white)](https://apps.apple.com/cn/app/ns-connect/id6766863710)
 [![TestFlight 构建](https://github.com/tyrad/nodeseek/actions/workflows/testflight.yml/badge.svg)](https://github.com/tyrad/nodeseek/actions/workflows/testflight.yml)
 ![Swift](https://img.shields.io/badge/Swift-F05138?logo=swift&logoColor=white)
 ![iOS](https://img.shields.io/badge/iOS-15%2B-000000?logo=apple&logoColor=white)
