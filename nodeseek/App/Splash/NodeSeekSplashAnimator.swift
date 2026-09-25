@@ -6,17 +6,17 @@
 import UIKit
 
 nonisolated enum NodeSeekSplashTimeline {
-    static let animationDuration: CFTimeInterval = 1.65
+    static let animationDuration: CFTimeInterval = 1.0
     static let reduceMotionDuration: CFTimeInterval = 0.18
 
-    static let nDuration: CFTimeInterval = 0.72
+    static let nDuration: CFTimeInterval = 0.43
     static let nLeftDuration: CFTimeInterval = nDuration * 0.31
     static let nDiagonalDuration: CFTimeInterval = nDuration * 0.39
     static let nFinalDuration: CFTimeInterval = nDuration - nLeftDuration - nDiagonalDuration
 
-    static let sDuration: CFTimeInterval = 0.58
-    static let dotBegin: CFTimeInterval = 1.30
-    static let dotDuration: CFTimeInterval = 0.30
+    static let sDuration: CFTimeInterval = 0.33
+    static let dotBegin: CFTimeInterval = nDuration + sDuration
+    static let dotDuration: CFTimeInterval = 0.20
 }
 
 @MainActor
