@@ -1,6 +1,6 @@
 # NS Connect · NodeSeek iOS
 
-[![App Store](https://img.shields.io/badge/App_Store-免费下载-0D96F6?logo=appstore&logoColor=white)](https://apps.apple.com/cn/app/ns-connect/id6766863710)
+[![App Store](https://img.shields.io/badge/App_Store-0D96F6?logo=appstore&logoColor=white)](https://apps.apple.com/cn/app/ns-connect/id6766863710)
 [![TestFlight 构建](https://github.com/tyrad/nodeseek/actions/workflows/testflight.yml/badge.svg)](https://github.com/tyrad/nodeseek/actions/workflows/testflight.yml)
 ![Swift](https://img.shields.io/badge/Swift-F05138?logo=swift&logoColor=white)
 ![iOS](https://img.shields.io/badge/iOS-15%2B-000000?logo=apple&logoColor=white)
@@ -17,7 +17,7 @@ NS Connect 是一个开源、非官方的 NodeSeek iOS 客户端，基于 Textur
 
 ## 安装体验
 
-**[从 App Store 下载](https://apps.apple.com/cn/app/ns-connect/id6766863710)**   
+**[从 App Store 下载(非国区)](https://apps.apple.com/cn/app/ns-connect/id6766863710)**   
 **[加入 TestFlight 测试](https://testflight.apple.com/join/T2YSXzFs)**
 
 > 接入通知能力，自行部署 https://github.com/tyrad/ns-apns
