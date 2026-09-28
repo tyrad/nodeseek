@@ -6,6 +6,8 @@ enum PushNotificationRoute: Equatable, Sendable {
     case atMe(postID: String, page: Int, floor: String?, url: URL)
     case checkin
     case inbox
+    case atMeList
+    case replyList
     case webPage(url: URL, title: String)
     case bannerOnly
 
@@ -18,6 +20,23 @@ enum PushNotificationRoute: Equatable, Sendable {
         let resolvedID = postID ?? post?.id
         let page = post?.page ?? Self.page(forFloor: floor)
         let resolvedURL = url ?? resolvedID.map { NodeSeekSite.postURL(id: $0, page: page) }
+
+        // 通知列表链接优先进入原生 tab；带帖子信息的推送仍直达详情。
+        let supportsNotificationList = ["reply", "at", "atme", "mention", "message", "dm", "inbox", "notification", "system"].contains(type)
+        if supportsNotificationList, resolvedID == nil, let url,
+           ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+           NodeSeekSite.isNodeSeekHost(url), url.path == "/notification" {
+            switch url.fragment {
+            case "/atMe":
+                self = .atMeList
+                return
+            case "/reply":
+                self = .replyList
+                return
+            default:
+                break
+            }
+        }
 
         switch type {
         case "other", "unknown":

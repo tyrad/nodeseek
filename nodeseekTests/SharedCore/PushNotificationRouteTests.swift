@@ -44,16 +44,35 @@ struct PushNotificationRouteTests {
         #expect(PushNotificationRoute(userInfo: ["type": "at", "post_id": "1"]) != nil)
     }
 
-    @Test func atMeListOpensWebPage() throws {
-        let route = try #require(PushNotificationRoute(userInfo: [
-            "type": "at",
+    @Test(arguments: ["at", "atme", "mention", "notification", "system", "inbox"])
+    func atMeListOpensNativeTab(type: String) {
+        #expect(PushNotificationRoute(userInfo: [
+            "type": type,
             "url": "https://www.nodeseek.com/notification#/atMe",
-        ]))
-        guard case let .webPage(_, title) = route else {
-            Issue.record("expected webPage for atMe list")
-            return
+        ]) == .atMeList)
+    }
+
+    @Test(arguments: ["reply", "notification", "system", "inbox"])
+    func replyListOpensNativeTab(type: String) {
+        #expect(PushNotificationRoute(userInfo: [
+            "type": type,
+            "url": "https://nodeseek.com/notification#/reply",
+        ]) == .replyList)
+    }
+
+    @Test func unrelatedURLsKeepExistingRouting() throws {
+        for address in [
+            "https://www.nodeseek.com/space/1#/atMe",
+            "https://www.nodeseek.com/notification#/replyExtra",
+            "https://www.nodeseek.com/notification#/message?mode=list",
+        ] {
+            let url = try #require(URL(string: address))
+            #expect(PushNotificationRoute(userInfo: ["type": "system", "url": address])
+                == .webPage(url: url, title: address.contains("atMe") ? "提到我" : "系统提醒"))
         }
-        #expect(title == "提到我")
+        #expect(PushNotificationRoute(userInfo: [
+            "type": "system", "url": "https://example.com/notification#/reply",
+        ]) == .inbox)
     }
 
     @Test func mapsSystemReminderToHiddenHeaderWebPage() throws {

@@ -11,6 +11,19 @@ import UIKit
 
 @MainActor
 struct NotificationViewControllerTests {
+    @Test(arguments: [NodeSeekNotificationTab.atMe, .reply])
+    func initialTabSelectsAndLoadsOnlyTarget(tab: NodeSeekNotificationTab) async throws {
+        let client = StubNotificationViewClient(unreadCount: .zero)
+        let viewController = NotificationViewController(
+            initialTab: tab, client: client, currentAccountStore: makeCurrentAccountStore()
+        )
+        viewController.loadViewIfNeeded()
+        let control = try #require(viewController.view.firstSubview(of: UISegmentedControl.self))
+        #expect(control.selectedSegmentIndex == tab.rawValue)
+        try await waitUntilAsync { await client.loadedTabs().isEmpty == false }
+        #expect(await client.loadedTabs() == [tab])
+    }
+
     @Test func failedSingleMarkReadRestoresUnreadCountAndRowState() async throws {
         let client = StubNotificationViewClient(
             unreadCount: NodeSeekNotificationUnreadCount(message: 0, atMe: 1, reply: 0, all: 1),
@@ -160,6 +173,7 @@ private actor StubNotificationViewClient: NodeSeekNotificationClientProtocol {
     private let replyRecords: [NodeSeekNotificationRecord]
     private let messageRecords: [NodeSeekMessageConversationRecord]
     private let markViewedError: Error?
+    private var loadedTabValues: [NodeSeekNotificationTab] = []
     private var markViewedCallValues: [MarkViewedCall] = []
 
     init(
@@ -176,6 +190,8 @@ private actor StubNotificationViewClient: NodeSeekNotificationClientProtocol {
         self.markViewedError = markViewedError
     }
 
+    func loadedTabs() -> [NodeSeekNotificationTab] { loadedTabValues }
+
     func markViewedCallCount() -> Int {
         markViewedCallValues.count
     }
@@ -189,15 +205,18 @@ private actor StubNotificationViewClient: NodeSeekNotificationClientProtocol {
     }
 
     func loadAtMe() async throws -> [NodeSeekNotificationRecord] {
-        atMeRecords
+        loadedTabValues.append(.atMe)
+        return atMeRecords
     }
 
     func loadReplies() async throws -> [NodeSeekNotificationRecord] {
-        replyRecords
+        loadedTabValues.append(.reply)
+        return replyRecords
     }
 
     func loadMessageConversations() async throws -> [NodeSeekMessageConversationRecord] {
-        messageRecords
+        loadedTabValues.append(.message)
+        return messageRecords
     }
 
     func markViewed(ids: [Int], tab: NodeSeekNotificationTab) async throws {

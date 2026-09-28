@@ -27,7 +27,7 @@ final class NotificationViewController: UIViewController {
     private var browserButton: UIBarButtonItem?
     private var markAllButton: UIBarButtonItem?
 
-    private var selectedTab: NodeSeekNotificationTab = .atMe
+    private var selectedTab: NodeSeekNotificationTab
     private var displayMode: DisplayMode = .content
     private var atMeRecords: [NodeSeekNotificationRecord] = []
     private var replyRecords: [NodeSeekNotificationRecord] = []
@@ -38,9 +38,11 @@ final class NotificationViewController: UIViewController {
     private var loadToken = 0
 
     init(
+        initialTab: NodeSeekNotificationTab = .atMe,
         client: NodeSeekNotificationClientProtocol? = nil,
         currentAccountStore: CurrentAccountStore = .shared
     ) {
+        self.selectedTab = initialTab
         self.client = client ?? NodeSeekNotificationClient()
         self.currentAccountStore = currentAccountStore
         super.init(nibName: nil, bundle: nil)
