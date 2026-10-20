@@ -28,6 +28,7 @@ final class DetailThumbnailLoader {
         maxPixelWidth: CGFloat,
         maxThumbnailBytes: Int,
         mode: DetailImageOptimizationMode,
+        cachedOriginalData: (URL) -> Data?,
         loadOriginalDataPayload: @escaping OriginalDataProvider,
         completion: @escaping Completion
     ) {
@@ -39,17 +40,15 @@ final class DetailThumbnailLoader {
         }
 
         if let cachedThumbnail = cachedThumbnailResult(for: resolvedURL, mode: mode) {
-            if cachedThumbnail.originalSize != nil {
-                completion(cachedThumbnail)
-            } else {
-                // 旧磁盘缩略图没有原图尺寸，从共享原文件缓存读取元数据，不解码大图。
-                loadOriginalDataPayload(imageURL) { payload in
-                    var result = cachedThumbnail
-                    result.originalSize = payload.isFallback ? cachedThumbnail.image?.size : payload.pixelSize
-                    self.stateQueue.sync { self.thumbnailImageCache[resolvedURL] = result }
-                    completion(result)
-                }
+            var result = cachedThumbnail
+            if result.originalSize == nil {
+                // 旧缩略图只补读磁盘元数据；原图已被清理时不触发下载。
+                result.originalSize = cachedOriginalData(resolvedURL).flatMap {
+                    ImageRenderer.rasterPixelSize(data: $0)
+                } ?? cachedThumbnail.image?.size
+                stateQueue.sync { thumbnailImageCache[resolvedURL] = result }
             }
+            completion(result)
             return
         }
 
@@ -61,7 +60,7 @@ final class DetailThumbnailLoader {
         loadOriginalDataPayload(imageURL) { [weak self] payload in
             guard let self else { return }
             if DetailImagePayloadFactory.resolvedKind(from: payload.data, mimeType: payload.mimeType) == .report {
-                let image = ImageRenderer.image(data: payload.data, mimeType: payload.mimeType) ?? DetailImageFallback.image
+                let image = payload.renderedSVGImage ?? ImageRenderer.image(data: payload.data, mimeType: payload.mimeType) ?? DetailImageFallback.image
                 let result = DetailInlineImageResult(image: image, resolvedKind: .report)
                 try? FileManager.default.removeItem(at: self.cacheFiles.thumbnailCacheURL(for: resolvedURL))
                 self.logOptimization(
@@ -72,7 +71,7 @@ final class DetailThumbnailLoader {
                 return
             }
 
-            let downsampled = ImageRenderer.image(
+            let downsampled = payload.renderedSVGImage.map { ImageRenderer.boundedImage($0, maxPixelSize: pixelSide) } ?? ImageRenderer.image(
                 data: payload.data,
                 mimeType: payload.mimeType,
                 maxPixelSize: min(pixelSide, Int(DetailImageLimits.maxPixelSide))

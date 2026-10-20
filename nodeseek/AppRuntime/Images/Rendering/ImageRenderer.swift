@@ -31,11 +31,27 @@ enum ImageRenderer {
         return UIImage(data: data)
     }
 
+    static func boundedImage(_ image: UIImage, maxPixelSize: Int) -> UIImage {
+        let maxSide = max(image.size.width, image.size.height)
+        guard maxPixelSize > 0, maxSide > CGFloat(maxPixelSize) else { return image }
+        let ratio = CGFloat(maxPixelSize) / maxSide
+        let size = CGSize(width: image.size.width * ratio, height: image.size.height * ratio)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }
+    }
+
     static func pixelSize(data: Data, mimeType: String?) -> CGSize? {
         if shouldRenderSVG(data: data, mimeType: mimeType) {
             return renderSVGImage(data: data)?.size
         }
 
+        return rasterPixelSize(data: data)
+    }
+
+    static func rasterPixelSize(data: Data) -> CGSize? {
         let options = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, options),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, options) as? [CFString: Any],
@@ -76,7 +92,7 @@ enum ImageRenderer {
         return UIImage(cgImage: image, scale: 1, orientation: .up)
     }
 
-    private static func shouldRenderSVG(data: Data, mimeType: String?) -> Bool {
+    static func shouldRenderSVG(data: Data, mimeType: String?) -> Bool {
         if mimeType?.lowercased().contains("svg") == true {
             return true
         }
@@ -84,19 +100,10 @@ enum ImageRenderer {
     }
 
     private static func renderSVGImage(data: Data, maxPixelSize: Int? = nil) -> UIImage? {
-        guard let size = SVGImageRenderer.imageSize(
+        SVGImageRenderer.image(
             from: data,
             fallbackSize: Limits.svgFallbackSize,
-            maxPixelSide: Limits.maxSVGPixelSide
-        ) else { return nil }
-        return SVGImageRenderer.image(from: data, size: normalizedSize(size, maxPixelSize: maxPixelSize))
-    }
-
-    private static func normalizedSize(_ size: CGSize, maxPixelSize: Int?) -> CGSize {
-        guard let maxPixelSize, maxPixelSize > 0 else { return size }
-        let maxSide = max(size.width, size.height)
-        guard maxSide > CGFloat(maxPixelSize) else { return size }
-        let scale = CGFloat(maxPixelSize) / maxSide
-        return CGSize(width: size.width * scale, height: size.height * scale)
+            maxPixelSide: min(Limits.maxSVGPixelSide, maxPixelSize.map(CGFloat.init) ?? Limits.maxSVGPixelSide)
+        )
     }
 }

@@ -31,6 +31,14 @@ enum SVGImageRenderer {
         }
     }
 
+    static func image(from data: Data, fallbackSize: CGSize, maxPixelSide: CGFloat) -> UIImage? {
+        withSVGImage(from: data) { svgImage in
+            let sourceSize = svgImage.hasSize() ? svgImage.size : fallbackSize
+            svgImage.size = normalizedSize(sourceSize, fallbackSize: fallbackSize, maxPixelSide: maxPixelSide)
+            return svgImage.uiImage
+        }
+    }
+
     static func imageSize(from data: Data, fallbackSize: CGSize, maxPixelSide: CGFloat) -> CGSize? {
         withSVGImage(from: data) { svgImage in
             let sourceSize = svgImage.hasSize() ? svgImage.size : fallbackSize

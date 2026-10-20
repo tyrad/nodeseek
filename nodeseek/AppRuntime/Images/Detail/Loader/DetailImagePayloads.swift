@@ -44,6 +44,8 @@ struct DetailOriginalDataPayload {
     let pixelSize: CGSize
     let isFallback: Bool
     let source: DetailImageLoadSource
+    // 仅在本次请求内复用 SVG 渲染结果，不常驻原图解码缓存。
+    var renderedSVGImage: UIImage? = nil
 }
 
 struct DetailInlineImageCacheKey: Hashable {

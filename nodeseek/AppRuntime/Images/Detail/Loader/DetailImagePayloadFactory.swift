@@ -46,7 +46,9 @@ enum DetailImagePayloadFactory {
         mimeType: String?,
         source: DetailImageLoadSource
     ) -> DetailOriginalDataPayload {
-        guard let imageSize = ImageRenderer.pixelSize(data: data, mimeType: mimeType) else {
+        let svgImage = ImageRenderer.shouldRenderSVG(data: data, mimeType: mimeType)
+            ? ImageRenderer.image(data: data, mimeType: mimeType) : nil
+        guard let imageSize = svgImage?.size ?? ImageRenderer.rasterPixelSize(data: data) else {
             AppLog.error(.image, "attachment 图片解码失败，使用兜底图 url=\(resolvedURL.absoluteString), bytes=\(data.count), mime=\(mimeType ?? "unknown")")
             return DetailImageFallback.originalDataPayload(source: source)
         }
@@ -61,7 +63,8 @@ enum DetailImagePayloadFactory {
             mimeType: mimeType,
             pixelSize: imageSize,
             isFallback: false,
-            source: source
+            source: source,
+            renderedSVGImage: svgImage
         )
     }
 

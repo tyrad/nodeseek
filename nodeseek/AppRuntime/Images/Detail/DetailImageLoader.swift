@@ -78,7 +78,7 @@ final class DetailImageLoader {
     func loadImageForPreview(_ imageURL: URL, completion: @escaping (UIImage?) -> Void) {
         loadOriginalDataPayload(for: imageURL) { [weak self] payload in
             guard let self else { return }
-            let image = ImageRenderer.image(data: payload.data, mimeType: payload.mimeType)
+            let image = payload.renderedSVGImage ?? ImageRenderer.image(data: payload.data, mimeType: payload.mimeType)
             self.logOptimization(
                 mode: self.optimizationModeProvider(),
                 "preview load source=\(payload.source.rawValue) fallback=\(payload.isFallback) url=\(imageURL.absoluteString) bytes=\(payload.data.count) pixelSize=\(Self.string(from: payload.pixelSize))"
@@ -146,6 +146,7 @@ final class DetailImageLoader {
                 maxPixelWidth: maxPixelWidth,
                 maxThumbnailBytes: maxThumbnailBytes,
                 mode: mode,
+                cachedOriginalData: { self.imageDataLoader.cachedData(for: $0) },
                 loadOriginalDataPayload: { url, completion in
                     self.loadOriginalDataPayload(for: url, completion: completion)
                 },
@@ -213,7 +214,7 @@ final class DetailImageLoader {
         )
         loadOriginalDataPayload(for: imageURL) { [weak self] payload in
             guard let self else { return }
-            let image = ImageRenderer.downsampledImage(
+            let image = payload.renderedSVGImage.map { ImageRenderer.boundedImage($0, maxPixelSize: pixelWidth) } ?? ImageRenderer.downsampledImage(
                 data: payload.data,
                 maxPixelSize: pixelWidth
             ) ?? ImageRenderer.image(data: payload.data, mimeType: payload.mimeType, maxPixelSize: pixelWidth)

@@ -15,6 +15,47 @@ import UIKit
 @MainActor
 @Suite(.serialized)
 struct DetailImageLoaderTests {
+    @Test func legacyThumbnailWithoutOriginalNeverStartsNetworkAcrossColdLoads() async throws {
+        let directory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = try #require(URL(string: "https://images.example.com/legacy.jpg"))
+        let data = try Self.makeNoisyJPEGData(width: 60, height: 360, quality: 0.8)
+        try Self.writeCachedThumbnail(data, for: url, in: directory)
+        DetailImageURLProtocol.reset()
+        let session = URLSession(configuration: Self.urlSessionConfiguration(protocolType: DetailImageURLProtocol.self))
+        for _ in 0 ..< 2 {
+            let loader = DetailImageLoader(session: session, cacheDirectory: directory)
+            let result: DetailInlineImageResult = await withCheckedContinuation { continuation in
+                loader.loadImageForInlineResult(url, maxPixelWidth: 600, displayScale: 2) {
+                    continuation.resume(returning: $0)
+                }
+            }
+            #expect(result.originalSize == CGSize(width: 60, height: 360))
+            #expect(result.image?.size == CGSize(width: 60, height: 360))
+        }
+        #expect(DetailImageURLProtocol.totalRequestCount() == 0)
+    }
+
+    @Test func svgRendersOncePerPreviewAndInlineRequest() async throws {
+        let directory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("report.svg")
+        try Self.makeCheckPlaceReportSVGData().write(to: url)
+        var renderCount = 0
+        SVGImageRenderer.renderThreadObserver = { _ in renderCount += 1 }
+        defer { SVGImageRenderer.renderThreadObserver = nil }
+        let loader = DetailImageLoader(session: .shared, cacheDirectory: directory)
+        #expect(await Self.loadPreviewImage(loader: loader, url: url) != nil)
+        #expect(renderCount == 1)
+        #expect(await Self.loadInlineImage(loader: loader, url: url, maxPixelWidth: 600) != nil)
+        #expect(renderCount == 2)
+        let unoptimizedLoader = DetailImageLoader(
+            session: .shared, cacheDirectory: directory, optimizationModeProvider: { .disabled }
+        )
+        #expect(await Self.loadInlineImage(loader: unoptimizedLoader, url: url, maxPixelWidth: 600) != nil)
+        #expect(renderCount == 3)
+    }
+
     @Test func localReportSupportsPreviewAndOriginalPayloadWithoutNetwork() async throws {
         let directory = Self.makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
