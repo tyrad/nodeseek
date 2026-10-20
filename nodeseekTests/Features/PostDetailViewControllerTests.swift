@@ -2788,6 +2788,34 @@ struct PostDetailViewControllerTests {
         #expect(layout.size.height == expectedHeight)
     }
 
+    @Test func richTextViewRebuildsFixedQuoteLookupWhenReconfigured() throws {
+        let blocks = DTCoreTextHTMLContentRenderer().renderTextBlocks(
+            fragment: "<blockquote><img src='https://example.com/quote.jpg'></blockquote>",
+            baseURL: try #require(URL(string: "https://example.com")), maxImageWidth: 320
+        )
+        let text = NSMutableAttributedString(string: "")
+        for case .text(let value) in blocks { text.append(value) }
+        var attachment: DTTextAttachment?
+        text.enumerateAttribute(.attachment, in: NSRange(location: 0, length: text.length)) { value, _, _ in
+            if let value = value as? DTTextAttachment { attachment = value }
+        }
+        let imageAttachment = try #require(attachment)
+        imageAttachment.originalSize = CGSize(width: 750, height: 4500)
+        let view = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 320, height: 240))
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 60, height: 360)).image { _ in }
+        for fixed in [true, false, true] {
+            text.addAttribute(DetailAttachmentAttributes.fixedQuoteImage, value: fixed, range: NSRange(location: 0, length: text.length))
+            view.configure(text, onImageTapped: nil, onLayoutInvalidated: nil)
+            let imageView = try #require(view.attributedTextContentView(
+                view, viewFor: imageAttachment, frame: CGRect(x: 0, y: 0, width: 320, height: 240)
+            ) as? DetailInlineImageView)
+            imageView.applyLoadedImage(DetailInlineImageResult(
+                image: image, resolvedKind: nil, originalSize: imageAttachment.originalSize
+            ))
+            #expect(imageView.subviews.compactMap { ($0 as? UILabel)?.text }.contains("长图") == !fixed)
+        }
+    }
+
     @Test func richTextViewUsesVideoStickerViewForVideoStickerAttachment() throws {
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
         let blocks = DTCoreTextHTMLContentRenderer().render(

@@ -28,6 +28,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
     private var signatureLinkCandidatesTapHandler: (([DetailLinkCandidate]) -> Void)?
     private var layoutInvalidatedHandler: (() -> Void)?
     private var attachmentLayoutUpdatedHandler: ((URL, CGSize, CGSize) -> Void)?
+    private var fixedQuoteImageAttachments = Set<ObjectIdentifier>()
     private var lastLayoutWidth: CGFloat = 0
     private let diagnosticID = String(UUID().uuidString.prefix(8))
     private var pendingRelayoutWorkItem: DispatchWorkItem?
@@ -107,7 +108,15 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         signatureLinkCandidatesTapHandler = onSignatureLinkCandidatesTapped
         layoutInvalidatedHandler = onLayoutInvalidated
         attachmentLayoutUpdatedHandler = onAttachmentLayoutUpdated
-        attributedString = attributedText ?? NSAttributedString()
+        let text = attributedText ?? NSAttributedString()
+        fixedQuoteImageAttachments.removeAll(keepingCapacity: true)
+        text.enumerateAttribute(.attachment, in: NSRange(location: 0, length: text.length)) { value, range, _ in
+            guard let attachment = value as? DTTextAttachment,
+                  (text.attribute(DetailAttachmentAttributes.fixedQuoteImage, at: range.location, effectiveRange: nil) as? Bool) == true
+            else { return }
+            fixedQuoteImageAttachments.insert(ObjectIdentifier(attachment))
+        }
+        attributedString = text
         logDiagnostics(
             "configure length=\(attributedString.length) bounds=\(Self.string(from: bounds.size)) attachments=\(attachmentDiagnostics())"
         )
@@ -204,14 +213,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         }
 
         let imageKind = DetailImageKind.resolved(isSticker: isStickerAttachment, imageURL: contentURL)
-        var isFixedQuoteImage = false
-        attributedString.enumerateAttribute(.attachment, in: NSRange(location: 0, length: attributedString.length)) { value, range, stop in
-            guard let candidate = value as? DTTextAttachment, candidate === attachment else { return }
-            isFixedQuoteImage = (attributedString.attribute(
-                DetailAttachmentAttributes.fixedQuoteImage, at: range.location, effectiveRange: nil
-            ) as? Bool) == true
-            stop.pointee = true
-        }
+        let isFixedQuoteImage = fixedQuoteImageAttachments.contains(ObjectIdentifier(attachment))
         let imageView = DetailInlineImageView(
             frame: viewFrame,
             imageURL: contentURL,
