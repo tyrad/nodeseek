@@ -226,11 +226,17 @@ final class NotificationViewController: UIViewController {
             do {
                 switch tab {
                 case .atMe:
-                    atMeRecords = try await client.loadAtMe()
+                    let records = try await client.loadAtMe()
+                    guard token == loadToken, tab == selectedTab else { return }
+                    atMeRecords = records
                 case .reply:
-                    replyRecords = try await client.loadReplies()
+                    let records = try await client.loadReplies()
+                    guard token == loadToken, tab == selectedTab else { return }
+                    replyRecords = records
                 case .message:
-                    messageRecords = try await client.loadMessageConversations()
+                    let records = try await client.loadMessageConversations()
+                    guard token == loadToken, tab == selectedTab else { return }
+                    messageRecords = records
                 }
                 loadedTabs.insert(tab)
                 finishLoading(tab: tab, token: token)
@@ -241,18 +247,17 @@ final class NotificationViewController: UIViewController {
     }
 
     private func finishLoading(tab: NodeSeekNotificationTab, token: Int) {
-        refreshControl.endRefreshing()
         guard token == loadToken, tab == selectedTab else { return }
+        refreshControl.endRefreshing()
         displayMode = .content
         errorView.isHidden = true
         applyDisplayState()
-        tableView.reloadData()
         updateMarkAllButton()
     }
 
     private func showError(_ message: String, tab: NodeSeekNotificationTab, token: Int) {
-        refreshControl.endRefreshing()
         guard token == loadToken, tab == selectedTab else { return }
+        refreshControl.endRefreshing()
         displayMode = .error
         errorView.messageLabel.text = message
         applyDisplayState()
@@ -273,6 +278,8 @@ final class NotificationViewController: UIViewController {
             errorView.isHidden = false
             tableView.backgroundView = nil
         }
+        // 标签和显示状态变化时，同步清除表格缓存的旧行数与预取状态。
+        tableView.reloadData()
     }
 
     private func emptyBackgroundView() -> UIView {
@@ -337,11 +344,12 @@ final class NotificationViewController: UIViewController {
             return
         }
         selectedTab = tab
+        refreshControl.endRefreshing()
         updateMarkAllButton()
         if loadedTabs.contains(tab) {
+            loadToken += 1
             displayMode = .content
             applyDisplayState()
-            tableView.reloadData()
         } else {
             loadSelectedTab(showLoading: true)
         }
@@ -550,6 +558,13 @@ extension NotificationViewController: UITableViewDataSource {
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        // 预取回调可能仍携带切换前的行号，不能直接访问当前标签的数组。
+        guard displayMode == .content,
+              indexPath.section == 0,
+              indexPath.row >= 0,
+              indexPath.row < currentRecordCount else {
+            return UITableViewCell()
+        }
         switch selectedTab {
         case .atMe:
             let record = atMeRecords[indexPath.row]
