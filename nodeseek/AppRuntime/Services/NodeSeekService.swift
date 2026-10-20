@@ -41,11 +41,11 @@ struct NodeSeekService: Sendable {
         let response = try await htmlClient.get(targetURL)
         AppLog.info(.service, "抓取返回 category=\(category.rawValue), sort=\(sortMode.rawValue), page=\(page), status=\(response.statusCode), htmlLength=\(response.html.utf8.count), finalURL=\(response.finalURL.absoluteString)")
 
-        switch try await parsePostListInBackground(response: response) {
+        switch try await parseInBackground(response: response, parse: { [parser] in try parser.parsePostList(html: $0.html) }) {
         case .challenge(let challenge):
             AppLog.warning(.service, "检测到 challenge: \(challenge.logDescription)")
             return .challenge(challenge)
-        case .posts(let posts, let account):
+        case .parsed(let posts, let account):
             await saveOpportunisticAccount(account)
             AppLog.info(.service, "列表解析完成，帖子数量: \(posts.count)")
             return .value(posts)
@@ -62,11 +62,11 @@ struct NodeSeekService: Sendable {
         let response = try await htmlClient.get(targetURL)
         AppLog.info(.service, "搜索抓取返回 category=\(category.rawValue), page=\(page), status=\(response.statusCode), htmlLength=\(response.html.utf8.count), finalURL=\(response.finalURL.absoluteString)")
 
-        switch try await parsePostListInBackground(response: response) {
+        switch try await parseInBackground(response: response, parse: { [parser] in try parser.parsePostList(html: $0.html) }) {
         case .challenge(let challenge):
             AppLog.warning(.service, "检测到搜索 challenge: \(challenge.logDescription)")
             return .challenge(challenge)
-        case .posts(let posts, let account):
+        case .parsed(let posts, let account):
             await saveOpportunisticAccount(account)
             AppLog.info(.service, "搜索解析完成，帖子数量: \(posts.count)")
             return .value(posts)
@@ -101,17 +101,17 @@ struct NodeSeekService: Sendable {
         let targetURL = postDetailURL(postID: postID, page: page)
         AppLog.info(.service, "开始抓取 NodeSeek 详情，postID=\(postID), page=\(page): \(targetURL.absoluteString)")
         let response = try await htmlClient.get(targetURL)
-        AppLog.info(.service, "详情抓取返回 postID=\(postID), page=\(page), status=\(response.statusCode), htmlLength=\(response.html.count), finalURL=\(response.finalURL.absoluteString)")
+        AppLog.info(.service, "详情抓取返回 postID=\(postID), page=\(page), status=\(response.statusCode), htmlLength=\(response.html.utf8.count), finalURL=\(response.finalURL.absoluteString)")
 
-        if let challenge = challengeDetector.detect(response: response) {
+        switch try await parseInBackground(response: response, parse: { [parser] in try parser.parsePostDetail(html: $0.html, url: targetURL) }) {
+        case .challenge(let challenge):
             AppLog.warning(.service, "检测到详情 challenge: \(challenge.logDescription)")
             return .challenge(challenge)
+        case .parsed(let detail, let account):
+            await saveOpportunisticAccount(account)
+            AppLog.info(.service, "详情解析完成，postID=\(detail.id), 评论数量: \(detail.comments.count)")
+            return .value(detail)
         }
-
-        await updateCurrentAccountIfPresent(in: response.html)
-        let detail = try parser.parsePostDetail(html: response.html, url: targetURL)
-        AppLog.info(.service, "详情解析完成，postID=\(detail.id), 评论数量: \(detail.comments.count)")
-        return .value(detail)
     }
 
     private func postListURL(page: Int, category: PostListCategoryItem, sortMode: PostListSortMode) -> URL {
@@ -148,31 +148,32 @@ struct NodeSeekService: Sendable {
         return components.url ?? baseURL.appendingPathComponent("search")
     }
 
-    private func updateCurrentAccountIfPresent(in html: String) async {
-        guard currentAccountStore != nil else { return }
-        await saveOpportunisticAccount(Self.opportunisticAccount(in: html, parser: parser))
-    }
-
     private func saveOpportunisticAccount(_ account: AccountResponse?) async {
         guard let currentAccountStore, let account else { return }
         await currentAccountStore.save(account)
         AppLog.debug(.account, "service: opportunistic account save -> loggedIn=\(account.isLoggedIn) name=\(account.displayName)")
     }
 
-    /// 整页 HTML 解析在真机上要十几到几十毫秒，留在主线程会让列表分页时掉帧，
-    /// 所以 challenge 检测、账号解析和列表解析一起放到后台执行。
-    private func parsePostListInBackground(response: HTMLResponse) async throws -> PostListParseOutcome {
+    /// 整页 HTML 解析要十几到几十毫秒，留在主线程会让滑动中的分页加载掉帧，
+    /// 所以 challenge 检测、账号解析和页面解析一起放到后台执行。
+    /// 后台任务不继承调用方的取消状态，前后各检查一次，避免已取消的请求写回账号。
+    private func parseInBackground<Value: Sendable>(
+        response: HTMLResponse,
+        parse: @escaping @Sendable (HTMLResponse) throws -> Value
+    ) async throws -> BackgroundParseOutcome<Value> {
+        try Task.checkCancellation()
         let parser = parser
         let challengeDetector = challengeDetector
         let parsesAccount = currentAccountStore != nil
-        return try await Task.detached(priority: .userInitiated) {
+        let outcome = try await Task.detached(priority: .userInitiated) { () throws -> BackgroundParseOutcome<Value> in
             if let challenge = challengeDetector.detect(response: response) {
                 return .challenge(challenge)
             }
             let account = parsesAccount ? Self.opportunisticAccount(in: response.html, parser: parser) : nil
-            let posts = try parser.parsePostList(html: response.html)
-            return .posts(posts, account: account)
+            return .parsed(try parse(response), account: account)
         }.value
+        try Task.checkCancellation()
+        return outcome
     }
 
     private nonisolated static func opportunisticAccount(in html: String, parser: any NodeSeekParser) -> AccountResponse? {
@@ -195,9 +196,9 @@ struct NodeSeekService: Sendable {
     }
 }
 
-private enum PostListParseOutcome: Sendable {
+private enum BackgroundParseOutcome<Value: Sendable>: Sendable {
     case challenge(ChallengeKind)
-    case posts([PostSummary], account: AccountResponse?)
+    case parsed(Value, account: AccountResponse?)
 }
 
 private extension URL {

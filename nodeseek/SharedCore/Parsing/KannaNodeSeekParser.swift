@@ -465,7 +465,7 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
         return candidates.max { $0.count < $1.count }
     }
 
-    nonisolated private static func isLikelyPostDetailEmptyStateText(_ text: String) -> Bool {
+    private static func isLikelyPostDetailEmptyStateText(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 4 else { return false }
         guard trimmed.rangeOfCharacter(from: .letters) != nil else { return false }
@@ -508,7 +508,7 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
         return postPage(from: url)
     }
     
-    nonisolated private static func firstInteger(in text: String) -> Int? {
+    private static func firstInteger(in text: String) -> Int? {
         guard let range = text.range(of: #"\d+"#, options: .regularExpression) else {
             return nil
         }

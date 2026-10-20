@@ -420,6 +420,9 @@ final class SearchViewController: UIViewController {
                 await MainActor.run {
                     self.handleLoadedPosts(posts, page: page, request: request, isLoadMore: isLoadMore, isRefresh: isRefresh)
                 }
+            } catch is CancellationError {
+                // 被新请求取消，状态由新请求负责更新。
+                return
             } catch {
                 await MainActor.run {
                     self.handleLoadFailure(error.localizedDescription, request: request, isLoadMore: isLoadMore, isRefresh: isRefresh)

@@ -235,6 +235,67 @@ struct NodeSeekServiceTests {
         #expect(parser.recordedCalls() == ["parseAccount:background", "parsePostList:background"])
     }
 
+    @Test func loadPostDetailParsesHTMLOffMainThread() async throws {
+        let html = try FixtureLoader.html(named: "post-703863-1")
+            .replacingOccurrences(of: "</body>", with: accountHTML(displayName: "缭雾") + "</body>")
+        let url = URL(string: "https://www.nodeseek.com/")!
+        let parser = ThreadRecordingParser(base: KannaNodeSeekParser(baseURL: url))
+        let store = CurrentAccountStore(
+            userDefaults: try #require(UserDefaults(suiteName: "NodeSeekServiceTests.\(UUID().uuidString)")),
+            storageKey: "account"
+        )
+        let service = NodeSeekService(
+            baseURL: url,
+            htmlClient: StaticHTMLClient(response: HTMLResponse(
+                statusCode: 200,
+                headers: [:],
+                finalURL: url,
+                html: html
+            )),
+            parser: parser,
+            currentAccountStore: store
+        )
+
+        _ = try await service.loadPostDetail(postID: "703863", page: 2)
+        let snapshot = await store.snapshot()
+
+        // 评论分页发生在用户滑动时，整页解析不能占用主线程。
+        #expect(parser.recordedCalls() == ["parseAccount:background", "parsePostDetail:background"])
+        #expect(snapshot?.account.displayName == "缭雾")
+    }
+
+    @Test func cancelledPostListLoadDoesNotSaveAccount() async throws {
+        let html = try FixtureLoader.html(named: "post-list-basic")
+            .replacingOccurrences(of: "</body>", with: accountHTML(displayName: "缭雾") + "</body>")
+        let url = URL(string: "https://www.nodeseek.com/")!
+        let parser = BlockingPostListParser(base: KannaNodeSeekParser(baseURL: url))
+        let store = CurrentAccountStore(
+            userDefaults: try #require(UserDefaults(suiteName: "NodeSeekServiceTests.\(UUID().uuidString)")),
+            storageKey: "account"
+        )
+        let service = NodeSeekService(
+            baseURL: url,
+            htmlClient: StaticHTMLClient(response: HTMLResponse(
+                statusCode: 200,
+                headers: [:],
+                finalURL: url,
+                html: html
+            )),
+            parser: parser,
+            currentAccountStore: store
+        )
+
+        let load = Task { try await service.loadPostList(page: 2) }
+        await parser.waitUntilParsingStarted()
+        load.cancel()
+        parser.resumeParsing()
+
+        await #expect(throws: CancellationError.self) {
+            _ = try await load.value
+        }
+        #expect(await store.snapshot() == nil)
+    }
+
     @Test func parsesPostListWhenServerHeaderIsCloudflareButPageIsNormal() async throws {
         let html = try FixtureLoader.html(named: "post-list-basic")
         let url = URL(string: "https://www.nodeseek.com/")!
@@ -626,7 +687,8 @@ private final class ThreadRecordingParser: NodeSeekParser, @unchecked Sendable {
     }
 
     func parsePostDetail(html: String, url: URL) throws -> PostDetail {
-        try base.parsePostDetail(html: html, url: url)
+        record("parsePostDetail")
+        return try base.parsePostDetail(html: html, url: url)
     }
 
     func parseCheckInState(html: String, pageURL: URL) throws -> CheckInState {
@@ -636,5 +698,43 @@ private final class ThreadRecordingParser: NodeSeekParser, @unchecked Sendable {
     private func record(_ name: String) {
         let thread = Thread.isMainThread ? "main" : "background"
         lock.withLock { calls.append("\(name):\(thread)") }
+    }
+}
+
+/// 在列表解析处停住，便于在后台解析进行中取消请求。
+private final class BlockingPostListParser: NodeSeekParser, @unchecked Sendable {
+    private let base: KannaNodeSeekParser
+    private let started = DispatchSemaphore(value: 0)
+    private let resume = DispatchSemaphore(value: 0)
+
+    init(base: KannaNodeSeekParser) {
+        self.base = base
+    }
+
+    func waitUntilParsingStarted() async {
+        let started = started
+        await Task.detached { started.wait() }.value
+    }
+
+    func resumeParsing() {
+        resume.signal()
+    }
+
+    func parseAccount(html: String) throws -> AccountResponse {
+        try base.parseAccount(html: html)
+    }
+
+    func parsePostList(html: String) throws -> [PostSummary] {
+        started.signal()
+        resume.wait()
+        return try base.parsePostList(html: html)
+    }
+
+    func parsePostDetail(html: String, url: URL) throws -> PostDetail {
+        try base.parsePostDetail(html: html, url: url)
+    }
+
+    func parseCheckInState(html: String, pageURL: URL) throws -> CheckInState {
+        try base.parseCheckInState(html: html, pageURL: pageURL)
     }
 }
