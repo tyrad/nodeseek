@@ -244,8 +244,10 @@ extension PostDetailViewController {
                 let visibleRows = self.tableNode.indexPathsForVisibleRows().map { "\($0.section):\($0.row)" }.joined(separator: ",")
                 AppLog.info(.rendering, "scheduleAttachmentLayoutRefresh fire visible=\(visibleRows) rows=\(self.tableNode(self.tableNode, numberOfRowsInSection: 0))")
             }
-            self.tableNode.relayoutItems()
-            self.tableNode.performBatch(animated: false, updates: {})
+            // 先重测再在同一次更新里问行高。分开调用时，表会沿用占位高度。
+            self.tableNode.performBatch(animated: false, updates: {
+                self.tableNode.relayoutItems()
+            })
         }
         attachmentLayoutRefreshWorkItem = workItem
         if NodeSeekDebugConfig.enableDetailRenderDiagnostics {

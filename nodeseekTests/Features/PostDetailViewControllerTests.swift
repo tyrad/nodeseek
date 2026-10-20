@@ -3139,6 +3139,140 @@ struct PostDetailViewControllerTests {
         #expect(didRequestGeneralRelayout == false)
     }
 
+    @Test func imageBlockNodeRequestsRelayoutWhenPortraitIsTallerThanPlaceholder() throws {
+        let imageURL = try #require(URL(string: "https://i.111666.best/image/portrait.webp"))
+        var didRequestRowReload = false
+        var didRequestGeneralRelayout = false
+        let node = DetailImageBlockNode(
+            imageBlock: RenderedImageBlock(url: imageURL, altText: nil),
+            imageURLs: [imageURL],
+            imageIndex: 0,
+            onImageTapped: { _, _ in },
+            onImageHeightReduced: {
+                didRequestRowReload = true
+            },
+            onLayoutInvalidated: {
+                didRequestGeneralRelayout = true
+            }
+        )
+
+        _ = node.layoutThatFits(ASSizeRange(
+            min: .zero,
+            max: CGSize(width: 360, height: CGFloat.greatestFiniteMagnitude)
+        ))
+        node.updateLoadedImageSize(CGSize(width: 1200, height: 1800))
+
+        #expect(didRequestRowReload == false)
+        #expect(didRequestGeneralRelayout)
+    }
+
+    @Test(arguments: [false, true])
+    func imageBlockGrowthInvalidatesCachedParentLayouts(isQuoted: Bool) throws {
+        let imageURL = try #require(URL(string: "https://example.com/portrait.webp"))
+        let image = DetailImageBlockNode(
+            imageBlock: RenderedImageBlock(url: imageURL, altText: nil),
+            imageURLs: [imageURL], imageIndex: 0,
+            onImageTapped: { _, _ in }, onLayoutInvalidated: {}
+        )
+        let content: ASDisplayNode
+        if isQuoted {
+            let quote = DetailQuoteBlockNode(children: [image])
+            quote.addSubnode(image)
+            content = quote
+        } else {
+            content = image
+        }
+        let cell = ASCellNode()
+        cell.addSubnode(content)
+        cell.layoutSpecBlock = { _, _ in ASWrapperLayoutSpec(layoutElement: content) }
+        let constraints = ASSizeRange(
+            min: .zero,
+            max: CGSize(width: 360, height: CGFloat.greatestFiniteMagnitude)
+        )
+        let before = cell.layoutThatFits(constraints).size.height
+        image.updateLoadedImageSize(CGSize(width: 1200, height: 1800))
+        let after = cell.layoutThatFits(constraints).size.height
+
+        #expect(after > before + 50)
+    }
+
+    @Test func portraitImagesGrowInPlaceAfterRealFileLoads() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.coordinateSpace.bounds
+        let controller = PostDetailViewController(presenter: SpyPostDetailPresenter())
+        window.rootViewController = UINavigationController(rootViewController: controller)
+        window.makeKeyAndVisible()
+        window.layoutIfNeeded()
+        defer {
+            controller.tableNode.view.removeFromSuperview()
+            window.rootViewController = nil
+            window.isHidden = true
+        }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let data = UIGraphicsImageRenderer(size: CGSize(width: 600, height: 900), format: format).jpegData(withCompressionQuality: 0.8) { context in
+            UIColor.systemOrange.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 600, height: 900))
+            UIColor.systemBlue.setFill()
+            context.fill(CGRect(x: 0, y: 800, width: 600, height: 100))
+        }
+        let urls = (0..<3).map { directory.appendingPathComponent("portrait-\($0).jpg") }
+        for url in urls { try data.write(to: url) }
+        let html = urls.map { "<p><img src='\($0.absoluteString)'></p>" }.joined()
+        controller.render(detail: PostDetail(
+            id: UUID().uuidString, title: "多张竖图高度回流", authorName: "Probe", avatarURL: nil,
+            metadataText: "", contentHTML: html, comments: []
+        ))
+        await waitForDetailContent(in: controller)
+        let hasCell = await waitUntil(timeout: 3) {
+            controller.tableNode.nodeForRow(at: IndexPath(row: 0, section: 0)) is PostBodyCellNode
+        }
+        #expect(hasCell)
+        let cell = try #require(controller.tableNode.nodeForRow(at: IndexPath(row: 0, section: 0)) as? PostBodyCellNode)
+        func images(in node: ASDisplayNode) -> [DetailImageBlockNode] {
+            if let image = node as? DetailImageBlockNode { return [image] }
+            return (node.subnodes ?? []).flatMap { images(in: $0) }
+        }
+        let allVisible = await waitUntil(timeout: 5) {
+            window.layoutIfNeeded()
+            let nodes = images(in: cell)
+            return nodes.count == urls.count && nodes.allSatisfy { node in
+                guard let view = node.view.subviews.first as? UIImageView, view.image != nil else { return false }
+                return abs(node.bounds.height - node.bounds.width) < 1 && view.frame.maxY <= node.bounds.height + 0.5
+            }
+        }
+        #expect(allVisible)
+        #expect(controller.tableNode.nodeForRow(at: IndexPath(row: 0, section: 0)) === cell)
+        #expect(urls.allSatisfy { controller.cachedDetailImageSize(for: $0) == CGSize(width: 600, height: 900) })
+    }
+
+    @Test func imageBlockWaitsForFinalRowHeightBeforeShowingPortrait() {
+        let waiting = DetailImageBlockLayout.visibleImage(
+            originalSize: CGSize(width: 1200, height: 1800),
+            bounds: CGRect(x: 0, y: 0, width: 360, height: 270),
+            kind: .normal
+        )
+        let grown = DetailImageBlockLayout.visibleImage(
+            originalSize: CGSize(width: 1200, height: 1800),
+            bounds: CGRect(x: 0, y: 0, width: 360, height: 360),
+            kind: .normal
+        )
+        let wide = DetailImageBlockLayout.visibleImage(
+            originalSize: CGSize(width: 1200, height: 400),
+            bounds: CGRect(x: 0, y: 0, width: 360, height: 270),
+            kind: .normal
+        )
+
+        #expect(waiting == nil)
+        #expect(abs((grown?.frame.width ?? 0) - 240) < 1)
+        #expect(abs((grown?.frame.height ?? 0) - 360) < 1)
+        #expect(wide != nil)
+    }
+
     @Test func imageBlockNodeCanSwitchToReportLayoutAfterSVGContentIsResolved() throws {
         let imageURL = try #require(URL(string: "https://example.com/report.svg"))
         var didRequestGeneralRelayout = false

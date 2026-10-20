@@ -48,8 +48,7 @@ final class DetailImageBlockNode: ASDisplayNode {
                 }
             )
         }
-        style.flexGrow = 1
-        style.flexShrink = 1
+        // 高度跟图片比例走。弹性拉伸保持默认 0，否则行高更新前会被父栈压回占位高度。
     }
 
     override func calculateSizeThatFits(_ constrainedSize: CGSize) -> CGSize {
@@ -85,7 +84,19 @@ final class DetailImageBlockNode: ASDisplayNode {
         if nextLayout.height < previousLayout.height - Self.heightReductionThreshold {
             onImageHeightReduced()
         } else {
+            // 变矮会重载整行。变高只重测，所以要清掉正文 cell 上仍停在占位高度的缓存。
+            invalidateAncestorCellLayout()
             onLayoutInvalidated()
+        }
+    }
+
+    private func invalidateAncestorCellLayout() {
+        var ancestor = supernode
+        while let node = ancestor {
+            // 引用块等中间容器也有布局缓存，只清 cell 仍会复用旧高度。
+            node.invalidateCalculatedLayout()
+            if node is ASCellNode { return }
+            ancestor = node.supernode
         }
     }
 }
@@ -95,6 +106,7 @@ private final class DetailImageBlockView: UIView {
     private let onImageLoaded: (CGSize, DetailImageKind?) -> Void
     private let onImageTapped: () -> Void
     private let imageView = UIImageView()
+    private var loadedImage: UIImage?
     private var originalImageSize: CGSize = .zero
     private var hasStartedLoad = false
     private var resolvedImageKind: DetailImageKind
@@ -119,24 +131,22 @@ private final class DetailImageBlockView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        imageView.frame = DetailImageBlockLayout.imageFrame(
+        if let visible = DetailImageBlockLayout.visibleImage(
             originalSize: originalImageSize,
             bounds: bounds,
             kind: resolvedImageKind
-        )
-        imageView.contentMode = DetailImageBlockLayout.contentMode(
-            originalSize: originalImageSize,
-            maxWidth: bounds.width,
-            kind: resolvedImageKind
-        )
-        DetailLongImagePreview.apply(
-            to: imageView,
-            isLongImage: DetailImageBlockLayout.isLongImage(
-                originalSize: originalImageSize,
-                maxWidth: bounds.width,
-                kind: resolvedImageKind
-            )
-        )
+        ) {
+            imageView.frame = visible.frame
+            imageView.image = loadedImage
+            imageView.contentMode = visible.contentMode
+            DetailLongImagePreview.apply(to: imageView, isLongImage: visible.isLongImage)
+        } else {
+            // 目标比当前行高更高时先留占位，等行高到位再按最终尺寸画，避免整张图先缩小再放大。
+            imageView.frame = bounds
+            imageView.image = nil
+            // 角标是子视图，图片被清掉后不会跟着消失。
+            DetailLongImagePreview.apply(to: imageView, isLongImage: false)
+        }
         loadImageIfNeeded()
     }
 
@@ -165,7 +175,7 @@ private final class DetailImageBlockView: UIView {
                         self.resolvedImageKind = resolvedKind
                     }
                     self.originalImageSize = result.originalSize ?? image.size
-                    self.imageView.image = image
+                    self.loadedImage = image
                     self.onImageLoaded(self.originalImageSize, result.resolvedKind)
                     self.setNeedsLayout()
                 }
@@ -200,12 +210,26 @@ enum DetailImageBlockLayout {
         return CGRect(x: 0, y: 0, width: size.width, height: size.height)
     }
 
-    static func contentMode(originalSize: CGSize, maxWidth: CGFloat) -> UIView.ContentMode {
-        contentMode(originalSize: originalSize, maxWidth: maxWidth, kind: .normal)
+    struct VisibleImage {
+        let frame: CGRect
+        let contentMode: UIView.ContentMode
+        let isLongImage: Bool
     }
 
-    static func contentMode(originalSize: CGSize, maxWidth: CGFloat, kind: DetailImageKind) -> UIView.ContentMode {
-        switch presentation(originalSize: originalSize, maxWidth: maxWidth, kind: kind).mode {
+    /// 目标高度还放不进当前行时返回 nil，调用方继续显示占位，不先画一张缩小的图。
+    static func visibleImage(originalSize: CGSize, bounds: CGRect, kind: DetailImageKind) -> VisibleImage? {
+        guard originalSize.width > 0, originalSize.height > 0, bounds.height > 0 else { return nil }
+        let proposed = presentation(originalSize: originalSize, maxWidth: bounds.width, kind: kind)
+        guard proposed.size.height <= bounds.height + 0.5 else { return nil }
+        return VisibleImage(
+            frame: CGRect(origin: .zero, size: proposed.size),
+            contentMode: contentMode(for: proposed.mode),
+            isLongImage: proposed.mode == .topCrop
+        )
+    }
+
+    private static func contentMode(for mode: DetailImageDisplayMode) -> UIView.ContentMode {
+        switch mode {
         case .thumbnailCrop:
             return .scaleAspectFill
         case .aspectFit:
@@ -213,10 +237,6 @@ enum DetailImageBlockLayout {
         case .topCrop:
             return .scaleToFill
         }
-    }
-
-    static func isLongImage(originalSize: CGSize, maxWidth: CGFloat, kind: DetailImageKind) -> Bool {
-        presentation(originalSize: originalSize, maxWidth: maxWidth, kind: kind).mode == .topCrop
     }
 
     static func presentationSize(originalSize: CGSize, maxWidth: CGFloat) -> CGSize {
