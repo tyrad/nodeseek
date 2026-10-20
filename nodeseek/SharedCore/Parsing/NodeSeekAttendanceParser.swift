@@ -5,7 +5,7 @@
 
 import Foundation
 
-enum NodeSeekAttendanceParser {
+nonisolated enum NodeSeekAttendanceParser {
     struct BoardPayload: Equatable, Sendable {
         let isCheckedIn: Bool
         let gain: Int?

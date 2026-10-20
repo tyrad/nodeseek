@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct ChallengeDetector: Sendable {
+nonisolated struct ChallengeDetector: Sendable {
 
     func detect(response: HTMLResponse) -> ChallengeKind? {
         if Self.containsLoginRequiredHTML(response.html) {

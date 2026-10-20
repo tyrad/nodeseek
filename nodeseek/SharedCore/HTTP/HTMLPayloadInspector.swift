@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum HTMLPayloadInspector {
+nonisolated enum HTMLPayloadInspector {
     private static let prefixByteLimit = 2048
 
     static func looksLikeHTMLPayload(_ data: Data) -> Bool {

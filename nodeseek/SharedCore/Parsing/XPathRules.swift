@@ -5,7 +5,7 @@
 //  Created by Codex on 2026/4/27.
 //
 
-enum XPathRules {
+nonisolated enum XPathRules {
     static let accountUserCard = "//*[@id='nsk-right-panel-container']//*[contains(concat(' ', normalize-space(@class), ' '), ' user-card ')][1]"
     static let accountUsername = ".//a[contains(concat(' ', normalize-space(@class), ' '), ' Username ')]"
     static let accountProfileLink = ".//a[contains(@href, '/space/')][1]"

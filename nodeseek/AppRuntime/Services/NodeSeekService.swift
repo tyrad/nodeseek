@@ -39,17 +39,17 @@ struct NodeSeekService: Sendable {
         let targetURL = postListURL(page: page, category: category, sortMode: sortMode)
         AppLog.info(.service, "开始抓取 NodeSeek 列表，category=\(category.rawValue), sort=\(sortMode.rawValue), page=\(page): \(targetURL.absoluteString)")
         let response = try await htmlClient.get(targetURL)
-        AppLog.info(.service, "抓取返回 category=\(category.rawValue), sort=\(sortMode.rawValue), page=\(page), status=\(response.statusCode), htmlLength=\(response.html.count), finalURL=\(response.finalURL.absoluteString)")
+        AppLog.info(.service, "抓取返回 category=\(category.rawValue), sort=\(sortMode.rawValue), page=\(page), status=\(response.statusCode), htmlLength=\(response.html.utf8.count), finalURL=\(response.finalURL.absoluteString)")
 
-        if let challenge = challengeDetector.detect(response: response) {
+        switch try await parsePostListInBackground(response: response) {
+        case .challenge(let challenge):
             AppLog.warning(.service, "检测到 challenge: \(challenge.logDescription)")
             return .challenge(challenge)
+        case .posts(let posts, let account):
+            await saveOpportunisticAccount(account)
+            AppLog.info(.service, "列表解析完成，帖子数量: \(posts.count)")
+            return .value(posts)
         }
-
-        await updateCurrentAccountIfPresent(in: response.html)
-        let posts = try parser.parsePostList(html: response.html)
-        AppLog.info(.service, "列表解析完成，帖子数量: \(posts.count)")
-        return .value(posts)
     }
 
     func loadSearchResults(
@@ -60,17 +60,17 @@ struct NodeSeekService: Sendable {
         let targetURL = searchURL(query: query, page: page, category: category)
         AppLog.info(.service, "开始抓取 NodeSeek 搜索，category=\(category.rawValue), page=\(page): \(targetURL.absoluteString)")
         let response = try await htmlClient.get(targetURL)
-        AppLog.info(.service, "搜索抓取返回 category=\(category.rawValue), page=\(page), status=\(response.statusCode), htmlLength=\(response.html.count), finalURL=\(response.finalURL.absoluteString)")
+        AppLog.info(.service, "搜索抓取返回 category=\(category.rawValue), page=\(page), status=\(response.statusCode), htmlLength=\(response.html.utf8.count), finalURL=\(response.finalURL.absoluteString)")
 
-        if let challenge = challengeDetector.detect(response: response) {
+        switch try await parsePostListInBackground(response: response) {
+        case .challenge(let challenge):
             AppLog.warning(.service, "检测到搜索 challenge: \(challenge.logDescription)")
             return .challenge(challenge)
+        case .posts(let posts, let account):
+            await saveOpportunisticAccount(account)
+            AppLog.info(.service, "搜索解析完成，帖子数量: \(posts.count)")
+            return .value(posts)
         }
-
-        await updateCurrentAccountIfPresent(in: response.html)
-        let posts = try parser.parsePostList(html: response.html)
-        AppLog.info(.service, "搜索解析完成，帖子数量: \(posts.count)")
-        return .value(posts)
     }
 
     func loadAccount() async throws -> NodeSeekResult<AccountResponse> {
@@ -149,25 +149,55 @@ struct NodeSeekService: Sendable {
     }
 
     private func updateCurrentAccountIfPresent(in html: String) async {
-        guard let currentAccountStore else { return }
-        guard htmlContainsCurrentAccountSignal(html) else { return }
+        guard currentAccountStore != nil else { return }
+        await saveOpportunisticAccount(Self.opportunisticAccount(in: html, parser: parser))
+    }
+
+    private func saveOpportunisticAccount(_ account: AccountResponse?) async {
+        guard let currentAccountStore, let account else { return }
+        await currentAccountStore.save(account)
+        AppLog.debug(.account, "service: opportunistic account save -> loggedIn=\(account.isLoggedIn) name=\(account.displayName)")
+    }
+
+    /// 整页 HTML 解析在真机上要十几到几十毫秒，留在主线程会让列表分页时掉帧，
+    /// 所以 challenge 检测、账号解析和列表解析一起放到后台执行。
+    private func parsePostListInBackground(response: HTMLResponse) async throws -> PostListParseOutcome {
+        let parser = parser
+        let challengeDetector = challengeDetector
+        let parsesAccount = currentAccountStore != nil
+        return try await Task.detached(priority: .userInitiated) {
+            if let challenge = challengeDetector.detect(response: response) {
+                return .challenge(challenge)
+            }
+            let account = parsesAccount ? Self.opportunisticAccount(in: response.html, parser: parser) : nil
+            let posts = try parser.parsePostList(html: response.html)
+            return .posts(posts, account: account)
+        }.value
+    }
+
+    private nonisolated static func opportunisticAccount(in html: String, parser: any NodeSeekParser) -> AccountResponse? {
+        guard htmlContainsCurrentAccountSignal(html) else { return nil }
 
         do {
             let account = try parser.parseAccount(html: html)
-            guard account.isLoggedIn else { return }
-            await currentAccountStore.save(account)
-            AppLog.debug(.account, "service: opportunistic account save -> loggedIn=\(account.isLoggedIn) name=\(account.displayName)")
+            return account.isLoggedIn ? account : nil
         } catch {
             AppLog.debug(.account, "service: opportunistic account parse failed \(error.localizedDescription)")
+            return nil
         }
     }
 
-    private func htmlContainsCurrentAccountSignal(_ html: String) -> Bool {
+    private nonisolated static func htmlContainsCurrentAccountSignal(_ html: String) -> Bool {
         html.contains("user-card")
             || html.contains(#"id="temp-script""#)
             || html.contains(#"id='temp-script'"#)
             || html.contains("nodeseek-captured-config")
     }
+}
+
+private enum PostListParseOutcome: Sendable {
+    case challenge(ChallengeKind)
+    case posts([PostSummary], account: AccountResponse?)
 }
 
 private extension URL {

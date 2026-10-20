@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct HTMLResponse: Sendable {
+nonisolated struct HTMLResponse: Sendable {
     let statusCode: Int
     let headers: [String: String]
     let finalURL: URL

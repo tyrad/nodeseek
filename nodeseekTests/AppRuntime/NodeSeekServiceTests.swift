@@ -208,6 +208,33 @@ struct NodeSeekServiceTests {
         #expect(snapshot?.account.isLoggedIn == true)
     }
 
+    @Test func loadPostListParsesHTMLOffMainThread() async throws {
+        let html = try FixtureLoader.html(named: "post-list-basic")
+            .replacingOccurrences(of: "</body>", with: accountHTML(displayName: "缭雾") + "</body>")
+        let url = URL(string: "https://www.nodeseek.com/")!
+        let parser = ThreadRecordingParser(base: KannaNodeSeekParser(baseURL: url))
+        let store = CurrentAccountStore(
+            userDefaults: try #require(UserDefaults(suiteName: "NodeSeekServiceTests.\(UUID().uuidString)")),
+            storageKey: "account"
+        )
+        let service = NodeSeekService(
+            baseURL: url,
+            htmlClient: StaticHTMLClient(response: HTMLResponse(
+                statusCode: 200,
+                headers: [:],
+                finalURL: url,
+                html: html
+            )),
+            parser: parser,
+            currentAccountStore: store
+        )
+
+        _ = try await service.loadPostList(page: 2)
+
+        // 分页发生在用户滑动时，整页解析不能占用主线程。
+        #expect(parser.recordedCalls() == ["parseAccount:background", "parsePostList:background"])
+    }
+
     @Test func parsesPostListWhenServerHeaderIsCloudflareButPageIsNormal() async throws {
         let html = try FixtureLoader.html(named: "post-list-basic")
         let url = URL(string: "https://www.nodeseek.com/")!
@@ -572,5 +599,42 @@ private actor URLCapturingHTMLClient: HTMLClient {
 
     func requestedURLs() -> [URL] {
         urls
+    }
+}
+
+private final class ThreadRecordingParser: NodeSeekParser, @unchecked Sendable {
+    private let base: KannaNodeSeekParser
+    private let lock = NSLock()
+    private var calls: [String] = []
+
+    init(base: KannaNodeSeekParser) {
+        self.base = base
+    }
+
+    func recordedCalls() -> [String] {
+        lock.withLock { calls }
+    }
+
+    func parseAccount(html: String) throws -> AccountResponse {
+        record("parseAccount")
+        return try base.parseAccount(html: html)
+    }
+
+    func parsePostList(html: String) throws -> [PostSummary] {
+        record("parsePostList")
+        return try base.parsePostList(html: html)
+    }
+
+    func parsePostDetail(html: String, url: URL) throws -> PostDetail {
+        try base.parsePostDetail(html: html, url: url)
+    }
+
+    func parseCheckInState(html: String, pageURL: URL) throws -> CheckInState {
+        try base.parseCheckInState(html: html, pageURL: pageURL)
+    }
+
+    private func record(_ name: String) {
+        let thread = Thread.isMainThread ? "main" : "background"
+        lock.withLock { calls.append("\(name):\(thread)") }
     }
 }

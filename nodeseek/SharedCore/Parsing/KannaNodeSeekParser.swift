@@ -8,12 +8,12 @@
 import Foundation
 import Kanna
 
-enum NodeSeekParserError: Error {
+nonisolated enum NodeSeekParserError: Error {
     case notImplemented
     case postDetailNotFound
 }
 
-struct KannaNodeSeekParser: NodeSeekParser {
+nonisolated struct KannaNodeSeekParser: NodeSeekParser {
     typealias DebugLogger = @Sendable (String) -> Void
 
     let baseURL: URL
@@ -929,7 +929,7 @@ struct KannaNodeSeekParser: NodeSeekParser {
     }
 }
 
-private extension AccountResponse {
+nonisolated private extension AccountResponse {
     func withNotification(_ notification: AccountNotification?) -> AccountResponse {
         AccountResponse(
             displayName: displayName,
@@ -942,7 +942,7 @@ private extension AccountResponse {
     }
 }
 
-private extension String {
+nonisolated private extension String {
     
     var trimmedNonEmpty: String? {
         let value = trimmingCharacters(in: .whitespacesAndNewlines)
@@ -958,7 +958,7 @@ private extension String {
     }
 }
 
-private extension Kanna.XMLElement {
+nonisolated private extension Kanna.XMLElement {
     func matchesReaction(_ kind: KannaNodeSeekParser.ReactionKind) -> Bool {
         let haystack = [
             self["class"],

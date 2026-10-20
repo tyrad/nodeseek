@@ -134,7 +134,7 @@ struct WebViewFallbackHTMLClient: HTMLClient {
         let challengeDescription = challengeDetector.detect(response: response)?.logDescription ?? "none"
         AppLog.info(
             .service,
-            "HTML加载结果 phase=\(phase) status=\(response.statusCode) htmlLength=\(response.html.count) finalURL=\(response.finalURL.absoluteString) challenge=\(challengeDescription)"
+            "HTML加载结果 phase=\(phase) status=\(response.statusCode) htmlLength=\(response.html.utf8.count) finalURL=\(response.finalURL.absoluteString) challenge=\(challengeDescription)"
         )
     }
 }

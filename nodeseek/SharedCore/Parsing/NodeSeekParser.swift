@@ -7,7 +7,7 @@
 
 import Foundation
 
-protocol NodeSeekParser: Sendable {
+nonisolated protocol NodeSeekParser: Sendable {
     func parseAccount(html: String) throws -> AccountResponse
     func parsePostList(html: String) throws -> [PostSummary]
     func parsePostDetail(html: String, url: URL) throws -> PostDetail
