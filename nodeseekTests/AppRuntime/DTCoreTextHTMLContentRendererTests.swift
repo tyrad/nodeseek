@@ -718,7 +718,7 @@ struct DTCoreTextHTMLContentRendererTests {
         #expect(attachmentURL?.absoluteString == "https://www.nodeseek.com/static/image/sticker/xhj/003.png")
     }
 
-    @Test func usesFixedPreviewSizeForNonStickerImageAttachments() throws {
+    @Test func preservesAspectRatioForNonStickerImageAttachments() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
         let blocks = renderer.render(
@@ -744,10 +744,11 @@ struct DTCoreTextHTMLContentRendererTests {
         }
 
         let displaySize = try #require(attachment?.displaySize)
-        #expect(displaySize == CGSize(width: 320, height: 160))
+        #expect(displaySize.width == 320)
+        #expect(abs(displaySize.height - 320 * 2 / 3) < 0.001)
     }
 
-    @Test func capsExtremeRatioImageAttachmentsToFixedPreviewSize() throws {
+    @Test func fitsPortraitImageAttachmentsWithinHeightLimit() throws {
         let renderer = DTCoreTextHTMLContentRenderer()
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
         let blocks = renderer.render(
@@ -773,7 +774,7 @@ struct DTCoreTextHTMLContentRendererTests {
         }
 
         let displaySize = try #require(attachment?.displaySize)
-        #expect(displaySize == CGSize(width: 320, height: 160))
+        #expect(displaySize == CGSize(width: 128, height: 320))
     }
 
     @Test func keepsStickerImageAttachmentsAtFixedHeight() throws {

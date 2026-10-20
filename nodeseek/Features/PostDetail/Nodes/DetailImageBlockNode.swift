@@ -95,6 +95,7 @@ private final class DetailImageBlockView: UIView {
     private let onImageLoaded: (CGSize, DetailImageKind?) -> Void
     private let onImageTapped: () -> Void
     private let imageView = UIImageView()
+    private var originalImageSize: CGSize = .zero
     private var hasStartedLoad = false
     private var resolvedImageKind: DetailImageKind
 
@@ -119,14 +120,22 @@ private final class DetailImageBlockView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         imageView.frame = DetailImageBlockLayout.imageFrame(
-            originalSize: imageView.image?.size ?? .zero,
+            originalSize: originalImageSize,
             bounds: bounds,
             kind: resolvedImageKind
         )
         imageView.contentMode = DetailImageBlockLayout.contentMode(
-            originalSize: imageView.image?.size ?? .zero,
+            originalSize: originalImageSize,
             maxWidth: bounds.width,
             kind: resolvedImageKind
+        )
+        DetailLongImagePreview.apply(
+            to: imageView,
+            isLongImage: DetailImageBlockLayout.isLongImage(
+                originalSize: originalImageSize,
+                maxWidth: bounds.width,
+                kind: resolvedImageKind
+            )
         )
         loadImageIfNeeded()
     }
@@ -155,8 +164,9 @@ private final class DetailImageBlockView: UIView {
                     if let resolvedKind = result.resolvedKind {
                         self.resolvedImageKind = resolvedKind
                     }
+                    self.originalImageSize = result.originalSize ?? image.size
                     self.imageView.image = image
-                    self.onImageLoaded(image.size, result.resolvedKind)
+                    self.onImageLoaded(self.originalImageSize, result.resolvedKind)
                     self.setNeedsLayout()
                 }
             }
@@ -200,7 +210,13 @@ enum DetailImageBlockLayout {
             return .scaleAspectFill
         case .aspectFit:
             return .scaleAspectFit
+        case .topCrop:
+            return .scaleToFill
         }
+    }
+
+    static func isLongImage(originalSize: CGSize, maxWidth: CGFloat, kind: DetailImageKind) -> Bool {
+        presentation(originalSize: originalSize, maxWidth: maxWidth, kind: kind).mode == .topCrop
     }
 
     static func presentationSize(originalSize: CGSize, maxWidth: CGFloat) -> CGSize {

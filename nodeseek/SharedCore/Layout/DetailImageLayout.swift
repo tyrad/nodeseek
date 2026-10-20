@@ -10,6 +10,8 @@ import CoreGraphics
 nonisolated enum DetailImageDisplayMode: Equatable, Sendable {
     case thumbnailCrop
     case aspectFit
+    /// 长图预览：从图片顶部开始显示，右下角标注「长图」。
+    case topCrop
 }
 
 nonisolated enum DetailImageKind: Equatable, Sendable {
@@ -31,12 +33,21 @@ nonisolated enum DetailImageLayout {
     static let fixedStickerHeight: CGFloat = 65
     static let maxImageHeight: CGFloat = 420
     private static let extremeAspectRatio: CGFloat = 1.8
+    /// 普通图加载前的占位高宽比，接近常见图片的平均高度，减少加载后的高度跳动。
+    private static let normalPlaceholderHeightRatio: CGFloat = 0.75
+    /// 按高度上限缩小后宽度不足栏宽这个比例时，视为长图，避免窄条看不清内容。
+    private static let longImageMinWidthRatio: CGFloat = 0.4
     private static let reportPlaceholderAspectRatio: CGFloat = 74 * 0.6 / 47
 
     static func fixedNormalImageSize(maxWidth: CGFloat) -> CGSize {
         guard maxWidth > 0 else { return .zero }
         let side = max(1, floor(maxWidth / 2))
         return CGSize(width: side, height: side)
+    }
+
+    static func normalPlaceholderSize(maxWidth: CGFloat) -> CGSize {
+        guard maxWidth > 0 else { return .zero }
+        return CGSize(width: maxWidth, height: max(1, floor(maxWidth * normalPlaceholderHeightRatio)))
     }
 
     static func reportPlaceholderSize(maxWidth: CGFloat) -> CGSize {
@@ -79,7 +90,7 @@ nonisolated enum DetailImageLayout {
             return reportPlaceholderSize(maxWidth: maxWidth)
         }
 
-        return fixedNormalImageSize(maxWidth: maxWidth)
+        return normalPlaceholderSize(maxWidth: maxWidth)
     }
 
     static func presentation(
@@ -117,18 +128,23 @@ nonisolated enum DetailImageLayout {
 
     private static func normalPresentation(for originalSize: CGSize, maxWidth: CGFloat) -> DetailImagePresentation {
         guard originalSize.width > 0, originalSize.height > 0 else {
-            return DetailImagePresentation(size: fixedNormalImageSize(maxWidth: maxWidth), mode: .thumbnailCrop)
+            return DetailImagePresentation(size: normalPlaceholderSize(maxWidth: maxWidth), mode: .thumbnailCrop)
         }
 
-        let maxPreviewHeight = normalPreviewMaxHeight(maxWidth: maxWidth)
-        let aspectFitSize = scaledSize(for: originalSize, maxWidth: maxWidth, maxHeight: nil)
-        guard maxPreviewHeight > 0, aspectFitSize.height > maxPreviewHeight else {
-            return DetailImagePresentation(size: aspectFitSize, mode: .aspectFit)
+        // 按原比例展示，不放大、不裁剪；高度超出上限时按高度等比缩小。
+        let maxHeight = normalMaxHeight(maxWidth: maxWidth)
+        let widthFitSize = scaledSize(for: originalSize, maxWidth: maxWidth, maxHeight: nil)
+        let fitSize = scaledSize(for: originalSize, maxWidth: maxWidth, maxHeight: maxHeight)
+        let isHeightLimited = widthFitSize.height >= maxHeight
+        guard isHeightLimited, fitSize.width < maxWidth * longImageMinWidthRatio else {
+            return DetailImagePresentation(size: fitSize, mode: .aspectFit)
         }
 
+        // 长图只展示顶部，宽度沿用原图宽度上限，避免小图被放大。
+        let previewWidth = min(maxWidth, originalSize.width)
         return DetailImagePresentation(
-            size: CGSize(width: maxWidth, height: maxPreviewHeight),
-            mode: .thumbnailCrop
+            size: CGSize(width: previewWidth, height: max(1, floor(previewWidth * normalPlaceholderHeightRatio))),
+            mode: .topCrop
         )
     }
 
@@ -143,8 +159,8 @@ nonisolated enum DetailImageLayout {
         )
     }
 
-    private static func normalPreviewMaxHeight(maxWidth: CGFloat) -> CGFloat {
-        floor(maxWidth / 2)
+    private static func normalMaxHeight(maxWidth: CGFloat) -> CGFloat {
+        min(maxWidth, maxImageHeight)
     }
 
     static func allowsInlineAnimation(

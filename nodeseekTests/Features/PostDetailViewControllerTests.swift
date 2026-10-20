@@ -2639,7 +2639,7 @@ struct PostDetailViewControllerTests {
         let updatedHeight = node.layoutThatFits(constrainedSize).size.height
 
         #expect(didUpdate)
-        #expect(updatedHeight > initialHeight)
+        #expect(updatedHeight < initialHeight)
     }
 
     @Test func richTextNodeUsesCachedAttachmentSizeBeforeImageReloads() throws {
@@ -2674,7 +2674,7 @@ struct PostDetailViewControllerTests {
         let uncachedHeight = uncachedNode.layoutThatFits(constrainedSize).size.height
         let cachedHeight = cachedNode.layoutThatFits(constrainedSize).size.height
 
-        #expect(cachedHeight > uncachedHeight)
+        #expect(cachedHeight < uncachedHeight)
     }
 
     @Test func rendererSplitsWideBlockImageBeforeFollowingText() throws {
@@ -2981,7 +2981,63 @@ struct PostDetailViewControllerTests {
         }
     }
 
-    @Test func imageBlockCapsLargeNormalImagesAtHalfWidthHeight() {
+    @Test func inlineLongImageUpdatesWithoutChangingPlaceholderFrame() throws {
+        let url = try #require(URL(string: "https://example.com/long.png"))
+        var loadedSize: CGSize?
+        let view = DetailInlineImageView(
+            frame: CGRect(x: 0, y: 0, width: 320, height: 240),
+            imageURL: url, targetPixelWidth: 960, displayScale: 3,
+            allowsInlineAnimation: false, usesDetailImageOptimization: true,
+            longImageLayoutWidth: 320,
+            onImageLoaded: { _, size in loadedSize = size }, onImageTapped: { _ in }
+        )
+        view.contentMode = .scaleAspectFill
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let thumbnail = UIGraphicsImageRenderer(size: CGSize(width: 100, height: 600), format: format).image { context in
+            UIColor.blue.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 100, height: 600))
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 100, height: 75))
+        }
+        view.applyLoadedImage(DetailInlineImageResult(
+            image: thumbnail, resolvedKind: nil, originalSize: CGSize(width: 750, height: 4500)
+        ))
+        #expect(view.frame.size == CGSize(width: 320, height: 240))
+        #expect(loadedSize == CGSize(width: 750, height: 4500))
+        #expect(view.contentMode == .scaleToFill)
+        #expect(view.subviews.compactMap { ($0 as? UILabel)?.text } == ["长图"])
+        #expect(view.layer.contentsRect == CGRect(x: 0, y: 0, width: 1, height: 0.125))
+
+        // 分别验证 UIKit 和 Kingfisher 实际绘制后的顶部像素，避免只断言裁剪参数。
+        let plainView = UIImageView(frame: view.frame)
+        plainView.image = thumbnail
+        DetailLongImagePreview.apply(to: plainView, isLongImage: true)
+        for imageView in [plainView, view] {
+            imageView.layer.displayIfNeeded()
+            let rendered = UIGraphicsImageRenderer(size: imageView.bounds.size, format: format).image { context in
+                imageView.layer.render(in: context.cgContext)
+            }
+            let cgImage = try #require(rendered.cgImage)
+            var pixel = [UInt8](repeating: 0, count: 4)
+            let context = try #require(CGContext(
+                data: &pixel, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ))
+            let sample = try #require(cgImage.cropping(to: CGRect(x: 20, y: 200, width: 1, height: 1)))
+            context.draw(sample, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            #expect(pixel[0] > 240)
+            #expect(pixel[2] < 15)
+        }
+
+        view.applyLoadedImage(DetailInlineImageResult(image: thumbnail, resolvedKind: .report))
+        #expect(view.layer.contentsRect == CGRect(x: 0, y: 0, width: 1, height: 1))
+        let remainingBadgeTexts = view.subviews.compactMap { ($0 as? UILabel)?.text }
+        #expect(remainingBadgeTexts.isEmpty)
+        #expect(view.contentMode == .scaleAspectFit)
+    }
+
+    @Test func imageBlockPreservesNormalImageAspectRatio() {
         let initialLayout = DetailImageBlockLayout.measure(
             originalSize: .zero,
             constrainedSize: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
@@ -2992,9 +3048,9 @@ struct PostDetailViewControllerTests {
         )
 
         #expect(initialLayout.width == 320)
-        #expect(initialLayout.height == 160)
+        #expect(initialLayout.height == 240)
         #expect(loadedLayout.width == 320)
-        #expect(loadedLayout.height == 160)
+        #expect(loadedLayout.height == 214)
     }
 
     @Test func imageBlockUsesFullWidthPlaceholderForReportImages() {
@@ -3025,7 +3081,7 @@ struct PostDetailViewControllerTests {
         ))
 
         #expect(layout.size.width == 320)
-        #expect(layout.size.height == 160)
+        #expect(layout.size.height == 214)
     }
 
     @Test func imageBlockNodeRequestsRowReloadWhenLoadedImageIsShorterThanPlaceholder() throws {

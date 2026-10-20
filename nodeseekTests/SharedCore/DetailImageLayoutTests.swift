@@ -35,14 +35,14 @@ struct DetailImageLayoutTests {
         #expect(size.height == 65)
     }
 
-    @Test func placeholderUsesHalfWidthSquareForNormalImage() {
+    @Test func placeholderUsesFullWidthThreeQuarterHeightForNormalImage() {
         let size = DetailImageLayout.placeholderSize(
             maxWidth: 320,
             kind: .normal
         )
 
-        #expect(size.width == 160)
-        #expect(size.height == 160)
+        #expect(size.width == 320)
+        #expect(size.height == 240)
     }
 
     @Test func reportImagePlaceholderUsesFullWidth() {
@@ -64,7 +64,7 @@ struct DetailImageLayoutTests {
         #expect(size.height == 187)
     }
 
-    @Test func normalPhotoUsesHalfWidthThumbnailPreview() {
+    @Test func normalPhotoPreservesAspectRatio() {
         let presentation = DetailImageLayout.presentation(
             for: CGSize(width: 1200, height: 800),
             maxWidth: 320,
@@ -72,21 +72,48 @@ struct DetailImageLayoutTests {
         )
 
         #expect(presentation.size.width == 320)
-        #expect(presentation.size.height == 160)
-        #expect(presentation.mode == .thumbnailCrop)
+        #expect(abs(presentation.size.height - 320 * 2 / 3) < 0.001)
+        #expect(presentation.mode == .aspectFit)
         #expect(presentation.targetPointSide == 320)
     }
 
-    @Test func tallImageUsesHalfWidthThumbnailPreview() {
+    @Test func portraitImageFitsHeightLimit() {
         let presentation = DetailImageLayout.presentation(
             for: CGSize(width: 800, height: 2000),
             maxWidth: 320,
             kind: .normal
         )
 
-        #expect(presentation.size == CGSize(width: 320, height: 160))
-        #expect(presentation.mode == .thumbnailCrop)
+        #expect(presentation.size == CGSize(width: 128, height: 320))
+        #expect(presentation.mode == .aspectFit)
         #expect(presentation.targetPointSide == 320)
+    }
+
+    @Test(arguments: [
+        (CGSize(width: 1000, height: 1000), CGSize(width: 320, height: 320), DetailImageDisplayMode.aspectFit),
+        (CGSize(width: 1920, height: 1080), CGSize(width: 320, height: 180), .aspectFit),
+        (CGSize(width: 1170, height: 2532), CGSize(width: 320.0 * 1170 / 2532, height: 320), .aspectFit),
+        (CGSize(width: 750, height: 4500), CGSize(width: 320, height: 240), .topCrop),
+        (CGSize(width: 100, height: 1000), CGSize(width: 100, height: 75), .topCrop),
+        (CGSize(width: 100, height: 320), CGSize(width: 100, height: 75), .topCrop),
+        (CGSize(width: 80, height: 120), CGSize(width: 80, height: 120), .aspectFit),
+        (CGSize.zero, CGSize(width: 320, height: 240), .thumbnailCrop)
+    ])
+    func normalImagesUseOriginalAspectRatio(original: CGSize, expected: CGSize, mode: DetailImageDisplayMode) {
+        let presentation = DetailImageLayout.presentation(for: original, maxWidth: 320, kind: .normal)
+        #expect(abs(presentation.size.width - expected.width) < 0.001)
+        #expect(abs(presentation.size.height - expected.height) < 0.001)
+        #expect(presentation.mode == mode)
+    }
+
+    @Test func wideColumnCapsNormalImageHeightAt420Points() {
+        let presentation = DetailImageLayout.presentation(for: CGSize(width: 1000, height: 1000), maxWidth: 600, kind: .normal)
+        #expect(presentation.size == CGSize(width: 420, height: 420))
+    }
+
+    @Test func placeholderRoundsHeightDown() {
+        #expect(DetailImageLayout.normalPlaceholderSize(maxWidth: 375) == CGSize(width: 375, height: 281))
+        #expect(DetailImageLayout.normalPlaceholderSize(maxWidth: 0) == .zero)
     }
 
     @Test func tallReportImageKeepsFullWidthInsteadOfHeightConstrainedThumbnail() {

@@ -15,8 +15,12 @@ final class DetailInlineImageView: AnimatedImageView {
     private let displayScale: CGFloat
     private let allowsInlineAnimation: Bool
     private let usesDetailImageOptimization: Bool
+    /// 用于判断是否按长图展示；为 nil 时不做长图处理，例如表情图。
+    private let longImageLayoutWidth: CGFloat?
     private let onImageLoaded: (URL, CGSize) -> Void
     private let onImageTapped: (URL) -> Void
+    private var originalImageSize: CGSize?
+    private var resolvedImageKind: DetailImageKind = .normal
     private var loadToken: UUID?
     private let diagnosticID = String(UUID().uuidString.prefix(8))
 
@@ -27,6 +31,7 @@ final class DetailInlineImageView: AnimatedImageView {
         displayScale: CGFloat,
         allowsInlineAnimation: Bool,
         usesDetailImageOptimization: Bool,
+        longImageLayoutWidth: CGFloat? = nil,
         onImageLoaded: @escaping (URL, CGSize) -> Void,
         onImageTapped: @escaping (URL) -> Void
     ) {
@@ -35,6 +40,7 @@ final class DetailInlineImageView: AnimatedImageView {
         self.displayScale = displayScale
         self.allowsInlineAnimation = allowsInlineAnimation
         self.usesDetailImageOptimization = usesDetailImageOptimization
+        self.longImageLayoutWidth = longImageLayoutWidth
         self.onImageLoaded = onImageLoaded
         self.onImageTapped = onImageTapped
         super.init(frame: frame)
@@ -48,6 +54,11 @@ final class DetailInlineImageView: AnimatedImageView {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        updateLongImagePreview()
     }
 
     override func didMoveToSuperview() {
@@ -79,20 +90,37 @@ final class DetailInlineImageView: AnimatedImageView {
                 displayScale: displayScale,
                 allowsOptimization: usesDetailImageOptimization
             )
-            .load { [weak self] image in
+            .loadResult { [weak self] result in
                 DispatchQueue.main.async {
                     guard let self, self.loadToken == token else { return }
-                    self.image = image
-                    if let image {
-                        self.logDiagnostics(
-                            "loaded url=\(self.imageURL.absoluteString) imageSize=\(Self.string(from: image.size)) frame=\(Self.string(from: self.frame))"
-                        )
-                        self.onImageLoaded(self.imageURL, image.size)
-                    } else {
-                        self.logDiagnostics("loaded nil url=\(self.imageURL.absoluteString)")
-                    }
+                    self.applyLoadedImage(result)
                 }
             }
+    }
+
+    func applyLoadedImage(_ result: DetailInlineImageResult) {
+        originalImageSize = result.originalSize ?? result.image?.size
+        resolvedImageKind = result.resolvedKind ?? .normal
+        image = result.image
+        // 即使占位与最终尺寸相同、富文本不重排，也立即切换裁剪和角标。
+        updateLongImagePreview()
+        if let image {
+            logDiagnostics(
+                "loaded url=\(imageURL.absoluteString) imageSize=\(Self.string(from: image.size)) frame=\(Self.string(from: frame))"
+            )
+            onImageLoaded(imageURL, originalImageSize ?? image.size)
+        } else {
+            logDiagnostics("loaded nil url=\(imageURL.absoluteString)")
+        }
+    }
+
+    private func updateLongImagePreview() {
+        guard let longImageLayoutWidth else { return }
+        let isLongImage = image.map {
+            DetailImageLayout.presentation(for: originalImageSize ?? $0.size, maxWidth: longImageLayoutWidth, kind: resolvedImageKind).mode == .topCrop
+        } ?? false
+        contentMode = isLongImage ? .scaleToFill : .scaleAspectFit
+        DetailLongImagePreview.apply(to: self, isLongImage: isLongImage)
     }
 
     private var shouldUseAnimatedInlineLoader: Bool {
@@ -119,6 +147,8 @@ final class DetailInlineImageView: AnimatedImageView {
             guard let self, self.loadToken == token else { return }
             switch result {
             case .success(let value):
+                self.originalImageSize = value.image.size
+                self.updateLongImagePreview()
                 self.logDiagnostics(
                     "animatedLoad loaded url=\(resolvedURL.absoluteString) imageSize=\(Self.string(from: value.image.size)) frame=\(Self.string(from: self.frame))"
                 )

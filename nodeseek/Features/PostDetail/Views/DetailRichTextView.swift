@@ -204,6 +204,14 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         }
 
         let imageKind = DetailImageKind.resolved(isSticker: isStickerAttachment, imageURL: contentURL)
+        var isFixedQuoteImage = false
+        attributedString.enumerateAttribute(.attachment, in: NSRange(location: 0, length: attributedString.length)) { value, range, stop in
+            guard let candidate = value as? DTTextAttachment, candidate === attachment else { return }
+            isFixedQuoteImage = (attributedString.attribute(
+                DetailAttachmentAttributes.fixedQuoteImage, at: range.location, effectiveRange: nil
+            ) as? Bool) == true
+            stop.pointee = true
+        }
         let imageView = DetailInlineImageView(
             frame: viewFrame,
             imageURL: contentURL,
@@ -217,6 +225,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
                 kind: imageKind
             ),
             usesDetailImageOptimization: imageKind == .normal,
+            longImageLayoutWidth: imageKind == .normal && !isFixedQuoteImage ? maxImageWidth() : nil,
             onImageLoaded: { [weak self] loadedURL, imageSize in
                 self?.handleLoadedImage(loadedURL, imageSize: imageSize)
             },
@@ -226,7 +235,8 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         )
         imageView.contentMode = contentMode(
             originalSize: attachment.originalSize,
-            kind: imageKind
+            kind: imageKind,
+            isFixedQuoteImage: isFixedQuoteImage
         )
         imageView.clipsToBounds = true
         imageView.isOpaque = false
@@ -467,6 +477,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
             )
             let displaySize = presentation.size
             if isSticker == false, attachment.displaySize == displaySize {
+                attachment.originalSize = originalSize
                 logDiagnostics(
                     "normal attachment fixed size unchanged url=\(url.absoluteString) imageSize=\(Self.string(from: originalSize)) display=\(Self.string(from: displaySize))"
                 )
@@ -702,7 +713,14 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         )
     }
 
-    private func contentMode(originalSize: CGSize, kind: DetailImageKind) -> UIView.ContentMode {
+    private func contentMode(originalSize: CGSize, kind: DetailImageKind, isFixedQuoteImage: Bool = false) -> UIView.ContentMode {
+        if isFixedQuoteImage, kind == .normal {
+            // 引用图片沿用原来的半宽方块裁剪策略。
+            guard originalSize.width > 0, originalSize.height > 0 else { return .scaleAspectFill }
+            let widthFitSize = DetailImageLayout.scaledSize(for: originalSize, maxWidth: maxImageWidth(), maxHeight: nil)
+            return widthFitSize.height > floor(maxImageWidth() / 2) ? .scaleAspectFill : .scaleAspectFit
+        }
+
         let mode = DetailImageLayout.presentation(
             for: originalSize,
             maxWidth: maxImageWidth(),
@@ -714,6 +732,8 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
             return .scaleAspectFill
         case .aspectFit:
             return .scaleAspectFit
+        case .topCrop:
+            return .scaleToFill
         }
     }
 

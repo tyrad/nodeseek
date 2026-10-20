@@ -7,6 +7,7 @@
 
 import CryptoKit
 import Foundation
+import ImageIO
 @testable import nodeseek
 import Testing
 import UIKit
@@ -39,6 +40,47 @@ struct DetailImageLoaderTests {
             #expect(error as? DetailOriginalFileError == .unavailable)
         }
         #expect(DetailImageURLProtocol.totalRequestCount() == 0)
+    }
+
+    @Test func inlineLongImagePreservesOriginalSizeWithBoundedDecodeAcrossCaches() async throws {
+        let url = try #require(URL(string: "https://images.example.com/long.jpg"))
+        let data = try Self.makeNoisyJPEGData(width: 750, height: 4500, quality: 0.8)
+        let directory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        DetailImageURLProtocol.reset()
+        DetailImageURLProtocol.stub(data: data, mimeType: "image/jpeg", for: url)
+        let session = URLSession(configuration: Self.urlSessionConfiguration(protocolType: DetailImageURLProtocol.self))
+        let loader = DetailImageLoader(session: session, cacheDirectory: directory)
+        let diskLoader = DetailImageLoader(session: session, cacheDirectory: directory)
+        let unoptimizedLoader = DetailImageLoader(
+            session: session, cacheDirectory: directory, optimizationModeProvider: { .disabled }
+        )
+        for currentLoader in [loader, loader, diskLoader, unoptimizedLoader] {
+            let result: DetailInlineImageResult = await withCheckedContinuation { continuation in
+                currentLoader.loadImageForInlineResult(url, maxPixelWidth: 600, displayScale: 2) {
+                    continuation.resume(returning: $0)
+                }
+            }
+            let image = try #require(result.image)
+            #expect(result.originalSize == CGSize(width: 750, height: 4500))
+            #expect(max(image.size.width, image.size.height) <= 600)
+            let layout = DetailImageLayout.presentation(for: try #require(result.originalSize), maxWidth: 320, kind: .normal)
+            #expect(layout.size == CGSize(width: 320, height: 240))
+            #expect(layout.mode == .topCrop)
+        }
+        #expect(DetailImageURLProtocol.totalRequestCount() == 1)
+    }
+
+    @Test func originalSizeMatchesRotatedThumbnailOrientation() throws {
+        let data = try Self.makeNoisyJPEGData(width: 100, height: 1000, quality: 0.8)
+        let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
+        let rotatedData = NSMutableData()
+        let destination = try #require(CGImageDestinationCreateWithData(rotatedData, "public.jpeg" as CFString, 1, nil))
+        CGImageDestinationAddImageFromSource(destination, source, 0, [kCGImagePropertyOrientation: 6] as CFDictionary)
+        #expect(CGImageDestinationFinalize(destination))
+        #expect(ImageRenderer.pixelSize(data: rotatedData as Data, mimeType: "image/jpeg") == CGSize(width: 1000, height: 100))
+        let thumbnail = try #require(ImageRenderer.downsampledImage(data: rotatedData as Data, maxPixelSize: 500))
+        #expect(thumbnail.size == CGSize(width: 500, height: 50))
     }
 
     @Test func defaultOptimizationConfigEnablesThumbnailCache() {

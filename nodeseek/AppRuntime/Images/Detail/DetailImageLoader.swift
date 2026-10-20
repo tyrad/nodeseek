@@ -11,7 +11,6 @@ import UIKit
 final class DetailImageLoader {
     // MARK: - Types
 
-    private typealias DecodedPayloadCompletion = (DetailDecodedImagePayload) -> Void
     private typealias OriginalDataCompletion = (DetailOriginalDataPayload) -> Void
     private typealias InlineImageCompletion = (DetailInlineImageResult) -> Void
 
@@ -28,8 +27,6 @@ final class DetailImageLoader {
     // MARK: - State
 
     private let stateQueue = DispatchQueue(label: "com.nodeseek.app.detailimage.state")
-    private var decodedPayloadCache: [URL: DetailDecodedImagePayload] = [:]
-    private var decodedPayloadCallbacks: [URL: [DecodedPayloadCompletion]] = [:]
     private var inlineImageCache: [DetailInlineImageCacheKey: DetailInlineImageResult] = [:]
     private var inlineImageCallbacks: [DetailInlineImageCacheKey: [InlineImageCompletion]] = [:]
 
@@ -170,8 +167,6 @@ final class DetailImageLoader {
     /// 清理详情图的内存缓存和 thumbnail 磁盘缓存，不清理通用原图 data 缓存。
     func clearDetailImageCache() throws {
         stateQueue.sync {
-            decodedPayloadCache.removeAll()
-            decodedPayloadCallbacks.removeAll()
             inlineImageCache.removeAll()
             inlineImageCallbacks.removeAll()
         }
@@ -216,18 +211,19 @@ final class DetailImageLoader {
         logDiagnostics(
             "inline load start url=\(imageURL.absoluteString) resolved=\(cacheURL.absoluteString) maxPixelWidth=\(pixelWidth) displayScale=\(Self.numberString(imageScale))"
         )
-        loadDecodedInlinePayload(for: imageURL) { [weak self] payload in
+        loadOriginalDataPayload(for: imageURL) { [weak self] payload in
             guard let self else { return }
             let image = ImageRenderer.downsampledImage(
                 data: payload.data,
                 maxPixelSize: pixelWidth
-            ) ?? payload.image
+            ) ?? ImageRenderer.image(data: payload.data, mimeType: payload.mimeType, maxPixelSize: pixelWidth)
             let result = DetailInlineImageResult(
                 image: image,
-                resolvedKind: DetailImagePayloadFactory.resolvedKind(from: payload.data, mimeType: payload.mimeType)
+                resolvedKind: DetailImagePayloadFactory.resolvedKind(from: payload.data, mimeType: payload.mimeType),
+                originalSize: payload.pixelSize
             )
             self.logDiagnostics(
-                "inline load payload url=\(imageURL.absoluteString) fallback=\(payload.isFallback) payloadImageSize=\(Self.string(from: payload.image.size)) finalImageSize=\(Self.string(from: image.size))"
+                "inline load payload url=\(imageURL.absoluteString) fallback=\(payload.isFallback) payloadImageSize=\(Self.string(from: payload.pixelSize)) finalImageSize=\(Self.string(from: image?.size ?? .zero))"
             )
             let callbacks = self.stateQueue.sync {
                 if payload.isFallback == false {
@@ -241,45 +237,6 @@ final class DetailImageLoader {
 
     // MARK: - Payload Loading
 
-    private func loadDecodedInlinePayload(for imageURL: URL, completion: @escaping DecodedPayloadCompletion) {
-        guard let resolvedURL = ImageURLResolver.resolve(imageURL) else {
-            AppLog.error(.image, "attachment URL 非法，使用兜底图 url=\(imageURL.absoluteString)")
-            completion(DetailImageFallback.decodedPayload)
-            return
-        }
-
-        if let cachedPayload = stateQueue.sync(execute: { decodedPayloadCache[resolvedURL] }) {
-            logDiagnostics(
-                "payload cache hit url=\(resolvedURL.absoluteString) imageSize=\(Self.string(from: cachedPayload.image.size))"
-            )
-            completion(cachedPayload)
-            return
-        }
-
-        let shouldStartLoad = stateQueue.sync { () -> Bool in
-            DetailImageCallbackQueue.enqueue(completion, for: resolvedURL, in: &decodedPayloadCallbacks)
-        }
-        guard shouldStartLoad else { return }
-
-        logDiagnostics("payload request start url=\(resolvedURL.absoluteString)")
-        imageDataLoader.loadData(for: imageURL) { [weak self] result in
-            guard let self else { return }
-            let payload: DetailDecodedImagePayload
-            switch result {
-            case .success(let dataPayload):
-                payload = DetailImagePayloadFactory.decodedPayload(
-                    resolvedURL: dataPayload.resolvedURL,
-                    data: dataPayload.data,
-                    mimeType: dataPayload.mimeType
-                )
-            case .failure:
-                AppLog.error(.image, "attachment 下载失败，使用兜底图 url=\(resolvedURL.absoluteString)")
-                payload = DetailImageFallback.decodedPayload
-            }
-            self.completeDecodedPayload(for: resolvedURL, payload: payload)
-        }
-    }
-
     private func loadOriginalDataPayload(for imageURL: URL, completion: @escaping OriginalDataCompletion) {
         guard let resolvedURL = ImageURLResolver.resolve(imageURL) else {
             AppLog.error(.image, "attachment URL 非法，使用兜底图 url=\(imageURL.absoluteString)")
@@ -287,8 +244,7 @@ final class DetailImageLoader {
             return
         }
 
-        imageDataLoader.loadData(for: imageURL) { [weak self] result in
-            guard let self else { return }
+        imageDataLoader.loadData(for: imageURL) { result in
             switch result {
             case .success(let dataPayload):
                 completion(DetailImagePayloadFactory.originalDataPayload(
@@ -302,18 +258,6 @@ final class DetailImageLoader {
                 completion(DetailImageFallback.originalDataPayload(source: .network))
             }
         }
-    }
-
-    // MARK: - Cache Completion
-
-    private func completeDecodedPayload(for url: URL, payload: DetailDecodedImagePayload) {
-        let callbacks: [DecodedPayloadCompletion] = stateQueue.sync {
-            if payload.isFallback == false {
-                decodedPayloadCache[url] = payload
-            }
-            return DetailImageCallbackQueue.take(for: url, from: &decodedPayloadCallbacks)
-        }
-        callbacks.forEach { $0(payload) }
     }
 
     // MARK: - Rules

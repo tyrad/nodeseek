@@ -21,6 +21,8 @@ enum DetailOriginalFileError: Error, Equatable {
 struct DetailInlineImageResult {
     let image: UIImage?
     let resolvedKind: DetailImageKind?
+    // 布局使用原图尺寸，不能把降采样后的像素尺寸当作小图。
+    var originalSize: CGSize? = nil
 }
 
 enum DetailImageLoadSource: String {

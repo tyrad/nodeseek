@@ -45,6 +45,11 @@ enum ImageRenderer {
             return nil
         }
 
+        // 元数据尺寸与自动旋转后的缩略图方向保持一致。
+        let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        if (5 ... 8).contains(orientation) {
+            return CGSize(width: CGFloat(height.doubleValue), height: CGFloat(width.doubleValue))
+        }
         return CGSize(width: CGFloat(width.doubleValue), height: CGFloat(height.doubleValue))
     }
 

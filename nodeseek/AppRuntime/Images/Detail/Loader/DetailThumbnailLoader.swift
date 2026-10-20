@@ -39,7 +39,17 @@ final class DetailThumbnailLoader {
         }
 
         if let cachedThumbnail = cachedThumbnailResult(for: resolvedURL, mode: mode) {
-            completion(cachedThumbnail)
+            if cachedThumbnail.originalSize != nil {
+                completion(cachedThumbnail)
+            } else {
+                // 旧磁盘缩略图没有原图尺寸，从共享原文件缓存读取元数据，不解码大图。
+                loadOriginalDataPayload(imageURL) { payload in
+                    var result = cachedThumbnail
+                    result.originalSize = payload.isFallback ? cachedThumbnail.image?.size : payload.pixelSize
+                    self.stateQueue.sync { self.thumbnailImageCache[resolvedURL] = result }
+                    completion(result)
+                }
+            }
             return
         }
 
@@ -71,7 +81,7 @@ final class DetailThumbnailLoader {
                 from: downsampled,
                 maxBytes: maxThumbnailBytes
             )
-            let result = DetailInlineImageResult(image: thumbnail.image, resolvedKind: nil)
+            let result = DetailInlineImageResult(image: thumbnail.image, resolvedKind: nil, originalSize: payload.pixelSize)
             if payload.isFallback == false, let cacheData = thumbnail.cacheData {
                 try? self.cacheFiles.writeData(cacheData, to: self.cacheFiles.thumbnailCacheURL(for: resolvedURL))
             }
