@@ -671,6 +671,8 @@ class PostDetailViewController: UIViewController {
         tableNode.dataSource = self
         tableNode.delegate = self
         tableNode.leadingScreensForBatching = leadingScreensForBatching
+        // 屏幕上方的图片加载后变高时，保持当前可见内容位置不动。
+        tableNode.automaticallyAdjustsContentOffset = true
         tableNode.view.backgroundColor = .systemBackground
         tableNode.view.separatorStyle = .none
         tableNode.view.showsVerticalScrollIndicator = true
