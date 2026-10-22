@@ -7,8 +7,9 @@
 
 设备：iphone 用 iPhone 17 Pro Max 模拟器原图（1320×2868），输出 1290×2796；
       ipad 用 iPad Pro 13-inch (M5) 模拟器原图（2064×2752），输出 2064×2752，文件名带 ipad- 前缀。
-<原图目录> 需包含 home.png、detail.png、nq.png、dark.png。打码区域按这批原图手工标定；
-重拍后名字位置会变，需要同步调整 BLUR_BOXES。不传 --raw 时直接用 raw/<设备>/ 里已打码的图。
+<原图目录> 需包含 home.png、detail.png、nq.png、dark.png。home.png 一般是 stitch_list.py 拼出的列表。
+首页按分隔线自动给每行的头像和用户名打码；其余页面的打码区域按这批原图手工标定，
+重拍后位置会变，需要同步调整 BLUR_BOXES。不传 --raw 时直接用 raw/<设备>/ 里已打码的图。
 App 界面只有简体中文，繁体版只换截图上的文案。
 """
 
@@ -21,44 +22,29 @@ from pathlib import Path
 
 from PIL import Image, ImageFilter
 
+from stitch_list import separators
+
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parents[1]
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
+# 帖子列表的行内布局：分区栏下沿、头像相对行顶的区域、用户名起始 x、用户名和浏览数图标之间的最小空隙
+LIST_LAYOUT = {
+    "iphone": {"top": 300, "avatar": (40, 20, 210, 172), "text_x": 222, "gap": 20},
+    "ipad": {"top": 139, "avatar": (26, 13, 134, 117), "text_x": 146, "gap": 14},
+}
 
-def name_box(y, x_end, x_start=215, half=30):
-    return (x_start, y - half, x_end + 8, y + half)
-
-
-def ipad_name_box(y, x_end):
-    return name_box(y, x_end, x_start=143, half=26)
-
-
-# 只打发帖人的名字，坐标基于各设备原图
+# 头像和用户名，坐标基于各设备原图
 BLUR_BOXES = {
     "iphone": {
-        "home": [
-            name_box(495, 300), name_box(730, 338), name_box(961, 393),
-            name_box(1195, 279), name_box(1368, 438), name_box(1560, 320),
-            name_box(1754, 387), name_box(2007, 432), name_box(2178, 345),
-            name_box(2372, 378), name_box(2625, 413), name_box(2798, 426),
-        ],
-        "detail": [(190, 595, 298, 655)],
-        "nq": [(190, 626, 418, 690)],
-        "dark": [(670, 227, 748, 283)],
+        "detail": [(560, 210, 760, 295)],
+        "nq": [(42, 596, 172, 722), (190, 626, 418, 690)],
+        "dark": [(560, 210, 760, 295)],
     },
     "ipad": {
-        "home": [
-            ipad_name_box(y, x) for y, x in [
-                (230, 200), (352, 236), (481, 230), (610, 225), (739, 276),
-                (868, 277), (997, 252), (1126, 252), (1296, 226), (1412, 272),
-                (1541, 237), (1670, 252), (1799, 340), (1928, 197), (2057, 299),
-                (2186, 295), (2315, 270), (2444, 262), (2573, 218), (2702, 262),
-            ]
-        ],
-        "detail": [(126, 280, 200, 330)],
-        "nq": [(126, 300, 276, 354)],
-        "dark": [(126, 282, 170, 332)],
+        "detail": [(960, 75, 1110, 135)],
+        "nq": [(28, 286, 116, 370), (126, 300, 276, 354)],
+        "dark": [(960, 75, 1110, 135)],
     },
 }
 
@@ -69,8 +55,53 @@ DEVICES = {
 }
 
 
+def name_line(im, top, bottom, text_x, gap):
+    """一行帖子里最下面一行文字就是用户名那一行；用户名到浏览数图标之间有一段空白。"""
+    px = im.load()
+
+    def inked(x, y):
+        return sum(px[x, y]) < 690
+
+    band_bottom = next((y for y in range(bottom - 2, top, -1)
+                        if any(inked(x, y) for x in range(text_x, text_x + 500, 2))), None)
+    if band_bottom is None:
+        return None
+    band_top = band_bottom
+    while band_top > top and any(inked(x, band_top - 1) for x in range(text_x, text_x + 500, 2)):
+        band_top -= 1
+    x_end, blank = text_x, 0
+    for x in range(text_x, text_x + 800):
+        if any(inked(x, y) for y in range(band_top, band_bottom + 1)):
+            x_end, blank = x, 0
+        elif x_end > text_x:
+            blank += 1
+            if blank >= gap:
+                break
+    return (text_x - 8, band_top - 8, x_end + 10, band_bottom + 8)
+
+
+def list_boxes(im, device):
+    layout = LIST_LAYOUT[device]
+    width, height = im.size
+    seps = [s for s in separators(im) if s[0] >= layout["top"]]
+    tops = [layout["top"]] + [s[1] + 1 for s in seps]
+    bottoms = [s[0] for s in seps] + [height]
+    ax0, ay0, ax1, ay1 = layout["avatar"]
+    boxes = []
+    for top, bottom in zip(tops, bottoms):
+        if bottom - top < ay1 - ay0:
+            continue
+        boxes.append((ax0, top + ay0, ax1, min(top + ay1, bottom)))
+        name = name_line(im, top, bottom, layout["text_x"], layout["gap"])
+        if name:
+            boxes.append(name)
+    return boxes
+
+
 def pixelate(src: Path, dst: Path, boxes):
     im = Image.open(src).convert("RGB")
+    if callable(boxes):
+        boxes = boxes(im)
     for box in boxes:
         region = im.crop(box)
         w, h = region.size
@@ -116,12 +147,12 @@ COPY = {
             ("image", "NodeImage", "回帖一键传图"),
             ("sticker", "表情贴纸", "社区表情全都有"),
             ("recent", "最近浏览", "看过的随时找回"),
-            ("code", "开源免费", "代码全公开"),
+            ("code", "开源透明", "代码全公开"),
         ],
         "notifications": [
-            ("现在", "新回复", "有人在「iLatency 公测」里回复了你"),
-            ("3 分钟前", "有人 @ 了你", "「出 megabox pro，溢价加剩余」"),
-            ("12 分钟前", "新私信", "老哥这台小鸡还在吗？"),
+            ("现在", "新回复", "有人在「Debian 13 升级踩坑记录」里回复了你"),
+            ("3 分钟前", "有人 @ 了你", "「这个 Docker 配置可以参考一下」"),
+            ("12 分钟前", "新私信", "谢谢你的教程，已经跑起来了"),
         ],
     },
     "zh-Hant": {
@@ -141,12 +172,12 @@ COPY = {
             ("image", "NodeImage", "回帖一鍵傳圖"),
             ("sticker", "表情貼紙", "社群表情全都有"),
             ("recent", "最近瀏覽", "看過的隨時找回"),
-            ("code", "開源免費", "程式碼全公開"),
+            ("code", "開源透明", "程式碼全公開"),
         ],
         "notifications": [
-            ("現在", "新回覆", "有人在「iLatency 公測」裡回覆了你"),
-            ("3 分鐘前", "有人 @ 了你", "「出 megabox pro，溢價加剩餘」"),
-            ("12 分鐘前", "新私訊", "老哥這台小雞還在嗎？"),
+            ("現在", "新回覆", "有人在「Debian 13 升級踩坑記錄」裡回覆了你"),
+            ("3 分鐘前", "有人 @ 了你", "「這個 Docker 設定可以參考一下」"),
+            ("12 分鐘前", "新私訊", "謝謝你的教學，已經跑起來了"),
         ],
     },
 }
@@ -273,7 +304,7 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
-    boxes = BLUR_BOXES[args.device]
+    boxes = {"home": lambda im: list_boxes(im, args.device), **BLUR_BOXES[args.device]}
     raw_dir = ROOT / "raw" / args.device
     raw_dir.mkdir(parents=True, exist_ok=True)
     if args.raw:
