@@ -1,0 +1,53 @@
+name: FramePlayHarness
+options:
+  deploymentTarget:
+    iOS: "15.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    CODE_SIGNING_ALLOWED: NO
+packages:
+  FramePlay:
+    path: ../..
+targets:
+  FramePlayHarness:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+        excludes: [Info.plist]
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: FramePlay Harness
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: local.frameplay.harness
+    dependencies:
+      - package: FramePlay
+  FramePlayHarnessTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ../../Tests/FramePlayTests
+        excludes: [Fixtures]
+      - path: ../../Tests/FramePlayTests/Fixtures
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: local.frameplay.harness.tests
+    dependencies:
+      - target: FramePlayHarness
+      - package: FramePlay
+schemes:
+  FramePlayHarness:
+    build:
+      targets:
+        FramePlayHarness: all
+    test:
+      targets: [FramePlayHarnessTests]
