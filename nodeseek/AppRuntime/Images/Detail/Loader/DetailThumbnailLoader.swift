@@ -36,7 +36,7 @@ final class DetailThumbnailLoader {
         let pixelSide = max(1, Int(ceil(maxPixelWidth)))
         guard let resolvedURL = ImageURLResolver.resolve(imageURL) else {
             AppLog.error(.image, "attachment URL 非法，使用兜底图 url=\(imageURL.absoluteString)")
-            completion(DetailInlineImageResult(image: DetailImageFallback.image, resolvedKind: nil))
+            completion(.failure)
             return
         }
 
@@ -71,6 +71,10 @@ final class DetailThumbnailLoader {
                 self.completeThumbnailLoad(for: resolvedURL, result: cached, cacheInMemory: !payload.isFallback)
                 return
             }
+            guard !payload.isFallback else {
+                self.completeThumbnailLoad(for: resolvedURL, result: .failure, cacheInMemory: false)
+                return
+            }
             if DetailImagePayloadFactory.resolvedKind(from: payload.data, mimeType: payload.mimeType) == .report {
                 let image = payload.renderedSVGImage ?? ImageRenderer.image(data: payload.data, mimeType: payload.mimeType) ?? DetailImageFallback.image
                 let result = DetailInlineImageResult(image: image, resolvedKind: .report)
@@ -83,11 +87,14 @@ final class DetailThumbnailLoader {
                 return
             }
 
-            let downsampled = payload.renderedSVGImage.map { ImageRenderer.boundedImage($0, maxPixelSize: pixelSide) } ?? ImageRenderer.image(
+            guard let downsampled = payload.renderedSVGImage.map({ ImageRenderer.boundedImage($0, maxPixelSize: pixelSide) }) ?? ImageRenderer.image(
                 data: payload.data,
                 mimeType: payload.mimeType,
                 maxPixelSize: min(pixelSide, Int(DetailImageLimits.maxPixelSide))
-            ) ?? DetailImageFallback.image
+            ) else {
+                self.completeThumbnailLoad(for: resolvedURL, result: .failure, cacheInMemory: false)
+                return
+            }
             let thumbnail = DetailThumbnailBuilder.makeBoundedThumbnail(
                 from: downsampled,
                 maxBytes: maxThumbnailBytes

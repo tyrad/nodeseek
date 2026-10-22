@@ -33,7 +33,7 @@ struct DetailInlineImageRequest {
     /// 加载正文 inline 图片结果，保留 report-like SVG 等类型信息。
     func loadResult(_ completion: @escaping (DetailInlineImageResult) -> Void) {
         guard let url else {
-            completion(DetailInlineImageResult(image: nil, resolvedKind: nil))
+            completion(.failure)
             return
         }
 

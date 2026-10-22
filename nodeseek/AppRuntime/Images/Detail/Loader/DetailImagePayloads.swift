@@ -24,6 +24,11 @@ struct DetailInlineImageResult {
     // 布局使用原图尺寸，不能把降采样后的像素尺寸当作小图。
     var originalSize: CGSize? = nil
     var animationAsset: DetailAnimatedImageAsset? = nil
+    var isFallback = false
+
+    static var failure: Self {
+        Self(image: DetailImageFallback.image, resolvedKind: nil, isFallback: true)
+    }
 }
 
 enum DetailImageLoadSource: String {

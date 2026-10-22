@@ -15,6 +15,7 @@ final class DetailImageBlockNode: ASDisplayNode {
     private let imageURL: URL
     private var imageKind: DetailImageKind
     private var loadedImageSize: CGSize
+    private var hasFailed = false
     private static let heightReductionThreshold: CGFloat = 1
 
     init(
@@ -43,6 +44,7 @@ final class DetailImageBlockNode: ASDisplayNode {
                 onImageLoaded: { imageSize, resolvedKind in
                     self?.updateLoadedImageSize(imageSize, resolvedKind: resolvedKind)
                 },
+                onImageFailed: { self?.handleImageFailure() },
                 onImageTapped: {
                     onImageTapped(imageURLs, imageIndex)
                 }
@@ -52,7 +54,10 @@ final class DetailImageBlockNode: ASDisplayNode {
     }
 
     override func calculateSizeThatFits(_ constrainedSize: CGSize) -> CGSize {
-        DetailImageBlockLayout.measure(
+        if hasFailed {
+            return DetailImagePlaceholderView.failureSize(maxWidth: constrainedSize.width)
+        }
+        return DetailImageBlockLayout.measure(
             originalSize: loadedImageSize,
             constrainedSize: constrainedSize,
             kind: imageKind
@@ -82,6 +87,8 @@ final class DetailImageBlockNode: ASDisplayNode {
     func updateLoadedImageSize(_ imageSize: CGSize, resolvedKind: DetailImageKind? = nil) {
         guard imageSize.width > 0, imageSize.height > 0 else { return }
         let previousSize = loadedImageSize
+        let wasFailed = hasFailed
+        hasFailed = false
         let previousKind = imageKind
         if let resolvedKind {
             imageKind = resolvedKind
@@ -98,7 +105,7 @@ final class DetailImageBlockNode: ASDisplayNode {
             maxWidth: calculatedSize.width,
             kind: imageKind
         )
-        guard previousLayout != nextLayout else { return }
+        guard wasFailed || previousLayout != nextLayout else { return }
         invalidateCalculatedLayout()
         setNeedsLayout()
         if nextLayout.height < previousLayout.height - Self.heightReductionThreshold {
@@ -108,6 +115,16 @@ final class DetailImageBlockNode: ASDisplayNode {
             invalidateAncestorCellLayout()
             onLayoutInvalidated()
         }
+    }
+
+    private func handleImageFailure() {
+        guard !hasFailed else { return }
+        hasFailed = true
+        invalidateCalculatedLayout()
+        setNeedsLayout()
+        invalidateAncestorCellLayout()
+        // 只重测现有节点；重载整行会创建新节点并反复请求失败图片。
+        onLayoutInvalidated()
     }
 
     private func invalidateAncestorCellLayout() {
@@ -124,8 +141,10 @@ final class DetailImageBlockNode: ASDisplayNode {
 final class DetailImageBlockView: UIView {
     private let imageBlock: RenderedImageBlock
     private let onImageLoaded: (CGSize, DetailImageKind?) -> Void
+    private let onImageFailed: () -> Void
     private let onImageTapped: () -> Void
     private let imageView = UIImageView()
+    private let placeholderView = DetailImagePlaceholderView()
     private var loadedImage: UIImage?
     private var originalImageSize: CGSize = .zero
     private var hasStartedLoad = false
@@ -140,10 +159,12 @@ final class DetailImageBlockView: UIView {
         imageBlock: RenderedImageBlock,
         imageKind: DetailImageKind,
         onImageLoaded: @escaping (CGSize, DetailImageKind?) -> Void,
+        onImageFailed: @escaping () -> Void = {},
         onImageTapped: @escaping () -> Void
     ) {
         self.imageBlock = imageBlock
         self.onImageLoaded = onImageLoaded
+        self.onImageFailed = onImageFailed
         self.onImageTapped = onImageTapped
         self.resolvedImageKind = imageKind
         super.init(frame: .zero)
@@ -156,13 +177,15 @@ final class DetailImageBlockView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        if let visible = DetailImageBlockLayout.visibleImage(
+        placeholderView.frame = bounds
+        if !placeholderView.hasFailed, let visible = DetailImageBlockLayout.visibleImage(
             originalSize: originalImageSize,
             bounds: bounds,
             kind: resolvedImageKind
         ) {
             canDisplayImage = true
             imageView.isHidden = false
+            placeholderView.isHidden = loadedImage != nil
             imageView.frame = visible.frame
             if !animationBinding.hasAnimation { imageView.image = loadedImage }
             imageView.contentMode = visible.contentMode
@@ -170,6 +193,7 @@ final class DetailImageBlockView: UIView {
         } else {
             canDisplayImage = false
             imageView.isHidden = true
+            placeholderView.isHidden = false
             // 目标比当前行高更高时先留占位，等行高到位再按最终尺寸画，避免整张图先缩小再放大。
             imageView.frame = bounds
             if !animationBinding.hasAnimation { imageView.image = nil }
@@ -203,6 +227,7 @@ final class DetailImageBlockView: UIView {
         imageView.accessibilityLabel = imageBlock.altText
         imageView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap)))
         addSubview(imageView)
+        addSubview(placeholderView)
     }
 
     private func loadImageIfNeeded() {
@@ -221,8 +246,18 @@ final class DetailImageBlockView: UIView {
     }
 
     func applyLoadedImage(_ result: DetailInlineImageResult) {
-        guard let image = result.image else { return }
         animationBinding.reset()
+        guard !result.isFallback, let image = result.image else {
+            loadedImage = nil
+            originalImageSize = .zero
+            placeholderView.showFailure(true)
+            placeholderView.isHidden = false
+            imageView.isHidden = true
+            onImageFailed()
+            setNeedsLayout()
+            return
+        }
+        placeholderView.showFailure(false)
         if let resolvedKind = result.resolvedKind { resolvedImageKind = resolvedKind }
         originalImageSize = result.originalSize ?? image.size
         loadedImage = image

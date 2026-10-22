@@ -18,10 +18,12 @@ final class DetailInlineImageView: AnimatedImageView {
     /// 用于判断是否按长图展示；为 nil 时不做长图处理，例如表情图。
     private let longImageLayoutWidth: CGFloat?
     private let onImageLoaded: (URL, CGSize) -> Void
+    private let onImageFailed: (URL) -> Void
     private let onImageTapped: (URL) -> Void
     private var originalImageSize: CGSize?
     private var resolvedImageKind: DetailImageKind = .normal
     private var loadToken: UUID?
+    private let placeholderView = DetailImagePlaceholderView()
     private lazy var animationBinding = DetailAnimatedImageBinding(imageView: self)
     private let diagnosticID = String(UUID().uuidString.prefix(8))
 
@@ -34,6 +36,7 @@ final class DetailInlineImageView: AnimatedImageView {
         usesDetailImageOptimization: Bool,
         longImageLayoutWidth: CGFloat? = nil,
         onImageLoaded: @escaping (URL, CGSize) -> Void,
+        onImageFailed: @escaping (URL) -> Void = { _ in },
         onImageTapped: @escaping (URL) -> Void
     ) {
         self.imageURL = imageURL
@@ -43,6 +46,7 @@ final class DetailInlineImageView: AnimatedImageView {
         self.usesDetailImageOptimization = usesDetailImageOptimization
         self.longImageLayoutWidth = longImageLayoutWidth
         self.onImageLoaded = onImageLoaded
+        self.onImageFailed = onImageFailed
         self.onImageTapped = onImageTapped
         super.init(frame: frame)
         autoPlayAnimatedImage = true
@@ -51,6 +55,7 @@ final class DetailInlineImageView: AnimatedImageView {
         purgeFramesOnBackground = true
         isUserInteractionEnabled = true
         addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap)))
+        addSubview(placeholderView)
     }
 
     required init?(coder: NSCoder) {
@@ -59,6 +64,7 @@ final class DetailInlineImageView: AnimatedImageView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        placeholderView.frame = bounds
         updateLongImagePreview()
     }
 
@@ -82,7 +88,8 @@ final class DetailInlineImageView: AnimatedImageView {
             animationBinding.reset()
             return
         }
-        guard loadToken == nil else { return }
+        guard loadToken == nil, !placeholderView.hasFailed else { return }
+        placeholderView.isHidden = false
 
         let token = UUID()
         loadToken = token
@@ -110,7 +117,13 @@ final class DetailInlineImageView: AnimatedImageView {
     }
 
     func applyLoadedImage(_ result: DetailInlineImageResult) {
+        guard !result.isFallback, result.image != nil else {
+            applyLoadFailure()
+            return
+        }
         animationBinding.reset()
+        placeholderView.showFailure(false)
+        placeholderView.isHidden = true
         originalImageSize = result.originalSize ?? result.image?.size
         resolvedImageKind = result.resolvedKind ?? .normal
         image = result.image
@@ -132,6 +145,16 @@ final class DetailInlineImageView: AnimatedImageView {
         }
     }
 
+    func applyLoadFailure(notify: Bool = true) {
+        animationBinding.reset()
+        image = nil
+        originalImageSize = nil
+        DetailLongImagePreview.apply(to: self, isLongImage: false)
+        placeholderView.showFailure(true)
+        placeholderView.isHidden = false
+        if notify { onImageFailed(imageURL) }
+    }
+
     private func updateLongImagePreview() {
         guard let longImageLayoutWidth else { return }
         let isLongImage = image.map {
@@ -148,6 +171,7 @@ final class DetailInlineImageView: AnimatedImageView {
     private func loadAnimatedImage(token: UUID) {
         guard let resolvedURL = ImageURLResolver.resolve(imageURL) else {
             logDiagnostics("animatedLoad invalidURL url=\(imageURL.absoluteString)")
+            applyLoadFailure()
             return
         }
 
@@ -165,6 +189,7 @@ final class DetailInlineImageView: AnimatedImageView {
             guard let self, self.loadToken == token else { return }
             switch result {
             case .success(let value):
+                self.placeholderView.isHidden = true
                 self.originalImageSize = value.image.size
                 self.updateLongImagePreview()
                 self.logDiagnostics(
@@ -172,6 +197,7 @@ final class DetailInlineImageView: AnimatedImageView {
                 )
                 self.onImageLoaded(self.imageURL, value.image.size)
             case .failure(let error):
+                self.applyLoadFailure()
                 self.logDiagnostics(
                     "animatedLoad failed url=\(resolvedURL.absoluteString) error=\(error.localizedDescription)"
                 )

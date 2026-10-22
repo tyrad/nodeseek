@@ -719,6 +719,7 @@ final class DetailRichTextNode: ASDisplayNode {
 
     private let attributedText: NSMutableAttributedString
     private let attributedTextLock = NSLock()
+    private var failedImageURLs = Set<URL>()
     private let onImageTapped: ([URL], Int) -> Void
     private let onLinkTapped: (URL) -> Void
     private let onSignatureLinkCandidatesTapped: ([DetailLinkCandidate]) -> Void
@@ -775,7 +776,8 @@ final class DetailRichTextNode: ASDisplayNode {
                 if didUpdate {
                     self.onImageSizeResolved(url, originalSize)
                 }
-            }
+            },
+            onImageFailed: { [weak self] url in self?.updateAttachmentFailure(matching: url) }
         )
     }
 
@@ -783,6 +785,22 @@ final class DetailRichTextNode: ASDisplayNode {
         super.didEnterVisibleState()
         guard isNodeLoaded else { return }
         (view as? DetailRichTextView)?.setPlaybackVisible(isVisible)
+    }
+
+    private func updateAttachmentFailure(matching url: URL) {
+        attributedTextLock.lock()
+        failedImageURLs.insert(url)
+        attributedTextLock.unlock()
+        invalidateCalculatedLayout()
+        setNeedsLayout()
+        // 附件缩小后也要清父容器缓存，否则 cell 仍保留加载前的高度。
+        var ancestor = supernode
+        while let node = ancestor {
+            node.invalidateCalculatedLayout()
+            if node is ASCellNode { break }
+            ancestor = node.supernode
+        }
+        onLayoutInvalidated()
     }
 
     override func didExitVisibleState() {
@@ -806,6 +824,7 @@ final class DetailRichTextNode: ASDisplayNode {
 
         var didUpdate = false
         attributedTextLock.lock()
+        failedImageURLs.remove(url)
         attributedText.enumerateAttribute(
             .attachment,
             in: NSRange(location: 0, length: attributedText.length)
@@ -841,6 +860,7 @@ final class DetailRichTextNode: ASDisplayNode {
         Self.applyCachedAttachmentSizes(
             to: attributedText,
             maxWidth: width,
+            failedImageURLs: failedImageURLs,
             imageSizeProvider: imageSizeProvider
         )
         let measuredText = NSAttributedString(attributedString: attributedText)
@@ -929,6 +949,7 @@ final class DetailRichTextNode: ASDisplayNode {
     private static func applyCachedAttachmentSizes(
         to attributedText: NSMutableAttributedString,
         maxWidth: CGFloat,
+        failedImageURLs: Set<URL>,
         imageSizeProvider: (URL) -> CGSize?
     ) {
         guard maxWidth > 0, attributedText.length > 0 else { return }
@@ -937,8 +958,12 @@ final class DetailRichTextNode: ASDisplayNode {
             in: NSRange(location: 0, length: attributedText.length)
         ) { value, range, _ in
             guard let attachment = value as? DTTextAttachment,
-                  let contentURL = attachment.contentURL,
-                  let originalSize = imageSizeProvider(contentURL),
+                  let contentURL = attachment.contentURL else { return }
+            if failedImageURLs.contains(contentURL) {
+                attachment.displaySize = DetailImagePlaceholderView.failureSize(maxWidth: maxWidth)
+                return
+            }
+            guard let originalSize = imageSizeProvider(contentURL),
                   originalSize.width > 0,
                   originalSize.height > 0 else {
                 return

@@ -87,3 +87,17 @@ MagicTab 扩展回归发现两项原有失败：`testTCPQualityFixtureKeepsFiveF
 测试宿主还记录了一条 QoS 等待的运行时警告，未据此作消除优先级反转的结论；构建仍有既有 Texture 头文件、主线程隔离和 XCTest 部署版本警告。
 
 历史缓存中若某非 WebP 扩展名 URL 只有 JPEG 缩略图、没有重新读取原始 Data，仍可能先按旧静态缓存显示；本轮不为所有旧静态缩略图强制重新下载原图。
+
+## 占位和失败高度回归修正
+
+用户反馈帖子 `881951` 四楼图片无内容但保留高度。2026-10-22 复查该楼图片地址 `https://img.nx.al/i/GAfyDp36zYNc.webp`，普通请求和携带 App 图片请求头的请求均返回 HTTP 200 / `text/html`，不是可解码图片。
+
+定位并修正三处问题：
+
+- 接入动画时隐藏了等待原图尺寸或行高的 UIImageView，连带隐藏其灰底。现在使用独立的系统动态灰色占位视图，覆盖加载中和等待行高更新的区域，成功后隐藏。
+- 加载结果未向视图透传失败状态，8×8 兜底图可能被当作真实尺寸。结果现在显式携带 `isFallback`；失败不写入缩略图缓存、不回传伪造的原图尺寸，显示图标和“图片加载失败”。
+- 失败图片收起为 44pt；富文本附件变矮时同步清理父 cell 的布局缓存，避免节点已缩小但表格保留旧行高。只重测当前节点，不因失败重载整行，避免重复请求循环。
+
+验证采用专用 iPhone 17 Pro / iOS 26.5 模拟器的本地坏图场景，包含“我也试试”及图片附件，分别检查图片节点与实际表格行高、后续布局稳定性、尺寸缓存和浅色/深色截图。`DetailImagePlaceholderTests` + `DetailAnimatedImageIntegrationTests` 6 项通过、1 项性能采样默认跳过；`DetailImageLoaderTests` 23 项通过；`PostDetailViewControllerTests` 124 项通过。原始结果分别见 `.build/DetailImagePlaceholder-3.xcresult`、`.build/DetailImagePlaceholder-loader-only.xcresult` 和 `.build/DetailImagePlaceholder-detail-only.xcresult`。
+
+首轮混跑时 SVG 全局渲染计数断言出现一次额外计数，隔离加载器套件后通过；没有改动该断言。最终回归采用分组运行，不将首轮失败记为通过。

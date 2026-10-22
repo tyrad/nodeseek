@@ -244,16 +244,18 @@ final class DetailImageLoader {
                 data: payload.data,
                 maxPixelSize: pixelWidth
             ) ?? ImageRenderer.image(data: payload.data, mimeType: payload.mimeType, maxPixelSize: pixelWidth)
+            let failed = payload.isFallback || image == nil
             let result = DetailInlineImageResult(
                 image: image,
                 resolvedKind: DetailImagePayloadFactory.resolvedKind(from: payload.data, mimeType: payload.mimeType),
-                originalSize: payload.pixelSize
+                originalSize: failed ? nil : payload.pixelSize,
+                isFallback: failed
             )
             self.logDiagnostics(
                 "inline load payload url=\(imageURL.absoluteString) fallback=\(payload.isFallback) payloadImageSize=\(Self.string(from: payload.pixelSize)) finalImageSize=\(Self.string(from: image?.size ?? .zero))"
             )
             let callbacks = self.stateQueue.sync {
-                if payload.isFallback == false {
+                if !failed {
                     self.inlineImageCache[key] = result
                 }
                 return DetailImageCallbackQueue.take(for: key, from: &self.inlineImageCallbacks)

@@ -28,6 +28,8 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
     private var signatureLinkCandidatesTapHandler: (([DetailLinkCandidate]) -> Void)?
     private var layoutInvalidatedHandler: (() -> Void)?
     private var attachmentLayoutUpdatedHandler: ((URL, CGSize, CGSize) -> Void)?
+    private var imageFailedHandler: ((URL) -> Void)?
+    private var failedImageURLs = Set<URL>()
     private var fixedQuoteImageAttachments = Set<ObjectIdentifier>()
     private var lastLayoutWidth: CGFloat = 0
     private let diagnosticID = String(UUID().uuidString.prefix(8))
@@ -107,7 +109,8 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         onLinkTapped: ((URL) -> Void)? = nil,
         onSignatureLinkCandidatesTapped: (([DetailLinkCandidate]) -> Void)? = nil,
         onLayoutInvalidated: (() -> Void)?,
-        onAttachmentLayoutUpdated: ((URL, CGSize, CGSize) -> Void)? = nil
+        onAttachmentLayoutUpdated: ((URL, CGSize, CGSize) -> Void)? = nil,
+        onImageFailed: ((URL) -> Void)? = nil
     ) {
         pendingRelayoutWorkItem?.cancel()
         imageTapHandler = onImageTapped
@@ -115,6 +118,8 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         signatureLinkCandidatesTapHandler = onSignatureLinkCandidatesTapped
         layoutInvalidatedHandler = onLayoutInvalidated
         attachmentLayoutUpdatedHandler = onAttachmentLayoutUpdated
+        imageFailedHandler = onImageFailed
+        failedImageURLs.removeAll()
         let text = attributedText ?? NSAttributedString()
         fixedQuoteImageAttachments.removeAll(keepingCapacity: true)
         text.enumerateAttribute(.attachment, in: NSRange(location: 0, length: text.length)) { value, range, _ in
@@ -238,6 +243,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
             onImageLoaded: { [weak self] loadedURL, imageSize in
                 self?.handleLoadedImage(loadedURL, imageSize: imageSize)
             },
+            onImageFailed: { [weak self] url in self?.handleFailedImage(url) },
             onImageTapped: { [weak self] tappedURL in
                 self?.handleImageTap(tappedURL)
             }
@@ -253,6 +259,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         imageView.image = (attachment as? DTImageTextAttachment)?.image
         inlineImageViews.add(imageView)
         imageView.setPlaybackVisible(playbackVisible)
+        if failedImageURLs.contains(contentURL) { imageView.applyLoadFailure(notify: false) }
 
         return imageView
     }
@@ -393,6 +400,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
     }
 
     private func handleLoadedImage(_ url: URL, imageSize: CGSize) {
+        failedImageURLs.remove(url)
         if shouldRecordStickerAspectRatio(for: url) {
             stickerAspectRatioProvider.recordLoadedSize(imageSize, for: url)
         }
@@ -414,6 +422,17 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         )
         attachmentLayoutUpdatedHandler?(url, imageSize, update.displaySize)
         scheduleDebouncedRelayout(reason: "imageLoaded")
+    }
+
+    private func handleFailedImage(_ url: URL) {
+        guard failedImageURLs.insert(url).inserted else { return }
+        let size = DetailImagePlaceholderView.failureSize(maxWidth: maxImageWidth())
+        attributedString.enumerateAttribute(.attachment, in: NSRange(location: 0, length: attributedString.length)) { value, _, _ in
+            guard let attachment = value as? DTTextAttachment, attachment.contentURL == url else { return }
+            attachment.displaySize = size
+        }
+        imageFailedHandler?(url)
+        scheduleDebouncedRelayout(reason: "imageFailed")
     }
 
     private func scheduleDebouncedRelayout(reason: String) {

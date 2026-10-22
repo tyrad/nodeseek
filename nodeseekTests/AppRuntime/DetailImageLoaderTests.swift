@@ -15,6 +15,38 @@ import UIKit
 @MainActor
 @Suite(.serialized)
 struct DetailImageLoaderTests {
+    @Test func inlineFailureIsExplicitAndNeverBecomesAnEightPixelImageSize() async throws {
+        let directory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = try #require(URL(string: "https://images.example.com/broken.webp"))
+        DetailImageURLProtocol.reset()
+        let session = URLSession(configuration: Self.urlSessionConfiguration(protocolType: DetailImageURLProtocol.self))
+        for optimized in [true, false] {
+            let loader = DetailImageLoader(session: session, cacheDirectory: directory.appendingPathComponent(String(optimized)))
+            DetailImageURLProtocol.stub(data: Data("<!doctype html><html>expired image host</html>".utf8), mimeType: "text/html", for: url)
+            for _ in 0 ..< 2 {
+                let result: DetailInlineImageResult = await withCheckedContinuation { continuation in
+                    loader.loadImageForInlineResult(url, maxPixelWidth: 320, displayScale: 1, allowsOptimization: optimized) {
+                        continuation.resume(returning: $0)
+                    }
+                }
+                #expect(result.isFallback)
+                #expect(result.originalSize == nil)
+                #expect(result.animationAsset == nil)
+                #expect(loader.detailImageCacheByteSize() == 0)
+            }
+            DetailImageURLProtocol.stub(data: try DetailWebPTestFixture.data(name: "static"), mimeType: "image/webp", for: url)
+            let recovered: DetailInlineImageResult = await withCheckedContinuation { continuation in
+                loader.loadImageForInlineResult(url, maxPixelWidth: 320, displayScale: 1, allowsOptimization: optimized) {
+                    continuation.resume(returning: $0)
+                }
+            }
+            #expect(!recovered.isFallback)
+            #expect(recovered.originalSize == CGSize(width: 32, height: 24))
+        }
+        #expect(DetailImageURLProtocol.totalRequestCount() == 6)
+    }
+
     @Test func animatedWebPBypassesLegacyJPEGAndSharesOnlyLiveAssets() async throws {
         let directory = Self.makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
