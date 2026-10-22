@@ -1,0 +1,4 @@
+/* 商店语言列表读取包内 .lproj。繁体仅覆盖系统会展示的 Info.plist 文案。 */
+"CFBundleDisplayName" = "NS Connect";
+"NSCameraUsageDescription" = "拍照上傳到 NodeImage 並插入回覆";
+"NSPhotoLibraryAddUsageDescription" = "儲存圖片到系統相簿";
