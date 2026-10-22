@@ -29,6 +29,7 @@ final class DetailImageLoader {
     private let stateQueue = DispatchQueue(label: "com.nodeseek.app.detailimage.state")
     private var inlineImageCache: [DetailInlineImageCacheKey: DetailInlineImageResult] = [:]
     private var inlineImageCallbacks: [DetailInlineImageCacheKey: [InlineImageCompletion]] = [:]
+    private var animatedAssets: [URL: DetailWeakAnimatedImageAsset] = [:]
 
     // MARK: - Initialization
 
@@ -136,6 +137,20 @@ final class DetailImageLoader {
         allowsOptimization: Bool = true,
         completion: @escaping (DetailInlineImageResult) -> Void
     ) {
+        // 磁盘命中也可能需要识别动画并生成首帧，统一放到后台处理。
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.loadInlineResult(imageURL, maxPixelWidth: maxPixelWidth, displayScale: displayScale,
+                                  allowsOptimization: allowsOptimization, completion: completion)
+        }
+    }
+
+    private func loadInlineResult(
+        _ imageURL: URL,
+        maxPixelWidth: CGFloat,
+        displayScale: CGFloat,
+        allowsOptimization: Bool,
+        completion: @escaping (DetailInlineImageResult) -> Void
+    ) {
         let mode = optimizationModeProvider()
         if allowsOptimization,
            isOptimizableDetailImageURL(imageURL),
@@ -149,6 +164,9 @@ final class DetailImageLoader {
                 cachedOriginalData: { self.imageDataLoader.cachedData(for: $0) },
                 loadOriginalDataPayload: { url, completion in
                     self.loadOriginalDataPayload(for: url, completion: completion)
+                },
+                animatedResult: { payload, pixels in
+                    self.animatedInlineResult(payload, url: imageURL, maximumPixelSize: pixels)
                 },
                 completion: completion
             )
@@ -170,6 +188,7 @@ final class DetailImageLoader {
         stateQueue.sync {
             inlineImageCache.removeAll()
             inlineImageCallbacks.removeAll()
+            animatedAssets.removeAll()
         }
         try thumbnailLoader.clearCache()
     }
@@ -214,6 +233,13 @@ final class DetailImageLoader {
         )
         loadOriginalDataPayload(for: imageURL) { [weak self] payload in
             guard let self else { return }
+            if let result = self.animatedInlineResult(payload, url: cacheURL, maximumPixelSize: pixelWidth) {
+                let callbacks = self.stateQueue.sync {
+                    DetailImageCallbackQueue.take(for: key, from: &self.inlineImageCallbacks)
+                }
+                callbacks.forEach { $0(result) }
+                return
+            }
             let image = payload.renderedSVGImage.map { ImageRenderer.boundedImage($0, maxPixelSize: pixelWidth) } ?? ImageRenderer.downsampledImage(
                 data: payload.data,
                 maxPixelSize: pixelWidth
@@ -237,6 +263,25 @@ final class DetailImageLoader {
     }
 
     // MARK: - Payload Loading
+
+    private func animatedInlineResult(
+        _ payload: DetailOriginalDataPayload, url: URL, maximumPixelSize: Int
+    ) -> DetailInlineImageResult? {
+        guard !payload.isFallback, DetailWebPAnimation.isAnimated(payload.data) else { return nil }
+        let key = ImageURLResolver.resolve(url) ?? url
+        let asset = stateQueue.sync {
+            if let asset = animatedAssets[key]?.value { return asset }
+            animatedAssets = animatedAssets.filter { $0.value.value != nil }
+            let asset = DetailAnimatedImageAsset(data: payload.data)
+            animatedAssets[key] = DetailWeakAnimatedImageAsset(asset)
+            return asset
+        }
+        let image = ImageRenderer.downsampledImage(
+            data: payload.data, maxPixelSize: min(maximumPixelSize, DetailWebPAnimation.maximumPixelSize)
+        ) ?? DetailImageFallback.image
+        return DetailInlineImageResult(image: image, resolvedKind: nil,
+                                       originalSize: payload.pixelSize, animationAsset: asset)
+    }
 
     private func loadOriginalDataPayload(for imageURL: URL, completion: @escaping OriginalDataCompletion) {
         guard let resolvedURL = ImageURLResolver.resolve(imageURL) else {

@@ -30,6 +30,7 @@ final class DetailThumbnailLoader {
         mode: DetailImageOptimizationMode,
         cachedOriginalData: (URL) -> Data?,
         loadOriginalDataPayload: @escaping OriginalDataProvider,
+        animatedResult: @escaping (DetailOriginalDataPayload, Int) -> DetailInlineImageResult?,
         completion: @escaping Completion
     ) {
         let pixelSide = max(1, Int(ceil(maxPixelWidth)))
@@ -39,7 +40,9 @@ final class DetailThumbnailLoader {
             return
         }
 
-        if let cachedThumbnail = cachedThumbnailResult(for: resolvedURL, mode: mode) {
+        // 旧版本可能将动态 WebP 缓存成 JPEG，必须先检查原图再使用该缩略图。
+        let inspectOriginal = DetailWebPAnimation.shouldInspectOriginal(resolvedURL)
+        if !inspectOriginal, let cachedThumbnail = cachedThumbnailResult(for: resolvedURL, mode: mode) {
             var result = cachedThumbnail
             if result.originalSize == nil {
                 // 旧缩略图只补读磁盘元数据；原图已被清理时不触发下载。
@@ -59,6 +62,15 @@ final class DetailThumbnailLoader {
 
         loadOriginalDataPayload(imageURL) { [weak self] payload in
             guard let self else { return }
+            if let result = animatedResult(payload, pixelSide) {
+                self.completeThumbnailLoad(for: resolvedURL, result: result, cacheInMemory: false)
+                return
+            }
+            if inspectOriginal, var cached = self.cachedThumbnailResult(for: resolvedURL, mode: mode) {
+                if !payload.isFallback { cached.originalSize = payload.pixelSize }
+                self.completeThumbnailLoad(for: resolvedURL, result: cached, cacheInMemory: !payload.isFallback)
+                return
+            }
             if DetailImagePayloadFactory.resolvedKind(from: payload.data, mimeType: payload.mimeType) == .report {
                 let image = payload.renderedSVGImage ?? ImageRenderer.image(data: payload.data, mimeType: payload.mimeType) ?? DetailImageFallback.image
                 let result = DetailInlineImageResult(image: image, resolvedKind: .report)

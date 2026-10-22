@@ -15,6 +15,81 @@ import UIKit
 @MainActor
 @Suite(.serialized)
 struct DetailImageLoaderTests {
+    @Test func animatedWebPBypassesLegacyJPEGAndSharesOnlyLiveAssets() async throws {
+        let directory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = try #require(URL(string: "https://images.example.com/animated.webp"))
+        let data = try DetailWebPTestFixture.data()
+        try Self.writeCachedThumbnail(Self.makeNoisyJPEGData(width: 20, height: 20, quality: 0.8), for: url, in: directory)
+        DetailImageURLProtocol.reset()
+        DetailImageURLProtocol.stub(data: data, mimeType: "image/webp", for: url)
+        let session = URLSession(configuration: Self.urlSessionConfiguration(protocolType: DetailImageURLProtocol.self))
+        let loader = DetailImageLoader(session: session, cacheDirectory: directory)
+        var first: DetailInlineImageResult? = await withCheckedContinuation { continuation in
+            loader.loadImageForInlineResult(url, maxPixelWidth: 1000, displayScale: 3) {
+                #expect(!Thread.isMainThread)
+                continuation.resume(returning: $0)
+            }
+        }
+        #expect(first?.animationAsset != nil)
+        #expect(first?.originalSize == CGSize(width: 640, height: 640))
+        #expect(first?.image?.size == CGSize(width: 512, height: 512))
+        var second: DetailInlineImageResult? = await withCheckedContinuation { continuation in
+            loader.loadImageForInlineResult(url, maxPixelWidth: 320, displayScale: 1) { continuation.resume(returning: $0) }
+        }
+        #expect(first?.animationAsset === second?.animationAsset)
+        #expect(second?.image?.size == CGSize(width: 320, height: 320))
+        let original = try await Self.loadOriginalImagePayload(loader: loader, url: url)
+        #expect(original.data == data)
+        let cold = DetailImageLoader(session: session, cacheDirectory: directory)
+        let result: DetailInlineImageResult = await withCheckedContinuation { continuation in
+            cold.loadImageForInlineResult(url, maxPixelWidth: 320, displayScale: 1) { continuation.resume(returning: $0) }
+        }
+        #expect(result.animationAsset != nil)
+        #expect(DetailImageURLProtocol.totalRequestCount() == 1)
+        weak var asset = first?.animationAsset
+        first = nil
+        second = nil
+        #expect(asset == nil, "原图资源不能被展示图缓存常驻持有")
+    }
+
+    @Test func webPIsDetectedFromContentAndDisabledOptimizationStillReturnsAnimation() async throws {
+        let directory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = try #require(URL(string: "https://images.example.com/animation.jpg"))
+        DetailImageURLProtocol.reset()
+        DetailImageURLProtocol.stub(data: try DetailWebPTestFixture.data(), mimeType: "application/octet-stream", for: url)
+        let loader = DetailImageLoader(
+            session: URLSession(configuration: Self.urlSessionConfiguration(protocolType: DetailImageURLProtocol.self)),
+            cacheDirectory: directory, optimizationModeProvider: { .disabled }
+        )
+        let result: DetailInlineImageResult = await withCheckedContinuation { continuation in
+            loader.loadImageForInlineResult(url, maxPixelWidth: 320, displayScale: 1) { continuation.resume(returning: $0) }
+        }
+        #expect(result.animationAsset != nil)
+        #expect(result.originalSize == CGSize(width: 640, height: 640))
+        #expect(loader.detailImageCacheByteSize() == 0)
+    }
+
+    @Test func staticWebPRemainsStaticAndCanUseThumbnailCache() async throws {
+        let directory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = try #require(URL(string: "https://images.example.com/static.webp"))
+        DetailImageURLProtocol.reset()
+        DetailImageURLProtocol.stub(data: try DetailWebPTestFixture.data(name: "static"), mimeType: "image/webp", for: url)
+        let loader = DetailImageLoader(
+            session: URLSession(configuration: Self.urlSessionConfiguration(protocolType: DetailImageURLProtocol.self)),
+            cacheDirectory: directory
+        )
+        let result: DetailInlineImageResult = await withCheckedContinuation { continuation in
+            loader.loadImageForInlineResult(url, maxPixelWidth: 320, displayScale: 1) { continuation.resume(returning: $0) }
+        }
+        #expect(result.animationAsset == nil)
+        #expect(result.originalSize == CGSize(width: 32, height: 24))
+        #expect(loader.detailImageCacheByteSize() > 0)
+        #expect(DetailImageURLProtocol.totalRequestCount() == 1)
+    }
+
     @Test func legacyThumbnailWithoutOriginalNeverStartsNetworkAcrossColdLoads() async throws {
         let directory = Self.makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

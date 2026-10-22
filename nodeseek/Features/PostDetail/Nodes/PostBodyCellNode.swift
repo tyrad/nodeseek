@@ -758,6 +758,7 @@ final class DetailRichTextNode: ASDisplayNode {
     override func didLoad() {
         super.didLoad()
         guard let richTextView = view as? DetailRichTextView else { return }
+        richTextView.setPlaybackVisible(isVisible)
         richTextView.configure(
             attributedText,
             onImageTapped: onImageTapped,
@@ -776,6 +777,18 @@ final class DetailRichTextNode: ASDisplayNode {
                 }
             }
         )
+    }
+
+    override func didEnterVisibleState() {
+        super.didEnterVisibleState()
+        guard isNodeLoaded else { return }
+        (view as? DetailRichTextView)?.setPlaybackVisible(isVisible)
+    }
+
+    override func didExitVisibleState() {
+        super.didExitVisibleState()
+        guard isNodeLoaded else { return }
+        (view as? DetailRichTextView)?.setPlaybackVisible(isVisible)
     }
 
     @discardableResult

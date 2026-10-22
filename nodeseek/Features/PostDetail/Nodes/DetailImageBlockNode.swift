@@ -59,6 +59,26 @@ final class DetailImageBlockNode: ASDisplayNode {
         )
     }
 
+    override func didLoad() {
+        super.didLoad()
+        updatePlaybackVisibility()
+    }
+
+    override func didEnterVisibleState() {
+        super.didEnterVisibleState()
+        updatePlaybackVisibility()
+    }
+
+    override func didExitVisibleState() {
+        super.didExitVisibleState()
+        updatePlaybackVisibility()
+    }
+
+    private func updatePlaybackVisibility() {
+        guard isNodeLoaded else { return }
+        (view as? DetailImageBlockView)?.setPlaybackVisible(isVisible)
+    }
+
     func updateLoadedImageSize(_ imageSize: CGSize, resolvedKind: DetailImageKind? = nil) {
         guard imageSize.width > 0, imageSize.height > 0 else { return }
         let previousSize = loadedImageSize
@@ -101,7 +121,7 @@ final class DetailImageBlockNode: ASDisplayNode {
     }
 }
 
-private final class DetailImageBlockView: UIView {
+final class DetailImageBlockView: UIView {
     private let imageBlock: RenderedImageBlock
     private let onImageLoaded: (CGSize, DetailImageKind?) -> Void
     private let onImageTapped: () -> Void
@@ -110,6 +130,11 @@ private final class DetailImageBlockView: UIView {
     private var originalImageSize: CGSize = .zero
     private var hasStartedLoad = false
     private var resolvedImageKind: DetailImageKind
+    private lazy var animationBinding = DetailAnimatedImageBinding(imageView: imageView)
+    private var playbackVisible = false
+    private var canDisplayImage = false
+
+    var isPlayingWebP: Bool { animationBinding.isPlaying }
 
     init(
         imageBlock: RenderedImageBlock,
@@ -136,18 +161,37 @@ private final class DetailImageBlockView: UIView {
             bounds: bounds,
             kind: resolvedImageKind
         ) {
+            canDisplayImage = true
+            imageView.isHidden = false
             imageView.frame = visible.frame
-            imageView.image = loadedImage
+            if !animationBinding.hasAnimation { imageView.image = loadedImage }
             imageView.contentMode = visible.contentMode
             DetailLongImagePreview.apply(to: imageView, isLongImage: visible.isLongImage)
         } else {
+            canDisplayImage = false
+            imageView.isHidden = true
             // 目标比当前行高更高时先留占位，等行高到位再按最终尺寸画，避免整张图先缩小再放大。
             imageView.frame = bounds
-            imageView.image = nil
+            if !animationBinding.hasAnimation { imageView.image = nil }
             // 角标是子视图，图片被清掉后不会跟着消失。
             DetailLongImagePreview.apply(to: imageView, isLongImage: false)
         }
+        updatePlaybackVisibility()
         loadImageIfNeeded()
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        animationBinding.windowDidChange()
+    }
+
+    func setPlaybackVisible(_ visible: Bool) {
+        playbackVisible = visible
+        updatePlaybackVisibility()
+    }
+
+    private func updatePlaybackVisibility() {
+        animationBinding.setVisible(playbackVisible && canDisplayImage)
     }
 
     private func configureView() {
@@ -162,7 +206,7 @@ private final class DetailImageBlockView: UIView {
     }
 
     private func loadImageIfNeeded() {
-        guard hasStartedLoad == false else { return }
+        guard hasStartedLoad == false, bounds.width > 0 else { return }
         hasStartedLoad = true
         let scale = window?.windowScene?.screen.scale ?? traitCollection.displayScale
         let targetPixelWidth = max(bounds.width, DetailImageLayout.maxImageHeight) * max(scale, 1)
@@ -170,16 +214,25 @@ private final class DetailImageBlockView: UIView {
             .toDetailInline(maxPixelWidth: targetPixelWidth, displayScale: scale)
             .loadResult { [weak self] result in
                 DispatchQueue.main.async {
-                    guard let self, let image = result.image else { return }
-                    if let resolvedKind = result.resolvedKind {
-                        self.resolvedImageKind = resolvedKind
-                    }
-                    self.originalImageSize = result.originalSize ?? image.size
-                    self.loadedImage = image
-                    self.onImageLoaded(self.originalImageSize, result.resolvedKind)
-                    self.setNeedsLayout()
+                    guard let self else { return }
+                    self.applyLoadedImage(result)
                 }
             }
+    }
+
+    func applyLoadedImage(_ result: DetailInlineImageResult) {
+        guard let image = result.image else { return }
+        animationBinding.reset()
+        if let resolvedKind = result.resolvedKind { resolvedImageKind = resolvedKind }
+        originalImageSize = result.originalSize ?? image.size
+        loadedImage = image
+        if let asset = result.animationAsset,
+           DetailImageLayout.allowsInlineAnimation(for: originalImageSize, maxWidth: bounds.width, kind: resolvedImageKind) {
+            let scale = window?.windowScene?.screen.scale ?? traitCollection.displayScale
+            animationBinding.load(asset, poster: image, maximumPixelSize: Int(ceil(bounds.width * max(scale, 1))))
+        }
+        onImageLoaded(originalImageSize, result.resolvedKind)
+        setNeedsLayout()
     }
 
     @objc

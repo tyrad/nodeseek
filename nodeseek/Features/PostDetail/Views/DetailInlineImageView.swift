@@ -22,6 +22,7 @@ final class DetailInlineImageView: AnimatedImageView {
     private var originalImageSize: CGSize?
     private var resolvedImageKind: DetailImageKind = .normal
     private var loadToken: UUID?
+    private lazy var animationBinding = DetailAnimatedImageBinding(imageView: self)
     private let diagnosticID = String(UUID().uuidString.prefix(8))
 
     init(
@@ -61,6 +62,15 @@ final class DetailInlineImageView: AnimatedImageView {
         updateLongImagePreview()
     }
 
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        animationBinding.windowDidChange()
+    }
+
+    func setPlaybackVisible(_ visible: Bool) { animationBinding.setVisible(visible) }
+
+    var isPlayingWebP: Bool { animationBinding.isPlaying }
+
     override func didMoveToSuperview() {
         super.didMoveToSuperview()
 
@@ -69,6 +79,7 @@ final class DetailInlineImageView: AnimatedImageView {
             loadToken = nil
             kf.cancelDownloadTask()
             purgeFrames()
+            animationBinding.reset()
             return
         }
         guard loadToken == nil else { return }
@@ -99,11 +110,18 @@ final class DetailInlineImageView: AnimatedImageView {
     }
 
     func applyLoadedImage(_ result: DetailInlineImageResult) {
+        animationBinding.reset()
         originalImageSize = result.originalSize ?? result.image?.size
         resolvedImageKind = result.resolvedKind ?? .normal
         image = result.image
         // 即使占位与最终尺寸相同、富文本不重排，也立即切换裁剪和角标。
         updateLongImagePreview()
+        // 附件首次可能尚无尺寸，WebP 用加载后的原始尺寸重新判断是否允许动画。
+        if let asset = result.animationAsset, let originalImageSize,
+           DetailImageLayout.allowsInlineAnimation(for: originalImageSize, maxWidth: bounds.width,
+                                                   kind: usesDetailImageOptimization ? .normal : .sticker) {
+            animationBinding.load(asset, poster: result.image, maximumPixelSize: Int(ceil(targetPixelWidth)))
+        }
         if let image {
             logDiagnostics(
                 "loaded url=\(imageURL.absoluteString) imageSize=\(Self.string(from: image.size)) frame=\(Self.string(from: frame))"

@@ -13,6 +13,7 @@
 		7A1000152FA0000000000001 /* JXPhotoBrowser in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000172FA0000000000001 /* JXPhotoBrowser */; };
 		7A1000182FA0000000000001 /* DTCoreText in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000192FA0000000000001 /* DTCoreText */; };
 		7A10001C2FA0000000000001 /* SVGKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7A10001D2FA0000000000001 /* SVGKit */; };
+		7A1000202FA0000000000001 /* FramePlay in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000212FA0000000000001 /* FramePlay */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,6 +68,7 @@
 				7A1000152FA0000000000001 /* JXPhotoBrowser in Frameworks */,
 				7A1000182FA0000000000001 /* DTCoreText in Frameworks */,
 				7A10001C2FA0000000000001 /* SVGKit in Frameworks */,
+				7A1000202FA0000000000001 /* FramePlay in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -124,6 +126,7 @@
 				7A1000172FA0000000000001 /* JXPhotoBrowser */,
 				7A1000192FA0000000000001 /* DTCoreText */,
 				7A10001D2FA0000000000001 /* SVGKit */,
+				7A1000212FA0000000000001 /* FramePlay */,
 			);
 			productName = nodeseek;
 			productReference = 5CD3D9512F9EFACE008DB075 /* nodeseek.app */;
@@ -189,6 +192,7 @@
 				7A1000162FA0000000000001 /* XCRemoteSwiftPackageReference "PhotoBrowser" */,
 				7A10001A2FA0000000000001 /* XCRemoteSwiftPackageReference "DTCoreText" */,
 				7A10001B2FA0000000000001 /* XCRemoteSwiftPackageReference "SVGKit" */,
+				7A1000222FA0000000000001 /* XCLocalSwiftPackageReference "Packages/FramePlay" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5CD3D9522F9EFACE008DB075 /* Products */;
@@ -513,6 +517,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		7A1000222FA0000000000001 /* XCLocalSwiftPackageReference "Packages/FramePlay" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/FramePlay;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		7A1000032FA0000000000001 /* XCRemoteSwiftPackageReference "Kanna" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -565,6 +576,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		7A1000212FA0000000000001 /* FramePlay */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7A1000222FA0000000000001 /* XCLocalSwiftPackageReference "Packages/FramePlay" */;
+			productName = FramePlay;
+		};
 		7A1000022FA0000000000001 /* Kanna */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 7A1000032FA0000000000001 /* XCRemoteSwiftPackageReference "Kanna" */;

@@ -33,6 +33,13 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
     private let diagnosticID = String(UUID().uuidString.prefix(8))
     private var pendingRelayoutWorkItem: DispatchWorkItem?
     private let stickerAspectRatioProvider: any StickerAspectRatioProviding = StickerAspectRatioCache.shared
+    private let inlineImageViews = NSHashTable<DetailInlineImageView>.weakObjects()
+    private var playbackVisible = false
+
+    func setPlaybackVisible(_ visible: Bool) {
+        playbackVisible = visible
+        inlineImageViews.allObjects.forEach { $0.setPlaybackVisible(visible) }
+    }
 
     private enum RelayoutDebounce {
         static let interval: TimeInterval = 0.10
@@ -244,6 +251,8 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         imageView.isOpaque = false
         imageView.backgroundColor = .clear
         imageView.image = (attachment as? DTImageTextAttachment)?.image
+        inlineImageViews.add(imageView)
+        imageView.setPlaybackVisible(playbackVisible)
 
         return imageView
     }
