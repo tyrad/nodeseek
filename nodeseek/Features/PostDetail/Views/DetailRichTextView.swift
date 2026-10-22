@@ -36,7 +36,30 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
     private var pendingRelayoutWorkItem: DispatchWorkItem?
     private let stickerAspectRatioProvider: any StickerAspectRatioProviding = StickerAspectRatioCache.shared
     private let inlineImageViews = NSHashTable<DetailInlineImageView>.weakObjects()
+    private let accessibilityAttachmentViews = NSMapTable<DTTextAttachment, UIView>(
+        keyOptions: [.weakMemory, .objectPointerPersonality],
+        valueOptions: .weakMemory
+    )
     private var playbackVisible = false
+
+    override var accessibilityElements: [Any]? {
+        get {
+            guard let layoutFrame else { return [] }
+            // DTCoreText 的附件代理会把 class 报告成 UIView 子类，但没有 UIView 的内存布局。
+            // 系统辅助功能可能直接读取 UIView 的字段，因此只向它提供仍在层级中的真实附件视图。
+            return DTCoreTextLayoutFrameAccessibilityElementGenerator().accessibilityElements(
+                for: layoutFrame,
+                view: self,
+                attachmentViewProvider: { [weak self] attachment in
+                    guard let self, let attachment,
+                          let view = self.accessibilityAttachmentViews.object(forKey: attachment),
+                          view.superview === self, !view.isHidden else { return nil }
+                    return view
+                }
+            )
+        }
+        set { super.accessibilityElements = newValue }
+    }
 
     func setPlaybackVisible(_ visible: Bool) {
         playbackVisible = visible
@@ -122,6 +145,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         failedImageURLs.removeAll()
         let text = attributedText ?? NSAttributedString()
         fixedQuoteImageAttachments.removeAll(keepingCapacity: true)
+        accessibilityAttachmentViews.removeAllObjects()
         text.enumerateAttribute(.attachment, in: NSRange(location: 0, length: text.length)) { value, range, _ in
             guard let attachment = value as? DTTextAttachment,
                   (text.attribute(DetailAttachmentAttributes.fixedQuoteImage, at: range.location, effectiveRange: nil) as? Bool) == true
@@ -216,7 +240,9 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
 
         let isStickerAttachment = isStickerAttachment(attachment, contentURL: contentURL)
         if isVideoURL(contentURL), isStickerAttachment {
-            return DetailInlineVideoStickerView(frame: viewFrame, videoURL: contentURL)
+            let videoView = DetailInlineVideoStickerView(frame: viewFrame, videoURL: contentURL)
+            accessibilityAttachmentViews.setObject(videoView, forKey: attachment)
+            return videoView
         }
 
         guard attachment is DTImageTextAttachment else {
@@ -261,6 +287,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         imageView.setPlaybackVisible(playbackVisible)
         if failedImageURLs.contains(contentURL) { imageView.applyLoadFailure(notify: false) }
 
+        accessibilityAttachmentViews.setObject(imageView, forKey: attachment)
         return imageView
     }
 
