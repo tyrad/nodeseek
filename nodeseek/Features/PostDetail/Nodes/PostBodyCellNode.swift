@@ -33,6 +33,8 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
     private let onReplyTapped: () -> Void
     private let onCommentTapped: () -> Void
     private let onContentCopyTapped: (PostDetailHeaderContent) -> Void
+    private let authorFilterMenuTitle: String?
+    private let onAuthorFilterTapped: () -> Void
     private let onTextLayoutInvalidated: () -> Void
     private let showsReplyActions: Bool
     private let avatarLoader = AvatarImageLoader.shared
@@ -106,6 +108,8 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         onReplyTapped: @escaping () -> Void = {},
         onCommentTapped: @escaping () -> Void = {},
         onContentCopyTapped: @escaping (PostDetailHeaderContent) -> Void = { _ in },
+        authorFilterMenuTitle: String? = nil,
+        onAuthorFilterTapped: @escaping () -> Void = {},
         showsReplyActions: Bool = true,
         showsAuthorRiskWarning: Bool = false,
         onTextLayoutInvalidated: @escaping () -> Void,
@@ -126,6 +130,8 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         self.onReplyTapped = onReplyTapped
         self.onCommentTapped = onCommentTapped
         self.onContentCopyTapped = onContentCopyTapped
+        self.authorFilterMenuTitle = authorFilterMenuTitle
+        self.onAuthorFilterTapped = onAuthorFilterTapped
         self.showsReplyActions = showsReplyActions
         self.onTextLayoutInvalidated = onTextLayoutInvalidated
         self.authorRiskWarningNode = showsAuthorRiskWarning
@@ -690,12 +696,18 @@ extension PostBodyCellNode: UIContextMenuInteractionDelegate {
     }
 
     private func bodyContextMenuActions() -> [UIAction] {
-        [
+        var actions = [
             UIAction(title: "复制", image: UIImage(systemName: "doc.on.doc")) { [weak self] _ in
                 guard let self else { return }
                 self.onContentCopyTapped(self.content)
             }
         ]
+        if let authorFilterMenuTitle {
+            actions.append(UIAction(title: authorFilterMenuTitle, image: UIImage(systemName: "person.crop.circle")) { [weak self] _ in
+                self?.onAuthorFilterTapped()
+            })
+        }
+        return actions
     }
 }
 

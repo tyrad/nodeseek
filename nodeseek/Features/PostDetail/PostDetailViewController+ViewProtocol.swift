@@ -14,7 +14,7 @@ private struct DetailCommentRenderSnapshot {
 }
 
 extension PostDetailViewController: PostDetailViewProtocol {
-    private func updateLoadMoreCommentsFooter() {
+    func updateLoadMoreCommentsFooter() {
         // footer 固定高度 56pt：
         // - 有下一页：保持空白（按钮和 spinner 都隐藏）
         // - 无下一页：显示“加载新评论”
@@ -173,10 +173,23 @@ extension PostDetailViewController: PostDetailViewProtocol {
         let oldCommentCount = comments.count
         let hasHeader = currentHeaderContent != nil
         let commentRowOffset = hasHeader ? 2 : 0
+        let oldRowCount = detailRows.count
+        let oldAuthorFilterBannerText = authorFilterBannerText
         currentPage = max(currentPage, detail.page)
         pagination = detail.pagination
         comments.append(contentsOf: detail.comments)
         loadedCommentPageRanges[detail.page] = oldCommentCount..<comments.count
+        if let authorFilter {
+            appendAuthorFilteredRows(
+                fromRowCount: oldRowCount,
+                bannerChanged: oldAuthorFilterBannerText != authorFilterBannerText
+            )
+            preheatCommentRender(for: detail.comments.filter(authorFilter.matches))
+            updateLoadMoreCommentsFooter()
+            updateReplyButtonVisibility()
+            scheduleAuthorFilterAutoLoadIfNeeded(newMatchCount: detail.comments.filter(authorFilter.matches).count)
+            return
+        }
         var insertedRows: [IndexPath] = []
         if hasHeader, oldCommentCount == 0, comments.isEmpty == false {
             // 初次有评论时，需要补上 header 与评论之间的分割行。
@@ -261,18 +274,23 @@ extension PostDetailViewController: PostDetailViewProtocol {
             insertRows.insert(IndexPath(row: 1, section: 0), at: 0)
         }
 
-        tableNode.performBatch(animated: false, updates: { [weak self] in
-            guard let self else { return }
-            if deleteRows.isEmpty == false {
-                self.tableNode.deleteRows(at: deleteRows, with: .none)
-            }
-            if insertRows.isEmpty == false {
-                self.tableNode.insertRows(at: insertRows, with: .none)
-            }
-            if reloadRows.isEmpty == false {
-                self.tableNode.reloadRows(at: reloadRows, with: .none)
-            }
-        })
+        if authorFilter != nil {
+            // 筛选中的行号与评论下标不对应，当前页刷新直接整表重载。
+            reloadTableData()
+        } else {
+            tableNode.performBatch(animated: false, updates: { [weak self] in
+                guard let self else { return }
+                if deleteRows.isEmpty == false {
+                    self.tableNode.deleteRows(at: deleteRows, with: .none)
+                }
+                if insertRows.isEmpty == false {
+                    self.tableNode.insertRows(at: insertRows, with: .none)
+                }
+                if reloadRows.isEmpty == false {
+                    self.tableNode.reloadRows(at: reloadRows, with: .none)
+                }
+            })
+        }
         AppLog.debug(.postDetail, "详情评论当前页局部刷新完成: page=\(detail.page), reload=\(reloadRows.count), insert=\(insertRows.count), delete=\(deleteRows.count), totalComments=\(comments.count)")
         preheatCommentRender(for: newComments)
         updateLoadMoreCommentsFooter()
@@ -519,6 +537,10 @@ extension PostDetailViewController: PostDetailViewProtocol {
         shouldScrollToTop: Bool,
         shouldScheduleMissingRender: Bool
     ) {
+        if currentHeaderContent?.postID != headerContent.postID {
+            authorFilter = nil
+        }
+        resetAuthorFilterAutoLoad()
         currentPage = targetPage
         hasRenderedDetailContent = true
         displayMode = .content
@@ -554,6 +576,9 @@ extension PostDetailViewController: PostDetailViewProtocol {
         updateLoadMoreCommentsFooter()
         updateReplyButtonVisibility()
         consumeInitialAnchorIfNeeded()
+        if authorFilter != nil {
+            scheduleAuthorFilterAutoLoadIfNeeded(newMatchCount: authorFilterMatchedCount)
+        }
     }
 
     private func preservedRenderedCommentSnapshot(
@@ -623,6 +648,8 @@ extension PostDetailViewController: PostDetailViewProtocol {
             contentHTML: message
         )
         configureHeader(headerContent, renderedContent: nil)
+        authorFilter = nil
+        resetAuthorFilterAutoLoad()
         pagination = nil
         comments = []
         commentRenderedCache.removeAll(keepingCapacity: true)

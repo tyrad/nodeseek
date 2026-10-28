@@ -224,6 +224,9 @@ class PostDetailViewController: UIViewController {
     var replyStickerPickerHeightConstraint: NSLayoutConstraint?
     let leadingScreensForBatching: CGFloat = 2.0
     var lastBatchFetchRequestedCommentCount: Int?
+    var authorFilter: PostDetailAuthorFilter?
+    var authorFilterAutoLoadStreak = 0
+    var authorFilterAutoLoadWorkItem: DispatchWorkItem?
     var actionConfirmationPresenter: PostDetailActionConfirmationPresenter = { viewController, context, onConfirm in
         let alert = UIAlertController(
             title: context.title,
@@ -272,6 +275,7 @@ class PostDetailViewController: UIViewController {
         case header
         case entryHint
         case postRepliesDivider
+        case authorFilterBanner
         case comment(Int)
         case skeletonComment(Int)
     }
@@ -590,6 +594,7 @@ class PostDetailViewController: UIViewController {
         attachmentLayoutRefreshWorkItem?.cancel()
         tableReloadWorkItem?.cancel()
         toastHideWorkItem?.cancel()
+        authorFilterAutoLoadWorkItem?.cancel()
         imageUploadTask?.cancel()
         NotificationCenter.default.removeObserver(self)
     }

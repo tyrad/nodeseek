@@ -353,6 +353,82 @@ struct PostDetailViewControllerTests {
         #expect(viewController.testHeaderContent()?.contentHTML == "<p>正文</p>")
     }
 
+    @Test func authorFilterShowsOnlyMatchingCommentsAndCanBeCleared() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: authorFilterDetail(
+            comments: [
+                Comment(id: "1", authorName: "ipv4", isPoster: true, avatarURL: nil, floorText: "#1", createdAtText: nil, contentHTML: "<p>楼主</p>"),
+                Comment(id: "2", authorName: "b", avatarURL: nil, floorText: "#2", createdAtText: nil, contentHTML: "<p>路人</p>"),
+                Comment(id: "3", authorName: "ipv4", isPoster: true, avatarURL: nil, floorText: "#3", createdAtText: nil, contentHTML: "<p>楼主补充</p>")
+            ],
+            page: 1,
+            nextPage: nil
+        ))
+        await waitForDetailContent(in: viewController, expectedRowCount: 5)
+        let header = try #require(viewController.currentHeaderContent)
+
+        viewController.toggleAuthorFilter(.poster(of: header), focusingCommentID: nil)
+
+        #expect(viewController.testRowCount(inSection: 0) == 4)
+        #expect(viewController.authorFilterBannerText == "只看楼主的回复")
+        #expect(viewController.authorFilterMenuTitle(defaultTitle: "只看楼主") == "查看全部回复")
+        #expect(presenter.didApproachCommentEndCount == 0)
+
+        // 筛选中任何入口都会回到全部回复。
+        viewController.toggleAuthorFilter(.author(of: viewController.comments[1]), focusingCommentID: "2")
+
+        #expect(viewController.authorFilter == nil)
+        #expect(viewController.testRowCount(inSection: 0) == 5)
+    }
+
+    @Test func authorFilterKeepsLoadingNextPagesAndPausesAfterEveryThreePages() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter)
+        let target = Comment(id: "t", authorName: "target", avatarURL: nil, authorProfileURL: URL(string: "https://www.nodeseek.com/space/1"), floorText: "#9", createdAtText: nil, contentHTML: "<p>目标</p>")
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: authorFilterDetail(
+            comments: [
+                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: nil, contentHTML: "<p>路人</p>")
+            ],
+            page: 1,
+            nextPage: 2
+        ))
+        await waitForDetailContent(in: viewController, expectedRowCount: 3)
+
+        viewController.toggleAuthorFilter(.author(of: target), focusingCommentID: nil)
+        #expect(await waitUntil { presenter.didApproachCommentEndCount == 1 })
+
+        for page in 2...4 {
+            viewController.appendCommentPage(detail: authorFilterDetail(
+                comments: [
+                    Comment(id: "p\(page)", authorName: "a", avatarURL: nil, floorText: "#\(page)", createdAtText: nil, contentHTML: "<p>路人</p>")
+                ],
+                page: page,
+                nextPage: page + 1
+            ))
+            if page < 4 {
+                #expect(await waitUntil { presenter.didApproachCommentEndCount == page })
+            }
+        }
+
+        // 第 4 次连续自动翻页前会停顿，不会立即请求。
+        try await Task.sleep(nanoseconds: 200_000_000)
+        #expect(presenter.didApproachCommentEndCount == 3)
+        #expect(await waitUntil(timeout: 2) { presenter.didApproachCommentEndCount == 4 })
+
+        viewController.appendCommentPage(detail: authorFilterDetail(
+            comments: [target],
+            page: 5,
+            nextPage: nil
+        ))
+        #expect(viewController.testRowCount(inSection: 0) == 3)
+        #expect(viewController.comments.count == 5)
+    }
+
     @Test func footerRefreshButtonAppearsAtEndAndTapsPresenter() async throws {
         let presenter = SpyPostDetailPresenter()
         let viewController = PostDetailViewController(presenter: presenter)
@@ -4715,6 +4791,25 @@ private extension ASLayout {
         }
         return nil
     }
+}
+
+private func authorFilterDetail(comments: [nodeseek.Comment], page: Int, nextPage: Int?) -> PostDetail {
+    PostDetail(
+        id: "703863",
+        title: "详情标题",
+        authorName: "ipv4",
+        avatarURL: nil,
+        metadataText: "刚刚",
+        contentHTML: "<p>正文</p>",
+        comments: comments,
+        page: page,
+        pagination: PostDetailPagination(
+            currentPage: page,
+            items: (1...max(page, nextPage ?? page)).map { PostDetailPageItem(page: $0, url: nil, isCurrent: $0 == page) },
+            previousPage: page > 1 ? page - 1 : nil,
+            nextPage: nextPage
+        )
+    )
 }
 
 @MainActor

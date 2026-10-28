@@ -126,6 +126,44 @@ struct ReplyAuthorContextMenuTests {
         #expect(node.debugBodyContextMenuActionTitles == ["复制"])
         #expect(node.debugBodyContextMenuHasPreview == false)
     }
+
+    @Test func authorFilterMenuItemsAppendAfterExistingActions() {
+        let comment = Comment(
+            id: "9835758",
+            authorName: "mist",
+            avatarURL: nil,
+            floorText: "#1",
+            createdAtText: "刚刚",
+            contentHTML: "<p>回复内容</p>"
+        )
+        var filteredCommentIDs: [String] = []
+        let commentNode = CommentCellNode(
+            comment: comment,
+            renderedBody: [],
+            onImageTapped: { _, _ in },
+            authorFilterMenuTitle: "只看 TA",
+            onAuthorFilterTapped: { filteredCommentIDs.append($0.id) },
+            onTextLayoutInvalidated: {}
+        )
+        let header = PostDetailHeaderContent(
+            postID: "703863",
+            title: "帖子标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>帖子正文</p>"
+        )
+        let bodyNode = PostBodyCellNode(
+            content: header,
+            renderedContent: [],
+            onImageTapped: { _, _ in },
+            authorFilterMenuTitle: "只看楼主",
+            onTextLayoutInvalidated: {}
+        )
+
+        #expect(commentNode.debugBodyContextMenuActionTitles == ["复制", "投放鸡腿", "只看 TA"])
+        #expect(bodyNode.debugBodyContextMenuActionTitles == ["复制", "只看楼主"])
+    }
 }
 
 private extension UIView {

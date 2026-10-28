@@ -58,6 +58,8 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
     private let onOpposeTapped: (Comment) -> Void
     private let onReplyTapped: (Comment) -> Void
     private let onQuoteTapped: (Comment) -> Void
+    private let authorFilterMenuTitle: String?
+    private let onAuthorFilterTapped: (Comment) -> Void
     private let onTextLayoutInvalidated: () -> Void
     private let avatarLoader = AvatarImageLoader.shared
     private weak var avatarImageView: UIImageView?
@@ -121,6 +123,8 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         onOpposeTapped: @escaping (Comment) -> Void = { _ in },
         onReplyTapped: @escaping (Comment) -> Void = { _ in },
         onQuoteTapped: @escaping (Comment) -> Void = { _ in },
+        authorFilterMenuTitle: String? = nil,
+        onAuthorFilterTapped: @escaping (Comment) -> Void = { _ in },
         onTextLayoutInvalidated: @escaping () -> Void,
         imageSizeProvider: @escaping (URL) -> CGSize? = { _ in nil },
         onImageSizeResolved: @escaping (URL, CGSize) -> Void = { _, _ in },
@@ -137,6 +141,8 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         self.onOpposeTapped = onOpposeTapped
         self.onReplyTapped = onReplyTapped
         self.onQuoteTapped = onQuoteTapped
+        self.authorFilterMenuTitle = authorFilterMenuTitle
+        self.onAuthorFilterTapped = onAuthorFilterTapped
         self.onTextLayoutInvalidated = onTextLayoutInvalidated
         self.authorBadgeNodes = comment.authorBadgeTexts.map { AuthorStatusBadgeNode(text: $0) }
         self.bodyNodes = DetailContentBlockNodeFactory.makeNodes(
@@ -689,7 +695,7 @@ extension CommentCellNode: UIContextMenuInteractionDelegate {
     }
 
     private func bodyContextMenuActions() -> [UIAction] {
-        return [
+        var actions = [
             UIAction(title: "复制", image: UIImage(systemName: "doc.on.doc")) { [weak self] _ in
                 guard let self else { return }
                 self.onAuthorCopyTapped(self.comment)
@@ -698,5 +704,12 @@ extension CommentCellNode: UIContextMenuInteractionDelegate {
                 self?.chickenLegTapped()
             }
         ]
+        if let authorFilterMenuTitle, hasDisplayableAuthor {
+            actions.append(UIAction(title: authorFilterMenuTitle, image: UIImage(systemName: "person.crop.circle")) { [weak self] _ in
+                guard let self else { return }
+                self.onAuthorFilterTapped(self.comment)
+            })
+        }
+        return actions
     }
 }

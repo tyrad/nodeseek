@@ -21,12 +21,16 @@ extension PostDetailViewController {
             if shouldShowInitialPageHint {
                 rows.append(.entryHint)
             }
-            if displayMode == .pageSkeleton || comments.isEmpty == false {
+            if authorFilter != nil, displayMode == .content {
+                rows.append(.authorFilterBanner)
+            } else if displayMode == .pageSkeleton || comments.isEmpty == false {
                 rows.append(.postRepliesDivider)
             }
         }
         if displayMode == .pageSkeleton {
             rows.append(contentsOf: (0..<skeletonCommentRowCount).map(DetailRow.skeletonComment))
+        } else if let authorFilter {
+            rows.append(contentsOf: comments.indices.filter { authorFilter.matches(comments[$0]) }.map(DetailRow.comment))
         } else {
             rows.append(contentsOf: comments.indices.map(DetailRow.comment))
         }
@@ -141,6 +145,7 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
             }
             let renderedContent = headerRenderedContent
             let showsWarning = authorRiskWarningPostID == header.postID
+            let filterMenuTitle = authorFilterMenuTitle(defaultTitle: "只看楼主")
             let imageSizeProvider = makeCurrentImageSizeProvider()
             return { [weak self] in
                 PostBodyCellNode(
@@ -179,6 +184,10 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                     onContentCopyTapped: { content in
                         self?.presentPostBodyCopySheet(for: content)
                     },
+                    authorFilterMenuTitle: filterMenuTitle,
+                    onAuthorFilterTapped: {
+                        self?.toggleAuthorFilter(.poster(of: header), focusingCommentID: nil)
+                    },
                     showsReplyActions: self?.showsReplyEntry == true,
                     showsAuthorRiskWarning: showsWarning,
                     onTextLayoutInvalidated: {
@@ -204,6 +213,13 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
             return {
                 PostRepliesDividerCellNode()
             }
+        case .authorFilterBanner:
+            let text = authorFilterBannerText
+            return { [weak self] in
+                PostDetailAuthorFilterBannerCellNode(text: text) {
+                    self?.toggleAuthorFilter(nil, focusingCommentID: nil)
+                }
+            }
         case .skeletonComment(_):
             return {
                 PostDetailSkeletonCellNode(kind: .comment)
@@ -215,6 +231,7 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
 
             let comment = comments[commentIndex]
             let renderedBody = commentRenderedCache[comment.id]
+            let filterMenuTitle = authorFilterMenuTitle(defaultTitle: "只看 TA")
             let imageSizeProvider = makeCurrentImageSizeProvider()
             return { [weak self] in
                 CommentCellNode(
@@ -249,6 +266,10 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                     },
                     onQuoteTapped: { comment in
                         self?.handleQuote(comment)
+                    },
+                    authorFilterMenuTitle: filterMenuTitle,
+                    onAuthorFilterTapped: { comment in
+                        self?.toggleAuthorFilter(.author(of: comment), focusingCommentID: comment.id)
                     },
                     onTextLayoutInvalidated: {
                         self?.scheduleAttachmentLayoutRefresh()
