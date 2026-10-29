@@ -181,6 +181,9 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                     onCommentTapped: {
                         self?.presentCommentEditor()
                     },
+                    onEditTapped: header.isOwnPost ? {
+                        self?.presenter.didTapEditPost()
+                    } : nil,
                     onContentCopyTapped: { content in
                         self?.presentPostBodyCopySheet(for: content)
                     },
@@ -271,6 +274,9 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                     onAuthorFilterTapped: { comment in
                         self?.toggleAuthorFilter(.author(of: comment), focusingCommentID: comment.id)
                     },
+                    onEditTapped: comment.isOwnComment ? { comment in
+                        self?.presenter.didTapEditComment(comment)
+                    } : nil,
                     onTextLayoutInvalidated: {
                         self?.scheduleAttachmentLayoutRefresh()
                     },

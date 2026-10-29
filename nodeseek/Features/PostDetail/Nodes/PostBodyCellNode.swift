@@ -32,6 +32,8 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
     private let onFavoriteTapped: () -> Void
     private let onReplyTapped: () -> Void
     private let onCommentTapped: () -> Void
+    /// 只有自己的帖子才传入，决定是否显示“编辑”。
+    private let onEditTapped: (() -> Void)?
     private let onContentCopyTapped: (PostDetailHeaderContent) -> Void
     private let authorFilterMenuTitle: String?
     private let onAuthorFilterTapped: () -> Void
@@ -57,6 +59,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
     private let favoriteButtonNode = ASButtonNode()
     private let replyButtonNode = ASButtonNode()
     private let commentButtonNode = ASButtonNode()
+    private let editButtonNode = ASButtonNode()
     private let bodyNodes: [ASDisplayNode]
     private var authorRiskWarningNode: PostAuthorRiskWarningNode?
     private let themeTraitObserver = ThemeTraitObserver()
@@ -69,7 +72,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         ].contains { $0 != nil }
     }
     private var hasFooterActions: Bool {
-        hasReactionActions || showsReplyActions
+        hasReactionActions || showsReplyActions || onEditTapped != nil
     }
 
     private lazy var avatarNode: ASDisplayNode = {
@@ -107,6 +110,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         onFavoriteTapped: @escaping () -> Void = {},
         onReplyTapped: @escaping () -> Void = {},
         onCommentTapped: @escaping () -> Void = {},
+        onEditTapped: (() -> Void)? = nil,
         onContentCopyTapped: @escaping (PostDetailHeaderContent) -> Void = { _ in },
         authorFilterMenuTitle: String? = nil,
         onAuthorFilterTapped: @escaping () -> Void = {},
@@ -129,6 +133,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         self.onFavoriteTapped = onFavoriteTapped
         self.onReplyTapped = onReplyTapped
         self.onCommentTapped = onCommentTapped
+        self.onEditTapped = onEditTapped
         self.onContentCopyTapped = onContentCopyTapped
         self.authorFilterMenuTitle = authorFilterMenuTitle
         self.onAuthorFilterTapped = onAuthorFilterTapped
@@ -279,6 +284,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         configureFavoriteActionButton(count: content.favoriteCount, isCollected: content.isFavoriteCollected)
         configureActionButton(replyButtonNode, systemImageName: "arrowshape.turn.up.left", accessibilityLabel: "回复楼主")
         configureActionButton(commentButtonNode, systemImageName: "text.bubble", accessibilityLabel: "评论帖子")
+        configureActionButton(editButtonNode, systemImageName: "square.and.pencil", accessibilityLabel: "编辑帖子")
     }
 
     private static func titleAttributedText(for content: PostDetailHeaderContent) -> NSAttributedString {
@@ -333,6 +339,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         favoriteButtonNode.addTarget(self, action: #selector(favoriteTapped), forControlEvents: .touchUpInside)
         replyButtonNode.addTarget(self, action: #selector(replyTapped), forControlEvents: .touchUpInside)
         commentButtonNode.addTarget(self, action: #selector(commentTapped), forControlEvents: .touchUpInside)
+        editButtonNode.addTarget(self, action: #selector(editTapped), forControlEvents: .touchUpInside)
     }
 
     private func installBodyContextMenus() {
@@ -368,6 +375,9 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
                 replyButtonNode,
                 commentButtonNode
             ])
+        }
+        if onEditTapped != nil {
+            actionChildren.append(editButtonNode)
         }
         actionStack.children = actionChildren
         return actionStack
@@ -568,6 +578,10 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
 
     @objc private func commentTapped() {
         onCommentTapped()
+    }
+
+    @objc private func editTapped() {
+        onEditTapped?()
     }
 
     private func requestAvatarIfNeeded() {

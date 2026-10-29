@@ -60,6 +60,8 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
     private let onQuoteTapped: (Comment) -> Void
     private let authorFilterMenuTitle: String?
     private let onAuthorFilterTapped: (Comment) -> Void
+    /// 只有自己的评论才传入，决定是否显示编辑。
+    private let onEditTapped: ((Comment) -> Void)?
     private let onTextLayoutInvalidated: () -> Void
     private let avatarLoader = AvatarImageLoader.shared
     private weak var avatarImageView: UIImageView?
@@ -82,6 +84,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
     private let opposeButtonNode = ASButtonNode()
     private let replyButtonNode = ASButtonNode()
     private let quoteButtonNode = ASButtonNode()
+    private let editButtonNode = ASButtonNode()
     private let separatorNode = ASDisplayNode()
     private let bodyNodes: [ASDisplayNode]
     private(set) var debugActionsAreDisplayedBelowBody = false
@@ -125,6 +128,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         onQuoteTapped: @escaping (Comment) -> Void = { _ in },
         authorFilterMenuTitle: String? = nil,
         onAuthorFilterTapped: @escaping (Comment) -> Void = { _ in },
+        onEditTapped: ((Comment) -> Void)? = nil,
         onTextLayoutInvalidated: @escaping () -> Void,
         imageSizeProvider: @escaping (URL) -> CGSize? = { _ in nil },
         onImageSizeResolved: @escaping (URL, CGSize) -> Void = { _, _ in },
@@ -143,6 +147,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         self.onQuoteTapped = onQuoteTapped
         self.authorFilterMenuTitle = authorFilterMenuTitle
         self.onAuthorFilterTapped = onAuthorFilterTapped
+        self.onEditTapped = onEditTapped
         self.onTextLayoutInvalidated = onTextLayoutInvalidated
         self.authorBadgeNodes = comment.authorBadgeTexts.map { AuthorStatusBadgeNode(text: $0) }
         self.bodyNodes = DetailContentBlockNodeFactory.makeNodes(
@@ -342,6 +347,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         configureOpposeActionButton(count: comment.opposeCount, isClicked: comment.isOpposeClicked)
         configureActionButton(replyButtonNode, systemImageName: "arrowshape.turn.up.left", accessibilityLabel: "回复评论")
         configureActionButton(quoteButtonNode, systemImageName: "quote.bubble", accessibilityLabel: "引用评论")
+        configureActionButton(editButtonNode, systemImageName: "square.and.pencil", accessibilityLabel: "编辑评论")
     }
 
     private func configureActions() {
@@ -354,6 +360,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         opposeButtonNode.addTarget(self, action: #selector(opposeTapped), forControlEvents: .touchUpInside)
         replyButtonNode.addTarget(self, action: #selector(replyTapped), forControlEvents: .touchUpInside)
         quoteButtonNode.addTarget(self, action: #selector(quoteTapped), forControlEvents: .touchUpInside)
+        editButtonNode.addTarget(self, action: #selector(editTapped), forControlEvents: .touchUpInside)
     }
 
     private func installContextMenu(on view: UIView) {
@@ -376,6 +383,9 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
             replyButtonNode,
             quoteButtonNode
         ]
+        if onEditTapped != nil {
+            actionStack.children?.append(editButtonNode)
+        }
         return actionStack
     }
 
@@ -637,6 +647,10 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         onQuoteTapped(comment)
     }
 
+    @objc private func editTapped() {
+        onEditTapped?(comment)
+    }
+
     @objc private func authorTapped() {
         guard let authorProfileURL = comment.authorProfileURL else { return }
         onAuthorTapped(authorProfileURL)
@@ -708,6 +722,11 @@ extension CommentCellNode: UIContextMenuInteractionDelegate {
             actions.append(UIAction(title: authorFilterMenuTitle, image: UIImage(systemName: "person.crop.circle")) { [weak self] _ in
                 guard let self else { return }
                 self.onAuthorFilterTapped(self.comment)
+            })
+        }
+        if onEditTapped != nil {
+            actions.append(UIAction(title: "编辑", image: UIImage(systemName: "square.and.pencil")) { [weak self] _ in
+                self?.editTapped()
             })
         }
         return actions

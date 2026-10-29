@@ -9,13 +9,15 @@ import UIKit
 /// 发帖预览：正文转成 HTML 后走详情页同一套渲染，看到的就是发出去在 App 里的样子。
 final class NewDiscussionPreviewViewController: UIViewController {
     private let draft: NewDiscussionDraft
+    private let publishTitle: String
     private let onPublish: () -> Void
     private let tableNode = ASTableNode(style: .plain)
     private var headerContent: PostDetailHeaderContent
     private var renderedContent: [RenderedContentBlock]?
 
-    init(draft: NewDiscussionDraft, onPublish: @escaping () -> Void) {
+    init(draft: NewDiscussionDraft, publishTitle: String = "发布", onPublish: @escaping () -> Void) {
         self.draft = draft
+        self.publishTitle = publishTitle
         self.onPublish = onPublish
         self.headerContent = Self.headerContent(for: draft, account: nil)
         super.init(nibName: nil, bundle: nil)
@@ -68,7 +70,7 @@ final class NewDiscussionPreviewViewController: UIViewController {
 
     private func setupPublishButton() {
         var configuration = UIButton.Configuration.filled()
-        configuration.title = "发布"
+        configuration.title = publishTitle
         configuration.cornerStyle = .capsule
         configuration.baseBackgroundColor = .label
         configuration.baseForegroundColor = .systemBackground

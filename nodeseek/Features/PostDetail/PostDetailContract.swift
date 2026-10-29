@@ -45,6 +45,10 @@ protocol PostDetailPresenterProtocol: AnyObject {
     func didTapCommentLike(_ comment: Comment)
     func didTapCommentChickenLeg(_ comment: Comment)
     func didTapCommentOppose(_ comment: Comment)
+    /// 编辑自己的帖子：先读原文再打开编辑页。
+    func didTapEditPost()
+    /// 编辑自己的评论：先在评论所在页读原文再打开编辑页。
+    func didTapEditComment(_ comment: Comment)
 }
 
 // MARK: - Interactor Input (Presenter -> Interactor)
@@ -92,4 +96,6 @@ protocol PostDetailInteractorOutput: AnyObject {
 // MARK: - Router Protocol (Presenter -> Router)
 protocol PostDetailRouterProtocol: AnyObject {
     func navigateToLogin(onClose: @escaping @MainActor () -> Void)
+    func presentEditPost(_ editable: EditableDiscussion, onSaved: @escaping () -> Void)
+    func presentEditComment(_ editable: EditableComment, onSaved: @escaping () -> Void)
 }

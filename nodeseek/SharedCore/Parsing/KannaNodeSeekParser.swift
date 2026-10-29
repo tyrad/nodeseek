@@ -356,8 +356,9 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             .flatMap(Self.firstInteger(in:))
             ?? restrictedNotice.flatMap(Self.firstInteger(in:))
 
+        let ownCommentIDs = ownCommentIDs(in: document)
         let comments = document.xpath(XPathRules.postDetailComments).compactMap { item -> Comment? in
-            parseComment(item, reactionConfiguration: reactionConfiguration)
+            parseComment(item, reactionConfiguration: reactionConfiguration, ownCommentIDs: ownCommentIDs)
         }
         let page = Self.postPage(from: url) ?? 1
         let pagination = parsePostDetailPagination(in: document, pageURL: url)
@@ -384,6 +385,7 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             requiredReadingLevel: requiredReadingLevel,
             lowLevelWarningAuthorID: restrictedNotice == nil
                 ? lowLevelWarningAuthorID(in: document, bodyItem: bodyItem) : nil,
+            isOwnPost: isOwnPost(in: document),
             authorName: authorName,
             authorBadgeTexts: bodyItem.map { parseAuthorBadgeTexts(in: $0) } ?? [],
             avatarURL: avatarURL,
@@ -405,6 +407,38 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             pagination: pagination,
             isLastPage: document.at_xpath(XPathRules.postDetailNextPage) == nil
         )
+    }
+
+    /// 和网页“编辑”按钮同一判断：楼主 uid 等于当前登录用户；任意分页都有这两项。
+    private func isOwnPost(in document: HTMLDocument) -> Bool {
+        for root in configRoots(in: document) {
+            guard let postData = root["postData"] as? [String: Any],
+                  let op = postData["op"] as? [String: Any],
+                  let user = root["user"] as? [String: Any],
+                  let ownerID = intValue(in: op, keys: ["uid"]),
+                  let memberID = intValue(in: user, keys: ["member_id"]),
+                  ownerID > 0 else { continue }
+            return ownerID == memberID
+        }
+        return false
+    }
+
+    /// 当前页里登录用户自己发的评论 ID（`data-comment-id`），按评论作者 uid 判断。
+    private func ownCommentIDs(in document: HTMLDocument) -> Set<String> {
+        for root in configRoots(in: document) {
+            guard let postData = root["postData"] as? [String: Any],
+                  let comments = postData["comments"] as? [[String: Any]],
+                  let user = root["user"] as? [String: Any],
+                  let memberID = intValue(in: user, keys: ["member_id"]),
+                  memberID > 0 else { continue }
+            return Set(comments.compactMap { comment -> String? in
+                guard let poster = comment["poster"] as? [String: Any],
+                      intValue(in: poster, keys: ["uid"]) == memberID,
+                      let commentID = intValue(in: comment, keys: ["commentId"]) else { return nil }
+                return String(commentID)
+            })
+        }
+        return []
     }
 
     private func lowLevelWarningAuthorID(in document: HTMLDocument, bodyItem: Kanna.XMLElement?) -> Int? {
@@ -578,7 +612,8 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
 
     private func parseComment(
         _ item: Kanna.XMLElement,
-        reactionConfiguration: PostReactionConfiguration?
+        reactionConfiguration: PostReactionConfiguration?,
+        ownCommentIDs: Set<String> = []
     ) -> Comment? {
         guard let authorName = firstText(in: item, xpaths: [XPathRules.contentAuthor]) else {
             return nil
@@ -624,7 +659,8 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             chickenLegCount: chickenLegCount,
             isChickenLegClicked: parseReactionClicked(in: item, kind: .chickenLeg),
             opposeCount: opposeCount,
-            isOpposeClicked: parseReactionClicked(in: item, kind: .oppose)
+            isOpposeClicked: parseReactionClicked(in: item, kind: .oppose),
+            isOwnComment: ownCommentIDs.contains(id)
         )
     }
 

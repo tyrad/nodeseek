@@ -93,6 +93,44 @@ struct KannaNodeSeekParserTests {
         #expect(detail.updatingFavoriteState(count: 2, isCollected: true).lowLevelWarningAuthorID == detail.lowLevelWarningAuthorID)
     }
 
+    @Test(arguments: [(31037, true), (999, false)])
+    func ownPostComparesOriginalPosterWithLoggedInUser(memberID: Int, isOwn: Bool) throws {
+        let payload = Data("{\"user\":{\"member_id\":\(memberID)},\"postData\":{\"category\":\"review\",\"op\":{\"uid\":31037}}}".utf8).base64EncodedString()
+        let html = """
+        <div class="post-title"><h1>测试</h1></div>
+        <script id="temp-script">\(payload)</script>
+        """
+        let parser = KannaNodeSeekParser(baseURL: NodeSeekSite.baseURL)
+        let detail = try parser.parsePostDetail(html: html, url: NodeSeekSite.postURL(id: "1016685", page: 2))
+        #expect(detail.isOwnPost == isOwn)
+
+        let loggedOut = try parser.parsePostDetail(
+            html: "<div class=\"post-title\"><h1>测试</h1></div>",
+            url: NodeSeekSite.postURL(id: "1016685", page: 1)
+        )
+        #expect(loggedOut.isOwnPost == false)
+    }
+
+    @Test func ownCommentsMatchCommentPosterWithLoggedInUser() throws {
+        let config = #"{"user":{"member_id":31037},"postData":{"op":{"uid":1},"comments":[{"commentId":13684177,"floorIndex":0,"poster":{"uid":1}},{"commentId":13684926,"floorIndex":1,"poster":{"uid":31037}},{"commentId":13684999,"floorIndex":2,"poster":{"uid":999}}]}}"#
+        let payload = Data(config.utf8).base64EncodedString()
+        let html = """
+        <div class="post-title"><h1>测试</h1></div>
+        <div class="nsk-post"><div class="content-item" id="0" data-comment-id="13684177">
+          <a class="author-name" href="/space/1">楼主</a><article class="post-content">正文</article>
+        </div><ul class="comments">
+          <li class="content-item" id="1" data-comment-id="13684926"><a class="author-name" href="/space/31037">我</a><article class="post-content">你好</article></li>
+          <li class="content-item" id="2" data-comment-id="13684999"><a class="author-name" href="/space/999">别人</a><article class="post-content">路过</article></li>
+        </ul></div>
+        <script id="temp-script">\(payload)</script>
+        """
+        let parser = KannaNodeSeekParser(baseURL: NodeSeekSite.baseURL)
+        let detail = try parser.parsePostDetail(html: html, url: NodeSeekSite.postURL(id: "1016685", page: 1))
+
+        #expect(detail.comments.map(\.isOwnComment) == [true, false])
+        #expect(detail.isOwnPost == false)
+    }
+
     @Test func lowLevelWarningFallsBackToBodyAuthorWithoutUsingCommentAuthor() throws {
         let html = """
         <div class="post-title"><h1>测试帖子</h1></div>

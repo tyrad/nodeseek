@@ -256,6 +256,136 @@ struct NewDiscussionPresenterTests {
         #expect(store.saved?.content == "正文\n结尾")
     }
 
+    // MARK: - 编辑已发帖子
+
+    private let original = EditableDiscussion(
+        postID: 1016685,
+        title: "测试",
+        content: "好的吧",
+        category: .review,
+        rank: .everyone,
+        userLevel: 4
+    )
+
+    @Test func editFillsOriginalAndNeedsChangesBeforeSaving() {
+        let (presenter, _, _, editor, view) = makeEditPresenter()
+
+        presenter.viewDidLoad()
+
+        #expect(view.filledDrafts.map(\.title) == ["测试"])
+        #expect(presenter.state.isEditing)
+        #expect(presenter.state.saveStatus == .unchanged)
+        #expect(presenter.state.canPublish == false)
+        #expect(presenter.rankOptions.contains(.level(4)))
+        #expect(presenter.closeDecision() == .close)
+        #expect(editor.levelLoadCount == 0)
+
+        presenter.didChangeContent("好的吧 补充")
+        #expect(presenter.state.saveStatus == .saved)
+        #expect(presenter.state.canPublish)
+        #expect(presenter.closeDecision() == .askSaveEdit)
+    }
+
+    @Test func editAutosavesOnlyModifiedContent() async throws {
+        let (presenter, store, _, _, _) = makeEditPresenter()
+        presenter.viewDidLoad()
+
+        presenter.didChangeTitle("测试 改")
+        try await waitUntil { store.saved != nil }
+        #expect(store.saved?.title == "测试 改")
+
+        presenter.didChangeTitle("测试")
+        try await waitUntil { store.saved == nil }
+        #expect(store.saved == nil)
+    }
+
+    @Test func savedEditOffersRestoreButIdenticalOneIsDropped() {
+        var modified = original.draft
+        modified.content = "上次改到一半"
+        let (presenter, _, _, _, _) = makeEditPresenter(saved: modified)
+        presenter.viewDidLoad()
+        #expect(presenter.state.pendingDraft == modified)
+
+        let (other, otherStore, _, _, _) = makeEditPresenter(saved: original.draft)
+        other.viewDidLoad()
+        #expect(other.state.pendingDraft == nil)
+        #expect(otherStore.saved == nil)
+    }
+
+    @Test func savingEditSubmitsPayloadAndClearsDraft() async throws {
+        let (presenter, store, router, editor, _) = makeEditPresenter()
+        presenter.viewDidLoad()
+        presenter.didChangeContent("新正文")
+
+        presenter.didTapPublish()
+        try await waitUntil { !router.publishedRoutes.isEmpty }
+
+        #expect(editor.edits == [EditDiscussionSubmission(postID: 1016685, title: "测试", content: "新正文", rank: .everyone)])
+        #expect(router.publishedRoutes.count == 1)
+        #expect(store.saved == nil)
+    }
+
+    @Test func becomingPrivateAsksForFeeFirst() async throws {
+        let (presenter, _, router, editor, view) = makeEditPresenter()
+        presenter.viewDidLoad()
+        presenter.didSelectRank(.onlyMe)
+
+        presenter.didTapPublish()
+        #expect(view.privateFeeConfirmations == [10])
+        #expect(editor.edits.isEmpty)
+
+        view.confirmPrivateFee()
+        try await waitUntil { !router.publishedRoutes.isEmpty }
+        #expect(editor.edits.first?.rank == .onlyMe)
+    }
+
+    @Test func editTimeoutReportsUnknownAndAllowsRetry() async throws {
+        let editor = StubDiscussionSubmitter()
+        editor.editResult = .failure(NodeSeekDiscussionSubmitError.resultUnknown)
+        let (presenter, store, _, _, view) = makeEditPresenter(editor: editor)
+        presenter.viewDidLoad()
+        presenter.didChangeContent("新正文")
+
+        presenter.didTapPublish()
+        try await waitUntil { !view.failures.isEmpty }
+
+        #expect(view.failures.first?.title == "保存结果未知")
+        #expect(view.failures.first?.allowsRetry == true)
+        #expect(store.saved?.content == "新正文")
+        #expect(presenter.state.isSubmitting == false)
+    }
+
+    // MARK: - 编辑评论
+
+    private let originalComment = EditableComment(postID: 1016685, commentID: 13684926, floorIndex: 1, content: "你好")
+
+    @Test func editCommentOnlyTracksContentAndSubmitsCommentPayload() async throws {
+        let (presenter, store, router, editor, view) = makeEditPresenter(mode: .editComment(originalComment))
+        presenter.viewDidLoad()
+
+        #expect(view.filledDrafts.map(\.content) == ["你好"])
+        #expect(presenter.state.editingCommentFloor == 1)
+        #expect(presenter.state.saveStatus == .unchanged)
+        #expect(presenter.closeDecision() == .close)
+        #expect(editor.levelLoadCount == 0)
+
+        presenter.didChangeContent("   ")
+        #expect(presenter.state.canPublish == false)
+        presenter.didTapPublish()
+        #expect(view.validationMessages.count == 1)
+
+        presenter.didChangeContent("你好，补充一句")
+        #expect(presenter.closeDecision() == .askSaveEdit)
+        try await waitUntil { store.saved != nil }
+        #expect(store.saved?.content == "你好，补充一句")
+
+        presenter.didTapPublish()
+        try await waitUntil { !router.publishedRoutes.isEmpty }
+        #expect(editor.commentEdits == [try EditCommentSubmission(commentID: 13684926, content: "你好，补充一句")])
+        #expect(editor.edits.isEmpty)
+        #expect(store.saved == nil)
+    }
+
     // MARK: - Helpers
 
     private func fillValidDraft(_ presenter: NewDiscussionPresenter, category: DiscussionCategory) {
@@ -292,6 +422,26 @@ struct NewDiscussionPresenterTests {
         presenter.view = view
         return (presenter, store, router, submitter, view)
     }
+
+    private func makeEditPresenter(
+        saved: NewDiscussionDraft? = nil,
+        editor: StubDiscussionSubmitter = StubDiscussionSubmitter(),
+        mode: NewDiscussionMode? = nil
+    ) -> (NewDiscussionPresenter, MemoryDraftStore, SpyNewDiscussionRouter, StubDiscussionSubmitter, SpyNewDiscussionView) {
+        let store = MemoryDraftStore(saved: saved)
+        let router = SpyNewDiscussionRouter()
+        let view = SpyNewDiscussionView()
+        let presenter = NewDiscussionPresenter(
+            router: router,
+            draftStore: store,
+            submitter: editor,
+            mode: mode ?? .edit(original),
+            editor: editor,
+            autosaveDelayNanoseconds: 1_000_000
+        )
+        presenter.view = view
+        return (presenter, store, router, editor, view)
+    }
 }
 
 private final class MemoryDraftStore: NewDiscussionDraftStoring {
@@ -306,15 +456,39 @@ private final class MemoryDraftStore: NewDiscussionDraftStoring {
     func clear() { saved = nil }
 }
 
-private final class StubDiscussionSubmitter: NodeSeekDiscussionSubmitting {
+private final class StubDiscussionSubmitter: NodeSeekDiscussionSubmitting, NodeSeekDiscussionEditing {
     var levelResult: Result<Int, Error> = .success(2)
+    var editResult: Result<Void, Error> = .success(())
+    private(set) var levelLoadCount = 0
+    private(set) var edits: [EditDiscussionSubmission] = []
     var submitResult: Result<NewDiscussionResponse, Error> = .success(
         NewDiscussionResponse(success: true, message: nil, redirect: "/post-512345-1", redirectHash: nil)
     )
     private(set) var submissions: [NewDiscussionSubmission] = []
 
     func loadUserLevel() async throws -> Int {
-        try levelResult.get()
+        levelLoadCount += 1
+        return try levelResult.get()
+    }
+
+    func loadEditableDiscussion(postID: Int) async throws -> EditableDiscussion {
+        throw NodeSeekDiscussionSubmitError.unexpected("unused")
+    }
+
+    func submitEdit(_ submission: EditDiscussionSubmission) async throws {
+        edits.append(submission)
+        try editResult.get()
+    }
+
+    private(set) var commentEdits: [EditCommentSubmission] = []
+
+    func loadEditableComment(postID: Int, commentID: Int, page: Int) async throws -> EditableComment {
+        throw NodeSeekDiscussionSubmitError.unexpected("unused")
+    }
+
+    func submitEditComment(_ submission: EditCommentSubmission, postID: Int) async throws {
+        commentEdits.append(submission)
+        try editResult.get()
     }
 
     func submit(_ submission: NewDiscussionSubmission) async throws -> NewDiscussionResponse {
@@ -338,7 +512,9 @@ private final class SpyNewDiscussionView: NewDiscussionViewProtocol {
     private(set) var validationMessages: [String] = []
     private(set) var feeConfirmations: [Int] = []
     private(set) var failures: [(title: String, message: String, allowsRetry: Bool)] = []
+    private(set) var privateFeeConfirmations: [Int] = []
     private var pendingFeeConfirmation: (() -> Void)?
+    private var pendingPrivateFeeConfirmation: (() -> Void)?
 
     func render(_ state: NewDiscussionViewState) {}
     func fill(_ draft: NewDiscussionDraft) { filledDrafts.append(draft) }
@@ -349,11 +525,20 @@ private final class SpyNewDiscussionView: NewDiscussionViewProtocol {
         pendingFeeConfirmation = onConfirm
     }
 
+    func confirmPrivateRankFee(_ fee: Int, onConfirm: @escaping () -> Void) {
+        privateFeeConfirmations.append(fee)
+        pendingPrivateFeeConfirmation = onConfirm
+    }
+
     func showSubmitFailure(title: String, message: String, allowsRetry: Bool) {
         failures.append((title, message, allowsRetry))
     }
 
     func confirmFee() {
         pendingFeeConfirmation?()
+    }
+
+    func confirmPrivateFee() {
+        pendingPrivateFeeConfirmation?()
     }
 }

@@ -48,6 +48,16 @@ class PostDetailRouter: PostDetailRouterProtocol {
         return view
     }
 
+    func presentEditPost(_ editable: EditableDiscussion, onSaved: @escaping () -> Void) {
+        let editor = NewDiscussionRouter.createEditModule(editable: editable, onSaved: onSaved)
+        viewController?.present(editor, animated: true)
+    }
+
+    func presentEditComment(_ editable: EditableComment, onSaved: @escaping () -> Void) {
+        let editor = NewDiscussionRouter.createEditModule(editable: editable, onSaved: onSaved)
+        viewController?.present(editor, animated: true)
+    }
+
     func navigateToLogin(onClose: @escaping @MainActor () -> Void) {
         let loginViewController = LoginWebViewController(onClose: onClose)
         if let navigationController = viewController?.navigationController {

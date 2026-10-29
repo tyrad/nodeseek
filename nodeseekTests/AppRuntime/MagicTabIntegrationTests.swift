@@ -504,4 +504,6 @@ private final class TerminalTestPresenter: PostDetailPresenterProtocol {
     func didTapCommentLike(_ comment: Comment) {}
     func didTapCommentChickenLeg(_ comment: Comment) {}
     func didTapCommentOppose(_ comment: Comment) {}
+    func didTapEditPost() {}
+    func didTapEditComment(_ comment: Comment) {}
 }

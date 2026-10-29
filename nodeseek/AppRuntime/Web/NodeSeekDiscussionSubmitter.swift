@@ -13,6 +13,8 @@ enum NodeSeekDiscussionSubmitError: LocalizedError, Equatable {
     case resultUnknown
     case network(String)
     case unexpected(String)
+    /// 帖子或评论不是当前登录用户发的。
+    case notOwner
 
     var errorDescription: String? {
         switch self {
@@ -26,6 +28,8 @@ enum NodeSeekDiscussionSubmitError: LocalizedError, Equatable {
             return "网络异常，帖子没有发出：\(message)"
         case .unexpected(let message):
             return "发帖失败：\(message)"
+        case .notOwner:
+            return "只能编辑自己发的内容。"
         }
     }
 }
@@ -35,8 +39,16 @@ protocol NodeSeekDiscussionSubmitting: AnyObject {
     func submit(_ submission: NewDiscussionSubmission) async throws -> NewDiscussionResponse
 }
 
-/// 在隐藏 WebView 里打开发帖页，读取用户等级和提交新帖。
-final class WebViewNodeSeekDiscussionSubmitter: NodeSeekDiscussionSubmitting {
+/// 编辑已发帖子或自己的评论：读原文、提交修改。
+protocol NodeSeekDiscussionEditing: AnyObject {
+    func loadEditableDiscussion(postID: Int) async throws -> EditableDiscussion
+    func submitEdit(_ submission: EditDiscussionSubmission) async throws
+    func loadEditableComment(postID: Int, commentID: Int, page: Int) async throws -> EditableComment
+    func submitEditComment(_ submission: EditCommentSubmission, postID: Int) async throws
+}
+
+/// 在隐藏 WebView 里打开发帖页或帖子页，读取用户等级、原文，提交新帖或修改。
+final class WebViewNodeSeekDiscussionSubmitter: NodeSeekDiscussionSubmitting, NodeSeekDiscussionEditing {
     private let pageURL: URL
     private let timeoutInterval: TimeInterval
 
@@ -64,7 +76,7 @@ final class WebViewNodeSeekDiscussionSubmitter: NodeSeekDiscussionSubmitting {
         AppLog.info(.webView, "发帖提交开始: category=\(submission.category.rawValue), rank=\(submission.rank.rawValue), titleLength=\(submission.title.count), contentLength=\(submission.content.count)")
         let object = try await runScript(
             NewDiscussionAutomationScript.submitSource,
-            arguments: ["payload": payload],
+            arguments: ["endpoint": "/api/content/new-discussion", "payload": payload],
             actionName: "发帖提交"
         )
         let statusCode = (object["statusCode"] as? NSNumber)?.intValue
@@ -91,8 +103,109 @@ final class WebViewNodeSeekDiscussionSubmitter: NodeSeekDiscussionSubmitting {
         return response
     }
 
-    private func runScript(_ source: String, arguments: [String: Any], actionName: String) async throws -> [String: Any] {
-        let pageURL = pageURL
+    // MARK: - 编辑
+
+    func loadEditableDiscussion(postID: Int) async throws -> EditableDiscussion {
+        let object = try await runScript(
+            NewDiscussionAutomationScript.editableDiscussionSource,
+            arguments: [:],
+            actionName: "编辑帖子读取原文",
+            pageURL: NodeSeekSite.postURL(id: String(postID), page: 1),
+            reusesLoadedPage: false
+        )
+        try Self.throwIfFailed(object)
+        guard let content = object["content"] as? String else {
+            throw NodeSeekDiscussionSubmitError.unexpected("没有读到帖子原文")
+        }
+        return EditableDiscussion(
+            postID: postID,
+            title: object["title"] as? String ?? "",
+            content: content,
+            category: (object["category"] as? String).flatMap(DiscussionCategory.init(rawValue:)),
+            rank: DiscussionReadRank(rawValue: (object["rank"] as? NSNumber)?.intValue ?? 0),
+            userLevel: (object["userLevel"] as? NSNumber)?.intValue ?? 0
+        )
+    }
+
+    func submitEdit(_ submission: EditDiscussionSubmission) async throws {
+        AppLog.info(.webView, "编辑帖子提交开始: postID=\(submission.postID), rank=\(submission.rank.rawValue), titleLength=\(submission.title.count), contentLength=\(submission.content.count)")
+        try await postEdit(
+            endpoint: "/api/content/edit-discussion",
+            payload: try submission.jsonData(),
+            postID: submission.postID,
+            actionName: "编辑帖子提交"
+        )
+    }
+
+    func loadEditableComment(postID: Int, commentID: Int, page: Int) async throws -> EditableComment {
+        let object = try await runScript(
+            NewDiscussionAutomationScript.editableCommentSource,
+            arguments: ["commentId": commentID],
+            actionName: "编辑评论读取原文",
+            pageURL: NodeSeekSite.postURL(id: String(postID), page: page),
+            reusesLoadedPage: false
+        )
+        try Self.throwIfFailed(object)
+        guard let content = object["content"] as? String else {
+            throw NodeSeekDiscussionSubmitError.unexpected("没有读到评论原文")
+        }
+        return EditableComment(
+            postID: postID,
+            commentID: commentID,
+            floorIndex: (object["floorIndex"] as? NSNumber)?.intValue ?? 0,
+            content: content
+        )
+    }
+
+    func submitEditComment(_ submission: EditCommentSubmission, postID: Int) async throws {
+        AppLog.info(.webView, "编辑评论提交开始: postID=\(postID), commentID=\(submission.commentID), contentLength=\(submission.content.count)")
+        try await postEdit(
+            endpoint: "/api/content/edit-comment",
+            payload: try submission.jsonData(),
+            postID: postID,
+            actionName: "编辑评论提交"
+        )
+    }
+
+    /// 在帖子页里提交修改；2xx 却解析不了按结果未知处理，重复保存同样内容没有副作用。
+    private func postEdit(endpoint: String, payload: Data, postID: Int, actionName: String) async throws {
+        let startedAt = Date()
+        let object = try await runScript(
+            NewDiscussionAutomationScript.submitSource,
+            arguments: ["endpoint": endpoint, "payload": String(decoding: payload, as: UTF8.self)],
+            actionName: actionName,
+            pageURL: NodeSeekSite.postURL(id: String(postID), page: 1)
+        )
+        let statusCode = (object["statusCode"] as? NSNumber)?.intValue
+        let body = object["body"] as? String
+        AppLog.info(.webView, "\(actionName)结束: ok=\(object["ok"] as? Bool ?? false), status=\(statusCode.map(String.init) ?? "nil"), reason=\(object["reason"] as? String ?? "nil"), bodyLength=\(body?.count ?? 0), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+
+        guard let body else {
+            try Self.throwIfFailed(object)
+            throw NodeSeekDiscussionSubmitError.unexpected("接口没有返回内容")
+        }
+        let response: NewDiscussionResponse
+        do {
+            response = try NewDiscussionResponseParser.parse(Data(body.utf8))
+        } catch {
+            if let statusCode, (200..<300).contains(statusCode) {
+                throw NodeSeekDiscussionSubmitError.resultUnknown
+            }
+            throw NodeSeekDiscussionSubmitError.unexpected("状态码 \(statusCode.map(String.init) ?? "未知")，返回内容无法识别")
+        }
+        guard response.success else {
+            throw NodeSeekDiscussionSubmitError.serverMessage(response.message ?? "保存失败，请稍后重试。")
+        }
+    }
+
+    private func runScript(
+        _ source: String,
+        arguments: [String: Any],
+        actionName: String,
+        pageURL: URL? = nil,
+        reusesLoadedPage: Bool = true
+    ) async throws -> [String: Any] {
+        let pageURL = pageURL ?? self.pageURL
         let timeoutInterval = timeoutInterval
         return try await withHiddenWebViewPageActionLoader(
             logMessage: "准备通过隐藏 WebView 执行\(actionName): url=\(pageURL.absoluteString)"
@@ -102,7 +215,8 @@ final class WebViewNodeSeekDiscussionSubmitter: NodeSeekDiscussionSubmitting {
                 source: source,
                 arguments: arguments,
                 timeoutInterval: timeoutInterval,
-                actionName: actionName
+                actionName: actionName,
+                reusesLoadedPage: reusesLoadedPage
             )
         }
     }
@@ -114,6 +228,8 @@ final class WebViewNodeSeekDiscussionSubmitter: NodeSeekDiscussionSubmitting {
         switch reason {
         case "not_logged_in":
             throw NodeSeekDiscussionSubmitError.notLoggedIn
+        case "not_owner":
+            throw NodeSeekDiscussionSubmitError.notOwner
         case "challenge":
             throw NodeSeekDiscussionSubmitError.challenge(message ?? "需要先通过站点验证，请稍后重试。")
         case "submit_timeout", "response_unreadable":

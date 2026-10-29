@@ -31,6 +31,8 @@ struct PostDetailHeaderContent: Equatable {
     let metadataText: String?
     let contentHTML: String
     let signatureHTML: String?
+    /// 当前用户是楼主，主楼显示“编辑”。
+    let isOwnPost: Bool
     private(set) var likeCount: Int?
     private(set) var isLikeClicked: Bool
     private(set) var chickenLegCount: Int?
@@ -60,8 +62,10 @@ struct PostDetailHeaderContent: Equatable {
         isOpposeClicked: Bool = false,
         favoriteCount: Int? = nil,
         isFavoriteCollected: Bool = false,
-        isFavoriteSubmitting: Bool = false
+        isFavoriteSubmitting: Bool = false,
+        isOwnPost: Bool = false
     ) {
+        self.isOwnPost = isOwnPost
         self.postID = postID
         self.title = title
         self.requiredReadingLevel = requiredReadingLevel
@@ -121,7 +125,8 @@ struct PostDetailHeaderContent: Equatable {
             isOpposeClicked: detail.isOpposeClicked,
             favoriteCount: detail.favoriteCount,
             isFavoriteCollected: detail.isFavoriteCollected,
-            isFavoriteSubmitting: false
+            isFavoriteSubmitting: false,
+            isOwnPost: detail.isOwnPost
         )
     }
 

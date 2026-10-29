@@ -32,7 +32,8 @@ final class NewDiscussionDraftStripView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func configure(summary: String, preview: String) {
+    func configure(title: String = "上次的草稿", summary: String, preview: String) {
+        titleLabel.text = title
         summaryLabel.text = summary
         previewLabel.text = preview.isEmpty ? "（正文为空）" : preview
         cancelPendingDiscard()

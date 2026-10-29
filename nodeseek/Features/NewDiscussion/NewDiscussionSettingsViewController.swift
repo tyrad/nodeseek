@@ -15,6 +15,8 @@ final class NewDiscussionSettingsViewController: UIViewController {
     private var rank: DiscussionReadRank
     private var userLevel: NewDiscussionUserLevelState
     private var rankOptions: [DiscussionReadRank]
+    /// 编辑已发帖子时板块不能改，只展示当前板块。
+    private let isCategoryLocked: Bool
 
     private let contentStack = UIStackView()
     private let categoryFlow = PillFlowView()
@@ -32,12 +34,14 @@ final class NewDiscussionSettingsViewController: UIViewController {
         category: DiscussionCategory?,
         rank: DiscussionReadRank,
         userLevel: NewDiscussionUserLevelState,
-        rankOptions: [DiscussionReadRank]
+        rankOptions: [DiscussionReadRank],
+        isCategoryLocked: Bool = false
     ) {
         self.category = category
         self.rank = rank
         self.userLevel = userLevel
         self.rankOptions = rankOptions
+        self.isCategoryLocked = isCategoryLocked
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -92,7 +96,7 @@ final class NewDiscussionSettingsViewController: UIViewController {
 
     private func setupUI() {
         let titleLabel = UILabel()
-        titleLabel.text = "发布到"
+        titleLabel.text = isCategoryLocked ? "帖子设置" : "发布到"
         titleLabel.font = .preferredFont(forTextStyle: .title3).withSymbolicTraits(.traitBold)
         titleLabel.adjustsFontForContentSizeCategory = true
 
@@ -116,13 +120,20 @@ final class NewDiscussionSettingsViewController: UIViewController {
             pill.addAction(UIAction { [weak self] _ in self?.select(category) }, for: .touchUpInside)
             categoryPills[category] = pill
         }
-        categoryFlow.setPills(DiscussionCategory.regularCases.compactMap { categoryPills[$0] } + [categoryPills[.inside]].compactMap { $0 })
-
         feeLabel.font = .preferredFont(forTextStyle: .footnote)
         feeLabel.adjustsFontForContentSizeCategory = true
         feeLabel.textColor = .systemOrange
         feeLabel.numberOfLines = 0
-        feeLabel.text = "内版用于敏感话题，发帖收取 \(DiscussionCategory.inside.chickenLegFee ?? 0) 鸡腿"
+        if isCategoryLocked {
+            // 只留当前板块，选中态展示，不响应点击。
+            let current = category.flatMap { categoryPills[$0] }
+            current?.isUserInteractionEnabled = false
+            categoryFlow.setPills([current].compactMap { $0 })
+            feeLabel.text = "发布后不能修改板块"
+        } else {
+            categoryFlow.setPills(DiscussionCategory.regularCases.compactMap { categoryPills[$0] } + [categoryPills[.inside]].compactMap { $0 })
+            feeLabel.text = "内版用于敏感话题，发帖收取 \(DiscussionCategory.inside.chickenLegFee ?? 0) 鸡腿"
+        }
 
         rankHintLabel.font = .preferredFont(forTextStyle: .footnote)
         rankHintLabel.adjustsFontForContentSizeCategory = true
@@ -215,7 +226,7 @@ final class NewDiscussionSettingsViewController: UIViewController {
 
     private func updateCategorySelection() {
         Self.applySelection(categoryPills.map { ($0.value, $0.key == category) })
-        feeLabel.textColor = category == .inside ? .systemOrange : .tertiaryLabel
+        feeLabel.textColor = category == .inside && !isCategoryLocked ? .systemOrange : .tertiaryLabel
     }
 
     // MARK: - 阅读限制

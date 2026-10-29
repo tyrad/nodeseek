@@ -656,9 +656,22 @@ class PostDetailViewController: UIViewController {
             self?.copyCurrentPostLink()
         }
 
+        // 是否本人要等详情加载完才知道，每次打开菜单时再判断。
+        let editAction = UIDeferredMenuElement.uncached { [weak self] completion in
+            guard self?.currentHeaderContent?.isOwnPost == true else {
+                completion([])
+                return
+            }
+            completion([
+                UIAction(title: "编辑帖子", image: UIImage(systemName: "square.and.pencil")) { [weak self] _ in
+                    self?.presenter.didTapEditPost()
+                }
+            ])
+        }
+
         moreButton = UIBarButtonItem(
             image: UIImage(systemName: "ellipsis.circle"),
-            menu: UIMenu(children: [refreshAction, copyLinkAction, shareAction])
+            menu: UIMenu(children: [editAction, refreshAction, copyLinkAction, shareAction])
         )
         moreButton?.accessibilityLabel = "更多"
 

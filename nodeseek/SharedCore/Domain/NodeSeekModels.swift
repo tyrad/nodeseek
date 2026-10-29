@@ -103,6 +103,8 @@ nonisolated struct PostDetail: Equatable, Sendable {
     let requiredReadingLevel: Int?
     // 仅交易、拼车帖提供楼主 ID；阅读权限等级不能用于风险判断。
     let lowLevelWarningAuthorID: Int?
+    /// 当前登录用户就是楼主，可以编辑主楼。
+    let isOwnPost: Bool
     let authorName: String
     let authorBadgeTexts: [String]
     let avatarURL: URL?
@@ -129,6 +131,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
         title: String,
         requiredReadingLevel: Int? = nil,
         lowLevelWarningAuthorID: Int? = nil,
+        isOwnPost: Bool = false,
         authorName: String,
         authorBadgeTexts: [String] = [],
         avatarURL: URL?,
@@ -154,6 +157,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
         self.title = title
         self.requiredReadingLevel = requiredReadingLevel
         self.lowLevelWarningAuthorID = lowLevelWarningAuthorID
+        self.isOwnPost = isOwnPost
         self.authorName = authorName
         self.authorBadgeTexts = authorBadgeTexts
         self.avatarURL = avatarURL
@@ -268,6 +272,8 @@ nonisolated struct Comment: Equatable, Sendable {
     let isChickenLegClicked: Bool
     let opposeCount: Int?
     let isOpposeClicked: Bool
+    /// 当前登录用户发的评论，可以编辑。
+    let isOwnComment: Bool
 
     init(
         id: String,
@@ -288,7 +294,8 @@ nonisolated struct Comment: Equatable, Sendable {
         chickenLegCount: Int? = nil,
         isChickenLegClicked: Bool = false,
         opposeCount: Int? = nil,
-        isOpposeClicked: Bool = false
+        isOpposeClicked: Bool = false,
+        isOwnComment: Bool = false
     ) {
         self.id = id
         self.anchorID = anchorID
@@ -309,6 +316,7 @@ nonisolated struct Comment: Equatable, Sendable {
         self.isChickenLegClicked = isChickenLegClicked
         self.opposeCount = opposeCount
         self.isOpposeClicked = isOpposeClicked
+        self.isOwnComment = isOwnComment
     }
 
     func updatingLikeReaction(count: Int?, isClicked: Bool) -> Comment {
@@ -331,7 +339,8 @@ nonisolated struct Comment: Equatable, Sendable {
             chickenLegCount: chickenLegCount,
             isChickenLegClicked: isChickenLegClicked,
             opposeCount: opposeCount,
-            isOpposeClicked: isOpposeClicked
+            isOpposeClicked: isOpposeClicked,
+            isOwnComment: isOwnComment
         )
     }
 
@@ -355,7 +364,8 @@ nonisolated struct Comment: Equatable, Sendable {
             chickenLegCount: count,
             isChickenLegClicked: isClicked,
             opposeCount: opposeCount,
-            isOpposeClicked: isOpposeClicked
+            isOpposeClicked: isOpposeClicked,
+            isOwnComment: isOwnComment
         )
     }
 
@@ -379,7 +389,8 @@ nonisolated struct Comment: Equatable, Sendable {
             chickenLegCount: chickenLegCount,
             isChickenLegClicked: isChickenLegClicked,
             opposeCount: count,
-            isOpposeClicked: isClicked
+            isOpposeClicked: isClicked,
+            isOwnComment: isOwnComment
         )
     }
 }

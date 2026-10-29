@@ -646,12 +646,16 @@ final class NewDiscussionViewController: UIViewController {
         view.endEditing(true)
         let state = presenter.state
         let draft = NewDiscussionDraft(
-            title: titleTextView.text,
+            // 评论没有标题，预览标题栏标出是哪一楼。
+            title: state.editingCommentFloor.map { "#\($0) 评论" } ?? titleTextView.text,
             content: bodyTextView.text,
             category: state.category,
             rank: state.rank
         )
-        let preview = NewDiscussionPreviewViewController(draft: draft) { [weak self] in
+        let preview = NewDiscussionPreviewViewController(
+            draft: draft,
+            publishTitle: state.isEditing ? "保存" : "发布"
+        ) { [weak self] in
             guard let self else { return }
             navigationController?.popViewController(animated: true)
             // 校验失败会弹提示，要等返回动画结束再发布，否则提示弹不出来。
@@ -674,7 +678,8 @@ final class NewDiscussionViewController: UIViewController {
             category: state.category,
             rank: state.rank,
             userLevel: state.userLevel,
-            rankOptions: presenter.rankOptions
+            rankOptions: presenter.rankOptions,
+            isCategoryLocked: state.isEditing
         )
         settings.onSelectCategory = { [weak self] category in self?.presenter.didSelectCategory(category) }
         settings.onSelectRank = { [weak self] rank in self?.presenter.didSelectRank(rank) }
@@ -700,6 +705,19 @@ final class NewDiscussionViewController: UIViewController {
                 self?.presenter.close(savingDraft: true)
             })
             sheet.addAction(UIAlertAction(title: "放弃草稿", style: .destructive) { [weak self] _ in
+                self?.presenter.close(savingDraft: false)
+            })
+            sheet.addAction(UIAlertAction(title: "继续编辑", style: .cancel))
+            presentActionSheet(sheet)
+        case .askSaveEdit:
+            let sheet = UIAlertController(title: nil, message: "修改还没有保存", preferredStyle: .actionSheet)
+            sheet.addAction(UIAlertAction(title: "保存修改", style: .default) { [weak self] _ in
+                self?.presenter.didTapPublish()
+            })
+            sheet.addAction(UIAlertAction(title: "留着下次继续", style: .default) { [weak self] _ in
+                self?.presenter.close(savingDraft: true)
+            })
+            sheet.addAction(UIAlertAction(title: "放弃修改", style: .destructive) { [weak self] _ in
                 self?.presenter.close(savingDraft: false)
             })
             sheet.addAction(UIAlertAction(title: "继续编辑", style: .cancel))
@@ -743,7 +761,11 @@ final class NewDiscussionViewController: UIViewController {
         secondary.foregroundColor = .secondaryLabel
 
         guard let category = state.category else {
-            result.append(AttributedString("选择板块", attributes: primary))
+            if state.isEditing {
+                result.append(AttributedString(state.rank.title, attributes: primary))
+            } else {
+                result.append(AttributedString("选择板块", attributes: primary))
+            }
             return result
         }
         result.append(AttributedString(category.title, attributes: primary))
@@ -760,24 +782,52 @@ extension NewDiscussionViewController: NewDiscussionViewProtocol {
 
         var settingsConfiguration = settingsButton.configuration
         settingsConfiguration?.attributedTitle = settingsTitle(for: state)
+        // 编辑时板块固定；站点新增、App 不认识的板块也不再提示去选。
+        let needsCategory = state.category == nil && !state.isEditing
+        let settingsSymbol: String
+        if needsCategory {
+            settingsSymbol = "plus"
+        } else if state.isEditing || state.category == .inside {
+            // 编辑时板块已锁定，用锁提示这里只能改阅读限制。
+            settingsSymbol = "lock.fill"
+        } else {
+            settingsSymbol = "chevron.down"
+        }
         settingsConfiguration?.image = UIImage(
-            systemName: state.category == nil ? "plus" : (state.category == .inside ? "lock.fill" : "chevron.down"),
+            systemName: settingsSymbol,
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
         )
         // 没选板块时用描边提示还差这一步，选了之后是普通灰底胶囊。
-        settingsConfiguration?.background.backgroundColor = state.category == nil ? .clear : .secondarySystemFill
-        settingsConfiguration?.background.strokeColor = state.category == nil ? .label : nil
-        settingsConfiguration?.background.strokeWidth = state.category == nil ? 1.5 : 0
+        settingsConfiguration?.background.backgroundColor = needsCategory ? .clear : .secondarySystemFill
+        settingsConfiguration?.background.strokeColor = needsCategory ? .label : nil
+        settingsConfiguration?.background.strokeWidth = needsCategory ? 1.5 : 0
         settingsConfiguration?.baseForegroundColor = state.category == .inside ? .systemOrange : .label
+        if let floor = state.editingCommentFloor {
+            // 评论没有板块和阅读限制，中间只标出在编辑哪一楼。
+            var title = AttributedString("编辑评论")
+            title.font = UIFont.preferredFont(forTextStyle: .subheadline).withWeight(.semibold)
+            var floorText = AttributedString("  #\(floor)")
+            floorText.font = UIFont.preferredFont(forTextStyle: .subheadline)
+            floorText.foregroundColor = .secondaryLabel
+            settingsConfiguration?.attributedTitle = title + floorText
+            settingsConfiguration?.image = nil
+            settingsConfiguration?.background.backgroundColor = .clear
+        }
         settingsButton.configuration = settingsConfiguration
         settingsButton.isEnabled = !state.isSubmitting
+        settingsButton.isUserInteractionEnabled = state.editingCommentFloor == nil
+        titleTextView.isHidden = state.editingCommentFloor != nil
 
         var publishConfiguration = publishButton.configuration
         publishConfiguration?.showsActivityIndicator = state.isSubmitting
-        publishConfiguration?.title = state.isSubmitting ? nil : "发布"
+        publishConfiguration?.title = state.isSubmitting ? nil : (state.isEditing ? "保存" : "发布")
+        // 编辑时没改动就没什么可保存，按钮置灰。
+        let isUnchanged = state.saveStatus == .unchanged
+        publishConfiguration?.baseBackgroundColor = isUnchanged ? .tertiarySystemFill : .label
+        publishConfiguration?.baseForegroundColor = isUnchanged ? .tertiaryLabel : .systemBackground
         publishButton.configuration = publishConfiguration
         // 发布按钮始终可点，缺什么由点击时的校验提示，避免用户不知道为什么点不了。
-        publishButton.isUserInteractionEnabled = !state.isSubmitting
+        publishButton.isUserInteractionEnabled = !state.isSubmitting && !isUnchanged
         navigationItem.leftBarButtonItem?.isEnabled = !state.isSubmitting
 
         if let fee = state.category?.chickenLegFee {
@@ -797,7 +847,11 @@ extension NewDiscussionViewController: NewDiscussionViewProtocol {
                     .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
                     .prefix(3)
                     .joined(separator: "\n")
-                draftStrip.configure(summary: parts.joined(separator: " · "), preview: preview)
+                draftStrip.configure(
+                    title: state.isEditing ? "上次没保存的修改" : "上次的草稿",
+                    summary: parts.joined(separator: " · "),
+                    preview: preview
+                )
             }
             draftBannerContainer.isHidden = false
         } else {
@@ -807,7 +861,8 @@ extension NewDiscussionViewController: NewDiscussionViewProtocol {
 
         switch state.saveStatus {
         case .empty: statusLabel.text = nil
-        case .saved: statusLabel.text = "已存本机"
+        case .unchanged: statusLabel.text = "未修改"
+        case .saved: statusLabel.text = state.isEditing ? "已修改 · 已存本机" : "已存本机"
         case .waitingForDraftDecision: statusLabel.text = "未保存"
         }
         if imageUploader.activeCount > 0 {
@@ -841,6 +896,13 @@ extension NewDiscussionViewController: NewDiscussionViewProtocol {
         present(alert, animated: true)
     }
 
+    func confirmPrivateRankFee(_ fee: Int, onConfirm: @escaping () -> Void) {
+        let alert = UIAlertController(title: "确认", message: "公开帖子设为私有需要收取\(fee)鸡腿手续费，是否继续？", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "继续", style: .default) { _ in onConfirm() })
+        present(alert, animated: true)
+    }
+
     func showSubmitFailure(title: String, message: String, allowsRetry: Bool) {
         UINotificationFeedbackGenerator().notificationOccurred(.error)
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
@@ -848,12 +910,15 @@ extension NewDiscussionViewController: NewDiscussionViewProtocol {
             alert.addAction(UIAlertAction(title: "重试", style: .default) { [weak self] _ in
                 self?.presenter.didTapPublish()
             })
-            alert.addAction(UIAlertAction(title: "用网页发帖", style: .default) { [weak self] _ in
-                guard let self else { return }
-                // 网页编辑器不会读 App 草稿，先把正文放进剪贴板方便粘贴。
-                UIPasteboard.general.string = bodyTextView.text
-                presenter.didTapOpenWebFallback()
-            })
+            // 网页兜底只对发新帖有意义，编辑时直接重试。
+            if lastState?.isEditing != true {
+                alert.addAction(UIAlertAction(title: "用网页发帖", style: .default) { [weak self] _ in
+                    guard let self else { return }
+                    // 网页编辑器不会读 App 草稿，先把正文放进剪贴板方便粘贴。
+                    UIPasteboard.general.string = bodyTextView.text
+                    presenter.didTapOpenWebFallback()
+                })
+            }
             alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         } else {
             alert.addAction(UIAlertAction(title: "好", style: .cancel))

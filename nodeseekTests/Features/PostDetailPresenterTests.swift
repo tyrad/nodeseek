@@ -71,6 +71,69 @@ struct PostDetailPresenterTests {
         #expect(view.loadingCount == 1)
     }
 
+    @Test func editOwnPostLoadsOriginalThenRefreshesAfterSaving() async throws {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let view = SpyPostDetailView()
+        let editor = StubDiscussionEditor()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1, discussionEditor: editor)
+        presenter.setView(view)
+
+        // 不是本人的帖子不会读原文。
+        presenter.didLoadPostDetail(PostDetailResponse(detail: makeEditableDetail(isOwnPost: false)))
+        presenter.didTapEditPost()
+        #expect(editor.loadedPostIDs.isEmpty)
+
+        presenter.didLoadPostDetail(PostDetailResponse(detail: makeEditableDetail(isOwnPost: true)))
+        presenter.didTapEditPost()
+        for _ in 0..<200 where router.presentedEditables.isEmpty {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        #expect(editor.loadedPostIDs == [706958])
+        #expect(router.presentedEditables.map(\.postID) == [706958])
+
+        router.capturedOnSaved?()
+        #expect(interactor.loadedPages.last == 1)
+        #expect(view.toastMessage == "已保存修改")
+    }
+
+    @Test func editOwnCommentLoadsItsPageThenRefreshesThatPage() async throws {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let view = SpyPostDetailView()
+        let editor = StubDiscussionEditor()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 2, discussionEditor: editor)
+        presenter.setView(view)
+        let mine = Comment(id: "13684926", anchorID: "12", authorName: "mist", avatarURL: nil, floorText: "#12", createdAtText: nil, contentHTML: "<p>原评论</p>", isOwnComment: true)
+        let others = Comment(id: "13684999", anchorID: "13", authorName: "b", avatarURL: nil, floorText: "#13", createdAtText: nil, contentHTML: "<p>路过</p>")
+        presenter.didLoadPostDetail(PostDetailResponse(detail: PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [mine, others],
+            page: 2
+        )))
+
+        presenter.didTapEditComment(others)
+        presenter.didTapEditComment(mine)
+        for _ in 0..<200 where router.presentedEditableComments.isEmpty {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        #expect(editor.loadedComments.map(\.commentID) == [13684926])
+        #expect(editor.loadedComments.map(\.page) == [2])
+
+        let loadedBefore = interactor.loadedPages.count
+        router.capturedOnSaved?()
+        #expect(view.toastMessage == "已保存修改")
+        for _ in 0..<200 where interactor.loadedPages.count == loadedBefore {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        #expect(interactor.loadedPages.last == 2)
+    }
+
     @Test func loadingDetailMarksPostAsVisited() {
         let interactor = SpyPostDetailInteractor()
         let router = SpyPostDetailRouter()
@@ -1302,6 +1365,55 @@ private final class SpyPostDetailRouter: PostDetailRouterProtocol {
         navigateToLoginCount += 1
         capturedOnClose = onClose
     }
+
+    private(set) var presentedEditables: [EditableDiscussion] = []
+    private(set) var capturedOnSaved: (() -> Void)?
+
+    func presentEditPost(_ editable: EditableDiscussion, onSaved: @escaping () -> Void) {
+        presentedEditables.append(editable)
+        capturedOnSaved = onSaved
+    }
+
+    private(set) var presentedEditableComments: [EditableComment] = []
+
+    func presentEditComment(_ editable: EditableComment, onSaved: @escaping () -> Void) {
+        presentedEditableComments.append(editable)
+        capturedOnSaved = onSaved
+    }
+}
+
+private final class StubDiscussionEditor: NodeSeekDiscussionEditing {
+    private(set) var loadedPostIDs: [Int] = []
+
+    func loadEditableDiscussion(postID: Int) async throws -> EditableDiscussion {
+        loadedPostIDs.append(postID)
+        return EditableDiscussion(postID: postID, title: "标题", content: "正文", category: .daily, rank: .everyone, userLevel: 2)
+    }
+
+    func submitEdit(_ submission: EditDiscussionSubmission) async throws {}
+
+    private(set) var loadedComments: [(commentID: Int, page: Int)] = []
+
+    func loadEditableComment(postID: Int, commentID: Int, page: Int) async throws -> EditableComment {
+        loadedComments.append((commentID, page))
+        return EditableComment(postID: postID, commentID: commentID, floorIndex: 12, content: "原评论")
+    }
+
+    func submitEditComment(_ submission: EditCommentSubmission, postID: Int) async throws {}
+}
+
+private func makeEditableDetail(isOwnPost: Bool) -> PostDetail {
+    PostDetail(
+        id: "706958",
+        title: "标题",
+        isOwnPost: isOwnPost,
+        authorName: "mist",
+        avatarURL: nil,
+        metadataText: nil,
+        contentHTML: "<p>正文</p>",
+        comments: [],
+        page: 1
+    )
 }
 
 private final class SpyPostDetailView: PostDetailViewProtocol {

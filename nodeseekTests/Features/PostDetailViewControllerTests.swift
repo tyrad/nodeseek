@@ -4496,6 +4496,9 @@ private final class SpyPostDetailPresenter: PostDetailPresenterProtocol {
     func didTapCommentOppose(_ comment: nodeseek.Comment) {
         opposedCommentIDs.append(comment.id)
     }
+
+    func didTapEditPost() {}
+    func didTapEditComment(_ comment: nodeseek.Comment) {}
 }
 
 private func deleteVideoAssetTestCookies(from storage: HTTPCookieStorage) {

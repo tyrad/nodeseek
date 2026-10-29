@@ -669,13 +669,17 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         source: String,
         arguments: [String: Any],
         timeoutInterval: TimeInterval,
-        actionName: String
+        actionName: String,
+        reusesLoadedPage: Bool = true
     ) async throws -> [String: Any] {
-        let response = try await loadAutomationPageIfNeeded(
-            pageURL: pageURL,
-            timeoutInterval: timeoutInterval,
-            actionName: actionName
-        )
+        // 要读页面数据（比如编辑前读原文）时必须重新加载，复用的页面里是旧数据。
+        let response = reusesLoadedPage
+            ? try await loadAutomationPageIfNeeded(
+                pageURL: pageURL,
+                timeoutInterval: timeoutInterval,
+                actionName: actionName
+            )
+            : try await loadAutomationPage(pageURL: pageURL, timeoutInterval: timeoutInterval)
         if let challenge = ChallengeDetector().detect(response: response) {
             return [
                 "ok": false,

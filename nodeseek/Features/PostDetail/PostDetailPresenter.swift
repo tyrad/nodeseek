@@ -98,7 +98,8 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
             currentDetail = currentDetail.replacingComments(
                 nextComments,
                 page: max(currentDetail.page, pageDetail.page),
-                pagination: pageDetail.pagination
+                // 刷新的是前面某一页（比如编辑评论后）时，翻页进度仍以已加载到的最后一页为准。
+                pagination: pageDetail.page >= currentDetail.page ? pageDetail.pagination : currentDetail.pagination
             )
             return currentDetail
         }
@@ -169,6 +170,8 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
     private let interactor: PostDetailInteractorInput
     private let router: PostDetailRouterProtocol
     private let visitedStore: VisitedPostStoreProtocol
+    private let discussionEditor: NodeSeekDiscussionEditing
+    private var isLoadingEditablePost = false
     private let initialPage: Int
     private var currentPage: Int
     private var nextCommentPage: Int?
@@ -192,11 +195,13 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         interactor: PostDetailInteractorInput,
         router: PostDetailRouterProtocol,
         initialPage: Int = 1,
-        visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore()
+        visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore(),
+        discussionEditor: NodeSeekDiscussionEditing = WebViewNodeSeekDiscussionSubmitter()
     ) {
         self.interactor = interactor
         self.router = router
         self.visitedStore = visitedStore
+        self.discussionEditor = discussionEditor
         self.initialPage = max(1, initialPage)
         self.currentPage = self.initialPage
     }
@@ -393,6 +398,63 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         isSubmittingPostOppose = true
         view?.showToast(message: ReactionKind.oppose.pendingToast)
         interactor.addPostOppose()
+    }
+
+    func didTapEditPost() {
+        guard let detail = currentDetail, detail.isOwnPost, let postID = Int(detail.id) else { return }
+        guard !isLoadingEditablePost else { return }
+        isLoadingEditablePost = true
+        view?.showToast(message: "正在读取原文…")
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let editable = try await discussionEditor.loadEditableDiscussion(postID: postID)
+                isLoadingEditablePost = false
+                router.presentEditPost(editable) { [weak self] in
+                    self?.didSaveEditedPost()
+                }
+            } catch {
+                isLoadingEditablePost = false
+                view?.showToast(message: error.localizedDescription)
+            }
+        }
+    }
+
+    /// 修改只影响主楼：回到进入时的页码重新加载，表格会回到顶部。
+    private func didSaveEditedPost() {
+        refreshInitialPage()
+        view?.showToast(message: "已保存修改")
+    }
+
+    func didTapEditComment(_ comment: Comment) {
+        guard comment.isOwnComment,
+              let detail = currentDetail,
+              let postID = Int(detail.id),
+              let commentID = Int(comment.id),
+              let floor = comment.anchorID.flatMap(Int.init) else { return }
+        guard !isLoadingEditablePost else { return }
+        isLoadingEditablePost = true
+        let page = EditableComment.page(forFloor: floor)
+        view?.showToast(message: "正在读取原文…")
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let editable = try await discussionEditor.loadEditableComment(postID: postID, commentID: commentID, page: page)
+                isLoadingEditablePost = false
+                router.presentEditComment(editable) { [weak self] in
+                    self?.didSaveEditedComment(page: page)
+                }
+            } catch {
+                isLoadingEditablePost = false
+                view?.showToast(message: error.localizedDescription)
+            }
+        }
+    }
+
+    /// 只重新加载评论所在的那一页，原地替换，不打断当前阅读位置。
+    private func didSaveEditedComment(page: Int) {
+        view?.showToast(message: "已保存修改")
+        scheduleCommentPageRefresh(page: page, reason: "编辑评论")
     }
 
     private var currentFavoriteCollectedState: Bool {
@@ -773,17 +835,20 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
     }
 
     private func scheduleCurrentPageRefreshAfterReplySubmission() {
-        let page = currentPage
-        AppLog.info(.postDetail, "回复提交成功后调度当前页刷新: page=\(page), delayNs=\(Self.replyRefreshDelayNanoseconds)")
+        scheduleCommentPageRefresh(page: currentPage, reason: "回复提交")
+    }
+
+    private func scheduleCommentPageRefresh(page: Int, reason: String) {
+        AppLog.info(.postDetail, "\(reason)成功后调度评论页刷新: page=\(page), delayNs=\(Self.replyRefreshDelayNanoseconds)")
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: Self.replyRefreshDelayNanoseconds)
             guard let self else { return }
             guard self.activeCommentPageRequest == nil else {
-                AppLog.debug(.postDetail, "忽略回复后评论刷新: 正在加载 page=\(self.activeCommentPageRequest?.requestedPage ?? -1)")
+                AppLog.debug(.postDetail, "忽略\(reason)后评论刷新: 正在加载 page=\(self.activeCommentPageRequest?.requestedPage ?? -1)")
                 return
             }
             self.activeCommentPageRequest = .replyRefresh(page: page)
-            AppLog.info(.postDetail, "回复提交成功后开始刷新当前页: page=\(page)")
+            AppLog.info(.postDetail, "\(reason)成功后开始刷新评论页: page=\(page)")
             self.interactor.loadPostDetail(page: page)
         }
     }
