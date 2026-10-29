@@ -89,7 +89,7 @@ final class NewDiscussionPreviewViewController: UIViewController {
         guard !markdown.isEmpty else {
             renderedContent = [.text(NSAttributedString(
                 string: "正文还是空的",
-                attributes: [.font: UIFont.preferredFont(forTextStyle: .body), .foregroundColor: UIColor.tertiaryLabel]
+                attributes: [.font: UIFont.preferredFont(forTextStyle: .body), .foregroundColor: MarkdownEditorStyler.secondaryTextColor]
             ))]
             return
         }

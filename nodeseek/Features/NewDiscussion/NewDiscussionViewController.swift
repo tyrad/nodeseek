@@ -118,7 +118,8 @@ final class NewDiscussionViewController: UIViewController {
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
-        if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory {
+        if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory
+            || traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
             MarkdownEditorStyler.apply(to: bodyTextView)
         }
     }
@@ -169,7 +170,7 @@ final class NewDiscussionViewController: UIViewController {
         separatorContainer.addSubview(separator)
         statusLabel.font = .preferredFont(forTextStyle: .caption2)
         statusLabel.adjustsFontForContentSizeCategory = true
-        statusLabel.textColor = .tertiaryLabel
+        statusLabel.textColor = MarkdownEditorStyler.secondaryTextColor
         statusLabel.setContentHuggingPriority(.required, for: .horizontal)
         statusLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -238,7 +239,7 @@ final class NewDiscussionViewController: UIViewController {
         titlePlaceholder.text = "标题"
         titlePlaceholder.font = titleTextView.font
         titlePlaceholder.adjustsFontForContentSizeCategory = true
-        titlePlaceholder.textColor = .placeholderText
+        titlePlaceholder.textColor = MarkdownEditorStyler.secondaryTextColor
         addPlaceholder(titlePlaceholder, to: titleTextView)
     }
 
@@ -259,7 +260,7 @@ final class NewDiscussionViewController: UIViewController {
         bodyPlaceholder.text = "鼓励友善发言，禁止人身攻击"
         bodyPlaceholder.font = bodyTextView.font
         bodyPlaceholder.adjustsFontForContentSizeCategory = true
-        bodyPlaceholder.textColor = .placeholderText
+        bodyPlaceholder.textColor = MarkdownEditorStyler.secondaryTextColor
         addPlaceholder(bodyPlaceholder, to: bodyTextView)
     }
 
@@ -816,7 +817,7 @@ extension NewDiscussionViewController: NewDiscussionViewProtocol {
             title.font = UIFont.preferredFont(forTextStyle: .subheadline).withWeight(.semibold)
             var floorText = AttributedString("  #\(floor)")
             floorText.font = UIFont.preferredFont(forTextStyle: .subheadline)
-            floorText.foregroundColor = .secondaryLabel
+            floorText.foregroundColor = MarkdownEditorStyler.secondaryTextColor
             settingsConfiguration?.attributedTitle = title + floorText
             settingsConfiguration?.image = nil
             settingsConfiguration?.background.backgroundColor = .clear

@@ -137,7 +137,7 @@ final class NewDiscussionSettingsViewController: UIViewController {
 
         rankHintLabel.font = .preferredFont(forTextStyle: .footnote)
         rankHintLabel.adjustsFontForContentSizeCategory = true
-        rankHintLabel.textColor = .secondaryLabel
+        rankHintLabel.textColor = MarkdownEditorStyler.secondaryTextColor
         rankHintLabel.numberOfLines = 0
 
         setupRankStatusRow()
@@ -226,7 +226,7 @@ final class NewDiscussionSettingsViewController: UIViewController {
 
     private func updateCategorySelection() {
         Self.applySelection(categoryPills.map { ($0.value, $0.key == category) })
-        feeLabel.textColor = category == .inside && !isCategoryLocked ? .systemOrange : .tertiaryLabel
+        feeLabel.textColor = category == .inside && !isCategoryLocked ? .systemOrange : MarkdownEditorStyler.secondaryTextColor
     }
 
     // MARK: - 阅读限制
@@ -279,10 +279,10 @@ final class NewDiscussionSettingsViewController: UIViewController {
             return
         }
         let font = UIFont.preferredFont(forTextStyle: .footnote)
-        let text = NSMutableAttributedString(string: hint, attributes: [.font: font, .foregroundColor: UIColor.secondaryLabel])
+        let text = NSMutableAttributedString(string: hint, attributes: [.font: font, .foregroundColor: MarkdownEditorStyler.secondaryTextColor])
         text.append(NSAttributedString(
             string: "\n最高只能选到你当前的等级 Lv\(level)",
-            attributes: [.font: font, .foregroundColor: UIColor.tertiaryLabel]
+            attributes: [.font: font, .foregroundColor: MarkdownEditorStyler.secondaryTextColor]
         ))
         rankHintLabel.attributedText = text
     }
