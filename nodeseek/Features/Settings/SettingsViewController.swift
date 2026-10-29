@@ -116,6 +116,7 @@ class SettingsViewController: UITableViewController {
         case homeSearchEntry
         case textSize
         case signatureDisplay
+        case imageDimming
     }
 
     private enum FeatureRow: Int, CaseIterable {
@@ -136,6 +137,7 @@ class SettingsViewController: UITableViewController {
     private let nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting
     private let textSizeSettings: AppTextSizeSettings
     private let signatureDisplaySettings: PostSignatureDisplaySettings
+    private let imageDimmingSettings: DetailImageDimmingSettings
     private let searchEntrySettings: PostListSearchEntrySettings
     private let categoryPreferenceStore: PostCategoryPreferenceStore
     private let specialFollowKeywordStore: SpecialFollowKeywordStore
@@ -161,6 +163,7 @@ class SettingsViewController: UITableViewController {
         nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting? = nil,
         textSizeSettings: AppTextSizeSettings = .shared,
         signatureDisplaySettings: PostSignatureDisplaySettings = .shared,
+        imageDimmingSettings: DetailImageDimmingSettings = .shared,
         searchEntrySettings: PostListSearchEntrySettings = .shared,
         categoryPreferenceStore: PostCategoryPreferenceStore = .shared,
         specialFollowKeywordStore: SpecialFollowKeywordStore = .shared,
@@ -184,6 +187,7 @@ class SettingsViewController: UITableViewController {
         self.nodeImageAuthorizationPresenter = nodeImageAuthorizationPresenter ?? DefaultNodeImageAuthorizationPresenter()
         self.textSizeSettings = textSizeSettings
         self.signatureDisplaySettings = signatureDisplaySettings
+        self.imageDimmingSettings = imageDimmingSettings
         self.searchEntrySettings = searchEntrySettings
         self.categoryPreferenceStore = categoryPreferenceStore
         self.specialFollowKeywordStore = specialFollowKeywordStore
@@ -347,6 +351,8 @@ class SettingsViewController: UITableViewController {
             return textSizeCell(for: indexPath)
         case .signatureDisplay:
             return signatureDisplayCell(for: indexPath)
+        case .imageDimming:
+            return imageDimmingCell()
         case .none:
             return UITableViewCell()
         }
@@ -403,6 +409,29 @@ class SettingsViewController: UITableViewController {
         cell.selectionStyle = .none
         cell.accessibilityIdentifier = "settings-post-signature-cell"
         return cell
+    }
+
+    private func imageDimmingCell() -> UITableViewCell {
+        let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+        cell.textLabel?.text = "深色模式图片变暗"
+        cell.textLabel?.numberOfLines = 0
+        cell.detailTextLabel?.text = "降低帖子和全屏预览中图片的亮度"
+        cell.detailTextLabel?.textColor = .secondaryLabel
+        cell.detailTextLabel?.numberOfLines = 0
+        cell.imageView?.image = UIImage(systemName: "moon")
+        let dimmingSwitch = UISwitch()
+        dimmingSwitch.isOn = imageDimmingSettings.isEnabled
+        dimmingSwitch.accessibilityLabel = "深色模式图片变暗"
+        dimmingSwitch.accessibilityIdentifier = "settings-image-dimming-switch"
+        dimmingSwitch.addTarget(self, action: #selector(imageDimmingSwitchChanged(_:)), for: .valueChanged)
+        cell.accessoryView = dimmingSwitch
+        cell.selectionStyle = .none
+        cell.accessibilityIdentifier = "settings-image-dimming-cell"
+        return cell
+    }
+
+    @objc private func imageDimmingSwitchChanged(_ sender: UISwitch) {
+        imageDimmingSettings.setEnabled(sender.isOn)
     }
 
     private func homeSearchEntryCell(for indexPath: IndexPath) -> UITableViewCell {
@@ -591,7 +620,7 @@ class SettingsViewController: UITableViewController {
             showPostCategoryPreferences()
         case .textSize:
             showTextSizeSettings()
-        case .homeSearchEntry, .signatureDisplay, .none:
+        case .homeSearchEntry, .signatureDisplay, .imageDimming, .none:
             break
         }
     }

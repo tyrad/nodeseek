@@ -1015,6 +1015,7 @@ private final class DetailTableImageView: UIImageView {
         self.targetPixelWidth = targetPixelWidth
         self.onTapped = onTapped
         super.init(frame: .zero)
+        DetailImageDimmingView.install(on: self)
         backgroundColor = .secondarySystemBackground
         contentMode = .scaleAspectFit
         clipsToBounds = true

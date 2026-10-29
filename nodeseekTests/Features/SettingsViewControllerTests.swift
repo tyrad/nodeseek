@@ -42,7 +42,7 @@ struct SettingsViewControllerTests {
             let tableView = try #require(viewController.tableView)
             #expect(viewController.title == "设置")
             #expect(tableView.numberOfSections == 7)
-            #expect(tableView.numberOfRows(inSection: 0) == 4)
+            #expect(tableView.numberOfRows(inSection: 0) == 5)
             #expect(tableView.numberOfRows(inSection: 1) == 3)
             #expect(tableView.numberOfRows(inSection: 2) == 1)
             #expect(tableView.numberOfRows(inSection: 3) == 1)
@@ -152,6 +152,30 @@ struct SettingsViewControllerTests {
         try await waitUntil { viewController.tableView.numberOfRows(inSection: 6) == 0 }
 
         #expect(viewController.tableView.numberOfRows(inSection: 6) == 0)
+    }
+
+    @Test func imageDimmingSwitchDefaultsOffAndPersistsChanges() throws {
+        let suiteName = "settings-image-dimming-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = DetailImageDimmingSettings(userDefaults: defaults)
+        let controller = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager(),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
+            imageDimmingSettings: settings
+        )
+        controller.loadViewIfNeeded()
+        let cell = controller.tableView(controller.tableView, cellForRowAt: IndexPath(row: 4, section: 0))
+        let control = try #require(cell.accessoryView as? UISwitch)
+        #expect(cell.textLabel?.text == "深色模式图片变暗")
+        #expect(!control.isOn)
+        control.isOn = true
+        control.sendActions(for: .valueChanged)
+        #expect(DetailImageDimmingSettings(userDefaults: defaults).isEnabled)
+        control.isOn = false
+        control.sendActions(for: .valueChanged)
+        #expect(!DetailImageDimmingSettings(userDefaults: defaults).isEnabled)
     }
 
     @Test func postSignatureDisplayDefaultsToEnabledWhenUnset() throws {

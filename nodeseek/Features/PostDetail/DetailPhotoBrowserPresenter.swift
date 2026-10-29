@@ -53,6 +53,7 @@ final class DetailPhotoBrowserPresenter: NSObject, JXPhotoBrowserDelegate {
 
     func photoBrowser(_ browser: JXPhotoBrowserViewController, willDisplay cell: JXPhotoBrowserAnyCell, at index: Int) {
         guard let photoCell = cell as? JXZoomImageCell else { return }
+        DetailImageDimmingView.install(on: photoCell.imageView)
         let imageURL = imageURLs[index]
         let requestKey = imageURL.absoluteString
         photoCell.imageView.image = nil

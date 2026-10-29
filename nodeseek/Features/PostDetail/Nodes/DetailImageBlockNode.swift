@@ -227,6 +227,7 @@ final class DetailImageBlockView: UIView {
         imageView.accessibilityLabel = imageBlock.altText
         imageView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap)))
         addSubview(imageView)
+        DetailImageDimmingView.install(on: imageView)
         addSubview(placeholderView)
     }
 

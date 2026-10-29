@@ -56,6 +56,7 @@ final class DetailInlineImageView: AnimatedImageView {
         isUserInteractionEnabled = true
         addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap)))
         addSubview(placeholderView)
+        DetailImageDimmingView.install(on: self)
     }
 
     required init?(coder: NSCoder) {

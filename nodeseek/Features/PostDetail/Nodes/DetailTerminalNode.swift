@@ -54,6 +54,7 @@ final class DetailTerminalView: UIView {
         layer.cornerRadius = 8
         clipsToBounds = true
         imageView.contentMode = .scaleAspectFit
+        DetailImageDimmingView.install(on: imageView)
         imageView.accessibilityIdentifier = "detail-terminal-image"
         openButton.accessibilityIdentifier = "detail-terminal-open-report"
         openButton.accessibilityLabel = "放大图片"
