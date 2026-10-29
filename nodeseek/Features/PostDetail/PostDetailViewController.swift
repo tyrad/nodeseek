@@ -268,6 +268,8 @@ class PostDetailViewController: UIViewController {
 
     let tableNode = ASTableNode(style: .plain)
     var toastHideWorkItem: DispatchWorkItem?
+    lazy var toastIconWidthConstraint = toastIconView.widthAnchor.constraint(equalToConstant: 18)
+    lazy var toastLabelLeadingConstraint = toastLabel.leadingAnchor.constraint(equalTo: toastIconView.trailingAnchor, constant: 8)
     let navigationAuthorTitleView = PostDetailNavigationAuthorTitleView()
     var isNavigationAuthorTitleVisible = false
 
@@ -746,10 +748,10 @@ class PostDetailViewController: UIViewController {
 
             toastIconView.leadingAnchor.constraint(equalTo: toastContainerView.leadingAnchor, constant: 12),
             toastIconView.centerYAnchor.constraint(equalTo: toastContainerView.centerYAnchor),
-            toastIconView.widthAnchor.constraint(equalToConstant: 18),
+            toastIconWidthConstraint,
             toastIconView.heightAnchor.constraint(equalToConstant: 18),
 
-            toastLabel.leadingAnchor.constraint(equalTo: toastIconView.trailingAnchor, constant: 8),
+            toastLabelLeadingConstraint,
             toastLabel.trailingAnchor.constraint(equalTo: toastContainerView.trailingAnchor, constant: -14),
             toastLabel.topAnchor.constraint(equalTo: toastContainerView.topAnchor, constant: 10),
             toastLabel.bottomAnchor.constraint(equalTo: toastContainerView.bottomAnchor, constant: -10),

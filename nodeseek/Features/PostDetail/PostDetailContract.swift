@@ -16,6 +16,8 @@ protocol PostDetailViewProtocol: AnyObject {
     func hideLoading()
     func showError(message: String)
     func showToast(message: String)
+    /// 进行中的提示，不带完成图标。
+    func showProgressToast(message: String)
     func setReplySubmitting(_ isSubmitting: Bool)
     func setFavoriteSubmitting(_ isSubmitting: Bool)
     func finishReplySubmission()
@@ -28,6 +30,12 @@ protocol PostDetailViewProtocol: AnyObject {
     func updateCommentChickenLeg(commentID: String, count: Int?, isClicked: Bool)
     func updateCommentOppose(commentID: String, count: Int?, isClicked: Bool)
     func renderLoginRequired(message: String)
+}
+
+extension PostDetailViewProtocol {
+    func showProgressToast(message: String) {
+        showToast(message: message)
+    }
 }
 
 // MARK: - Presenter Protocol (View -> Presenter)

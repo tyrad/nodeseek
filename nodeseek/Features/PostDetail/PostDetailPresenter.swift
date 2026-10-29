@@ -341,7 +341,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         }
         guard submittingCommentLikeIDs.contains(comment.id) == false else { return }
         submittingCommentLikeIDs.insert(comment.id)
-        view?.showToast(message: ReactionKind.like.pendingToast)
+        view?.showProgressToast(message: ReactionKind.like.pendingToast)
         interactor.addCommentLike(commentID: comment.id)
     }
 
@@ -352,7 +352,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         }
         guard submittingCommentChickenLegIDs.contains(comment.id) == false else { return }
         submittingCommentChickenLegIDs.insert(comment.id)
-        view?.showToast(message: ReactionKind.chickenLeg.pendingToast)
+        view?.showProgressToast(message: ReactionKind.chickenLeg.pendingToast)
         interactor.addCommentChickenLeg(commentID: comment.id)
     }
 
@@ -363,7 +363,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         }
         guard submittingCommentOpposeIDs.contains(comment.id) == false else { return }
         submittingCommentOpposeIDs.insert(comment.id)
-        view?.showToast(message: ReactionKind.oppose.pendingToast)
+        view?.showProgressToast(message: ReactionKind.oppose.pendingToast)
         interactor.addCommentOppose(commentID: comment.id)
     }
 
@@ -374,7 +374,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         }
         guard isSubmittingPostLike == false else { return }
         isSubmittingPostLike = true
-        view?.showToast(message: ReactionKind.like.pendingToast)
+        view?.showProgressToast(message: ReactionKind.like.pendingToast)
         interactor.addPostLike()
     }
 
@@ -385,7 +385,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         }
         guard isSubmittingPostChickenLeg == false else { return }
         isSubmittingPostChickenLeg = true
-        view?.showToast(message: ReactionKind.chickenLeg.pendingToast)
+        view?.showProgressToast(message: ReactionKind.chickenLeg.pendingToast)
         interactor.addPostChickenLeg()
     }
 
@@ -396,7 +396,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         }
         guard isSubmittingPostOppose == false else { return }
         isSubmittingPostOppose = true
-        view?.showToast(message: ReactionKind.oppose.pendingToast)
+        view?.showProgressToast(message: ReactionKind.oppose.pendingToast)
         interactor.addPostOppose()
     }
 
@@ -404,7 +404,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         guard let detail = currentDetail, detail.isOwnPost, let postID = Int(detail.id) else { return }
         guard !isLoadingEditablePost else { return }
         isLoadingEditablePost = true
-        view?.showToast(message: "正在读取原文…")
+        view?.showProgressToast(message: "正在读取原文…")
         Task { [weak self] in
             guard let self else { return }
             do {
@@ -435,7 +435,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         guard !isLoadingEditablePost else { return }
         isLoadingEditablePost = true
         let page = EditableComment.page(forFloor: floor)
-        view?.showToast(message: "正在读取原文…")
+        view?.showProgressToast(message: "正在读取原文…")
         Task { [weak self] in
             guard let self else { return }
             do {

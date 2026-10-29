@@ -70,8 +70,20 @@ extension PostDetailViewController: PostDetailViewProtocol {
     }
 
     func showToast(message: String) {
+        presentToast(message: message, showsIcon: true)
+    }
+
+    func showProgressToast(message: String) {
+        presentToast(message: message, showsIcon: false)
+    }
+
+    private func presentToast(message: String, showsIcon: Bool) {
         toastHideWorkItem?.cancel()
         toastLabel.text = message
+        // 进行中的提示不显示完成勾，收起图标后左右留白与右侧一致
+        toastIconView.isHidden = !showsIcon
+        toastIconWidthConstraint.constant = showsIcon ? 18 : 0
+        toastLabelLeadingConstraint.constant = showsIcon ? 8 : 2
         toastContainerView.isHidden = false
         toastContainerView.alpha = 0
         toastContainerView.transform = CGAffineTransform(translationX: 0, y: 8)
@@ -101,7 +113,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
 
     func setFavoriteSubmitting(_ isSubmitting: Bool) {
         guard isSubmitting else { return }
-        showToast(message: "正在处理")
+        showProgressToast(message: "正在处理")
     }
 
     func render(detail: PostDetail) {
