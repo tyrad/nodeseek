@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>原生发帖页 UI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #e9ebee;
+    font-family: -apple-system, "PingFang SC", "SF Pro Text", sans-serif;
+    padding: 48px 48px 56px;
+    color: #111;
+    width: 1362px;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 { font-size: 32px; font-weight: 700; letter-spacing: -.5px; }
+  .sub { color: #6b6b70; font-size: 15px; margin: 6px 0 22px; }
+  .rules { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 40px; }
+  .rule { background: #fff; border-radius: 16px; padding: 14px 16px; font-size: 13px; line-height: 1.55; color: #48484c; }
+  .rule b { display: block; color: #111; font-size: 14px; margin-bottom: 4px; }
+  .row { display: flex; gap: 48px; margin-bottom: 44px; }
+  .cell { width: 390px; }
+  .cap { margin-top: 16px; font-size: 13.5px; line-height: 1.65; color: #3a3a3e; }
+  .cap b { display: block; font-size: 16px; margin-bottom: 4px; color: #111; }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; background: rgba(0,0,0,.06); border-radius: 4px; padding: 0 3px; }
+
+  /* 手机：所有颜色走变量，对应 UIKit 动态色 */
+  .phone {
+    --bg: #fff; --label: #000; --label2: #86868b; --label3: #c2c2c6;
+    --sep: rgba(60,60,67,.14); --fill: #f2f2f5; --fill2: #e6e6eb;
+    --bar: rgba(255,255,255,.86); --bar-border: rgba(0,0,0,.07);
+    --kb: #d3d5da; --kbkey: #fff; --kbkey2: #adb1b9;
+    --accent: #000; --accent-soft: rgba(0,0,0,.07); --on-accent: #fff;
+    --sheet: #f6f6f8; --tile: #fff; --dim: rgba(0,0,0,.22); --orange: #c2620a; --red: #e5372b;
+    --grid: rgba(0,0,0,.035);
+    position: relative; width: 390px; height: 844px; border-radius: 55px;
+    background: var(--bg); color: var(--label); overflow: hidden;
+    box-shadow: 0 0 0 10px #18181a, 0 30px 60px rgba(0,0,0,.25);
+  }
+  .phone.dark {
+    --bg: #000; --label: #fff; --label2: #8e8e93; --label3: #4a4a4e;
+    --sep: rgba(84,84,88,.5); --fill: #1c1c1e; --fill2: #2c2c2e;
+    --bar: rgba(38,38,40,.88); --bar-border: rgba(255,255,255,.08);
+    --kb: #2a2a2c; --kbkey: #6c6c70; --kbkey2: #47474a;
+    --accent: #fff; --accent-soft: rgba(255,255,255,.14); --on-accent: #000;
+    --sheet: #1c1c1e; --tile: #2c2c2e; --dim: rgba(0,0,0,.5); --orange: #ff9f0a; --red: #ff453a;
+    --grid: rgba(255,255,255,.04);
+  }
+  svg { display: block; flex: none; }
+  .status { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 8px 36px 0 48px; font-weight: 600; font-size: 17px; }
+  .island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; border-radius: 20px; background: #000; }
+  .sicons { display: flex; gap: 6px; align-items: center; }
+  .bat { width: 25px; height: 12px; border: 1.5px solid currentColor; border-radius: 4px; position: relative; opacity: .9; }
+  .bat::after { content: ""; position: absolute; inset: 1.5px; width: 72%; background: currentColor; border-radius: 1.5px; }
+
+  /* 导航：中间就是“发到哪里” */
+  .nav { height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; position: relative; }
+  .gbtn { width: 44px; height: 44px; border-radius: 22px; background: var(--bar); border: .5px solid var(--bar-border); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 12px rgba(0,0,0,.07); color: var(--label); }
+  .gbtn.off { color: var(--label3); }
+  .dest { position: absolute; left: 50%; transform: translateX(-50%); height: 36px; border-radius: 18px; padding: 0 10px 0 12px; display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; background: var(--fill); white-space: nowrap; }
+  .dest .dot { display: none; }
+  .dest .mid { color: var(--label3); font-weight: 400; }
+  .dest .rk { color: var(--label2); font-weight: 500; }
+  .dest.need { background: transparent; box-shadow: inset 0 0 0 1.5px var(--accent); color: var(--accent); }
+  .dest.press { background: var(--fill2); }
+  .post { height: 40px; padding: 0 18px; border-radius: 20px; background: var(--accent); color: var(--on-accent); font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+  .post.off { background: var(--fill); color: var(--label3); }
+  .note { display: flex; justify-content: center; align-items: center; gap: 5px; font-size: 12.5px; color: var(--orange); margin-top: 2px; }
+
+  /* 编辑区 */
+  .edit { padding: 14px 20px 0; }
+  .title { font-size: 23px; font-weight: 700; line-height: 1.32; letter-spacing: -.3px; }
+  .rule-line { height: .5px; background: var(--sep); margin: 14px 0 12px; }
+  .ph { color: var(--label3); font-weight: inherit; }
+  .body { font-size: 17px; line-height: 1.62; }
+  .body p { min-height: 27px; }
+  .mk { color: var(--label3); }
+  .hd { font-weight: 700; }
+  .hd .mk { color: var(--label2); font-weight: 600; }
+  .ic { white-space: nowrap; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 15px; background: var(--fill); border-radius: 5px; padding: 1px 4px; }
+  .img { color: var(--label2); font-size: 15px; }
+  .img .mk { color: var(--label3); }
+  .caret { display: inline-block; width: 2px; height: 21px; background: var(--accent); vertical-align: -4px; margin-left: 1px; border-radius: 1px; }
+  .dimmed { opacity: .45; }
+  .paper { background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 22px 22px; }
+
+  /* 草稿卡 */
+  .draft { margin: 12px 16px 0; border-radius: 16px; background: var(--fill); padding: 12px 14px 12px; }
+  .draft .t1 { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .draft .t2 { font-size: 13px; color: var(--label2); margin-top: 3px; line-height: 1.45; }
+  .draft .acts { display: flex; gap: 8px; margin-top: 10px; }
+  .btn { height: 34px; border-radius: 17px; padding: 0 16px; display: inline-flex; align-items: center; font-size: 14.5px; font-weight: 600; }
+  .btn.pri { background: var(--accent); color: var(--on-accent); }
+  .btn.sec { background: var(--bg); color: var(--label); }
+  .btn.dan { background: var(--bg); color: var(--red); }
+
+  /* 键盘上方：上传任务区 + 工具条 */
+  .dock { position: absolute; left: 0; right: 0; }
+  .tbar { margin: 0 10px 8px; height: 48px; border-radius: 24px; background: var(--bar); border: .5px solid var(--bar-border); box-shadow: 0 4px 18px rgba(0,0,0,.08); display: flex; align-items: center; padding: 0 6px; backdrop-filter: blur(20px); }
+  .tb { width: 42px; height: 36px; border-radius: 18px; display: flex; align-items: center; justify-content: center; color: var(--label); }
+  .tb.on { background: var(--accent); color: var(--on-accent); }
+  .tsp { flex: 1; }
+  .saved { font-size: 12px; color: var(--label2); padding: 0 8px; white-space: nowrap; }
+  .tdiv { width: .5px; height: 22px; background: var(--sep); margin: 0 2px; }
+
+  .tasks { margin: 0 10px 8px; border-radius: 18px; background: var(--bar); border: .5px solid var(--bar-border); box-shadow: 0 4px 18px rgba(0,0,0,.08); overflow: hidden; }
+  .task { display: flex; align-items: center; gap: 10px; padding: 9px 12px; font-size: 14px; }
+  .task + .task { border-top: .5px solid var(--sep); }
+  .tthumb { width: 34px; height: 34px; border-radius: 8px; background: #1d2024; position: relative; overflow: hidden; flex: none; }
+  .tthumb i { position: absolute; left: 5px; height: 2.5px; border-radius: 2px; background: #cfd3d8; opacity: .55; }
+  .tthumb i.g { background: #5fd38d; opacity: .8; }
+  .tinfo { flex: 1; min-width: 0; }
+  .tinfo .s { font-size: 12px; color: var(--label2); margin-top: 1px; }
+  .tinfo .s.err { color: var(--red); }
+  .prog { height: 3px; border-radius: 2px; background: var(--fill2); margin-top: 5px; overflow: hidden; }
+  .prog i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+  .tact { font-size: 14px; font-weight: 600; color: var(--accent); padding: 4px 2px; }
+  .tact.mute { color: var(--label2); font-weight: 500; }
+
+  /* 键盘 */
+  .keyboard { height: 291px; background: var(--kb); padding: 9px 3px 0; }
+  .krow { display: flex; justify-content: center; gap: 6px; margin-bottom: 11px; }
+  .key { width: 33px; height: 42px; border-radius: 6px; background: var(--kbkey); box-shadow: 0 1px 0 rgba(0,0,0,.28); display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--label); }
+  .key.f { background: var(--kbkey2); font-size: 15px; width: 45px; }
+  .key.space { width: 182px; font-size: 15px; }
+  .key.ret { width: 90px; font-size: 15px; background: var(--kbkey2); }
+  .cand { height: 38px; display: flex; align-items: center; gap: 22px; padding: 0 16px; font-size: 18px; background: var(--kb); border-bottom: .5px solid var(--sep); }
+  .cand .on { font-weight: 600; }
+
+  /* Aa 格式面板 */
+  .fmt { height: 291px; background: var(--sheet); padding: 14px 14px 0; border-top: .5px solid var(--sep); }
+  .fmt-h { display: flex; justify-content: space-between; align-items: center; font-size: 15px; font-weight: 600; margin-bottom: 12px; padding: 0 2px; }
+  .xs { width: 28px; height: 28px; border-radius: 14px; background: var(--fill2); display: flex; align-items: center; justify-content: center; color: var(--label2); }
+  .grp { display: flex; gap: 8px; margin-bottom: 8px; }
+  .seg { flex: 1; display: flex; background: var(--tile); border-radius: 12px; height: 46px; overflow: hidden; }
+  .seg span { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 15px; border-right: .5px solid var(--sep); color: var(--label); gap: 5px; }
+  .seg span:last-child { border-right: none; }
+  .seg span.on { color: var(--on-accent); font-weight: 600; background: var(--accent); }
+
+  /* 发布设置 sheet */
+  .dim { position: absolute; inset: 0; background: var(--dim); }
+  .behind { position: absolute; inset: 0; transform: scale(.94) translateY(-6px); border-radius: 40px; overflow: hidden; background: var(--bg); filter: brightness(.82); }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; top: 150px; background: var(--sheet); border-radius: 22px 22px 0 0; padding: 8px 16px 0; }
+  .grab { width: 36px; height: 5px; border-radius: 3px; background: var(--label3); margin: 0 auto 12px; }
+  .sh-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding: 0 2px; }
+  .sh-h h3 { font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
+  .lab { font-size: 13px; color: var(--label2); margin: 0 4px 8px; font-weight: 600; display: flex; justify-content: space-between; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
+  .tile { background: var(--tile); border-radius: 16px; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 600; position: relative; }
+  .tile.on { box-shadow: inset 0 0 0 2px var(--accent); color: var(--accent); }
+  .tile .ok { position: absolute; top: 6px; right: 6px; width: 16px; height: 16px; border-radius: 8px; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center; }
+  .inside { background: var(--tile); border-radius: 16px; height: 50px; display: flex; align-items: center; gap: 10px; padding: 0 14px; font-size: 14px; font-weight: 600; margin-bottom: 20px; }
+  .coin { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--orange); background: rgba(255,149,0,.12); border-radius: 8px; padding: 3px 8px; }
+  .ranks { display: flex; background: var(--tile); border-radius: 12px; padding: 3px; gap: 2px; }
+  .ranks span { flex: 1; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; }
+  .ranks span.on { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+  .rk-err { display: flex; align-items: center; gap: 8px; background: var(--tile); border-radius: 12px; height: 40px; padding: 0 12px; font-size: 13px; color: var(--label2); }
+  .rk-err b { margin-left: auto; color: var(--accent); font-size: 14px; }
+  .done { position: absolute; left: 16px; right: 16px; bottom: 34px; height: 50px; border-radius: 25px; background: var(--label); color: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; }
+
+  .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(0,35,15,.25); border-top-color: currentColor; }
+  .home { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--label); z-index: 5; }
+</style>
+</head>
+<body>
+
+<!-- 图标：按 SF Symbols 造型手绘，实现时直接用对应 SF Symbol -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+  <symbol id="xmark" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="photo" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="3.5" stroke="currentColor" stroke-width="1.8" fill="none"/><circle cx="8.6" cy="9.6" r="1.7" fill="currentColor"/><path d="M3.5 17l5-4.6 3.6 3.2 3.2-2.8 5.2 4.6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/></symbol>
+  <symbol id="sticker" viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 108.5 8.5V11h-4.5a4 4 0 01-4-4V3.5z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/><path d="M12.5 3.6l7.9 7.6" stroke="currentColor" stroke-width="1.8"/><circle cx="8.8" cy="11.5" r="1.1" fill="currentColor"/><path d="M8.3 15c1.4 1.5 3.8 1.6 5.4.3" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="aa" viewBox="0 0 24 24"><text x="1.5" y="18" font-size="15" font-weight="600" font-family="-apple-system" fill="currentColor">A</text><text x="12.5" y="18" font-size="11" font-weight="600" font-family="-apple-system" fill="currentColor">a</text></symbol>
+  <symbol id="link" viewBox="0 0 24 24"><path d="M10.2 13.8a4 4 0 005.6 0l3.1-3.1a4 4 0 00-5.6-5.6l-1.2 1.2M13.8 10.2a4 4 0 00-5.6 0l-3.1 3.1a4 4 0 005.6 5.6l1.2-1.2" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="code" viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.8 5l-3.6 14" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="kbdown" viewBox="0 0 24 24"><rect x="2.5" y="3.5" width="19" height="12" rx="2.5" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M6.3 7.5h.5M9.8 7.5h.5M13.3 7.5h.5M16.8 7.5h.5M7.5 11.5h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M9 18.5l3 2.3 3-2.3" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="down" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M5.5 12.5l4.2 4.2 8.8-9" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="doc" viewBox="0 0 24 24"><path d="M7 3.5h7l4.5 4.5v12.5H7z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/><path d="M14 3.5V8h4.5M9.5 12.5h6M9.5 16h4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="warn" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M12 7.5v5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.3" r="1.1" fill="currentColor"/></symbol>
+  <symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M8 10.5V8a4 4 0 018 0v2.5" stroke="currentColor" stroke-width="1.8" fill="none"/></symbol>
+  <!-- 板块图标 -->
+  <symbol id="c-daily" viewBox="0 0 24 24"><path d="M5 9h11v5a5 5 0 01-5 5h-1a5 5 0 01-5-5V9z" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M16 10.5h1.5a2.5 2.5 0 010 5H16M8 3.5c-.8 1 .8 2 0 3M12 3.5c-.8 1 .8 2 0 3" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="c-tech" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="3.5" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M7 9.5l3 2.5-3 2.5M12 15h5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="c-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.8" fill="currentColor"/><path d="M8.2 8.2a5.4 5.4 0 000 7.6M15.8 8.2a5.4 5.4 0 010 7.6M5.4 5.4a9.3 9.3 0 000 13.2M18.6 5.4a9.3 9.3 0 010 13.2" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="c-review" viewBox="0 0 24 24"><path d="M4 16a8 8 0 1116 0" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M12 16l3.5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16" r="1.6" fill="currentColor"/></symbol>
+  <symbol id="c-trade" viewBox="0 0 24 24"><path d="M4 8.5h14M14.5 5l3.5 3.5-3.5 3.5M20 15.5H6M9.5 12L6 15.5 9.5 19" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="c-carpool" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M3.5 19a5.5 5.5 0 0111 0" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M15.5 5.8a3 3 0 010 5.4M17 14a5.5 5.5 0 013.5 5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="c-promo" viewBox="0 0 24 24"><path d="M4 10v4h3l7 4.5v-13L7 10H4z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/><path d="M17.5 9a4 4 0 010 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="c-life" viewBox="0 0 24 24"><path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/><path d="M5 19l8-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="c-dev" viewBox="0 0 24 24"><path d="M9 4.5c-2.5 0-2.5 1.5-2.5 3.5S6 11 4 12c2 1 2.5 2 2.5 4s0 3.5 2.5 3.5M15 4.5c2.5 0 2.5 1.5 2.5 3.5S18 11 20 12c-2 1-2.5 2-2.5 4s0 3.5-2.5 3.5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="c-expose" viewBox="0 0 24 24"><path d="M12 4l9 15.5H3L12 4z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/><path d="M12 10v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.8" r="1.1" fill="currentColor"/></symbol>
+  <symbol id="c-sandbox" viewBox="0 0 24 24"><path d="M12 3.5l8 4.3v8.4l-8 4.3-8-4.3V7.8l8-4.3z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/><path d="M4.3 8L12 12.2 19.7 8M12 12.2v8" stroke="currentColor" stroke-width="1.6" fill="none"/></symbol>
+  </defs>
+</svg>
+
+<template id="statusbar">
+  <div class="status"><span>9:41</span><span class="sicons"><svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5.5" width="3" height="6.5" rx="1" fill="currentColor"/><rect x="10" y="3" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><span class="bat"></span></span></div>
+  <div class="island"></div>
+</template>
+
+<template id="tbar">
+  <div class="tbar">
+    <span class="tb k-photo"><svg width="22" height="22"><use href="#photo"/></svg></span>
+    <span class="tb k-sticker"><svg width="22" height="22"><use href="#sticker"/></svg></span>
+    <span class="tb k-aa"><svg width="24" height="24"><use href="#aa"/></svg></span>
+    <span class="tb k-link"><svg width="21" height="21"><use href="#link"/></svg></span>
+    <span class="tb k-code"><svg width="21" height="21"><use href="#code"/></svg></span>
+    <span class="tsp"></span>
+    <span class="saved">已存本机</span>
+    <span class="tdiv"></span>
+    <span class="tb"><svg width="22" height="22"><use href="#kbdown"/></svg></span>
+  </div>
+</template>
+
+<template id="keyboard">
+  <div class="keyboard">
+    <div class="krow"><span class="key">q</span><span class="key">w</span><span class="key">e</span><span class="key">r</span><span class="key">t</span><span class="key">y</span><span class="key">u</span><span class="key">i</span><span class="key">o</span><span class="key">p</span></div>
+    <div class="krow"><span class="key">a</span><span class="key">s</span><span class="key">d</span><span class="key">f</span><span class="key">g</span><span class="key">h</span><span class="key">j</span><span class="key">k</span><span class="key">l</span></div>
+    <div class="krow"><span class="key f">⇧</span><span class="key">z</span><span class="key">x</span><span class="key">c</span><span class="key">v</span><span class="key">b</span><span class="key">n</span><span class="key">m</span><span class="key f">⌫</span></div>
+    <div class="krow"><span class="key f">123</span><span class="key f">中</span><span class="key space">空格</span><span class="key ret">换行</span></div>
+  </div>
+</template>
+
+<template id="nav-tech">
+  <div class="nav">
+    <span class="gbtn"><svg width="17" height="17"><use href="#xmark"/></svg></span>
+    <span class="dest"><span class="dot"></span>技术<span class="mid">·</span><span class="rk">公开</span><svg width="12" height="12" style="color:var(--label2)"><use href="#down"/></svg></span>
+    <span class="post">发布</span>
+  </div>
+</template>
+
+<h1>原生发帖页 · UI 设计 v3</h1>
+<div class="sub">NodeSeek iOS · 一期（预览放二期）· 2026-10-28 · 沿用 App 的黑白主题，只用系统黑白灰；把空间还给正文，补齐草稿、插图、发布设置的边界情况</div>
+
+<div class="rules">
+  <div class="rule"><b>“发到哪里”放进导航栏</b>去掉头像和昵称那一行。导航栏中间一个胶囊写着“技术 · 公开”，点开在同一个面板里选板块和阅读限制。标题往上提了约 60pt。</div>
+  <div class="rule"><b>轻量高亮，字号不跳</b>正文只用颜色和字重区分：标题行加粗，<code>##</code> 等标记符号变灰，行内代码等宽加底色。字号始终不变，打字和中文输入法选字时不会抖。</div>
+  <div class="rule"><b>草稿不悄悄覆盖</b>有旧草稿时先问“恢复 / 丢弃”；没选之前，新内容不自动保存，旧草稿原样保留。保存状态写“已存本机”，不暗示云同步。</div>
+  <div class="rule"><b>插图以正文为准</b>上传区只显示进行中和失败的任务，可以取消、重试；传完就消失，之后以正文里的图片标记为准，不做缩略图和正文的双向同步。</div>
+</div>
+
+<div class="row">
+  <!-- A 刚打开 + 草稿 -->
+  <div class="cell">
+    <div class="phone" data-tpl="statusbar">
+      <div class="nav">
+        <span class="gbtn"><svg width="17" height="17"><use href="#xmark"/></svg></span>
+        <span class="dest need"><svg width="13" height="13"><use href="#plus"/></svg>选择板块</span>
+        <span class="post off">发布</span>
+      </div>
+      <div class="draft">
+        <div class="t1"><svg width="17" height="17" style="color:var(--label2)"><use href="#doc"/></svg>上次有一份没发出的草稿</div>
+        <div class="t2">「求推荐美西 CN2 GIA 小鸡」· 技术 · 昨天 23:10</div>
+        <div class="acts"><span class="btn pri">恢复</span><span class="btn dan">丢弃</span></div>
+      </div>
+      <div class="edit">
+        <div class="title"><span class="caret" style="height:27px;vertical-align:-6px;margin:0 1px 0 0"></span><span class="ph">标题</span></div>
+        <div class="rule-line"></div>
+        <div class="body"><span class="ph">鼓励友善发言，禁止人身攻击</span></div>
+      </div>
+      <div class="dock" style="bottom:291px"><div data-tpl="tbar"></div></div>
+      <div class="dock" style="bottom:0" data-tpl="keyboard"></div>
+    </div>
+    <div class="cap"><b>A · 刚打开（有旧草稿）</b>光标在标题，键盘直接弹起。还没选板块，导航栏胶囊是黑色描边的“+ 选择板块”。旧草稿卡片给两个明确选项。不选直接开始写，卡片会留着，新内容也不会覆盖旧草稿；这时点关闭，再问一次要保留哪份。</div>
+  </div>
+
+  <!-- B 编辑主态 -->
+  <div class="cell">
+    <div class="phone" data-tpl="statusbar,nav-tech">
+      <div class="edit">
+        <div class="title">求推荐美西 CN2 GIA 小鸡</div>
+        <div class="rule-line"></div>
+        <div class="body">
+          <p>预算每月 10 刀以内，主要跑博客和 <span class="ic">sing-box</span>。</p>
+          <p class="hd"><span class="mk">## </span>需求</p>
+          <p><span class="mk">- </span>晚高峰延迟稳定</p>
+          <p><span class="mk">- </span><span class="mk">**</span><b>支持按月付</b><span class="mk">**</span></p>
+          <p><span class="mk">- </span>最好有 IPv6 tc<span class="caret"></span></p>
+        </div>
+      </div>
+      <div class="dock" style="bottom:329px"><div data-tpl="tbar"></div></div>
+      <div class="dock" style="bottom:0">
+        <div class="cand"><span class="on">脱敏</span><span>同城</span><span>通常</span><span>天窗</span><span>tc</span></div>
+        <div data-tpl="keyboard"></div>
+      </div>
+    </div>
+    <div class="cap"><b>B · 编辑主态</b>导航栏中间直接看到“发到 技术 · 公开”。正文所有行字号相同，只靠字重和颜色区分层级。图里正在用拼音输入，组字中的文字不参与高亮，选完字才重新着色，避免输入法抖动。工具条右侧写“已存本机”。</div>
+  </div>
+
+  <!-- C 发布设置 sheet -->
+  <div class="cell">
+    <div class="phone">
+      <div class="behind" data-tpl="statusbar,nav-tech"></div>
+      <div class="dim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="sh-h"><h3>发布到</h3><span class="xs"><svg width="11" height="11"><use href="#xmark"/></svg></span></div>
+        <div class="lab"><span>板块</span></div>
+        <div class="grid">
+          <div class="tile"><svg width="22" height="22"><use href="#c-daily"/></svg>日常</div>
+          <div class="tile on"><span class="ok"><svg width="10" height="10"><use href="#check"/></svg></span><svg width="22" height="22"><use href="#c-tech"/></svg>技术</div>
+          <div class="tile"><svg width="22" height="22"><use href="#c-info"/></svg>情报</div>
+          <div class="tile"><svg width="22" height="22"><use href="#c-review"/></svg>测评</div>
+          <div class="tile"><svg width="22" height="22"><use href="#c-trade"/></svg>交易</div>
+          <div class="tile"><svg width="22" height="22"><use href="#c-carpool"/></svg>拼车</div>
+          <div class="tile"><svg width="22" height="22"><use href="#c-promo"/></svg>推广</div>
+          <div class="tile"><svg width="22" height="22"><use href="#c-life"/></svg>生活</div>
+          <div class="tile"><svg width="22" height="22"><use href="#c-dev"/></svg>Dev</div>
+          <div class="tile"><svg width="22" height="22"><use href="#photo"/></svg>贴图</div>
+          <div class="tile"><svg width="22" height="22"><use href="#c-expose"/></svg>曝光</div>
+          <div class="tile"><svg width="22" height="22"><use href="#c-sandbox"/></svg>沙盒</div>
+        </div>
+        <div class="inside"><svg width="20" height="20"><use href="#lock"/></svg>内版<span style="color:var(--label2);font-weight:400;font-size:13px">敏感话题</span><span class="coin">5 鸡腿</span></div>
+        <div class="lab"><span>阅读限制</span></div>
+        <div class="ranks"><span class="on">公开</span><span>Lv1</span><span>Lv2</span><span>Lv3</span><span>Lv4</span><span>私有</span></div>
+        <div class="done">完成</div>
+      </div>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>C · 发布设置</b>板块和阅读限制合并到一个面板，一次选完。板块只有图标和名称，不再写我编的说明。内版单独一行，标明 5 鸡腿。阅读限制用分段控件：公开、Lv1 到你的等级、私有。</div>
+  </div>
+</div>
+
+<div class="row">
+  <!-- D Aa -->
+  <div class="cell">
+    <div class="phone" data-tpl="statusbar,nav-tech">
+      <div class="edit">
+        <div class="title">求推荐美西 CN2 GIA 小鸡</div>
+        <div class="rule-line"></div>
+        <div class="body">
+          <p>预算每月 10 刀以内，主要跑博客和 <span class="ic">sing-box</span>。</p>
+          <p class="hd"><span class="mk">## </span>需求<span class="caret"></span></p>
+          <p><span class="mk">- </span>晚高峰延迟稳定</p>
+        </div>
+      </div>
+      <div class="dock" style="bottom:291px"><div data-tpl="tbar" data-on="k-aa"></div></div>
+      <div class="dock fmt" style="bottom:0">
+        <div class="fmt-h"><span>格式</span><span class="xs"><svg width="11" height="11"><use href="#xmark"/></svg></span></div>
+        <div class="grp"><div class="seg"><span>正文</span><span class="on">标题</span><span style="font-family:ui-monospace,Menlo;font-size:13px">代码块</span><span>引用</span></div></div>
+        <div class="grp"><div class="seg"><span style="font-weight:800;font-size:17px">B</span><span style="font-style:italic;font-family:Georgia,serif;font-size:17px">I</span><span style="text-decoration:line-through;font-size:17px">S</span><span style="font-family:ui-monospace,Menlo;font-size:13px">`code`</span></div></div>
+        <div class="grp"><div class="seg"><span>• 无序列表</span><span>1. 有序列表</span></div></div>
+        <div class="grp"><div class="seg"><span>表格</span><span>分割线</span></div></div>
+      </div>
+    </div>
+    <div class="cap"><b>D · Aa 格式面板</b>面板替换键盘，第一行是段落类型，光标在 <code>## 需求</code> 上所以“标题”亮。标题只留一级（插入 <code>## </code>），不让用户纠结 H1～H6。所有按钮只在选区两侧插入 Markdown 语法，系统撤销照常可用。</div>
+  </div>
+
+  <!-- E 插图任务区 -->
+  <div class="cell">
+    <div class="phone" data-tpl="statusbar">
+      <div class="nav">
+        <span class="gbtn"><svg width="17" height="17"><use href="#xmark"/></svg></span>
+        <span class="dest"><span class="dot"></span>测评<span class="mid">·</span><span class="rk">公开</span><svg width="12" height="12" style="color:var(--label2)"><use href="#down"/></svg></span>
+        <span class="post off">发布</span>
+      </div>
+      <div class="edit">
+        <div class="title">某家新上的 HK 机器简单测评</div>
+        <div class="rule-line"></div>
+        <div class="body">
+          <p>融合怪跑分如下：</p>
+          <p class="img"><span class="mk">![</span>图片<span class="mk">](…/a1.webp)</span></p>
+          <p>晚高峰电信回程<span class="caret"></span></p>
+        </div>
+      </div>
+      <div class="dock" style="bottom:291px">
+        <div class="tasks">
+          <div class="task">
+            <span class="tthumb"><i class="g" style="top:6px;width:16px"></i><i style="top:12px;width:22px"></i><i style="top:18px;width:18px"></i><i class="g" style="top:24px;width:12px"></i></span>
+            <div class="tinfo"><div>正在上传 IMG_2041</div><div class="prog"><i style="width:62%"></i></div></div>
+            <span class="tact mute">取消</span>
+          </div>
+          <div class="task">
+            <span class="tthumb"><i style="top:8px;width:22px"></i><i class="g" style="top:14px;width:14px"></i><i style="top:20px;width:20px"></i></span>
+            <div class="tinfo"><div>IMG_2042</div><div class="s err">上传失败：网络连接中断</div></div>
+            <span class="tact">重试</span>
+          </div>
+        </div>
+        <div data-tpl="tbar" data-on="k-photo"></div>
+      </div>
+      <div class="dock" style="bottom:0" data-tpl="keyboard"></div>
+    </div>
+    <div class="cap"><b>E · 插图上传</b>每张图先在光标处占好位置，传完替换成 <code>![图片](url)</code>，这一行变淡显示。上传区只放进行中和失败的，可以取消、重试，传完自动消失。有任务没结束时“发布”置灰；这时点关闭，可以选“取消上传，保存文字草稿”。</div>
+  </div>
+
+  <!-- F 暗黑 + 内版 + 发布中 -->
+  <div class="cell">
+    <div class="phone dark" data-tpl="statusbar">
+      <div class="nav">
+        <span class="gbtn off"><svg width="17" height="17"><use href="#xmark"/></svg></span>
+        <span class="dest"><svg width="13" height="13" style="color:var(--orange)"><use href="#lock"/></svg>内版<span class="mid">·</span><span class="rk">Lv2</span><svg width="12" height="12" style="color:var(--label2)"><use href="#down"/></svg></span>
+        <span class="post" style="opacity:.8;padding:0;width:56px;justify-content:center"><span class="spin" style="border-color:rgba(0,0,0,.2);border-top-color:#000"></span></span>
+      </div>
+      <div class="note"><svg width="13" height="13"><use href="#warn"/></svg>发到内版将收取 5 鸡腿</div>
+      <div class="edit dimmed">
+        <div class="title">关于某商家跑路前兆的一些观察</div>
+        <div class="rule-line"></div>
+        <div class="body">
+          <p>先说结论：续费前务必看看最近的工单回复速度。</p>
+          <p class="hd"><span class="mk">## </span>时间线</p>
+          <p><span class="mk">1. </span>9 月起工单回复变慢</p>
+          <p><span class="mk">2. </span>10 月停止接受年付</p>
+          <p><span class="mk">3. </span>官网 TG 群禁言</p>
+        </div>
+      </div>
+      <div class="dock" style="bottom:34px"><div data-tpl="tbar"></div></div>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>F · 暗黑模式：内版 + 发布中</b>选了内版，胶囊上的图标变成橙色的锁，下面常驻一行扣费说明，发布前还会再确认一次。发布中按钮只剩转圈，正文变淡、不能编辑，关闭按钮也暂时不能点。成功后直接打开新帖，并有成功震动反馈。</div>
+  </div>
+</div>
+
+<script>
+  // 把模板展开到占位元素里，避免六屏重复写同一结构
+  const tpl = id => document.getElementById(id).content.cloneNode(true);
+  document.querySelectorAll('[data-tpl]').forEach(el => {
+    const frag = document.createDocumentFragment();
+    el.dataset.tpl.split(',').forEach(id => frag.appendChild(tpl(id)));
+    if (el.classList.contains('phone') || el.classList.contains('behind')) el.prepend(frag); else el.appendChild(frag);
+    if (el.dataset.on) el.querySelector('.' + el.dataset.on)?.classList.add('on');
+  });
+</script>
+</body>
+</html>
