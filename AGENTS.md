@@ -25,6 +25,7 @@
 - 优先使用 UIKit/SwiftUI 的系统动态颜色，例如 `.systemBackground`、`.secondarySystemBackground`、`.label`、`.secondaryLabel`、`.separator`。
 - 避免在界面代码里直接写固定的黑白色或硬编码 RGB 颜色，除非确实是品牌色、状态色或业务语义色。
 - 如果系统颜色无法满足设计需要，应优先在 Assets 中定义支持 Light/Dark variants 的自定义颜色，再在代码中引用。
+- 新版本功能介绍页的内容与样式约束见 `docs/project-overview.md` 的「8. 新功能介绍页」。
 
 ## 5. 复杂任务处理
 - 简单改动可直接做。

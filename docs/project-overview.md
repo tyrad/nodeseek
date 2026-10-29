@@ -179,3 +179,34 @@ xcodebuild -showdestinations -project nodeseek.xcodeproj -scheme nodeseek
 - 顶部分类导航保持轻量横向 tab，选中态用黑色字重和短下划线表达，避免胶囊化或过度品牌化。
 - 右侧排序入口可以使用贴边工具柄风格：实色高对比、右侧贴屏、只保留左上/左下圆角，像快捷操作抽屉而不是页面内容。
 - 浮动工具入口应克制，不遮挡关键标题和元信息；文案要具体，例如“按发帖时间排序”“按回复时间排序”。
+
+## 8. 新功能介绍页
+
+升级后展示的新版本功能介绍页基于 WhatsNewKit，入口代码在 `nodeseek/Features/WhatsNew/WhatsNewModule.swift`。框架已就绪，内容按版本单独填写。
+
+展示规则：
+
+- 内容写在 `WhatsNewModule.catalog`，用 `release("x.y.z", features: [...])` 新增一个版本，新版本插在最前面。
+- 版本号必须与 `MARKETING_VERSION` 完全一致，否则不会弹出。
+- 只修 bug、没有用户可感知变化的版本不加条目；`catalog` 为空时不弹出，设置 › 关于 里的「新功能」入口也隐藏。
+- 开屏动画结束后自动弹出，每个版本只弹一次；推送冷启动、或当前已有其他弹窗时不弹。
+- 新安装用户目前也会弹出，暂不区分。
+- 用户可在 设置 › 关于 › 新功能 中重新查看。
+
+内容约束：
+
+- 每个版本 2～4 条。
+- 标题不超过 8 个字；说明一句话，不超过 20 个字。
+- 写用户感知到的效果，不写实现细节（如主线程、缓存、解析器），口径与提交信息一致。
+
+视觉约束：
+
+- 整页保持 App 黑白主题：标题「NS Connect／新功能」和「继续」按钮由 `release` 固定，不要单独改色或改文案。
+- 只有功能图标使用彩色：`feature(systemName:tint:...)` 生成彩色圆角底 + 白色符号。
+- 图标用 SF Symbols，优先 `.fill` 实心变体，且必须是 iOS 15 可用的符号。
+- `tint` 只用系统彩色（如 `.systemBlue`、`.systemIndigo`、`.systemPink`、`.systemOrange`、`.systemTeal`、`.systemPurple`），相邻两条不要同色；避免用绿色，以免与站点绿混淆。
+
+发版前验证：
+
+- 在模拟器分别截浅色、深色两张图确认排版与配色。
+- 跑 `make xcode-test-class TEST=WhatsNewModuleTests`。

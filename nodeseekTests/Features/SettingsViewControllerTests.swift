@@ -469,39 +469,44 @@ struct SettingsViewControllerTests {
     }
 
     @Test func aboutScreenShowsBuildInfo() throws {
-        let viewController = SettingsAboutViewController(buildInfo: .testFlightFixture)
+        let viewController = SettingsAboutViewController(buildInfo: .testFlightFixture, showsWhatsNew: true)
         viewController.loadViewIfNeeded()
 
         #expect(viewController.title == "关于")
-        #expect(viewController.tableView.numberOfRows(inSection: 0) == 6)
+        #expect(viewController.tableView.numberOfRows(inSection: 0) == 7)
 
         let appVersionCell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
             cellForRowAt: IndexPath(row: 0, section: 0)
         ))
-        let buildNumberCell = try #require(viewController.tableView.dataSource?.tableView(
+        let whatsNewCell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
             cellForRowAt: IndexPath(row: 1, section: 0)
         ))
-        let gitCell = try #require(viewController.tableView.dataSource?.tableView(
+        let buildNumberCell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
             cellForRowAt: IndexPath(row: 2, section: 0)
         ))
-        let repositoryCell = try #require(viewController.tableView.dataSource?.tableView(
+        let gitCell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
             cellForRowAt: IndexPath(row: 3, section: 0)
         ))
-        let workflowCell = try #require(viewController.tableView.dataSource?.tableView(
+        let repositoryCell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
             cellForRowAt: IndexPath(row: 4, section: 0)
         ))
-        let githubCell = try #require(viewController.tableView.dataSource?.tableView(
+        let workflowCell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
             cellForRowAt: IndexPath(row: 5, section: 0)
+        ))
+        let githubCell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: IndexPath(row: 6, section: 0)
         ))
 
         #expect(appVersionCell.textLabel?.text == "版本")
         #expect(appVersionCell.detailTextLabel?.text == "1.0.1")
+        #expect(whatsNewCell.textLabel?.text == "新功能")
         #expect(buildNumberCell.textLabel?.text == "Build")
         #expect(buildNumberCell.detailTextLabel?.text == "42")
         #expect(gitCell.textLabel?.text == "Git")
@@ -513,6 +518,18 @@ struct SettingsViewControllerTests {
         #expect(workflowCell.detailTextLabel?.text == "TestFlight #25443881348")
         #expect(githubCell.textLabel?.text == "GitHub")
         #expect(githubCell.detailTextLabel?.text == "https://github.com/tyrad/nodeseek/actions/runs/25443881348")
+    }
+
+    @Test func aboutScreenHidesWhatsNewWithoutContent() throws {
+        let viewController = SettingsAboutViewController(buildInfo: .testFlightFixture, showsWhatsNew: false)
+        viewController.loadViewIfNeeded()
+
+        #expect(viewController.tableView.numberOfRows(inSection: 0) == 6)
+        let secondCell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: IndexPath(row: 1, section: 0)
+        ))
+        #expect(secondCell.textLabel?.text == "Build")
     }
 
     @Test func selectingAutoCheckInPushesModuleSettingsScreen() throws {

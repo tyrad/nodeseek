@@ -14,6 +14,7 @@
 		7A1000182FA0000000000001 /* DTCoreText in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000192FA0000000000001 /* DTCoreText */; };
 		7A10001C2FA0000000000001 /* SVGKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7A10001D2FA0000000000001 /* SVGKit */; };
 		7A1000202FA0000000000001 /* FramePlay in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000212FA0000000000001 /* FramePlay */; };
+		7A1000232FA0000000000001 /* WhatsNewKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000242FA0000000000001 /* WhatsNewKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,6 +70,7 @@
 				7A1000182FA0000000000001 /* DTCoreText in Frameworks */,
 				7A10001C2FA0000000000001 /* SVGKit in Frameworks */,
 				7A1000202FA0000000000001 /* FramePlay in Frameworks */,
+				7A1000232FA0000000000001 /* WhatsNewKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -127,6 +129,7 @@
 				7A1000192FA0000000000001 /* DTCoreText */,
 				7A10001D2FA0000000000001 /* SVGKit */,
 				7A1000212FA0000000000001 /* FramePlay */,
+				7A1000242FA0000000000001 /* WhatsNewKit */,
 			);
 			productName = nodeseek;
 			productReference = 5CD3D9512F9EFACE008DB075 /* nodeseek.app */;
@@ -193,6 +196,7 @@
 				7A10001A2FA0000000000001 /* XCRemoteSwiftPackageReference "DTCoreText" */,
 				7A10001B2FA0000000000001 /* XCRemoteSwiftPackageReference "SVGKit" */,
 				7A1000222FA0000000000001 /* XCLocalSwiftPackageReference "Packages/FramePlay" */,
+				7A1000252FA0000000000001 /* XCRemoteSwiftPackageReference "WhatsNewKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5CD3D9522F9EFACE008DB075 /* Products */;
@@ -573,9 +577,22 @@
 				kind = branch;
 			};
 		};
+		7A1000252FA0000000000001 /* XCRemoteSwiftPackageReference "WhatsNewKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SvenTiigi/WhatsNewKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.2.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		7A1000242FA0000000000001 /* WhatsNewKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7A1000252FA0000000000001 /* XCRemoteSwiftPackageReference "WhatsNewKit" */;
+			productName = WhatsNewKit;
+		};
 		7A1000212FA0000000000001 /* FramePlay */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 7A1000222FA0000000000001 /* XCLocalSwiftPackageReference "Packages/FramePlay" */;

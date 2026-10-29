@@ -908,6 +908,7 @@ final class SettingsTextSizeViewController: UITableViewController {
 final class SettingsAboutViewController: UITableViewController {
     private enum Row: Int, CaseIterable {
         case appVersion
+        case whatsNew
         case buildNumber
         case gitSHA
         case repository
@@ -917,9 +918,12 @@ final class SettingsAboutViewController: UITableViewController {
 
     private let repositoryURL = URL(string: "https://github.com/tyrad/nodeseek")!
     private let buildInfo: SettingsBuildInfo
+    private let rows: [Row]
 
-    init(buildInfo: SettingsBuildInfo = SettingsBuildInfo()) {
+    init(buildInfo: SettingsBuildInfo = SettingsBuildInfo(), showsWhatsNew: Bool = WhatsNewModule.hasContent) {
         self.buildInfo = buildInfo
+        // 没有新功能内容时隐藏入口，避免点了没反应
+        self.rows = Row.allCases.filter { showsWhatsNew || $0 != .whatsNew }
         super.init(style: .insetGrouped)
     }
 
@@ -936,11 +940,11 @@ final class SettingsAboutViewController: UITableViewController {
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        Row.allCases.count
+        rows.count
     }
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let row = Row(rawValue: indexPath.row)
+        let row = rows.indices.contains(indexPath.row) ? rows[indexPath.row] : nil
         let usesSubtitle = row == .repository || row == .githubURL
         let cell = UITableViewCell(style: usesSubtitle ? .subtitle : .value1, reuseIdentifier: nil)
         cell.selectionStyle = .none
@@ -951,6 +955,11 @@ final class SettingsAboutViewController: UITableViewController {
             cell.textLabel?.text = "版本"
             cell.detailTextLabel?.text = buildInfo.appVersion
             cell.accessibilityIdentifier = "settings-version-cell"
+        case .whatsNew:
+            cell.textLabel?.text = "新功能"
+            cell.accessoryType = .disclosureIndicator
+            cell.selectionStyle = .default
+            cell.accessibilityIdentifier = "settings-whats-new-cell"
         case .buildNumber:
             cell.textLabel?.text = "Build"
             cell.detailTextLabel?.text = buildInfo.buildNumber
@@ -983,7 +992,10 @@ final class SettingsAboutViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        switch Row(rawValue: indexPath.row) {
+        switch rows.indices.contains(indexPath.row) ? rows[indexPath.row] : nil {
+        case .whatsNew:
+            guard let viewController = WhatsNewModule.makeViewController() else { return }
+            present(viewController, animated: true)
         case .repository:
             UIApplication.shared.open(repositoryURL)
         case .workflow:
