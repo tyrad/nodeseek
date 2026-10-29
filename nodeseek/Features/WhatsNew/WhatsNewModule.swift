@@ -22,7 +22,34 @@ enum WhatsNewModule {
     ///     )
     /// ])
     /// ```
-    static let catalog: [WhatsNew] = []
+    static let catalog: [WhatsNew] = [
+        release("1.0.11", features: [
+            feature(
+                systemName: "square.and.pencil",
+                tint: .systemBlue,
+                title: "原生发帖",
+                subtitle: "草稿自动保存，支持格式、插图和预览"
+            ),
+            feature(
+                systemName: "pencil.circle.fill",
+                tint: .systemOrange,
+                title: "编辑帖子",
+                subtitle: "自己的帖子和评论可以直接修改"
+            ),
+            feature(
+                systemName: "person.crop.circle.fill.badge.checkmark",
+                tint: .systemIndigo,
+                title: "只看楼主",
+                subtitle: "长按菜单可只看楼主或某人的回复"
+            ),
+            feature(
+                systemName: "moon.fill",
+                tint: .systemPurple,
+                title: "图片变暗",
+                subtitle: "深色模式下图片可调暗，分三档"
+            )
+        ])
+    ]
 
     static var hasContent: Bool { !catalog.isEmpty }
 
