@@ -24,10 +24,13 @@ final class DetailImageDimmingTests: XCTestCase {
         imageView.frame = CGRect(x: 0, y: 100, width: 200, height: 200)
         controller.view.addSubview(imageView)
         let overlay = DetailImageDimmingView.install(on: imageView, settings: settings)
-        XCTAssertEqual(opacity(of: overlay, traits: window.traitCollection), 0)
-
-        settings.setEnabled(true)
+        // 未设置过时默认开启标准档。
         XCTAssertEqual(opacity(of: overlay, traits: imageView.traitCollection), 0.35, accuracy: 0.001)
+        settings.setLevel(.light)
+        XCTAssertEqual(opacity(of: overlay, traits: imageView.traitCollection), 0.2, accuracy: 0.001)
+        settings.setLevel(.strong)
+        XCTAssertEqual(opacity(of: overlay, traits: imageView.traitCollection), 0.5, accuracy: 0.001)
+        settings.setLevel(.standard)
         XCTAssertTrue(imageView.image === image, "遮罩不能修改供缓存或导出使用的原图")
         window.overrideUserInterfaceStyle = .light
         controller.view.layoutIfNeeded()
@@ -108,13 +111,17 @@ final class DetailImageDimmingTests: XCTestCase {
             UIColor.systemGreen.setFill()
             context.fill(CGRect(x: 24, y: 120, width: 272, height: 28))
         }
-        let original = UIImageView(image: image)
-        let adjusted = UIImageView(image: image)
-        for (index, view) in [original, adjusted].enumerated() {
-            view.frame = CGRect(x: 24, y: 160 + index * 220, width: 320, height: 180)
+        let levels: [DetailImageDimmingSettings.Level?] = [nil] + DetailImageDimmingSettings.Level.allCases
+        for (index, level) in levels.enumerated() {
+            let view = UIImageView(image: image)
+            view.frame = CGRect(x: 24, y: 80 + index * 190, width: 320, height: 180)
             preview.view.addSubview(view)
+            guard let level else { continue }
+            let levelDefaults = try XCTUnwrap(UserDefaults(suiteName: "\(suiteName)-\(level.rawValue)"))
+            let levelSettings = DetailImageDimmingSettings(userDefaults: levelDefaults)
+            levelSettings.setLevel(level)
+            DetailImageDimmingView.install(on: view, settings: levelSettings)
         }
-        DetailImageDimmingView.install(on: adjusted, settings: settings)
         for style in [UIUserInterfaceStyle.light, .dark] {
             window.overrideUserInterfaceStyle = style
             window.layoutIfNeeded()

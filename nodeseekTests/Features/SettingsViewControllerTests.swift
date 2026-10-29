@@ -22,6 +22,7 @@ struct SettingsViewControllerTests {
             let textSizeDefaults = try #require(UserDefaults(suiteName: "settings-text-size-\(UUID().uuidString)"))
             let textSizeSettings = AppTextSizeSettings(userDefaults: textSizeDefaults, storageKey: "text-size")
             let searchEntrySettings = makeSettingsPostListSearchEntrySettings()
+            let imageDimmingDefaults = try #require(UserDefaults(suiteName: "settings-image-dimming-\(UUID().uuidString)"))
             let viewController = SettingsViewController(
                 cacheManager: FakeSettingsCacheManager(cacheByteSize: 4_096),
                 sessionManager: FakeSettingsSessionManager(),
@@ -29,6 +30,7 @@ struct SettingsViewControllerTests {
                 buildInfo: .testFlightFixture,
                 nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
                 textSizeSettings: textSizeSettings,
+                imageDimmingSettings: DetailImageDimmingSettings(userDefaults: imageDimmingDefaults),
                 searchEntrySettings: searchEntrySettings,
                 categoryPreferenceStore: categoryStore,
                 pushAuthorizationStatusProvider: { .notDetermined },
@@ -42,7 +44,7 @@ struct SettingsViewControllerTests {
             let tableView = try #require(viewController.tableView)
             #expect(viewController.title == "设置")
             #expect(tableView.numberOfSections == 7)
-            #expect(tableView.numberOfRows(inSection: 0) == 5)
+            #expect(tableView.numberOfRows(inSection: 0) == 6)
             #expect(tableView.numberOfRows(inSection: 1) == 3)
             #expect(tableView.numberOfRows(inSection: 2) == 1)
             #expect(tableView.numberOfRows(inSection: 3) == 1)
@@ -154,7 +156,7 @@ struct SettingsViewControllerTests {
         #expect(viewController.tableView.numberOfRows(inSection: 6) == 0)
     }
 
-    @Test func imageDimmingSwitchDefaultsOffAndPersistsChanges() throws {
+    @Test func imageDimmingDefaultsOnAndLevelRowFollowsSwitch() throws {
         let suiteName = "settings-image-dimming-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -166,16 +168,31 @@ struct SettingsViewControllerTests {
             imageDimmingSettings: settings
         )
         controller.loadViewIfNeeded()
-        let cell = controller.tableView(controller.tableView, cellForRowAt: IndexPath(row: 4, section: 0))
+        let tableView = try #require(controller.tableView)
+        let cell = controller.tableView(tableView, cellForRowAt: IndexPath(row: 4, section: 0))
         let control = try #require(cell.accessoryView as? UISwitch)
         #expect(cell.textLabel?.text == "深色模式图片变暗")
-        #expect(!control.isOn)
-        control.isOn = true
-        control.sendActions(for: .valueChanged)
-        #expect(DetailImageDimmingSettings(userDefaults: defaults).isEnabled)
+        #expect(control.isOn)
+        #expect(tableView.numberOfRows(inSection: 0) == 6)
+
+        let levelCell = controller.tableView(tableView, cellForRowAt: IndexPath(row: 5, section: 0))
+        let levelControl = try #require(levelCell.accessoryView as? UISegmentedControl)
+        #expect(levelCell.textLabel?.text == "变暗程度")
+        #expect(levelControl.numberOfSegments == 3)
+        #expect(levelControl.selectedSegmentIndex == 1)
+        levelControl.selectedSegmentIndex = 2
+        levelControl.sendActions(for: .valueChanged)
+        #expect(DetailImageDimmingSettings(userDefaults: defaults).level == .strong)
+
         control.isOn = false
         control.sendActions(for: .valueChanged)
         #expect(!DetailImageDimmingSettings(userDefaults: defaults).isEnabled)
+        #expect(tableView.numberOfRows(inSection: 0) == 5)
+        control.isOn = true
+        control.sendActions(for: .valueChanged)
+        #expect(DetailImageDimmingSettings(userDefaults: defaults).isEnabled)
+        #expect(tableView.numberOfRows(inSection: 0) == 6)
+        #expect(DetailImageDimmingSettings(userDefaults: defaults).level == .strong)
     }
 
     @Test func postSignatureDisplayDefaultsToEnabledWhenUnset() throws {

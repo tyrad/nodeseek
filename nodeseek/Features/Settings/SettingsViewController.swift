@@ -117,6 +117,8 @@ class SettingsViewController: UITableViewController {
         case textSize
         case signatureDisplay
         case imageDimming
+        // 仅在开启变暗后显示，必须保持在最后一行。
+        case imageDimmingLevel
     }
 
     private enum FeatureRow: Int, CaseIterable {
@@ -247,7 +249,7 @@ class SettingsViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         switch Section(rawValue: section) {
         case .reading:
-            return ReadingRow.allCases.count
+            return ReadingRow.allCases.count - (imageDimmingSettings.isEnabled ? 0 : 1)
         case .features:
             return FeatureRow.allCases.count
         case .notifications:
@@ -353,6 +355,8 @@ class SettingsViewController: UITableViewController {
             return signatureDisplayCell(for: indexPath)
         case .imageDimming:
             return imageDimmingCell()
+        case .imageDimmingLevel:
+            return imageDimmingLevelCell()
         case .none:
             return UITableViewCell()
         }
@@ -412,12 +416,8 @@ class SettingsViewController: UITableViewController {
     }
 
     private func imageDimmingCell() -> UITableViewCell {
-        let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+        let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
         cell.textLabel?.text = "深色模式图片变暗"
-        cell.textLabel?.numberOfLines = 0
-        cell.detailTextLabel?.text = "降低帖子和全屏预览中图片的亮度"
-        cell.detailTextLabel?.textColor = .secondaryLabel
-        cell.detailTextLabel?.numberOfLines = 0
         cell.imageView?.image = UIImage(systemName: "moon")
         let dimmingSwitch = UISwitch()
         dimmingSwitch.isOn = imageDimmingSettings.isEnabled
@@ -430,8 +430,36 @@ class SettingsViewController: UITableViewController {
         return cell
     }
 
+    private func imageDimmingLevelCell() -> UITableViewCell {
+        let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.text = "变暗程度"
+        let levels = DetailImageDimmingSettings.Level.allCases
+        let control = UISegmentedControl(items: levels.map(\.title))
+        control.selectedSegmentIndex = levels.firstIndex(of: imageDimmingSettings.level) ?? UISegmentedControl.noSegment
+        control.accessibilityLabel = "变暗程度"
+        control.accessibilityIdentifier = "settings-image-dimming-level-control"
+        control.addTarget(self, action: #selector(imageDimmingLevelChanged(_:)), for: .valueChanged)
+        control.sizeToFit()
+        cell.accessoryView = control
+        cell.selectionStyle = .none
+        cell.accessibilityIdentifier = "settings-image-dimming-level-cell"
+        return cell
+    }
+
     @objc private func imageDimmingSwitchChanged(_ sender: UISwitch) {
         imageDimmingSettings.setEnabled(sender.isOn)
+        let levelIndexPath = IndexPath(row: ReadingRow.imageDimmingLevel.rawValue, section: Section.reading.rawValue)
+        if sender.isOn {
+            tableView.insertRows(at: [levelIndexPath], with: .fade)
+        } else {
+            tableView.deleteRows(at: [levelIndexPath], with: .fade)
+        }
+    }
+
+    @objc private func imageDimmingLevelChanged(_ sender: UISegmentedControl) {
+        let levels = DetailImageDimmingSettings.Level.allCases
+        guard levels.indices.contains(sender.selectedSegmentIndex) else { return }
+        imageDimmingSettings.setLevel(levels[sender.selectedSegmentIndex])
     }
 
     private func homeSearchEntryCell(for indexPath: IndexPath) -> UITableViewCell {
@@ -620,7 +648,7 @@ class SettingsViewController: UITableViewController {
             showPostCategoryPreferences()
         case .textSize:
             showTextSizeSettings()
-        case .homeSearchEntry, .signatureDisplay, .imageDimming, .none:
+        case .homeSearchEntry, .signatureDisplay, .imageDimming, .imageDimmingLevel, .none:
             break
         }
     }

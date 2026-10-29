@@ -38,11 +38,11 @@ final class DetailImageDimmingView: UIView {
     deinit { NotificationCenter.default.removeObserver(self) }
 
     @objc private func updateAppearance() {
-        let enabled = settings.isEnabled
+        let opacity = settings.isEnabled ? settings.level.opacity : 0
         // 由 UIKit 在首次显示和主题切换时解析颜色，避免等待主题回调导致亮图闪现。
         // 黑色是压暗图片的混合色，浅色模式和关闭状态使用全透明。
         backgroundColor = UIColor { traits in
-            UIColor.black.withAlphaComponent(enabled && traits.userInterfaceStyle == .dark ? 0.35 : 0)
+            UIColor.black.withAlphaComponent(traits.userInterfaceStyle == .dark ? opacity : 0)
         }
     }
 }
