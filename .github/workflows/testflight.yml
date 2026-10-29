@@ -168,7 +168,7 @@ jobs:
           MARKDOWN
 
       - name: Upload IPA to GitHub Release
-        if: success() && github.ref_type == 'tag'
+        if: success()
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
@@ -177,7 +177,16 @@ jobs:
           set -euo pipefail
 
           release_title="iOS v${RELEASE_VERSION} (${RELEASE_BUILD_NUMBER})"
-          release_tag="${GITHUB_REF_NAME}-build.${RELEASE_BUILD_NUMBER}"
+          release_tag="ios/v${RELEASE_VERSION}-build.${RELEASE_BUILD_NUMBER}"
+          # 手动触发的 TestFlight 构建也留存 IPA，但标为预发布，不抢 Latest
+          release_flags=()
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            source_ref="${GITHUB_REF_NAME}"
+          else
+            source_ref="${GITHUB_REF_NAME} (workflow_dispatch)"
+            release_title="${release_title} TestFlight"
+            release_flags=(--prerelease --latest=false)
+          fi
           release_notes="$(mktemp)"
           previous_release_tag="$(
             git tag --merged "${GITHUB_SHA}" --sort=-v:refname 'ios/v*' \
@@ -202,7 +211,7 @@ jobs:
 
           - Version: ${RELEASE_VERSION}
           - Build number: ${RELEASE_BUILD_NUMBER}
-          - Source tag: ${GITHUB_REF_NAME}
+          - Source ref: ${source_ref}
           - Previous source tag: ${previous_release_tag:-none}
           - Commit: ${GITHUB_SHA}
 
@@ -218,7 +227,8 @@ jobs:
           gh release create "${release_tag}" \
               --target "${GITHUB_SHA}" \
               --title "${release_title}" \
-              --notes-file "${release_notes}"
+              --notes-file "${release_notes}" \
+              ${release_flags[@]+"${release_flags[@]}"}
 
           gh release upload "${release_tag}" \
             build/nodeseek.ipa \
