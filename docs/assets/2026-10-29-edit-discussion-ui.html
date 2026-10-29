@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>编辑帖子 UI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #e9ebee;
+    font-family: -apple-system, "PingFang SC", "SF Pro Text", sans-serif;
+    padding: 48px 48px 40px;
+    color: #111;
+    width: 1362px;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 { font-size: 32px; font-weight: 700; letter-spacing: -.5px; }
+  .sub { color: #6b6b70; font-size: 15px; margin: 6px 0 22px; }
+  .rules { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 40px; }
+  .rule { background: #fff; border-radius: 16px; padding: 14px 16px; font-size: 13px; line-height: 1.55; color: #48484c; }
+  .rule b { display: block; color: #111; font-size: 14px; margin-bottom: 4px; }
+  .row { display: flex; gap: 48px; margin-bottom: 44px; }
+  .cell { width: 390px; }
+  .cap { margin-top: 18px; font-size: 13.5px; line-height: 1.65; color: #3a3a3e; }
+  .cap b { display: block; font-size: 16px; margin-bottom: 4px; color: #111; }
+
+  /* 手机：颜色都对应 UIKit 动态色，深色模式同一套变量切换 */
+  .phone {
+    --bg: #fff; --label: #000; --label2: #8a8a8e; --label3: #c4c4c8;
+    --sep: rgba(60,60,67,.14); --fill: #f0f0f3; --fill2: #e4e4e9;
+    --bar: rgba(250,250,252,.92); --bar-border: rgba(0,0,0,.06);
+    --kb: #d3d5da; --kbkey: #fff; --kbkey2: #adb1b9;
+    --sheet: #f7f7f9; --dim: rgba(0,0,0,.25); --orange: #c2620a; --red: #e5372b;
+    position: relative; width: 390px; height: 844px; border-radius: 55px;
+    background: var(--bg); color: var(--label); overflow: hidden;
+    box-shadow: 0 0 0 10px #18181a, 0 30px 60px rgba(0,0,0,.25);
+  }
+  svg { display: block; flex: none; }
+  .status { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 8px 36px 0 48px; font-weight: 600; font-size: 17px; }
+  .island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; border-radius: 20px; background: #000; }
+  .bat { width: 25px; height: 12px; border: 1.5px solid currentColor; border-radius: 4px; position: relative; }
+  .bat::after { content: ""; position: absolute; inset: 1.5px; width: 72%; background: currentColor; border-radius: 1.5px; }
+  .home { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--label); z-index: 9; }
+
+  /* 导航 */
+  .nav { height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; position: relative; }
+  .gbtn { width: 44px; height: 44px; border-radius: 22px; background: var(--bar); border: .5px solid var(--bar-border); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+  .dest { position: absolute; left: 50%; transform: translateX(-50%); height: 34px; border-radius: 17px; padding: 0 12px; display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; background: var(--fill); white-space: nowrap; }
+  .dest .mid { color: var(--label3); font-weight: 400; }
+  .dest .rk { color: var(--label2); font-weight: 500; }
+  .cta { height: 40px; padding: 0 18px; border-radius: 20px; background: var(--label); color: var(--bg); font-size: 16px; font-weight: 600; display: flex; align-items: center; }
+  .cta.off { background: var(--fill); color: var(--label3); }
+  .navtitle { position: absolute; left: 50%; transform: translateX(-50%); font-size: 17px; font-weight: 600; }
+
+  /* 编辑区 */
+  .edit { padding: 12px 20px 0; }
+  .title { font-size: 23px; font-weight: 700; line-height: 1.32; }
+  .sepline { display: flex; align-items: center; gap: 8px; margin: 12px 0 10px; }
+  .sepline i { flex: 1; height: .5px; background: var(--sep); }
+  .sepline span { font-size: 11.5px; color: var(--label3); }
+  .sepline span.on { color: var(--label2); }
+  .body { font-size: 17px; line-height: 1.62; }
+  .mk { color: var(--label2); }
+  .hd { font-weight: 700; }
+  .caret { display: inline-block; width: 2px; height: 21px; background: #3b82f6; vertical-align: -4px; margin-left: 1px; border-radius: 1px; }
+  .new { background: rgba(255,214,10,.28); border-radius: 3px; }
+
+  /* 旧修改细条 */
+  .strip { margin: 10px 16px 0; height: 46px; border-radius: 14px; background: var(--fill); display: flex; align-items: center; gap: 8px; padding: 0 6px 0 12px; font-size: 13px; }
+  .strip b { font-weight: 600; white-space: nowrap; }
+  .strip .s2 { color: var(--label2); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill-btn { height: 28px; padding: 0 12px; border-radius: 14px; background: var(--label); color: var(--bg); font-size: 13px; font-weight: 600; display: flex; align-items: center; }
+  .x { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: var(--label2); }
+
+  /* 工具条 + 键盘 */
+  .dock { position: absolute; left: 0; right: 0; bottom: 0; }
+  .tbar { margin: 0 10px 6px; height: 48px; border-radius: 24px; background: var(--bar); border: .5px solid var(--bar-border); box-shadow: 0 4px 18px rgba(0,0,0,.08); display: flex; align-items: center; padding: 0 6px; gap: 6px; }
+  .modes { display: flex; background: var(--fill2); border-radius: 20px; padding: 2px; }
+  .tb { width: 38px; height: 34px; border-radius: 17px; display: flex; align-items: center; justify-content: center; }
+  .tb.on { background: var(--label); color: var(--bg); }
+  .tsp { flex: 1; }
+  .prev { height: 32px; padding: 0 10px; border-radius: 16px; background: var(--fill2); display: flex; align-items: center; gap: 4px; font-size: 14px; }
+  .tdiv { width: .5px; height: 22px; background: var(--sep); }
+  .keyboard { height: 291px; background: var(--kb); padding: 9px 3px 0; }
+  .krow { display: flex; justify-content: center; gap: 6px; margin-bottom: 11px; }
+  .key { width: 33px; height: 42px; border-radius: 6px; background: var(--kbkey); box-shadow: 0 1px 0 rgba(0,0,0,.28); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  .key.f { background: var(--kbkey2); font-size: 15px; width: 45px; }
+  .key.space { width: 182px; font-size: 15px; }
+  .key.ret { width: 90px; font-size: 15px; background: var(--kbkey2); }
+
+  /* 详情页 */
+  .dnav { height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+  .dnav .r { display: flex; gap: 10px; }
+  .post { padding: 6px 20px 0; }
+  .ptitle { font-size: 22px; font-weight: 700; line-height: 1.35; display: flex; align-items: center; gap: 8px; }
+  .tag { font-size: 12px; font-weight: 600; color: var(--label2); background: var(--fill); border-radius: 6px; padding: 2px 6px; display: inline-flex; gap: 3px; align-items: center; }
+  .author { display: flex; align-items: center; gap: 10px; margin: 14px 0 12px; }
+  .ava { width: 36px; height: 36px; border-radius: 18px; background: linear-gradient(135deg,#9aa4b2,#596273); }
+  .an { font-size: 15px; font-weight: 600; display: flex; gap: 6px; align-items: center; }
+  .an em { font-style: normal; font-size: 11px; font-weight: 600; color: var(--label2); border: .5px solid var(--label3); border-radius: 5px; padding: 0 4px; }
+  .meta { font-size: 12.5px; color: var(--label2); margin-top: 2px; }
+  .pbody { font-size: 16.5px; line-height: 1.65; }
+  .pbody code { font-family: ui-monospace, Menlo, monospace; font-size: 14px; background: var(--fill); border-radius: 5px; padding: 1px 4px; }
+  .acts { display: flex; align-items: center; gap: 18px; margin-top: 18px; padding: 12px 0; border-top: .5px solid var(--sep); border-bottom: .5px solid var(--sep); font-size: 14px; color: var(--label2); }
+  .acts span { display: flex; align-items: center; gap: 4px; }
+  .acts .sp { flex: 1; }
+  .acts .edit-act { color: var(--label); font-weight: 600; background: var(--fill); border-radius: 14px; padding: 4px 10px 4px 8px; }
+  .reply { padding: 14px 20px; font-size: 14px; color: var(--label2); }
+  .menu { position: absolute; right: 16px; top: 116px; width: 230px; border-radius: 16px; background: rgba(248,248,250,.97); box-shadow: 0 12px 40px rgba(0,0,0,.18); overflow: hidden; z-index: 5; }
+  .mi { height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; font-size: 16px; border-top: .5px solid var(--sep); }
+  .mi:first-child { border-top: none; }
+  .mi.gap { border-top: 7px solid rgba(0,0,0,.05); }
+  .mi.strong { font-weight: 600; }
+  .scrim { position: absolute; inset: 0; background: rgba(0,0,0,.04); z-index: 4; }
+  .toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: 64px; height: 40px; padding: 0 16px; border-radius: 20px; background: var(--label); color: var(--bg); display: flex; align-items: center; gap: 6px; font-size: 14.5px; font-weight: 600; z-index: 6; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+  .hl { animation: none; background: rgba(255,214,10,.22); border-radius: 6px; margin: 0 -6px; padding: 0 6px; }
+
+  /* 设置面板 */
+  .dimmed { position: absolute; inset: 0; background: var(--dim); z-index: 3; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; top: 400px; background: var(--sheet); border-radius: 30px 30px 0 0; padding: 8px 22px 0; z-index: 4; }
+  .grab { width: 36px; height: 5px; border-radius: 3px; background: var(--label3); margin: 0 auto 14px; }
+  .sh-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .sh-h h3 { font-size: 21px; font-weight: 700; }
+  .sh-h span { font-size: 17px; font-weight: 600; }
+  .lab { font-size: 14px; color: var(--label2); font-weight: 600; margin-bottom: 9px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pl { height: 36px; padding: 0 13px; border-radius: 18px; background: var(--fill2); display: flex; align-items: center; gap: 5px; font-size: 14.5px; font-weight: 700; }
+  .pl.on { background: var(--label); color: var(--bg); }
+  .pl .ico { color: var(--label2); }
+  .pl.on .ico { color: var(--bg); }
+  .hint { font-size: 12.5px; color: var(--label2); margin-top: 9px; line-height: 1.55; }
+  .hint.mute { color: var(--label3); }
+  .locked { display: flex; align-items: center; gap: 10px; }
+  .locked .t { font-size: 12.5px; color: var(--label2); line-height: 1.45; }
+
+  /* 系统弹窗 */
+  .sheet2 { position: absolute; left: 10px; right: 10px; bottom: 30px; z-index: 6; }
+  .as { background: rgba(250,250,252,.97); border-radius: 18px; overflow: hidden; margin-bottom: 8px; }
+  .as .h { padding: 14px 16px 12px; text-align: center; font-size: 13px; color: var(--label2); line-height: 1.45; border-bottom: .5px solid var(--sep); }
+  .as .h b { display: block; font-size: 14px; color: var(--label); margin-bottom: 2px; }
+  .ab { height: 56px; display: flex; align-items: center; justify-content: center; font-size: 18px; border-top: .5px solid var(--sep); }
+  .ab:nth-child(2) { border-top: none; }
+  .ab.red { color: var(--red); }
+  .ab.bold { font-weight: 600; }
+  .alert { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 280px; border-radius: 22px; background: rgba(250,250,252,.97); z-index: 6; padding: 20px 18px 16px; text-align: center; }
+  .alert b { font-size: 17px; display: block; margin-bottom: 6px; }
+  .alert p { font-size: 13.5px; color: #48484c; line-height: 1.5; }
+  .alert .btns { display: flex; gap: 10px; margin-top: 16px; }
+  .alert .btns span { flex: 1; height: 44px; border-radius: 22px; background: var(--fill2); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; }
+  .alert .btns span.pri { background: var(--label); color: var(--bg); }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+  <symbol id="xmark" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7" fill="none"/><circle cx="8" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="16" cy="12" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="safari" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7" fill="none"/><path d="M15.5 8.5l-2 5-5 2 2-5z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/></symbol>
+  <symbol id="photo" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="3.5" stroke="currentColor" stroke-width="1.8" fill="none"/><circle cx="8.6" cy="9.6" r="1.7" fill="currentColor"/><path d="M3.5 17l5-4.6 3.6 3.2 3.2-2.8 5.2 4.6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/></symbol>
+  <symbol id="smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6" stroke="currentColor" stroke-width="1.8" fill="none"/><circle cx="9" cy="10" r="1.1" fill="currentColor"/><circle cx="15" cy="10" r="1.1" fill="currentColor"/><path d="M8.3 14.2c1.8 2 5.6 2 7.4 0" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="aa" viewBox="0 0 24 24"><text x="1.5" y="18" font-size="15" font-weight="500" font-family="-apple-system" fill="currentColor">A</text><text x="12.5" y="18" font-size="11" font-weight="500" font-family="-apple-system" fill="currentColor">a</text></symbol>
+  <symbol id="ibeam" viewBox="0 0 24 24"><text x="1" y="18" font-size="15" font-weight="500" font-family="-apple-system" fill="currentColor">A</text><path d="M15 5.5h4M15 18.5h4M17 5.5v13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="link" viewBox="0 0 24 24"><path d="M10.2 13.8a4 4 0 005.6 0l3.1-3.1a4 4 0 00-5.6-5.6l-1.2 1.2M13.8 10.2a4 4 0 00-5.6 0l-3.1 3.1a4 4 0 005.6 5.6l1.2-1.2" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" stroke="currentColor" stroke-width="1.7" fill="none"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7" fill="none"/></symbol>
+  <symbol id="kbdown" viewBox="0 0 24 24"><rect x="2.5" y="3.5" width="19" height="12" rx="2.5" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M6.3 7.5h.5M9.8 7.5h.5M13.3 7.5h.5M16.8 7.5h.5M7.5 11.5h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M9 18.5l3 2.3 3-2.3" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="down" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5" stroke="currentColor" stroke-width="1.9" fill="none"/><path d="M8 10.5V8a4 4 0 018 0v2.5" stroke="currentColor" stroke-width="1.9" fill="none"/></symbol>
+  <symbol id="pencil" viewBox="0 0 24 24"><path d="M4.5 19.5l1-4.5L16 4.5l3.5 3.5L9 18.5z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/><path d="M13.5 7l3.5 3.5" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="quote" viewBox="0 0 24 24"><path d="M5 17v-4.5C5 9 7 7 9.5 6.5M13 17v-4.5C13 9 15 7 17.5 6.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="thumb" viewBox="0 0 24 24"><path d="M7.5 10.5v9h-3v-9zM7.5 10.5l3.5-6.5a2 2 0 012.6 2.3l-.8 3.7h5.6a1.8 1.8 0 011.8 2.1l-1.3 6.2a2 2 0 01-2 1.7H7.5" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linejoin="round"/></symbol>
+  <symbol id="star" viewBox="0 0 24 24"><path d="M12 4l2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linejoin="round"/></symbol>
+  <symbol id="review" viewBox="0 0 24 24"><path d="M4 16a8 8 0 1116 0" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M12 16l3.5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16" r="1.6" fill="currentColor"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M5.5 12.5l4.2 4.2 8.8-9" stroke="currentColor" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="refresh" viewBox="0 0 24 24"><path d="M19 12a7 7 0 11-2.1-5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M17.5 3.5v4h-4" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="share" viewBox="0 0 24 24"><path d="M12 3.5v11M8 7l4-3.5L16 7" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 10.5H6.5v9.5h11v-9.5h-2" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/></symbol>
+  <symbol id="doc" viewBox="0 0 24 24"><path d="M7 3.5h7l4.5 4.5v12.5H7z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/><path d="M14 3.5V8h4.5M9.5 12.5h6M9.5 16h4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<h1>编辑已发帖子</h1>
+<p class="sub">复用原生发帖页，进入“编辑模式”。只能改标题、正文、谁可以看；板块发布后不能改（和网页一致）。</p>
+<div class="rules">
+  <div class="rule"><b>入口只对自己的帖子出现</b>主楼操作行多一个「编辑」，右上「更多」菜单里也有「编辑帖子」。别人的帖子看不到。</div>
+  <div class="rule"><b>打开就是站点上的原文</b>重新读一次帖子第一页，拿原始 Markdown、标题、阅读限制；在第 3 页点编辑也没问题。</div>
+  <div class="rule"><b>没改动就不能保存</b>右上「保存」在内容和设置都没变化时是灰的；关闭时没改动直接关，有改动才问。</div>
+  <div class="rule"><b>保存后回到详情</b>详情页刷新并停在主楼，顶部提示「已保存修改」。超时可以放心重试，重复保存同样内容没有副作用。</div>
+</div>
+
+<template id="statusbar">
+  <div class="status"><span>9:41</span><span style="display:flex;gap:6px;align-items:center"><svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5.5" width="3" height="6.5" rx="1" fill="currentColor"/><rect x="10" y="3" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><span class="bat"></span></span></div>
+  <div class="island"></div>
+</template>
+
+<template id="toolbar-kb">
+  <div class="dock">
+    <div class="tbar">
+      <div class="modes">
+        <div class="tb on"><svg width="20" height="20"><use href="#ibeam"/></svg></div>
+        <div class="tb"><svg width="20" height="20"><use href="#smile"/></svg></div>
+        <div class="tb"><svg width="20" height="20"><use href="#aa"/></svg></div>
+      </div>
+      <div class="tb"><svg width="20" height="20"><use href="#photo"/></svg></div>
+      <div class="tb" style="margin-left:-6px"><svg width="20" height="20"><use href="#link"/></svg></div>
+      <div class="tsp"></div>
+      <div class="prev"><svg width="16" height="16"><use href="#eye"/></svg>预览</div>
+      <div class="tdiv"></div>
+      <div class="tb"><svg width="22" height="22"><use href="#kbdown"/></svg></div>
+    </div>
+    <div class="keyboard">
+      <div class="krow"><div class="key">q</div><div class="key">w</div><div class="key">e</div><div class="key">r</div><div class="key">t</div><div class="key">y</div><div class="key">u</div><div class="key">i</div><div class="key">o</div><div class="key">p</div></div>
+      <div class="krow"><div class="key">a</div><div class="key">s</div><div class="key">d</div><div class="key">f</div><div class="key">g</div><div class="key">h</div><div class="key">j</div><div class="key">k</div><div class="key">l</div></div>
+      <div class="krow"><div class="key f">⇧</div><div class="key">z</div><div class="key">x</div><div class="key">c</div><div class="key">v</div><div class="key">b</div><div class="key">n</div><div class="key">m</div><div class="key f">⌫</div></div>
+      <div class="krow"><div class="key f">123</div><div class="key f">🌐</div><div class="key space">空格</div><div class="key ret">换行</div></div>
+    </div>
+  </div>
+</template>
+
+<template id="detail">
+  <div class="dnav">
+    <div class="gbtn"><svg width="20" height="20"><use href="#back"/></svg></div>
+    <div class="r">
+      <div class="gbtn"><svg width="22" height="22"><use href="#safari"/></svg></div>
+      <div class="gbtn"><svg width="22" height="22"><use href="#more"/></svg></div>
+    </div>
+  </div>
+  <div class="post">
+    <div class="ptitle">测试 <span class="tag"><svg width="11" height="11"><use href="#lock"/></svg>私有</span></div>
+    <div class="author">
+      <div class="ava"></div>
+      <div><div class="an">缭雾 <em>楼主</em></div><div class="meta">测评 · 4 分钟前</div></div>
+    </div>
+    <div class="pbody BODY">好的吧<br><code>&gt; `~~**~~`</code><br>🙂 🙃<br>• 看看<br>• 哦哦 <s>解决了</s></div>
+    <div class="acts">
+      <span><svg width="16" height="16"><use href="#thumb"/></svg>0</span>
+      <span>🍗 0</span>
+      <span><svg width="16" height="16"><use href="#star"/></svg>0</span>
+      <span class="sp"></span>
+      <span><svg width="15" height="15"><use href="#quote"/></svg>引用</span>
+      <span class="edit-act"><svg width="15" height="15"><use href="#pencil"/></svg>编辑</span>
+    </div>
+  </div>
+  <div class="reply">还没有回复</div>
+</template>
+
+<!-- 第一行 -->
+<div class="row">
+  <div class="cell">
+    <div class="phone">
+      <use-tpl data-t="statusbar"></use-tpl>
+      <use-tpl data-t="detail"></use-tpl>
+      <div class="scrim"></div>
+      <div class="menu">
+        <div class="mi">刷新<svg width="18" height="18"><use href="#refresh"/></svg></div>
+        <div class="mi">复制链接<svg width="18" height="18"><use href="#link"/></svg></div>
+        <div class="mi">分享<svg width="18" height="18"><use href="#share"/></svg></div>
+        <div class="mi gap strong">编辑帖子<svg width="18" height="18"><use href="#pencil"/></svg></div>
+      </div>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>① 入口：自己的帖子才有</b>主楼操作行右侧「编辑」用浅底胶囊，和「引用」并排；右上「更多」菜单分组里多一项「编辑帖子」。按当前登录账号和楼主 uid 判断，别人的帖子不显示。</div>
+  </div>
+
+  <div class="cell">
+    <div class="phone">
+      <use-tpl data-t="statusbar"></use-tpl>
+      <div class="nav">
+        <div class="gbtn"><svg width="20" height="20"><use href="#xmark"/></svg></div>
+        <div class="dest"><svg width="15" height="15"><use href="#lock"/></svg>测评<span class="mid">·</span><span class="rk">私有</span><svg width="14" height="14" style="color:var(--label2)"><use href="#down"/></svg></div>
+        <div class="cta off">保存</div>
+      </div>
+      <div class="strip">
+        <svg width="16" height="16" style="color:var(--label2)"><use href="#doc"/></svg>
+        <b>上次没保存的修改</b><span class="s2">昨天 22:10</span>
+        <div class="pill-btn">恢复</div>
+        <div class="x"><svg width="13" height="13"><use href="#xmark"/></svg></div>
+      </div>
+      <div class="edit">
+        <div class="title">测试</div>
+        <div class="sepline"><i></i><span>未修改</span></div>
+        <div class="body">
+          好的吧<br>
+          <span class="mk">```</span><br><span class="mk">```</span><br>
+          <span class="mk">&gt;</span> `~~**~~`<br>
+          :ac03: :ac02:<br>
+          <span class="mk">-</span> 看看<span class="caret"></span>
+        </div>
+      </div>
+      <use-tpl data-t="toolbar-kb"></use-tpl>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>② 编辑页：打开即原文</b>就是发帖页：中间胶囊带锁，显示「板块 · 谁可以看」；右上按钮是「保存」，没改动时灰掉。分隔线右端显示「未修改」。上次编辑没保存过的话，顶部出现「上次没保存的修改」细条，可恢复或丢弃。</div>
+  </div>
+
+  <div class="cell">
+    <div class="phone">
+      <use-tpl data-t="statusbar"></use-tpl>
+      <div class="nav">
+        <div class="gbtn"><svg width="20" height="20"><use href="#xmark"/></svg></div>
+        <div class="dest"><svg width="15" height="15"><use href="#lock"/></svg>测评<span class="mid">·</span><span class="rk">私有</span><svg width="14" height="14" style="color:var(--label2)"><use href="#down"/></svg></div>
+        <div class="cta">保存</div>
+      </div>
+      <div class="edit">
+        <div class="title">测试（补充）</div>
+        <div class="sepline"><i></i><span class="on">已修改 · 已存本机</span></div>
+        <div class="body">
+          好的吧<br>
+          <span class="mk">```</span><br><span class="mk">```</span><br>
+          <span class="mk">&gt;</span> `~~**~~`<br>
+          :ac03: :ac02:<br>
+          <span class="mk">-</span> 看看<br>
+          <span class="mk">-</span> <span class="new">补充一条</span><span class="caret"></span>
+        </div>
+      </div>
+      <use-tpl data-t="toolbar-kb"></use-tpl>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>③ 有改动后</b>「保存」变成黑底可点；分隔线右端「已修改 · 已存本机」（编辑中的内容按帖子单独存草稿，App 被杀也不丢）。工具栏、表情、格式、链接条、预览全部和发帖一致。</div>
+  </div>
+</div>
+
+<!-- 第二行 -->
+<div class="row">
+  <div class="cell">
+    <div class="phone">
+      <use-tpl data-t="statusbar"></use-tpl>
+      <div class="nav">
+        <div class="gbtn"><svg width="20" height="20"><use href="#xmark"/></svg></div>
+        <div class="dest"><svg width="15" height="15"><use href="#lock"/></svg>测评<span class="mid">·</span><span class="rk">私有</span><svg width="14" height="14" style="color:var(--label2)"><use href="#down"/></svg></div>
+        <div class="cta">保存</div>
+      </div>
+      <div class="edit"><div class="title">测试（补充）</div></div>
+      <div class="dimmed"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="sh-h"><h3>帖子设置</h3><span>完成</span></div>
+        <div class="lab">板块</div>
+        <div class="locked">
+          <div class="pl on"><svg class="ico" width="16" height="16"><use href="#review"/></svg>测评</div>
+          <div class="t">发布后不能修改板块</div>
+        </div>
+        <div class="lab" style="margin-top:22px">谁可以看</div>
+        <div class="pills">
+          <div class="pl">公开</div><div class="pl">Lv1</div><div class="pl">Lv2</div><div class="pl">Lv3</div><div class="pl">Lv4</div>
+          <div class="pl on"><svg class="ico" width="14" height="14"><use href="#lock"/></svg>私有</div>
+        </div>
+        <div class="hint">只有你自己能看到<br><span style="color:var(--label3)">最高只能选到你当前的等级 Lv4</span></div>
+      </div>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>④ 帖子设置：板块锁定</b>标题从「发布到」改为「帖子设置」。板块只显示当前这一个（选中态），旁边写「发布后不能修改板块」，不给其他选项；「谁可以看」照常可改。</div>
+  </div>
+
+  <div class="cell">
+    <div class="phone">
+      <use-tpl data-t="statusbar"></use-tpl>
+      <div class="nav">
+        <div class="gbtn"><svg width="20" height="20"><use href="#xmark"/></svg></div>
+        <div class="dest"><svg width="15" height="15"><use href="#lock"/></svg>测评<span class="mid">·</span><span class="rk">私有</span><svg width="14" height="14" style="color:var(--label2)"><use href="#down"/></svg></div>
+        <div class="cta">保存</div>
+      </div>
+      <div class="edit"><div class="title">测试（补充）</div><div class="sepline"><i></i><span class="on">已修改 · 已存本机</span></div><div class="body">好的吧<br>…</div></div>
+      <div class="dimmed"></div>
+      <div class="alert">
+        <b>改为私有需要 10 鸡腿</b>
+        <p>原来是公开的帖子设为私有，站点会收取 10 鸡腿手续费。</p>
+        <div class="btns"><span>取消</span><span class="pri">继续保存</span></div>
+      </div>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>⑤ 保存前的确认</b>只有「原来不是私有 → 改成私有」时才弹（和网页同一条规则）。关闭页面时有改动，底部弹出：<br>「保存修改」/「留着下次继续」/「放弃修改」（红色）/ 取消。</div>
+  </div>
+
+  <div class="cell">
+    <div class="phone">
+      <use-tpl data-t="statusbar"></use-tpl>
+      <div class="dnav">
+        <div class="gbtn"><svg width="20" height="20"><use href="#back"/></svg></div>
+        <div class="r">
+          <div class="gbtn"><svg width="22" height="22"><use href="#safari"/></svg></div>
+          <div class="gbtn"><svg width="22" height="22"><use href="#more"/></svg></div>
+        </div>
+      </div>
+      <div class="toast"><svg width="16" height="16"><use href="#check"/></svg>已保存修改</div>
+      <div class="post">
+        <div class="ptitle">测试（补充） <span class="tag"><svg width="11" height="11"><use href="#lock"/></svg>私有</span></div>
+        <div class="author">
+          <div class="ava"></div>
+          <div><div class="an">缭雾 <em>楼主</em></div><div class="meta">测评 · 6 分钟前 · 编辑于刚刚</div></div>
+        </div>
+        <div class="pbody">好的吧<br><code>&gt; `~~**~~`</code><br>🙂 🙃<br>• 看看<br>• <span class="hl">补充一条</span></div>
+        <div class="acts">
+          <span><svg width="16" height="16"><use href="#thumb"/></svg>0</span>
+          <span>🍗 0</span>
+          <span><svg width="16" height="16"><use href="#star"/></svg>0</span>
+          <span class="sp"></span>
+          <span><svg width="15" height="15"><use href="#quote"/></svg>引用</span>
+          <span class="edit-act"><svg width="15" height="15"><use href="#pencil"/></svg>编辑</span>
+        </div>
+      </div>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>⑥ 保存成功</b>关闭编辑页，详情页刷新并滚到主楼，顶部黑色胶囊提示「已保存修改」两秒后消失。失败时停在编辑页，内容不丢；超时显示「保存结果未知」，可以直接重试。</div>
+  </div>
+</div>
+
+<script>
+  // 模板展开
+  document.querySelectorAll('use-tpl').forEach(el => {
+    const t = document.getElementById(el.dataset.t);
+    el.replaceWith(t.content.cloneNode(true));
+  });
+</script>
+</body>
+</html>
