@@ -93,6 +93,14 @@ final class NewDiscussionViewController: UIViewController {
         presenter.viewDidLoad()
     }
 
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        // 关闭时输入框还在编辑的话，键盘上方的工具条会残留在下层页面上，先统一收起。
+        if navigationController?.isBeingDismissed == true || isBeingDismissed {
+            view.endEditing(true)
+        }
+    }
+
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         // 整个发帖页被关掉时停掉上传，草稿保存时已去掉占位。
