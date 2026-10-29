@@ -344,7 +344,7 @@ struct PostListPresenterTests {
         #expect(view.events.contains("openDetailTestURLFromPasteboard"))
     }
 
-    @Test func tappingNewDiscussionRoutesToNewDiscussionWebView() {
+    @Test func tappingNewDiscussionRoutesToNewDiscussionComposer() {
         let router = SpyPostListRouter()
         let presenter = makePresenter(router: router)
 

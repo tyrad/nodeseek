@@ -59,9 +59,32 @@ class PostListRouter: PostListRouterProtocol {
     }
 
     func navigateToNewDiscussion() {
-        AppLog.info(.postList, "Router 开始导航到发帖页")
-        show(NewDiscussionWebViewController())
+        AppLog.info(.postList, "Router 开始导航到原生发帖页")
+        let composer = NewDiscussionRouter.createModule { [weak self] route in
+            self?.openPublishedDiscussion(route: route)
+        }
+        viewController?.present(composer, animated: true)
         AppLog.info(.postList, "Router 已触发发帖页展示")
+    }
+
+    /// 发帖成功：能解析出新帖地址就直接打开，否则留在列表由用户下拉刷新。
+    private func openPublishedDiscussion(route: NodeSeekPostRoute?) {
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        guard let route else {
+            AppLog.warning(.postList, "发帖成功但没有解析出新帖地址")
+            return
+        }
+        let post = PostSummary(
+            id: route.postID,
+            title: "",
+            url: route.url,
+            authorName: "",
+            nodeName: nil,
+            replyCount: 0,
+            lastActivityText: nil
+        )
+        let detailViewController = PostDetailRouter.createModule(post: post, page: route.page, initialAnchorID: nil)
+        viewController?.navigationController?.pushViewController(detailViewController, animated: true)
     }
 
     func navigateToCheckIn(boardURL: URL) {
