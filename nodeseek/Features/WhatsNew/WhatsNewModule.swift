@@ -23,6 +23,32 @@ enum WhatsNewModule {
     /// ])
     /// ```
     static let catalog: [WhatsNew] = [
+        release("1.1.0", features: [
+            feature(
+                systemName: "person.crop.circle.fill",
+                tint: .systemBlue,
+                title: "原生个人页",
+                subtitle: "资料、今日进度和自述一屏看全"
+            ),
+            feature(
+                systemName: "star.fill",
+                tint: .systemOrange,
+                title: "星辰与鸡腿",
+                subtitle: "余额和每笔变动原生展示"
+            ),
+            feature(
+                systemName: "person.2.fill",
+                tint: .systemIndigo,
+                title: "关注与粉丝",
+                subtitle: "名单原生展示，左右滑动切换"
+            ),
+            feature(
+                systemName: "photo.fill",
+                tint: .systemPink,
+                title: "看大图",
+                subtitle: "从原图位置放大打开、缩回关闭"
+            )
+        ]),
         release("1.0.11", features: [
             feature(
                 systemName: "square.and.pencil",
