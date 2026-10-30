@@ -214,6 +214,44 @@ struct NodeSeekUserContentClientTests {
         await #expect(throws: UserContentClientError.self) { _ = try await client.loadStardust(uid: 31037) }
     }
 
+    @Test func loadsCreditTupleRowsAndUsesCurrentAccountEndpoint() async throws {
+        let client = makeClient(responseBody: """
+        {"success":true,"data":[[1,1758,"回帖奖励","2026-10-30T01:06:08.000Z"],
+        [-5,1753,"扣减示例","2026-10-30T01:06:09.000Z"]],"total":773}
+        """)
+        let page = try await client.loadCredits(page: 2)
+        #expect(MockURLProtocol.lastRequest?.url?.absoluteString == "https://www.nodeseek.com/api/account/credit/page-2")
+        #expect(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Referer") == "https://www.nodeseek.com/credit")
+        #expect(MockURLProtocol.lastRequest?.httpMethod == "GET")
+        #expect(page.total == 773)
+        #expect(page.pageCount == 39)
+        #expect(page.records.first == UserCreditRecord(diff: 1, balance: 1758, reason: "回帖奖励", createdAt: "2026-10-30T01:06:08.000Z"))
+        #expect(page.records.last?.changeText == "-5")
+    }
+
+    @Test func emptyCreditListAndWebPageLimit() async throws {
+        let client = makeClient(responseBody: #"{"success":true,"data":[],"total":0}"#)
+        let page = try await client.loadCredits(page: 0)
+        #expect(page.records.isEmpty)
+        #expect(page.pageCount == 0)
+        #expect(MockURLProtocol.lastRequest?.url?.path == "/api/account/credit/page-1")
+        _ = try await client.loadCredits(page: 101)
+        #expect(MockURLProtocol.lastRequest?.url?.path == "/api/account/credit/page-100")
+        #expect(UserCreditPage(records: [], total: 20).pageCount == 1)
+        #expect(UserCreditPage(records: [], total: 21).pageCount == 2)
+        #expect(UserCreditPage(records: [], total: 2001).pageCount == 100)
+    }
+
+    @Test func creditFailureDoesNotBecomeEmptySuccess() async throws {
+        let client = makeClient(responseBody: #"{"success":false,"message":"请先登录"}"#)
+        await #expect(throws: UserContentClientError.self) { _ = try await client.loadCredits(page: 1) }
+    }
+
+    @Test func malformedCreditTupleFailsWithoutDroppingTheRow() async throws {
+        let client = makeClient(responseBody: #"{"success":true,"data":[[1,1758,"回帖奖励"]],"total":1}"#)
+        await #expect(throws: DecodingError.self) { _ = try await client.loadCredits(page: 1) }
+    }
+
     @Test func joinedDaysRoundsUpPartialDay() {
         let createdAt = ISO8601DateFormatter().date(from: "2025-04-27T14:29:22Z")!
         let now = ISO8601DateFormatter().date(from: "2026-10-30T02:00:00Z")!

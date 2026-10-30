@@ -322,9 +322,17 @@ final class UserProfileViewController: UIViewController {
 
     private func makeStatsCard(_ profile: UserProfileRecord) -> UIView {
         let uid = profile.uid
+        let creditStat: UserProfileStatView
+        if isSelf {
+            creditStat = UserProfileStatView(value: "\(profile.coin)", title: "鸡腿") { [weak self] in
+                self?.navigationController?.pushViewController(UserCreditViewController(uid: uid, profile: profile), animated: true)
+            }
+        } else {
+            creditStat = UserProfileStatView(value: "\(profile.coin)", title: "鸡腿")
+        }
         var items: [UserProfileStatView] = [
             UserProfileStatView(value: "Lv \(profile.rank)", title: "等级"),
-            UserProfileStatView(value: "\(profile.coin)", title: "鸡腿"),
+            creditStat,
             UserProfileStatView(value: "\(profile.stardust)", title: "星辰") { [weak self] in
                 self?.navigationController?.pushViewController(UserStardustViewController(uid: uid, profile: profile, isSelf: self?.isSelf ?? false), animated: true)
             }

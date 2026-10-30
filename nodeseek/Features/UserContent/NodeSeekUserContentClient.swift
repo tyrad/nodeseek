@@ -73,6 +73,18 @@ final class NodeSeekUserContentClient {
         }
     }
 
+    /// 只读取当前登录账号；接口不支持指定他人的 uid。
+    func loadCredits(page: Int) async throws -> UserCreditPage {
+        let url = baseURL.appendingPathComponent("api/account/credit/page-\(min(100, max(1, page)))")
+        var request = URLRequest(url: url)
+        WebRequestFingerprint.applyJSONHeaders(to: &request, referer: baseURL.appendingPathComponent("credit"))
+        let response = try await decode(CreditResponse.self, from: request)
+        guard response.success, let records = response.data, let total = response.total, total >= 0 else {
+            throw UserContentClientError.unsuccessfulResponse
+        }
+        return UserCreditPage(records: records, total: total)
+    }
+
     func loadStardust(uid: Int, beforeID: Int? = nil) async throws -> UserStardustPage {
         var query = [URLQueryItem(name: "count", value: "10"), URLQueryItem(name: "member_id", value: "\(uid)")]
         if let beforeID { query.append(URLQueryItem(name: "before_id", value: "\(beforeID)")) }
@@ -317,4 +329,10 @@ private struct StardustResponse: Decodable {
         case success, records, cursor
         case hasMore = "exist_more"
     }
+}
+
+private struct CreditResponse: Decodable {
+    let success: Bool
+    let data: [UserCreditRecord]?
+    let total: Int?
 }
