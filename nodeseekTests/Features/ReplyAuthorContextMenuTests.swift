@@ -125,6 +125,55 @@ struct ReplyAuthorContextMenuTests {
 
         #expect(node.debugBodyContextMenuActionTitles == ["复制"])
         #expect(node.debugBodyContextMenuHasPreview == false)
+        #expect(node.debugAuthorContextMenuHasPreview == false)
+    }
+
+    @Test func longPressOnPostAuthorAvatarAndNamePreviewsProfile() throws {
+        let profileURL = try #require(URL(string: "https://www.nodeseek.com/space/31037"))
+        var opened: [URL] = []
+        let node = makePostBodyNode(profileURL: profileURL, onAuthorTapped: { opened.append($0) })
+        let host = try display(node)
+
+        let avatar = try #require(host.firstView(accessibilityIdentifier: "post-author-avatar"))
+        let name = try #require(host.firstView(accessibilityIdentifier: "post-author-name"))
+
+        #expect(try authorMenuIdentifier(from: node, on: avatar)?.hasSuffix("-author") == true)
+        #expect(try authorMenuIdentifier(from: node, on: name)?.hasSuffix("-author") == true)
+        #expect(node.makeAuthorPreviewViewController() is UserProfileViewController)
+        #expect(opened.isEmpty)
+
+        let interaction = try #require(avatar.interactions.compactMap { $0 as? UIContextMenuInteraction }.first)
+        let configuration = try #require(node.contextMenuInteraction(interaction, configurationForMenuAtLocation: .zero))
+        let animator = ContextMenuCommitAnimator()
+        node.contextMenuInteraction(interaction, willPerformPreviewActionForMenuWith: configuration, animator: animator)
+        animator.runCompletions()
+        #expect(opened == [profileURL])
+    }
+
+    @Test func longPressOnCommentAuthorNamePreviewsProfile() throws {
+        let profileURL = try #require(URL(string: "https://www.nodeseek.com/space/31037"))
+        let comment = Comment(
+            id: "9835758",
+            authorName: "mist",
+            avatarURL: nil,
+            authorProfileURL: profileURL,
+            floorText: "#1",
+            createdAtText: "刚刚",
+            contentHTML: "<p>回复内容</p>"
+        )
+        let node = CommentCellNode(
+            comment: comment,
+            renderedBody: [],
+            onImageTapped: { _, _ in },
+            onTextLayoutInvalidated: {}
+        )
+        let host = try display(node)
+
+        let avatar = try #require(host.firstView(accessibilityIdentifier: "comment-author-avatar"))
+        let name = try #require(host.firstView(accessibilityIdentifier: "comment-author-name"))
+        #expect(try authorMenuIdentifier(from: node, on: avatar)?.hasSuffix("-avatar") == true)
+        #expect(try authorMenuIdentifier(from: node, on: name)?.hasSuffix("-avatar") == true)
+        #expect(node.makeAuthorPreviewViewController() is UserProfileViewController)
     }
 
     @Test func authorFilterMenuItemsAppendAfterExistingActions() {
@@ -166,7 +215,82 @@ struct ReplyAuthorContextMenuTests {
     }
 }
 
+@MainActor
+private func makePostBodyNode(
+    profileURL: URL?,
+    onAuthorTapped: @escaping (URL) -> Void = { _ in }
+) -> PostBodyCellNode {
+    let header = PostDetailHeaderContent(
+        postID: "703863",
+        title: "帖子标题",
+        authorName: "mist",
+        avatarURL: URL(string: "https://www.nodeseek.com/avatar/31037.png"),
+        authorProfileURL: profileURL,
+        metadataText: "刚刚",
+        contentHTML: "<p>帖子正文</p>"
+    )
+    return PostBodyCellNode(
+        content: header,
+        renderedContent: [],
+        onImageTapped: { _, _ in },
+        onAuthorTapped: onAuthorTapped,
+        onTextLayoutInvalidated: {}
+    )
+}
+
+@MainActor
+private func display(_ node: ASDisplayNode) throws -> UIView {
+    let size = node.layoutThatFits(ASSizeRange(
+        min: .zero,
+        max: CGSize(width: 390, height: 2_000)
+    )).size
+    node.frame = CGRect(origin: .zero, size: size)
+    let host = UIView(frame: node.frame)
+    host.addSubview(node.view)
+    node.layoutIfNeeded()
+    node.recursivelyEnsureDisplaySynchronously(true)
+    return host
+}
+
+@MainActor
+private func authorMenuIdentifier(
+    from delegate: UIContextMenuInteractionDelegate,
+    on view: UIView
+) throws -> String? {
+    let interaction = try #require(view.interactions.compactMap { $0 as? UIContextMenuInteraction }.first)
+    let configuration = try #require(delegate.contextMenuInteraction(interaction, configurationForMenuAtLocation: .zero))
+    return configuration.identifier as? String
+}
+
+private final class ContextMenuCommitAnimator: NSObject, UIContextMenuInteractionCommitAnimating {
+    var preferredCommitStyle: UIContextMenuInteractionCommitStyle = .pop
+    var previewViewController: UIViewController?
+    private var completions: [() -> Void] = []
+
+    func addAnimations(_ animations: @escaping () -> Void) {}
+
+    func addCompletion(_ completion: @escaping () -> Void) {
+        completions.append(completion)
+    }
+
+    func runCompletions() {
+        completions.forEach { $0() }
+    }
+}
+
 private extension UIView {
+    func firstView(accessibilityIdentifier: String) -> UIView? {
+        if self.accessibilityIdentifier == accessibilityIdentifier {
+            return self
+        }
+        for subview in subviews {
+            if let matched = subview.firstView(accessibilityIdentifier: accessibilityIdentifier) {
+                return matched
+            }
+        }
+        return nil
+    }
+
     func firstTextView(accessibilityIdentifier: String) -> UITextView? {
         if let textView = self as? UITextView, textView.accessibilityIdentifier == accessibilityIdentifier {
             return textView

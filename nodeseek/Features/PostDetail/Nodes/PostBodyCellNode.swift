@@ -21,6 +21,11 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         static let bodySpacing: CGFloat = 18
     }
 
+    private enum ContextMenuIdentifier {
+        static let authorSuffix = "-author"
+        static let bodySuffix = "-body"
+    }
+
     private var content: PostDetailHeaderContent
     private let onImageTapped: ([URL], Int) -> Void
     private let onLinkTapped: (URL) -> Void
@@ -82,9 +87,11 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
             imageView.backgroundColor = .systemGray5
             imageView.layer.cornerRadius = PostDetailContentLayout.avatarCornerRadius
             imageView.layer.masksToBounds = true
+            imageView.accessibilityIdentifier = "post-author-avatar"
             imageView.isUserInteractionEnabled = self?.hasAuthorProfileLink == true
             if self?.hasAuthorProfileLink == true {
                 imageView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(PostBodyCellNode.authorTapped)))
+                self?.installContextMenu(on: imageView)
             }
             self?.avatarImageView = imageView
             return imageView
@@ -163,6 +170,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         super.didLoad()
         themeTraitObserver.install(on: self)
         installBodyContextMenus()
+        installAuthorNameContextMenuIfNeeded()
         requestAvatarIfNeeded()
     }
 
@@ -267,6 +275,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
             ),
             for: .normal
         )
+        authorButtonNode.accessibilityIdentifier = "post-author-name"
         authorButtonNode.accessibilityLabel = "查看 \(AuthorDisplayPolicy.displayName(from: content.authorName) ?? "作者") 的主页"
 
         metadataNode.maximumNumberOfLines = 0
@@ -344,14 +353,22 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
 
     private func installBodyContextMenus() {
         for bodyNode in bodyNodes {
-            installBodyContextMenu(on: bodyNode.view)
+            installContextMenu(on: bodyNode.view)
         }
     }
 
-    private func installBodyContextMenu(on view: UIView) {
+    private func installContextMenu(on view: UIView) {
         guard view.interactions.contains(where: { $0 is UIContextMenuInteraction }) == false else { return }
         view.isUserInteractionEnabled = true
         view.addInteraction(UIContextMenuInteraction(delegate: self))
+    }
+
+    /// 名字按钮要等 node 加载出 view 才能挂上预览。
+    private func installAuthorNameContextMenuIfNeeded() {
+        guard hasAuthorProfileLink else { return }
+        authorButtonNode.onDidLoad { [weak self] node in
+            self?.installContextMenu(on: node.view)
+        }
     }
 
     private func makeFooterActionStack() -> ASLayoutSpec {
@@ -662,6 +679,10 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         content.isFavoriteSubmitting
     }
 
+    var debugAuthorContextMenuHasPreview: Bool {
+        hasAuthorProfileLink
+    }
+
     var debugBodyContextMenuActionTitles: [String] {
         bodyContextMenuActions().map(\.title)
     }
@@ -700,13 +721,45 @@ extension PostBodyCellNode: UIContextMenuInteractionDelegate {
         _ interaction: UIContextMenuInteraction,
         configurationForMenuAtLocation location: CGPoint
     ) -> UIContextMenuConfiguration? {
-        UIContextMenuConfiguration(
-            identifier: "\(content.postID)-body-copy" as NSString,
+        if isAuthorPreviewInteraction(interaction) {
+            guard hasAuthorProfileLink else { return nil }
+            return UIContextMenuConfiguration(
+                identifier: "\(content.postID)\(ContextMenuIdentifier.authorSuffix)" as NSString,
+                previewProvider: { [weak self] in
+                    self?.makeAuthorPreviewViewController()
+                }
+            )
+        }
+
+        return UIContextMenuConfiguration(
+            identifier: "\(content.postID)\(ContextMenuIdentifier.bodySuffix)" as NSString,
             previewProvider: nil,
             actionProvider: { [weak self] _ in
                 UIMenu(children: self?.bodyContextMenuActions() ?? [])
             }
         )
+    }
+
+    func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        willPerformPreviewActionForMenuWith configuration: UIContextMenuConfiguration,
+        animator: UIContextMenuInteractionCommitAnimating
+    ) {
+        guard (configuration.identifier as? NSString)?.hasSuffix(ContextMenuIdentifier.authorSuffix) == true else { return }
+        guard let authorProfileURL = content.authorProfileURL else { return }
+        animator.addCompletion { [weak self] in
+            self?.onAuthorTapped(authorProfileURL)
+        }
+    }
+
+    func makeAuthorPreviewViewController() -> UIViewController? {
+        guard let authorProfileURL = content.authorProfileURL else { return nil }
+        return UserProfileRouter.makeViewController(profileURL: authorProfileURL)
+    }
+
+    private func isAuthorPreviewInteraction(_ interaction: UIContextMenuInteraction) -> Bool {
+        if interaction.view === avatarImageView { return true }
+        return authorButtonNode.isNodeLoaded && interaction.view === authorButtonNode.view
     }
 
     private func bodyContextMenuActions() -> [UIAction] {

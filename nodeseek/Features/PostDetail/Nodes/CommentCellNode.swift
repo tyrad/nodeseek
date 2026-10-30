@@ -99,6 +99,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
             imageView.layer.cornerRadius = PostDetailContentLayout.avatarCornerRadius
             imageView.layer.masksToBounds = true
             imageView.isUserInteractionEnabled = self?.hasAuthorProfileLink == true
+            imageView.accessibilityIdentifier = "comment-author-avatar"
             if self?.hasAuthorProfileLink == true {
                 imageView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(CommentCellNode.authorTapped)))
                 self?.installContextMenu(on: imageView)
@@ -171,6 +172,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         super.didLoad()
         themeTraitObserver.install(on: self)
         installContextMenu(on: view)
+        installAuthorNameContextMenuIfNeeded()
         requestAvatarIfNeeded()
     }
 
@@ -304,6 +306,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
             ),
             for: .normal
         )
+        authorButtonNode.accessibilityIdentifier = "comment-author-name"
         authorButtonNode.accessibilityLabel = "查看 \(AuthorDisplayPolicy.displayName(from: comment.authorName) ?? "作者") 的主页"
 
         posterBadgeNode.maximumNumberOfLines = 1
@@ -366,6 +369,14 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
     private func installContextMenu(on view: UIView) {
         guard view.interactions.contains(where: { $0 is UIContextMenuInteraction }) == false else { return }
         view.addInteraction(UIContextMenuInteraction(delegate: self))
+    }
+
+    /// 名字按钮要等 node 加载出 view 才能挂上预览，和头像同一张个人页。
+    private func installAuthorNameContextMenuIfNeeded() {
+        guard hasAuthorProfileLink else { return }
+        authorButtonNode.onDidLoad { [weak self] node in
+            self?.installContextMenu(on: node.view)
+        }
     }
 
     private func makeFooterActionStack() -> ASLayoutSpec {
@@ -677,12 +688,12 @@ extension CommentCellNode: UIContextMenuInteractionDelegate {
         _ interaction: UIContextMenuInteraction,
         configurationForMenuAtLocation location: CGPoint
     ) -> UIContextMenuConfiguration? {
-        if interaction.view === avatarImageView {
-            guard let authorProfileURL = comment.authorProfileURL, hasDisplayableAuthor else { return nil }
+        if isAuthorPreviewInteraction(interaction) {
+            guard hasAuthorProfileLink else { return nil }
             return UIContextMenuConfiguration(
                 identifier: "\(comment.id)\(ContextMenuIdentifier.avatarSuffix)" as NSString,
-                previewProvider: {
-                    UserProfileRouter.makeViewController(profileURL: authorProfileURL)
+                previewProvider: { [weak self] in
+                    self?.makeAuthorPreviewViewController()
                 }
             )
         }
@@ -706,6 +717,16 @@ extension CommentCellNode: UIContextMenuInteractionDelegate {
         animator.addCompletion { [weak self] in
             self?.onAuthorTapped(authorProfileURL)
         }
+    }
+
+    func makeAuthorPreviewViewController() -> UIViewController? {
+        guard let authorProfileURL = comment.authorProfileURL else { return nil }
+        return UserProfileRouter.makeViewController(profileURL: authorProfileURL)
+    }
+
+    private func isAuthorPreviewInteraction(_ interaction: UIContextMenuInteraction) -> Bool {
+        if interaction.view === avatarImageView { return true }
+        return authorButtonNode.isNodeLoaded && interaction.view === authorButtonNode.view
     }
 
     private func bodyContextMenuActions() -> [UIAction] {
