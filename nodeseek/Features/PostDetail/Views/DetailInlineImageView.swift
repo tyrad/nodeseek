@@ -208,6 +208,7 @@ final class DetailInlineImageView: AnimatedImageView {
 
     @objc
     private func handleTap() {
+        DetailPhotoTransitionAnchor.record(imageView: self, url: imageURL)
         onImageTapped(imageURL)
     }
 
@@ -227,4 +228,9 @@ final class DetailInlineImageView: AnimatedImageView {
     private static func numberString(_ value: CGFloat) -> String {
         String(format: "%.1f", Double(value))
     }
+}
+
+extension DetailInlineImageView: DetailPhotoThumbnailSource {
+    var detailPhotoThumbnailURL: URL? { imageURL }
+    var detailPhotoThumbnailView: UIImageView { self }
 }

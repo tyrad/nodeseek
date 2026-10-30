@@ -142,6 +142,14 @@ final class DetailTerminalView: UIView {
 
     @objc private func openReport() {
         guard let snapshot else { return }
+        if let url = snapshot.pages.first?.url {
+            DetailPhotoTransitionAnchor.record(imageView: imageView, url: url)
+        }
         onImageTapped(snapshot.pages.map(\.url), 0)
     }
+}
+
+extension DetailTerminalView: DetailPhotoThumbnailSource {
+    var detailPhotoThumbnailURL: URL? { snapshot?.pages.first?.url }
+    var detailPhotoThumbnailView: UIImageView { imageView }
 }

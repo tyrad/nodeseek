@@ -273,8 +273,14 @@ final class DetailImageBlockView: UIView {
 
     @objc
     private func handleTap() {
+        DetailPhotoTransitionAnchor.record(imageView: imageView, url: imageBlock.url)
         onImageTapped()
     }
+}
+
+extension DetailImageBlockView: DetailPhotoThumbnailSource {
+    var detailPhotoThumbnailURL: URL? { imageBlock.url }
+    var detailPhotoThumbnailView: UIImageView { imageView }
 }
 
 enum DetailImageBlockLayout {

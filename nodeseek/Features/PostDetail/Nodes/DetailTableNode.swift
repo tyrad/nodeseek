@@ -1054,8 +1054,14 @@ private final class DetailTableImageView: UIImageView {
 
     @objc
     private func handleTap() {
+        DetailPhotoTransitionAnchor.record(imageView: self, url: imageURL)
         onTapped()
     }
+}
+
+extension DetailTableImageView: DetailPhotoThumbnailSource {
+    var detailPhotoThumbnailURL: URL? { imageURL }
+    var detailPhotoThumbnailView: UIImageView { self }
 }
 
 enum DetailTableLayout {

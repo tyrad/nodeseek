@@ -11,20 +11,46 @@ import UIKit
 
 final class DetailPhotoBrowserPresenter: NSObject, JXPhotoBrowserDelegate {
     private let imageURLs: [URL]
+    private weak var sourceRoot: UIView?
+    private weak var anchorView: UIImageView?
+    private var anchorURL: URL?
+    private weak var hiddenThumbnail: UIImageView?
 
-    init(imageURLs: [URL]) {
+    init(
+        imageURLs: [URL],
+        sourceRoot: UIView? = nil,
+        anchorView: UIImageView? = nil,
+        anchorURL: URL? = nil
+    ) {
         self.imageURLs = imageURLs
+        self.sourceRoot = sourceRoot
+        self.anchorView = anchorView
+        self.anchorURL = anchorURL
         super.init()
     }
 
     func present(from viewController: UIViewController, initialIndex: Int) {
         guard imageURLs.isEmpty == false else { return }
 
-        let browser = JXPhotoBrowserViewController()
+        sourceRoot = viewController.view
+        if let anchor = DetailPhotoTransitionAnchor.take() {
+            anchorView = anchor.imageView
+            anchorURL = anchor.url
+        }
+
+        let browser = DetailPhotoBrowserController()
         browser.delegate = self
         browser.initialIndex = min(max(initialIndex, 0), imageURLs.count - 1)
-        browser.transitionType = .fade
+        // 源图还在屏幕上就从它缩放进出；不在屏幕上或开启减少动态效果时直接淡入淡出。
+        browser.transitionType = canZoom(at: browser.initialIndex) ? .zoom : .fade
         browser.isLoopingEnabled = false
+        browser.prepareForDismiss = { [weak self, weak browser] in
+            guard let self, let browser else { return }
+            self.applyDismissTransition(on: browser)
+        }
+        browser.onDidLeave = { [weak self] in
+            self?.restoreHiddenThumbnail()
+        }
         browser.addOverlay(JXPageIndicatorOverlay())
 
         let actionOverlay = DetailPhotoActionOverlay()
@@ -56,8 +82,10 @@ final class DetailPhotoBrowserPresenter: NSObject, JXPhotoBrowserDelegate {
         DetailImageDimmingView.install(on: photoCell.imageView)
         let imageURL = imageURLs[index]
         let requestKey = imageURL.absoluteString
-        photoCell.imageView.image = nil
+        // 先放详情里已经显示的图，缩放结束时目标位置才有内容，清晰图随后替换。
+        photoCell.imageView.image = thumbnail(at: index)?.image
         photoCell.imageView.accessibilityIdentifier = requestKey
+        photoCell.setNeedsLayout()
         ImageLoad.url(imageURL).toDetailPreview().load { [weak photoCell] image in
             DispatchQueue.main.async {
                 guard let photoCell else { return }
@@ -72,6 +100,55 @@ final class DetailPhotoBrowserPresenter: NSObject, JXPhotoBrowserDelegate {
         guard let photoCell = cell as? JXZoomImageCell else { return }
         photoCell.imageView.accessibilityIdentifier = nil
         photoCell.imageView.image = nil
+    }
+
+    func photoBrowser(_ browser: JXPhotoBrowserViewController, thumbnailViewAt index: Int) -> UIView? {
+        thumbnail(at: index)
+    }
+
+    func photoBrowser(_ browser: JXPhotoBrowserViewController, setThumbnailHidden hidden: Bool, at index: Int) {
+        guard let thumbnail = thumbnail(at: index) else {
+            if !hidden {
+                restoreHiddenThumbnail()
+            }
+            return
+        }
+        if hiddenThumbnail !== thumbnail {
+            hiddenThumbnail?.isHidden = false
+        }
+        thumbnail.isHidden = hidden
+        hiddenThumbnail = hidden ? thumbnail : nil
+    }
+
+    func applyDismissTransition(
+        on browser: JXPhotoBrowserViewController,
+        reduceMotion: Bool = UIAccessibility.isReduceMotionEnabled
+    ) {
+        let zoom = canZoom(at: browser.pageIndex, reduceMotion: reduceMotion)
+        browser.transitionType = zoom ? .zoom : .fade
+        // 淡出不会把源图显示回来，先恢复，避免列表里留下一个空洞。
+        if !zoom {
+            restoreHiddenThumbnail()
+        }
+    }
+
+    private func canZoom(at index: Int, reduceMotion: Bool = UIAccessibility.isReduceMotionEnabled) -> Bool {
+        !reduceMotion && thumbnail(at: index) != nil
+    }
+
+    private func thumbnail(at index: Int) -> UIImageView? {
+        guard imageURLs.indices.contains(index) else { return nil }
+        return DetailPhotoThumbnailFinder.thumbnail(
+            matching: imageURLs[index],
+            in: sourceRoot,
+            anchorView: anchorView,
+            anchorURL: anchorURL
+        )
+    }
+
+    private func restoreHiddenThumbnail() {
+        hiddenThumbnail?.isHidden = false
+        hiddenThumbnail = nil
     }
 
     private func presentActionMenu(from browser: JXPhotoBrowserViewController, sourceView: UIView) {
