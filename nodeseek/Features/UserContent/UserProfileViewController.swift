@@ -27,7 +27,8 @@ final class UserProfileViewController: UIViewController {
     private let refreshControl = UIRefreshControl()
     private let skeletonView = UserProfileSkeletonView()
     private let errorView = UserContentErrorView(accessibilityIdentifier: "user-profile-error-view")
-    private let avatarImageView = UIImageView()
+    private let avatarControl = UserProfileAvatarControl()
+    private var photoBrowserPresenter: DetailPhotoBrowserPresenter?
     private let progressSection = UIStackView()
     private let progressCard = UserProfileProgressCardView()
 
@@ -77,15 +78,11 @@ final class UserProfileViewController: UIViewController {
         contentStack.spacing = 0
         contentStack.translatesAutoresizingMaskIntoConstraints = false
 
-        avatarImageView.contentMode = .scaleAspectFill
-        avatarImageView.clipsToBounds = true
-        avatarImageView.layer.cornerRadius = 16
-        avatarImageView.layer.cornerCurve = .continuous
-        avatarImageView.backgroundColor = .tertiarySystemFill
-        avatarImageView.translatesAutoresizingMaskIntoConstraints = false
+        avatarControl.translatesAutoresizingMaskIntoConstraints = false
+        avatarControl.addTarget(self, action: #selector(avatarTapped), for: .touchUpInside)
         NSLayoutConstraint.activate([
-            avatarImageView.widthAnchor.constraint(equalToConstant: Layout.avatarSize),
-            avatarImageView.heightAnchor.constraint(equalToConstant: Layout.avatarSize)
+            avatarControl.widthAnchor.constraint(equalToConstant: Layout.avatarSize),
+            avatarControl.heightAnchor.constraint(equalToConstant: Layout.avatarSize)
         ])
 
         skeletonView.translatesAutoresizingMaskIntoConstraints = false
@@ -248,8 +245,9 @@ final class UserProfileViewController: UIViewController {
     }
 
     private func makeHeader(_ profile: UserProfileRecord) -> UIView {
+        avatarControl.detailPhotoThumbnailURL = profile.avatarURL
         AvatarImageLoader.shared.loadAvatar(
-            into: avatarImageView,
+            into: avatarControl.imageView,
             postID: "profile-\(profile.uid)",
             avatarURL: profile.avatarURL
         )
@@ -285,13 +283,21 @@ final class UserProfileViewController: UIViewController {
         }
         infoStack.addArrangedSubview(makeLabel(meta, size: 12.5, color: .secondaryLabel))
 
-        let header = UIStackView(arrangedSubviews: [avatarImageView, infoStack])
+        let header = UIStackView(arrangedSubviews: [avatarControl, infoStack])
         header.axis = .horizontal
         header.alignment = .center
         header.spacing = 14
         header.isLayoutMarginsRelativeArrangement = true
         header.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20)
         return header
+    }
+
+    @objc private func avatarTapped() {
+        guard let url = avatarControl.detailPhotoThumbnailURL else { return }
+        DetailPhotoTransitionAnchor.record(imageView: avatarControl.imageView, url: url)
+        let presenter = DetailPhotoBrowserPresenter(imageURLs: [url])
+        photoBrowserPresenter = presenter
+        presenter.present(from: self, initialIndex: 0)
     }
 
     private func makeMessageButton() -> UIButton {
@@ -530,6 +536,38 @@ final class UserProfileViewController: UIViewController {
 }
 
 // MARK: - 子视图
+
+/// 个人页头像。点按打开大图，并作为缩放预览的起点。
+private final class UserProfileAvatarControl: UIControl, DetailPhotoThumbnailSource {
+    let imageView = UIImageView()
+    var detailPhotoThumbnailURL: URL?
+    var detailPhotoThumbnailView: UIImageView { imageView }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        imageView.layer.cornerRadius = 16
+        imageView.layer.cornerCurve = .continuous
+        imageView.backgroundColor = .tertiarySystemFill
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(imageView)
+        NSLayoutConstraint.activate([
+            imageView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            imageView.topAnchor.constraint(equalTo: topAnchor),
+            imageView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+        isAccessibilityElement = true
+        accessibilityIdentifier = "user-profile-avatar"
+        accessibilityLabel = "查看头像大图"
+        accessibilityTraits = .button
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
 
 /// 角色徽章：描边颜色跟随深浅色切换
 private final class UserProfileBadgeLabel: UILabel {
