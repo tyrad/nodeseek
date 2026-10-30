@@ -340,10 +340,10 @@ final class UserProfileViewController: UIViewController {
         // 粉丝、关注列表网页只能看自己的
         if isSelf {
             items.append(UserProfileStatView(value: "\(profile.fans)", title: "粉丝") { [weak self] in
-                self?.openWeb(path: "/fans", query: [URLQueryItem(name: "type", value: "fans")])
+                self?.navigationController?.pushViewController(UserConnectionsViewController(initialKind: .followers), animated: true)
             })
             items.append(UserProfileStatView(value: "\(profile.follows)", title: "关注") { [weak self] in
-                self?.openWeb(path: "/fans", query: [URLQueryItem(name: "type", value: "follow")])
+                self?.navigationController?.pushViewController(UserConnectionsViewController(initialKind: .following), animated: true)
             })
         } else {
             items.append(UserProfileStatView(value: "\(profile.fans)", title: "粉丝"))

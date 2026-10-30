@@ -252,6 +252,38 @@ struct NodeSeekUserContentClientTests {
         await #expect(throws: DecodingError.self) { _ = try await client.loadCredits(page: 1) }
     }
 
+    @Test func loadsFollowersWithNullableBioAndStatistics() async throws {
+        let client = makeClient(responseBody: """
+        {"success":true,"memberList":[{"member_id":67694,"member_name":"xroses","rank":4,"coin":1834,
+        "stardust":53,"bio":null,"nPost":40,"nComment":1413,"fans":1,"followed":false}]}
+        """)
+        let members = try await client.loadConnections(kind: .followers)
+        #expect(MockURLProtocol.lastRequest?.url?.absoluteString == "https://www.nodeseek.com/api/fans/fans")
+        #expect(MockURLProtocol.lastRequest?.httpMethod == "GET")
+        #expect(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Referer") == "https://www.nodeseek.com/fans?type=fans")
+        #expect(members.first?.uid == 67694)
+        #expect(members.first?.bio == nil)
+        #expect(members.first?.coin == 1834)
+        #expect(members.first?.commentCount == 1413)
+    }
+
+    @Test func followingHasItsOwnEndpointAndAllowsMissingOptionalStats() async throws {
+        let client = makeClient(responseBody: #"{"success":true,"memberList":[{"member_id":9,"member_name":"酒神"}]}"#)
+        let members = try await client.loadConnections(kind: .following)
+        #expect(MockURLProtocol.lastRequest?.url?.path == "/api/fans/follow")
+        #expect(members.first?.name == "酒神")
+        #expect(members.first?.rank == nil)
+    }
+
+    @Test func emptyConnectionsAreDifferentFromUnauthenticatedFailure() async throws {
+        let client = makeClient(responseBody: #"{"success":true,"memberList":[]}"#)
+        #expect(try await client.loadConnections(kind: .following).isEmpty)
+        MockURLProtocol.responseData = Data(#"{"success":false,"message":"用户未登录"}"#.utf8)
+        await #expect(throws: UserContentClientError.self) { _ = try await client.loadConnections(kind: .followers) }
+        MockURLProtocol.responseData = Data(#"{"success":true}"#.utf8)
+        await #expect(throws: UserContentClientError.self) { _ = try await client.loadConnections(kind: .followers) }
+    }
+
     @Test func joinedDaysRoundsUpPartialDay() {
         let createdAt = ISO8601DateFormatter().date(from: "2025-04-27T14:29:22Z")!
         let now = ISO8601DateFormatter().date(from: "2026-10-30T02:00:00Z")!

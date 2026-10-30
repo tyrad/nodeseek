@@ -73,6 +73,20 @@ final class NodeSeekUserContentClient {
         }
     }
 
+    /// 关注与被关注均只返回当前登录账号的完整名单。
+    func loadConnections(kind: UserConnectionKind) async throws -> [UserConnectionRecord] {
+        let url = baseURL.appendingPathComponent("api/fans/\(kind.rawValue)")
+        var request = URLRequest(url: url)
+        var referer = URLComponents(url: baseURL.appendingPathComponent("fans"), resolvingAgainstBaseURL: false)
+        referer?.queryItems = [URLQueryItem(name: "type", value: kind.rawValue)]
+        WebRequestFingerprint.applyJSONHeaders(to: &request, referer: referer?.url ?? baseURL)
+        let response = try await decode(ConnectionsResponse.self, from: request)
+        guard response.success, let members = response.memberList else {
+            throw UserContentClientError.unsuccessfulResponse
+        }
+        return members
+    }
+
     /// 只读取当前登录账号；接口不支持指定他人的 uid。
     func loadCredits(page: Int) async throws -> UserCreditPage {
         let url = baseURL.appendingPathComponent("api/account/credit/page-\(min(100, max(1, page)))")
@@ -335,4 +349,9 @@ private struct CreditResponse: Decodable {
     let success: Bool
     let data: [UserCreditRecord]?
     let total: Int?
+}
+
+private struct ConnectionsResponse: Decodable {
+    let success: Bool
+    let memberList: [UserConnectionRecord]?
 }
