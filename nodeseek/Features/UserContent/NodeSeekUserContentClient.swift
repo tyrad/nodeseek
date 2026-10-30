@@ -73,6 +73,19 @@ final class NodeSeekUserContentClient {
         }
     }
 
+    func loadStardust(uid: Int, beforeID: Int? = nil) async throws -> UserStardustPage {
+        var query = [URLQueryItem(name: "count", value: "10"), URLQueryItem(name: "member_id", value: "\(uid)")]
+        if let beforeID { query.append(URLQueryItem(name: "before_id", value: "\(beforeID)")) }
+        let response = try await decode(
+            StardustResponse.self,
+            from: makeRequest(path: "/api/stardust/list", queryItems: query, refererUID: uid)
+        )
+        guard response.success, let records = response.records, let hasMore = response.hasMore else {
+            throw UserContentClientError.unsuccessfulResponse
+        }
+        return UserStardustPage(records: records, hasMore: hasMore, cursor: response.cursor)
+    }
+
     func loadProfile(uid: Int) async throws -> UserProfileRecord {
         let request = makeRequest(
             path: "/api/account/getInfo/\(uid)",
@@ -292,4 +305,16 @@ private struct AttendanceBoardResponse: Decodable {
 
 private struct AttendanceRecord: Decodable {
     let gain: Int
+}
+
+private struct StardustResponse: Decodable {
+    let success: Bool
+    let records: [UserStardustRecord]?
+    let hasMore: Bool?
+    let cursor: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case success, records, cursor
+        case hasMore = "exist_more"
+    }
 }

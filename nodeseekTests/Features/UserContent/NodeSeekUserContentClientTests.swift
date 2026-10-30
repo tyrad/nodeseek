@@ -179,6 +179,41 @@ struct NodeSeekUserContentClientTests {
         #expect(progress.checkInGain == nil)
     }
 
+    @Test func loadsStardustWithCursorAndPreservesLedgerFields() async throws {
+        let client = makeClient(responseBody: """
+        {"success":true,"records":[{"id":78272,"member_id":31037,"peer_id":28452,"type":"upvote",
+        "diff":1,"result":1,"created_at":"2026-02-14T11:01:30.000Z"}],"exist_more":false,"cursor":78272}
+        """)
+        let page = try await client.loadStardust(uid: 31037, beforeID: 95822)
+        let url = try #require(MockURLProtocol.lastRequest?.url)
+        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+        #expect(url.path == "/api/stardust/list")
+        #expect(query?.contains(URLQueryItem(name: "count", value: "10")) == true)
+        #expect(query?.contains(URLQueryItem(name: "member_id", value: "31037")) == true)
+        #expect(query?.contains(URLQueryItem(name: "before_id", value: "95822")) == true)
+        #expect(MockURLProtocol.lastRequest?.httpMethod == "GET")
+        #expect(page.records.first?.peerID == 28452)
+        #expect(page.records.first?.result == 1)
+        #expect(page.cursor == 78272)
+        #expect(!page.hasMore)
+    }
+
+    @Test func stardustFirstPageOmitsCursorAndSupportsSystemRecord() async throws {
+        let client = makeClient(responseBody: """
+        {"success":true,"records":[{"id":1,"member_id":31037,"peer_id":null,"type":"system",
+        "diff":1,"result":1,"created_at":"2026-02-14T11:01:30Z"}],"exist_more":false,"cursor":1}
+        """)
+        let page = try await client.loadStardust(uid: 31037)
+        #expect(MockURLProtocol.lastRequest?.url?.query?.contains("before_id") == false)
+        #expect(page.records.first?.validPeerID == nil)
+        #expect(page.records.first?.typeText == "系统")
+    }
+
+    @Test func stardustFailureDoesNotDecodeAsEmptyList() async throws {
+        let client = makeClient(responseBody: #"{"success":false,"message":"请先登录"}"#)
+        await #expect(throws: UserContentClientError.self) { _ = try await client.loadStardust(uid: 31037) }
+    }
+
     @Test func joinedDaysRoundsUpPartialDay() {
         let createdAt = ISO8601DateFormatter().date(from: "2025-04-27T14:29:22Z")!
         let now = ISO8601DateFormatter().date(from: "2026-10-30T02:00:00Z")!

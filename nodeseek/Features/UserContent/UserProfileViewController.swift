@@ -326,7 +326,7 @@ final class UserProfileViewController: UIViewController {
             UserProfileStatView(value: "Lv \(profile.rank)", title: "等级"),
             UserProfileStatView(value: "\(profile.coin)", title: "鸡腿"),
             UserProfileStatView(value: "\(profile.stardust)", title: "星辰") { [weak self] in
-                self?.openWeb(path: "/stardust/list", query: [URLQueryItem(name: "member_id", value: "\(uid)")])
+                self?.navigationController?.pushViewController(UserStardustViewController(uid: uid, profile: profile, isSelf: self?.isSelf ?? false), animated: true)
             }
         ]
         // 粉丝、关注列表网页只能看自己的
