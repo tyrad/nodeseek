@@ -11,9 +11,6 @@ final class UserStardustCell: UITableViewCell {
     private let arrow = UIImageView()
     private let members = UIStackView()
     private let stack = UIStackView()
-    private let skeletonBlock = UIView()
-    private var contentConstraints: [NSLayoutConstraint] = []
-    private var skeletonConstraints: [NSLayoutConstraint] = []
     private var equalMemberWidths: NSLayoutConstraint!
     private var wideMemberWidths: [NSLayoutConstraint] = []
     private var outgoing = false
@@ -62,27 +59,12 @@ final class UserStardustCell: UITableViewCell {
         [top, members, bottom].forEach { stack.addArrangedSubview($0) }
         stack.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(stack)
-        contentConstraints = [
+        NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
             stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
-        ]
-        NSLayoutConstraint.activate(contentConstraints)
-        skeletonBlock.backgroundColor = .systemGray5
-        skeletonBlock.layer.cornerRadius = 12
-        skeletonBlock.layer.cornerCurve = .continuous
-        skeletonBlock.translatesAutoresizingMaskIntoConstraints = false
-        skeletonBlock.isHidden = true
-        skeletonBlock.accessibilityIdentifier = "stardust-record-skeleton"
-        contentView.addSubview(skeletonBlock)
-        skeletonConstraints = [
-            skeletonBlock.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            skeletonBlock.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            skeletonBlock.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
-            skeletonBlock.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10),
-            skeletonBlock.heightAnchor.constraint(equalToConstant: 82)
-        ]
+        ])
         peer.onSelect = { [weak self] uid in self?.onSelectUser?(uid) }
         member.onSelect = { [weak self] uid in self?.onSelectUser?(uid) }
     }
@@ -96,19 +78,7 @@ final class UserStardustCell: UITableViewCell {
         onSelectUser = nil
     }
 
-    func configure(record: UserStardustRecord?, profile: UserProfileRecord?) {
-        let isSkeleton = record == nil
-        isUserInteractionEnabled = !isSkeleton
-        accessibilityElementsHidden = isSkeleton
-        stack.isHidden = isSkeleton
-        skeletonBlock.isHidden = !isSkeleton
-        NSLayoutConstraint.deactivate(isSkeleton ? contentConstraints : skeletonConstraints)
-        NSLayoutConstraint.activate(isSkeleton ? skeletonConstraints : contentConstraints)
-        guard let record else {
-            peer.cancelImage()
-            member.cancelImage()
-            return
-        }
+    func configure(record: UserStardustRecord, profile: UserProfileRecord?) {
         reasonLabel.text = record.typeText
         changeLabel.text = record.changeText
         balanceLabel.text = "余额 \(record.result)"

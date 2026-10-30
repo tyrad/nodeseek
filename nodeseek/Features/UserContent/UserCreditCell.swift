@@ -7,9 +7,6 @@ final class UserCreditCell: UITableViewCell {
     private let timeLabel = UILabel()
     private let balanceLabel = UILabel()
     private let stack = UIStackView()
-    private let skeleton = UIView()
-    private var contentConstraints: [NSLayoutConstraint] = []
-    private var skeletonConstraints: [NSLayoutConstraint] = []
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -39,40 +36,19 @@ final class UserCreditCell: UITableViewCell {
         stack.spacing = 8
         [top, bottom].forEach { stack.addArrangedSubview($0) }
         stack.translatesAutoresizingMaskIntoConstraints = false
-        skeleton.translatesAutoresizingMaskIntoConstraints = false
-        skeleton.backgroundColor = .systemGray5
-        skeleton.layer.cornerRadius = 12
-        skeleton.layer.cornerCurve = .continuous
-        skeleton.isHidden = true
         contentView.addSubview(stack)
-        contentView.addSubview(skeleton)
-        contentConstraints = [
+        NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 14),
             stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -14)
-        ]
-        skeletonConstraints = [
-            skeleton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            skeleton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            skeleton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
-            skeleton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10),
-            skeleton.heightAnchor.constraint(equalToConstant: 54)
-        ]
-        NSLayoutConstraint.activate(contentConstraints)
+        ])
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    func configure(record: UserCreditRecord?) {
-        let loading = record == nil
+    func configure(record: UserCreditRecord) {
         isUserInteractionEnabled = false
-        accessibilityElementsHidden = loading
-        stack.isHidden = loading
-        skeleton.isHidden = !loading
-        NSLayoutConstraint.deactivate(loading ? contentConstraints : skeletonConstraints)
-        NSLayoutConstraint.activate(loading ? skeletonConstraints : contentConstraints)
-        guard let record else { return }
         reasonLabel.text = record.reason
         changeLabel.text = record.changeText
         balanceLabel.text = "余额 \(record.balance)"

@@ -11,6 +11,7 @@ final class UserCreditViewController: UIViewController, UITableViewDataSource, U
     private let ownerLabel = UILabel()
     private let footerButton = UIButton(type: .system)
     private let footerSpinner = UIActivityIndicatorView(style: .medium)
+    private let skeletonView = UserListSkeletonView(style: .credit)
     private var listTask: Task<Void, Never>?
     private var profileTask: Task<Void, Never>?
 
@@ -170,7 +171,7 @@ final class UserCreditViewController: UIViewController, UITableViewDataSource, U
     }
 
     private func render() {
-        let skeleton = !model.hasLoaded && model.isLoading
+        let skeleton = showsSkeleton
         balanceLabel.text = model.profile.map { "\($0.coin)" } ?? (skeleton ? "      " : "—")
         balanceLabel.backgroundColor = model.profile == nil && skeleton ? .systemGray5 : .clear
         balanceLabel.accessibilityLabel = model.profile.map { "鸡腿余额 \($0.coin)" } ?? "鸡腿余额暂不可用"
@@ -219,15 +220,30 @@ final class UserCreditViewController: UIViewController, UITableViewDataSource, U
         return container
     }
 
+    private var showsSkeleton: Bool { !model.hasLoaded && model.isLoading }
+
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        !model.hasLoaded && model.isLoading ? 5 : model.records.count
+        showsSkeleton ? 0 : model.records.count
+    }
+
+    func tableView(_ tableView: UITableView, viewForFooterInSection section: Int) -> UIView? {
+        showsSkeleton ? skeletonView : nil
+    }
+
+    func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
+        guard showsSkeleton else { return UITableView.automaticDimension }
+        return skeletonView.systemLayoutSizeFitting(
+            CGSize(width: tableView.bounds.width, height: 0),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        ).height
     }
 
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? { "变动记录" }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "record", for: indexPath) as! UserCreditCell
-        let record = !model.hasLoaded && model.isLoading ? nil : model.records[indexPath.row]
+        let record = model.records[indexPath.row]
         cell.configure(record: record)
         return cell
     }
