@@ -73,6 +73,70 @@ final class NodeSeekUserContentClient {
         }
     }
 
+    func loadProfile(uid: Int) async throws -> UserProfileRecord {
+        let request = makeRequest(
+            path: "/api/account/getInfo/\(uid)",
+            queryItems: [
+                URLQueryItem(name: "readme", value: "1")
+            ],
+            refererUID: uid
+        )
+        let response = try await decode(ProfileResponse.self, from: request)
+        guard response.success, let detail = response.detail else { throw UserContentClientError.unsuccessfulResponse }
+        return UserProfileRecord(
+            uid: detail.memberID,
+            name: detail.memberName,
+            rank: detail.rank ?? 0,
+            coin: detail.coin ?? 0,
+            stardust: detail.stardust ?? 0,
+            bio: detail.bio ?? "",
+            readme: detail.readme ?? "",
+            createdAt: detail.createdAt.flatMap(Self.parseDate),
+            postCount: detail.postCount ?? 0,
+            commentCount: detail.commentCount ?? 0,
+            follows: detail.follows ?? 0,
+            fans: detail.fans ?? 0,
+            collectionCount: detail.collectionCount,
+            roleNames: (detail.roles ?? []).compactMap(\.displayText).filter { !$0.isEmpty }
+        )
+    }
+
+    /// 今日进度只对当前登录用户有效，两个接口与网页进度页一致
+    func loadTodayProgress(uid: Int) async throws -> UserTodayProgressRecord {
+        async let progressResponse = decode(
+            TodayProgressResponse.self,
+            from: makeRequest(path: "/api/progress/today", queryItems: [], refererUID: uid)
+        )
+        async let attendanceResponse = decode(
+            AttendanceBoardResponse.self,
+            from: makeRequest(
+                path: "/api/attendance/board",
+                queryItems: [URLQueryItem(name: "page", value: "1")],
+                refererUID: uid
+            )
+        )
+        let progress = try await progressResponse
+        guard progress.success else { throw UserContentClientError.unsuccessfulResponse }
+        let attendance = try await attendanceResponse
+        return UserTodayProgressRecord(
+            postBonusCount: progress.postBonusCount,
+            maxPostBonusCount: progress.maxPostBonusCount,
+            commentBonusCount: progress.commentBonusCount,
+            maxCommentBonusCount: progress.maxCommentBonusCount,
+            freeLikeUsed: progress.freeLikeUsed,
+            maxFreeLike: progress.maxFreeLike,
+            checkInGain: attendance.record?.gain
+        )
+    }
+
+    private static func parseDate(_ text: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: text) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: text)
+    }
+
     private func makeRequest(path: String, queryItems: [URLQueryItem], refererUID: Int) -> URLRequest {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
         components?.path = path
@@ -163,4 +227,69 @@ private struct DiscussionItem: Decodable {
         case title
         case postID = "post_id"
     }
+}
+
+private struct ProfileResponse: Decodable {
+    let success: Bool
+    let detail: ProfileDetail?
+}
+
+private struct ProfileDetail: Decodable {
+    let memberID: Int
+    let memberName: String
+    let rank: Int?
+    let coin: Int?
+    let stardust: Int?
+    let bio: String?
+    let readme: String?
+    let createdAt: String?
+    let postCount: Int?
+    let commentCount: Int?
+    let follows: Int?
+    let fans: Int?
+    let collectionCount: Int?
+    let roles: [ProfileRole]?
+
+    private enum CodingKeys: String, CodingKey {
+        case memberID = "member_id"
+        case memberName = "member_name"
+        case rank
+        case coin
+        case stardust
+        case bio
+        case readme
+        case createdAt = "created_at"
+        case postCount = "nPost"
+        case commentCount = "nComment"
+        case follows
+        case fans
+        case collectionCount
+        case roles
+    }
+}
+
+private struct ProfileRole: Decodable {
+    let displayText: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case displayText = "display_text"
+    }
+}
+
+private struct TodayProgressResponse: Decodable {
+    let success: Bool
+    let postBonusCount: Int
+    let maxPostBonusCount: Int
+    let commentBonusCount: Int
+    let maxCommentBonusCount: Int
+    let freeLikeUsed: Int
+    let maxFreeLike: Int
+}
+
+private struct AttendanceBoardResponse: Decodable {
+    let record: AttendanceRecord?
+}
+
+private struct AttendanceRecord: Decodable {
+    let gain: Int
 }

@@ -55,7 +55,7 @@ class PostListRouter: PostListRouterProtocol {
     }
 
     func navigateToUserProfile(profileURL: URL) {
-        show(UserInfoWebViewController(profileURL: profileURL))
+        show(UserProfileRouter.makeViewController(profileURL: profileURL))
     }
 
     func navigateToNewDiscussion() {

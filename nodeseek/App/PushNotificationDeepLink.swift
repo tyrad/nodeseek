@@ -56,7 +56,7 @@ extension AppRouter: PushNotificationNavigating {
         case .checkin:
             push(UserInfoWebViewController(profileURL: NodeSeekSite.boardURL, title: "签到"))
         case let .webPage(url, title):
-            push(UserInfoWebViewController(profileURL: url, title: title))
+            push(UserProfileRouter.makeViewController(profileURL: url, title: title))
         case .inbox, .atMeList:
             push(NotificationViewController(initialTab: .atMe))
         case .replyList:

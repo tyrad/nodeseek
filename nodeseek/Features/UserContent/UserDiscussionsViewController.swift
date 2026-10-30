@@ -18,6 +18,7 @@ final class UserDiscussionsViewController: UIViewController {
     private let currentAccountStore: CurrentAccountStore
     private var records: [UserDiscussionRecord] = []
     private var displayMode: UserContentDisplayMode = .content
+    private let targetUID: Int?
     private var uid: Int?
     private var nextPage = 2
     private var hasMorePages = true
@@ -28,14 +29,18 @@ final class UserDiscussionsViewController: UIViewController {
     private let skeletonRowCount = 9
     var onSelectPost: ((PostSummary, Int, String?) -> Void)?
 
+    /// 不传 uid 时取当前账号，供侧边栏「我的」入口使用
     init(
+        uid: Int? = nil,
+        title: String = "帖子",
         client: NodeSeekUserContentClient? = nil,
         currentAccountStore: CurrentAccountStore = .shared
     ) {
+        self.targetUID = uid
         self.client = client ?? NodeSeekUserContentClient()
         self.currentAccountStore = currentAccountStore
         super.init(nibName: nil, bundle: nil)
-        title = "帖子"
+        self.title = title
     }
 
     required init?(coder: NSCoder) {
@@ -125,6 +130,7 @@ final class UserDiscussionsViewController: UIViewController {
     }
 
     private func resolveUID() async throws -> Int {
+        if let targetUID { return targetUID }
         guard let snapshot = await currentAccountStore.snapshot(),
               let uid = snapshot.account.nodeSeekUID else {
             throw UserContentViewError.missingUID

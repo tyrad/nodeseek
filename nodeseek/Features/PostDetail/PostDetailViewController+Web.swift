@@ -305,7 +305,7 @@ extension PostDetailViewController {
     }
 
     func openUserInfo(profileURL: URL) {
-        let viewController = UserInfoWebViewController(profileURL: profileURL)
+        let viewController = UserProfileRouter.makeViewController(profileURL: profileURL)
         showDetailDestination(viewController)
     }
 

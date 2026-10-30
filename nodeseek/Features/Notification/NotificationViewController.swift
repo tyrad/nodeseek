@@ -513,7 +513,7 @@ final class NotificationViewController: UIViewController {
 
     private func openProfile(_ record: NodeSeekNotificationRecord) {
         navigationController?.pushViewController(
-            UserInfoWebViewController(profileURL: record.profileURL),
+            UserProfileRouter.makeViewController(profileURL: record.profileURL),
             animated: true
         )
     }

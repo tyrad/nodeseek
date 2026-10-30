@@ -1,0 +1,136 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>原生个人页 UI</title><style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #e9ebee; font-family: -apple-system, "PingFang SC", "SF Pro Text", sans-serif; padding: 48px 48px 40px; color: #111; width: 1362px; -webkit-font-smoothing: antialiased; }
+h1 { font-size: 32px; font-weight: 700; letter-spacing: -.5px; }
+.sub { color: #6b6b70; font-size: 15px; margin: 6px 0 22px; }
+.rules { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 40px; }
+.rule { background: #fff; border-radius: 16px; padding: 14px 16px; font-size: 13px; line-height: 1.55; color: #48484c; }
+.rule b { display: block; color: #111; font-size: 14px; margin-bottom: 4px; }
+.row { display: flex; gap: 48px; }
+.cell { width: 390px; }
+.cap { margin-top: 18px; font-size: 13.5px; line-height: 1.65; color: #3a3a3e; }
+.cap b { display: block; font-size: 16px; margin-bottom: 4px; color: #111; }
+.num { font-variant-numeric: tabular-nums; }
+
+.phone {
+  --bg: #f2f2f7; --card: #fff; --label: #000; --label2: rgba(60,60,67,.6); --label3: rgba(60,60,67,.3);
+  --sep: rgba(60,60,67,.12); --fill: rgba(120,120,128,.12); --glass: rgba(255,255,255,.8); --glass-b: rgba(0,0,0,.05);
+  --orange: #FF9500; --blue: #007AFF; --teal: #30B0C7; --pink: #FF2D55; --indigo: #5856D6;
+  position: relative; width: 390px; height: 844px; border-radius: 55px; background: var(--bg); color: var(--label); overflow: hidden;
+  box-shadow: 0 0 0 10px #18181a, 0 30px 60px rgba(0,0,0,.25);
+}
+.phone.dark {
+  --bg: #000; --card: #1c1c1e; --label: #fff; --label2: rgba(235,235,245,.6); --label3: rgba(235,235,245,.3);
+  --sep: rgba(84,84,88,.55); --fill: rgba(120,120,128,.26); --glass: rgba(44,44,46,.8); --glass-b: rgba(255,255,255,.06);
+  --orange: #FF9F0A; --blue: #0A84FF; --teal: #40C8E0; --pink: #FF375F; --indigo: #5E5CE6;
+}
+svg { display: block; flex: none; }
+.status { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 8px 36px 0 48px; font-weight: 600; font-size: 17px; }
+.island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; border-radius: 20px; background: #000; }
+.bat { width: 25px; height: 12px; border: 1.5px solid currentColor; border-radius: 4px; position: relative; }
+.bat::after { content: ""; position: absolute; inset: 1.5px; width: 72%; background: currentColor; border-radius: 1.5px; }
+.home { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--label); z-index: 9; }
+.nav { height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+.navr { display: flex; gap: 8px; }
+.gbtn { height: 40px; min-width: 40px; border-radius: 20px; background: var(--glass); border: .5px solid var(--glass-b); display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 14.5px; font-weight: 600; }
+.gbtn.pill { padding: 0 14px; }
+
+.head { display: flex; gap: 14px; align-items: center; padding: 6px 20px 0; position: relative; }
+.pm { position: absolute; right: 20px; top: 8px; height: 30px; padding: 0 12px; border-radius: 15px; background: var(--fill); font-size: 13.5px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+.avatar { width: 72px; height: 72px; border-radius: 16px; flex: none; background: var(--tone); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.9); font-size: 24px; font-weight: 600; }
+.name { display: flex; align-items: center; gap: 6px; }
+.name h2 { font-size: 24px; font-weight: 700; letter-spacing: -.3px; }
+.badge { font-size: 11.5px; font-weight: 600; line-height: 18px; padding: 0 6px; border-radius: 5px; border: 1px solid var(--label); }
+.bio { margin-top: 4px; font-size: 14.5px; color: var(--label2); }
+.meta { margin-top: 3px; font-size: 12.5px; color: var(--label2); }
+
+.stats { display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); margin: 18px 16px 0; background: var(--card); border-radius: 14px; padding: 14px 0 12px; }
+.stat { text-align: center; position: relative; }
+.stat + .stat::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: .5px; background: var(--sep); }
+.stat b { display: block; font-size: 20px; font-weight: 700; letter-spacing: -.2px; }
+.stat .lab { display: inline-flex; align-items: center; gap: 3px; margin-top: 2px; font-size: 12px; color: var(--label2); }
+.chev { width: 5px; height: 8px; }
+
+.gtitle { display: flex; justify-content: space-between; margin: 22px 32px 7px; font-size: 13px; color: var(--label2); }
+.card { margin: 0 16px; background: var(--card); border-radius: 14px; overflow: hidden; }
+
+.lv { padding: 14px 16px 14px; }
+.lvtop { display: flex; justify-content: space-between; align-items: baseline; font-size: 15px; }
+.lvtop b { font-weight: 700; }
+.lvtop span { font-size: 13px; color: var(--label2); }
+.bar { height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 3px; background: var(--label); }
+.lv .bar { margin-top: 10px; }
+.hr { height: .5px; background: var(--sep); margin-left: 16px; }
+.prow { display: grid; grid-template-columns: 64px 1fr 58px; align-items: center; gap: 12px; height: 40px; padding: 0 16px; font-size: 15px; }
+.prow .v { text-align: right; font-size: 13px; color: var(--label2); }
+.prow .v.done { color: var(--label); font-weight: 600; }
+.prow.first { margin-top: 6px; } .prow.last { margin-bottom: 6px; }
+
+.item { display: flex; align-items: center; height: 46px; padding: 0 14px 0 16px; font-size: 16px; position: relative; }
+.item + .item::before { content: ""; position: absolute; left: 50px; right: 0; top: 0; height: .5px; background: var(--sep); }
+.item .ic { width: 20px; margin-right: 14px; color: var(--label); }
+.item .t { flex: 1; }
+.item .n { color: var(--label2); margin-right: 8px; font-size: 15px; }
+.readme { padding: 13px 16px 15px; font-size: 15px; line-height: 1.6; }
+</style></head><body>
+<h1>原生个人页 · 第六版（定稿）</h1>
+<p class="sub">回到第一 / 二版的黑白高对比：黑字粗数字、居中统计、描边徽章、进度条带系统色；保留这几轮确定的内容（小私信、四格数字、今日进度）。</p>
+<div class="rules">
+  <div class="rule"><b>黑白高对比</b>主要信息用 .label 纯黑 / 纯白，数字 20pt 粗体居中；辅助信息灰。无彩色、无渐变、无阴影。</div>
+  <div class="rule"><b>头部</b>头像 72 在左；名字后跟 .label 描边徽章「服主」「管理」；私信是名字右侧的灰底小胶囊。</div>
+  <div class="rule"><b>今日进度</b>只有进度条有颜色：等级 indigo、签到 orange、发帖 blue、评论 teal、投喂 pink（系统色），6pt；完成项数值加粗「+6 ✓」。</div>
+  <div class="rule"><b>列表</b>线性图标用 .label 黑；分组标题 13pt 灰；卡片圆角 14。</div>
+</div>
+<div class="row">
+  <div class="cell"><div class="phone" style="--tone: #46536b"><div class="island"></div><div class="status"><span>9:41</span><div class="bat"></div></div>
+    <div class="nav"><div class="gbtn"><svg width="11" height="18" viewBox="0 0 12 20"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="navr"><div class="gbtn"><svg width="18" height="5" viewBox="0 0 20 5"><circle cx="2.5" cy="2.5" r="2.2" fill="currentColor"/><circle cx="10" cy="2.5" r="2.2" fill="currentColor"/><circle cx="17.5" cy="2.5" r="2.2" fill="currentColor"/></svg></div></div></div>
+    <div class="head"><div class="avatar">L</div><div>
+      <div class="name"><h2>Lloyd</h2><span class="badge">服主</span><span class="badge">管理</span></div>
+      <div class="bio">本论坛的创建者</div><div class="meta">UID 1 · 加入 1437 天</div></div><div class="pm"><svg width="15" height="14" viewBox="0 0 18 16"><path d="M2 3a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H8l-4 3v-3a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg>私信</div></div>
+    <div class="stats"><div class="stat"><b class="num">Lv 6</b><span class="lab">等级</span></div><div class="stat"><b class="num">8282</b><span class="lab">鸡腿</span></div><div class="stat"><b class="num">21</b><span class="lab">星辰<svg class="chev" viewBox="0 0 5 8"><path d="m1 1 3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><div class="stat"><b class="num">77</b><span class="lab">粉丝</span></div></div>
+    <div class="gtitle"><span>内容</span></div>
+    <div class="card"><div class="item"><svg class="ic" width="20" height="20" viewBox="0 0 20 20"><rect x="4" y="2.5" width="12" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 7h6M7 10h6M7 13h3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="t">主题帖</span><span class="n num">26</span><svg width="7" height="12" viewBox="0 0 8 13"><path d="m1.5 1.5 5 5-5 5" fill="none" stroke="var(--label3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="item"><svg class="ic" width="20" height="20" viewBox="0 0 20 20"><path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h9A2.5 2.5 0 0 1 17 5.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4 3v-3A2.5 2.5 0 0 1 3 11.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="t">评论</span><span class="n num">90</span><svg width="7" height="12" viewBox="0 0 8 13"><path d="m1.5 1.5 5 5-5 5" fill="none" stroke="var(--label3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+    <div class="gtitle"><span>自述</span></div>
+    <div class="card"><div class="readme">一时兴起写了这个社区，欢迎同好加入NodeSeek</div></div>
+    <div class="home"></div></div><p class="cap"><b>① 看别人 · 浅色</b>私信缩成名字右侧的小胶囊；四格数字居中，星辰可点，其余只展示。</p></div>
+  <div class="cell"><div class="phone" style="--tone: #7a6046; --cols: 5"><div class="island"></div><div class="status"><span>9:41</span><div class="bat"></div></div>
+    <div class="nav"><div class="gbtn"><svg width="11" height="18" viewBox="0 0 12 20"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="navr"><div class="gbtn"><svg width="18" height="5" viewBox="0 0 20 5"><circle cx="2.5" cy="2.5" r="2.2" fill="currentColor"/><circle cx="10" cy="2.5" r="2.2" fill="currentColor"/><circle cx="17.5" cy="2.5" r="2.2" fill="currentColor"/></svg></div></div></div>
+    <div class="head"><div class="avatar">缭</div><div>
+      <div class="name"><h2>缭雾</h2></div><div class="meta">UID 31037 · 加入 551 天</div></div></div>
+    <div class="stats"><div class="stat"><b class="num">Lv 4</b><span class="lab">等级<svg class="chev" viewBox="0 0 5 8"><path d="m1 1 3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><div class="stat"><b class="num">1758</b><span class="lab">鸡腿<svg class="chev" viewBox="0 0 5 8"><path d="m1 1 3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><div class="stat"><b class="num">11</b><span class="lab">星辰<svg class="chev" viewBox="0 0 5 8"><path d="m1 1 3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><div class="stat"><b class="num">3</b><span class="lab">粉丝<svg class="chev" viewBox="0 0 5 8"><path d="m1 1 3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><div class="stat"><b class="num">0</b><span class="lab">关注<svg class="chev" viewBox="0 0 5 8"><path d="m1 1 3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div></div>
+    <div class="gtitle"><span>今日进度</span><span>10 月 30 日</span></div>
+    <div class="card">
+      <div class="lv"><div class="lvtop"><b>距 Lv 5 还差 <span class="num" style="color:var(--label);font-size:15px">742</span> 鸡腿</b><span class="num">1758 / 2500</span></div>
+        <div class="bar"><i style="width:18%; background: var(--indigo)"></i></div></div>
+      <div class="hr"></div>
+      <div class="prow first"><span>签到</span><div class="bar"><i style="width:100%; background: var(--orange)"></i></div><span class="v num done">+6 ✓</span></div>
+      <div class="prow "><span>发帖</span><div class="bar"><i style="width:0%; background: var(--blue)"></i></div><span class="v num">0 / 20</span></div>
+      <div class="prow "><span>评论</span><div class="bar"><i style="width:15%; background: var(--teal)"></i></div><span class="v num">3 / 20</span></div>
+      <div class="prow last"><span>免费投喂</span><div class="bar"><i style="width:0%; background: var(--pink)"></i></div><span class="v num">0 / 3</span></div>
+    </div>
+    <div class="gtitle"><span>我的内容</span></div>
+    <div class="card"><div class="item"><svg class="ic" width="20" height="20" viewBox="0 0 20 20"><rect x="4" y="2.5" width="12" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 7h6M7 10h6M7 13h3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="t">我的帖子</span><span class="n num">19</span><svg width="7" height="12" viewBox="0 0 8 13"><path d="m1.5 1.5 5 5-5 5" fill="none" stroke="var(--label3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="item"><svg class="ic" width="20" height="20" viewBox="0 0 20 20"><path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h9A2.5 2.5 0 0 1 17 5.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4 3v-3A2.5 2.5 0 0 1 3 11.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="t">我的评论</span><span class="n num">550</span><svg width="7" height="12" viewBox="0 0 8 13"><path d="m1.5 1.5 5 5-5 5" fill="none" stroke="var(--label3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="item"><svg class="ic" width="20" height="20" viewBox="0 0 20 20"><path d="M10 2.8l2.2 4.5 5 .7-3.6 3.5.85 4.95L10 14.1l-4.45 2.35.85-4.95L2.8 8l5-.7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="t">我的收藏</span><span class="n num">58</span><svg width="7" height="12" viewBox="0 0 8 13"><path d="m1.5 1.5 5 5-5 5" fill="none" stroke="var(--label3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+    <div class="home"></div></div><p class="cap"><b>② 看自己 · 浅色</b>自己页五格：等级 / 鸡腿 / 星辰 / 粉丝 / 关注。今日进度只有进度条带颜色，其余仍是黑白。</p></div>
+  <div class="cell"><div class="phone dark" style="--tone: #7a6046; --cols: 5"><div class="island"></div><div class="status"><span>9:41</span><div class="bat"></div></div>
+    <div class="nav"><div class="gbtn"><svg width="11" height="18" viewBox="0 0 12 20"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="navr"><div class="gbtn"><svg width="18" height="5" viewBox="0 0 20 5"><circle cx="2.5" cy="2.5" r="2.2" fill="currentColor"/><circle cx="10" cy="2.5" r="2.2" fill="currentColor"/><circle cx="17.5" cy="2.5" r="2.2" fill="currentColor"/></svg></div></div></div>
+    <div class="head"><div class="avatar">缭</div><div>
+      <div class="name"><h2>缭雾</h2></div><div class="meta">UID 31037 · 加入 551 天</div></div></div>
+    <div class="stats"><div class="stat"><b class="num">Lv 4</b><span class="lab">等级<svg class="chev" viewBox="0 0 5 8"><path d="m1 1 3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><div class="stat"><b class="num">1758</b><span class="lab">鸡腿<svg class="chev" viewBox="0 0 5 8"><path d="m1 1 3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><div class="stat"><b class="num">11</b><span class="lab">星辰<svg class="chev" viewBox="0 0 5 8"><path d="m1 1 3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><div class="stat"><b class="num">3</b><span class="lab">粉丝<svg class="chev" viewBox="0 0 5 8"><path d="m1 1 3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><div class="stat"><b class="num">0</b><span class="lab">关注<svg class="chev" viewBox="0 0 5 8"><path d="m1 1 3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div></div>
+    <div class="gtitle"><span>今日进度</span><span>10 月 30 日</span></div>
+    <div class="card">
+      <div class="lv"><div class="lvtop"><b>距 Lv 5 还差 <span class="num" style="color:var(--label);font-size:15px">742</span> 鸡腿</b><span class="num">1758 / 2500</span></div>
+        <div class="bar"><i style="width:18%; background: var(--indigo)"></i></div></div>
+      <div class="hr"></div>
+      <div class="prow first"><span>签到</span><div class="bar"><i style="width:100%; background: var(--orange)"></i></div><span class="v num done">+6 ✓</span></div>
+      <div class="prow "><span>发帖</span><div class="bar"><i style="width:0%; background: var(--blue)"></i></div><span class="v num">0 / 20</span></div>
+      <div class="prow "><span>评论</span><div class="bar"><i style="width:15%; background: var(--teal)"></i></div><span class="v num">3 / 20</span></div>
+      <div class="prow last"><span>免费投喂</span><div class="bar"><i style="width:0%; background: var(--pink)"></i></div><span class="v num">0 / 3</span></div>
+    </div>
+    <div class="gtitle"><span>我的内容</span></div>
+    <div class="card"><div class="item"><svg class="ic" width="20" height="20" viewBox="0 0 20 20"><rect x="4" y="2.5" width="12" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 7h6M7 10h6M7 13h3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="t">我的帖子</span><span class="n num">19</span><svg width="7" height="12" viewBox="0 0 8 13"><path d="m1.5 1.5 5 5-5 5" fill="none" stroke="var(--label3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="item"><svg class="ic" width="20" height="20" viewBox="0 0 20 20"><path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h9A2.5 2.5 0 0 1 17 5.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4 3v-3A2.5 2.5 0 0 1 3 11.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="t">我的评论</span><span class="n num">550</span><svg width="7" height="12" viewBox="0 0 8 13"><path d="m1.5 1.5 5 5-5 5" fill="none" stroke="var(--label3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="item"><svg class="ic" width="20" height="20" viewBox="0 0 20 20"><path d="M10 2.8l2.2 4.5 5 .7-3.6 3.5.85 4.95L10 14.1l-4.45 2.35.85-4.95L2.8 8l5-.7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="t">我的收藏</span><span class="n num">58</span><svg width="7" height="12" viewBox="0 0 8 13"><path d="m1.5 1.5 5 5-5 5" fill="none" stroke="var(--label3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+    <div class="home"></div></div><p class="cap"><b>③ 看自己 · 深色</b>全部系统动态色，进度条用系统色的深色变体。</p></div>
+</div></body></html>

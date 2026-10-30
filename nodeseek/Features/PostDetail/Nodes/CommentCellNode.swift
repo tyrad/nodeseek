@@ -682,7 +682,7 @@ extension CommentCellNode: UIContextMenuInteractionDelegate {
             return UIContextMenuConfiguration(
                 identifier: "\(comment.id)\(ContextMenuIdentifier.avatarSuffix)" as NSString,
                 previewProvider: {
-                    UserInfoWebViewController(profileURL: authorProfileURL)
+                    UserProfileRouter.makeViewController(profileURL: authorProfileURL)
                 }
             )
         }
