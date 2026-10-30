@@ -113,6 +113,7 @@ struct NodeSeekUserContentClientTests {
         #expect(profile.fans == 77)
         #expect(profile.collectionCount == nil)
         #expect(profile.roleNames == ["服主", "管理"])
+        #expect(profile.followed == false)
         #expect(profile.readme == "一时兴起写了这个社区")
         #expect(profile.createdAt == ISO8601DateFormatter().date(from: "2022-11-23T17:11:12Z"))
     }
@@ -284,6 +285,28 @@ struct NodeSeekUserContentClientTests {
         await #expect(throws: UserContentClientError.self) { _ = try await client.loadConnections(kind: .followers) }
     }
 
+    @Test func followAndUnfollowGoThroughPageFetchWithWebBody() async throws {
+        let submitter = FollowSubmitterStub()
+        let client = NodeSeekUserContentClient(followSubmitter: submitter)
+        try await client.setFollowing(true, uid: 9)
+        try await client.setFollowing(false, uid: 9)
+        #expect(submitter.calls.map(\.apiPath) == ["/api/fans/add", "/api/fans/del"])
+        #expect(submitter.calls.first?.bodyJSON == #"{"followed_member_id":9}"#)
+        #expect(submitter.calls.first?.referer == NodeSeekSite.baseURL)
+    }
+
+    @Test func followFailureCarriesServerMessage() async throws {
+        let submitter = FollowSubmitterStub()
+        submitter.error = UserContentClientError.rejected("用户未登录")
+        let client = NodeSeekUserContentClient(followSubmitter: submitter)
+        do {
+            try await client.setFollowing(true, uid: 9)
+            Issue.record("应当抛错")
+        } catch {
+            #expect(error.localizedDescription == "用户未登录")
+        }
+    }
+
     @Test func joinedDaysRoundsUpPartialDay() {
         let createdAt = ISO8601DateFormatter().date(from: "2025-04-27T14:29:22Z")!
         let now = ISO8601DateFormatter().date(from: "2026-10-30T02:00:00Z")!
@@ -375,4 +398,13 @@ private final class MockURLProtocol: URLProtocol, @unchecked Sendable {
     }
 
     override func stopLoading() {}
+}
+
+private final class FollowSubmitterStub: UserFollowSubmitting, @unchecked Sendable {
+    var calls: [(apiPath: String, bodyJSON: String, referer: URL)] = []
+    var error: Error?
+    func submit(apiPath: String, bodyJSON: String, referer: URL) async throws {
+        calls.append((apiPath, bodyJSON, referer))
+        if let error { throw error }
+    }
 }

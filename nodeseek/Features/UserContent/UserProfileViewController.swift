@@ -34,6 +34,9 @@ final class UserProfileViewController: UIViewController {
 
     private var profile: UserProfileRecord?
     private var isSelf = false
+    private let followButton = UIButton(configuration: .plain())
+    private weak var fansStatView: UserProfileStatView?
+    private var isUpdatingFollow = false
     private var loadTask: Task<Void, Never>?
     var onSelectPost: ((PostSummary, Int, String?) -> Void)?
 
@@ -61,6 +64,7 @@ final class UserProfileViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         setupMoreMenu()
+        setupFollowButton()
         loadProfile(showsIndicator: true)
     }
 
@@ -268,6 +272,8 @@ final class UserProfileViewController: UIViewController {
         }
         nameRow.addArrangedSubview(UIView())
         if !isSelf {
+            followButton.applyFollowStyle(followed: profile.followed, busy: isUpdatingFollow)
+            nameRow.addArrangedSubview(followButton)
             nameRow.addArrangedSubview(makeMessageButton())
         }
 
@@ -298,6 +304,59 @@ final class UserProfileViewController: UIViewController {
         let presenter = DetailPhotoBrowserPresenter(imageURLs: [url])
         photoBrowserPresenter = presenter
         presenter.present(from: self, initialIndex: 0)
+    }
+
+    // MARK: - 关注
+
+    private func setupFollowButton() {
+        followButton.accessibilityIdentifier = "user-profile-follow-button"
+        followButton.setContentHuggingPriority(.required, for: .horizontal)
+        followButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        followButton.addAction(UIAction { [weak self] _ in
+            self?.followTapped()
+        }, for: .touchUpInside)
+    }
+
+    private func followTapped() {
+        guard let profile, !isUpdatingFollow else { return }
+        guard profile.followed else {
+            updateFollow(true)
+            return
+        }
+        // 取消关注需要确认，和关注列表一致
+        let sheet = UIAlertController(title: "不再关注「\(profile.name)」？", message: nil, preferredStyle: .actionSheet)
+        sheet.addAction(UIAlertAction(title: "取消关注", style: .destructive) { [weak self] _ in
+            self?.updateFollow(false)
+        })
+        sheet.addAction(UIAlertAction(title: "取消", style: .cancel))
+        sheet.popoverPresentationController?.sourceView = followButton
+        sheet.popoverPresentationController?.sourceRect = followButton.bounds
+        present(sheet, animated: true)
+    }
+
+    private func updateFollow(_ follow: Bool) {
+        isUpdatingFollow = true
+        followButton.applyFollowStyle(followed: !follow, busy: true)
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await client.setFollowing(follow, uid: uid)
+                isUpdatingFollow = false
+                if var profile {
+                    profile.followed = follow
+                    profile.fans = max(0, profile.fans + (follow ? 1 : -1))
+                    self.profile = profile
+                    fansStatView?.setValue("\(profile.fans)")
+                }
+                followButton.applyFollowStyle(followed: follow, busy: false)
+                UISelectionFeedbackGenerator().selectionChanged()
+                BottomToast.show(follow ? "已关注" : "已取消关注", in: view)
+            } catch {
+                isUpdatingFollow = false
+                followButton.applyFollowStyle(followed: profile?.followed ?? false, busy: false)
+                BottomToast.show(error.localizedDescription, style: .failure, in: view)
+            }
+        }
     }
 
     private func makeMessageButton() -> UIButton {
@@ -352,7 +411,10 @@ final class UserProfileViewController: UIViewController {
                 self?.navigationController?.pushViewController(UserConnectionsViewController(initialKind: .following), animated: true)
             })
         } else {
-            items.append(UserProfileStatView(value: "\(profile.fans)", title: "粉丝"))
+            // 关注 / 取消关注后就地更新粉丝数
+            let fans = UserProfileStatView(value: "\(profile.fans)", title: "粉丝")
+            fansStatView = fans
+            items.append(fans)
         }
         items.dropFirst().forEach { $0.showsLeadingSeparator = true }
 
@@ -611,11 +673,16 @@ private final class UserProfileStatView: UIControl {
         didSet { separator.isHidden = !showsLeadingSeparator }
     }
 
+    func setValue(_ value: String) {
+        valueLabel.text = value
+    }
+
+    private let valueLabel = UILabel()
+
     init(value: String, title: String, action: (() -> Void)? = nil) {
         self.action = action
         super.init(frame: .zero)
 
-        let valueLabel = UILabel()
         valueLabel.text = value
         valueLabel.font = .monospacedDigitSystemFont(ofSize: 20, weight: .bold)
         valueLabel.textColor = .label

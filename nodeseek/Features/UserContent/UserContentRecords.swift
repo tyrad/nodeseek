@@ -79,10 +79,12 @@ nonisolated struct UserProfileRecord: Equatable, Sendable {
     let postCount: Int
     let commentCount: Int
     let follows: Int
-    let fans: Int
+    var fans: Int
     /// 只有看自己时接口才返回
     let collectionCount: Int?
     let roleNames: [String]
+    /// 当前账号是否已关注此人；看自己或未登录时为 false
+    var followed = false
 
     var avatarURL: URL {
         NodeSeekNotificationURLBuilder.avatarURL(memberID: uid)

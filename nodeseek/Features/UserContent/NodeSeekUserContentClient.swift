@@ -11,13 +11,16 @@ final class NodeSeekUserContentClient {
     private let session: URLSession
     private let baseURL: URL
     private let decoder = JSONDecoder()
+    private let followSubmitter: UserFollowSubmitting
 
     init(
         session: URLSession = .shared,
-        baseURL: URL = NodeSeekSite.baseURL
+        baseURL: URL = NodeSeekSite.baseURL,
+        followSubmitter: UserFollowSubmitting? = nil
     ) {
         self.session = session
         self.baseURL = baseURL
+        self.followSubmitter = followSubmitter ?? WebViewUserFollowSubmitter()
     }
 
     func loadCollections(page: Int, uid: Int) async throws -> [UserCollectionRecord] {
@@ -87,6 +90,17 @@ final class NodeSeekUserContentClient {
         return members
     }
 
+    /// 关注 / 取消关注，接口和请求体与网页 fans 页的 changeFollow 一致。
+    func setFollowing(_ follow: Bool, uid: Int) async throws {
+        let body = try JSONEncoder().encode(["followed_member_id": uid])
+        // 隐藏 WebView 打开 /fans 会被站点 403 拦截，改在首页里发同源请求，登录态一致
+        try await followSubmitter.submit(
+            apiPath: follow ? "/api/fans/add" : "/api/fans/del",
+            bodyJSON: String(decoding: body, as: UTF8.self),
+            referer: baseURL
+        )
+    }
+
     /// 只读取当前登录账号；接口不支持指定他人的 uid。
     func loadCredits(page: Int) async throws -> UserCreditPage {
         let url = baseURL.appendingPathComponent("api/account/credit/page-\(min(100, max(1, page)))")
@@ -136,7 +150,8 @@ final class NodeSeekUserContentClient {
             follows: detail.follows ?? 0,
             fans: detail.fans ?? 0,
             collectionCount: detail.collectionCount,
-            roleNames: (detail.roles ?? []).compactMap(\.displayText).filter { !$0.isEmpty }
+            roleNames: (detail.roles ?? []).compactMap(\.displayText).filter { !$0.isEmpty },
+            followed: detail.followed ?? false
         )
     }
 
@@ -202,6 +217,7 @@ final class NodeSeekUserContentClient {
 enum UserContentClientError: LocalizedError {
     case httpStatus(Int)
     case unsuccessfulResponse
+    case rejected(String)
 
     var errorDescription: String? {
         switch self {
@@ -209,6 +225,8 @@ enum UserContentClientError: LocalizedError {
             return "请求失败：HTTP \(status)"
         case .unsuccessfulResponse:
             return "接口返回失败"
+        case .rejected(let message):
+            return message
         }
     }
 }
@@ -288,6 +306,7 @@ private struct ProfileDetail: Decodable {
     let fans: Int?
     let collectionCount: Int?
     let roles: [ProfileRole]?
+    let followed: Bool?
 
     private enum CodingKeys: String, CodingKey {
         case memberID = "member_id"
@@ -304,6 +323,7 @@ private struct ProfileDetail: Decodable {
         case fans
         case collectionCount
         case roles
+        case followed
     }
 }
 

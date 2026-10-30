@@ -35,6 +35,20 @@ final class UserConnectionsViewControllerTests: XCTestCase {
             try await Task.sleep(nanoseconds: 150_000_000)
             capture(window, name: "connections-following-\(name)")
         }
+        // 未关注的人直接关注，按钮变成「已关注」
+        let second = try XCTUnwrap(table.cellForRow(at: IndexPath(row: 1, section: 0)))
+        let follow = try XCTUnwrap(descendants(second).first { $0.accessibilityIdentifier == "connection-follow-button" } as? UIButton)
+        XCTAssertEqual(follow.configuration?.title, "关注")
+        follow.sendActions(for: .touchUpInside)
+        for _ in 0..<100 where client.followCalls.isEmpty { await Task.yield() }
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertEqual(client.followCalls.first?.0, true)
+        XCTAssertEqual(client.followCalls.first?.1, 10)
+        let updated = try XCTUnwrap(table.cellForRow(at: IndexPath(row: 1, section: 0)))
+        XCTAssertEqual((descendants(updated).first { $0.accessibilityIdentifier == "connection-follow-button" } as? UIButton)?.configuration?.title, "已关注")
+        let toast = try XCTUnwrap(descendants(window).first { $0.accessibilityIdentifier == BottomToast.accessibilityIdentifier })
+        XCTAssertTrue(descendants(toast).compactMap { $0 as? UILabel }.contains { $0.text == "已关注" })
+        capture(window, name: "connections-follow-toast")
         table.setContentOffset(CGPoint(x: 0, y: 240), animated: false)
         let savedOffset = table.contentOffset.y
         func page(to index: Int) {
@@ -109,7 +123,8 @@ final class UserConnectionsViewControllerTests: XCTestCase {
 
     static func person(uid: Int) -> UserConnectionRecord {
         UserConnectionRecord(uid: uid, name: uid == 9 ? "酒神" : (uid == 14496 ? "yaoguangting" : "用户\(uid)"), rank: 5, coin: 2899, stardust: 26,
-                             bio: uid == 9 ? "人生得意须尽欢，莫使金樽空对月" : nil, postCount: 39, commentCount: 1375, fans: 2)
+                             bio: uid == 9 ? "人生得意须尽欢，莫使金樽空对月" : nil, postCount: 39, commentCount: 1375, fans: 2,
+                             followed: uid == 9 || uid == 14496)
     }
 }
 
@@ -121,4 +136,6 @@ private final class ConnectionsScreenClient: UserConnectionsLoading {
         calls.append(kind)
         return try await withCheckedThrowingContinuation { pending[kind] = $0 }
     }
+    var followCalls: [(Bool, Int)] = []
+    func setFollowing(_ follow: Bool, uid: Int) async throws { followCalls.append((follow, uid)) }
 }

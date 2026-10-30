@@ -133,7 +133,7 @@ final class UserConnectionsViewController: UIViewController, UITableViewDataSour
 
     private func load(_ kind: UserConnectionKind, refresh: Bool = false) {
         let state = model.state(for: kind)
-        guard refresh || (!state.isLoading && !state.hasLoaded) else { return }
+        guard refresh || (state.isStale && !state.isLoading) || (!state.isLoading && !state.hasLoaded) else { return }
         if refresh { tasks[kind]?.cancel() }
         let model = model
         tasks[kind] = Task { await model.load(kind, refresh: refresh) }
@@ -219,7 +219,12 @@ final class UserConnectionsViewController: UIViewController, UITableViewDataSour
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let state = model.state(for: kind(of: tableView))
         let cell = tableView.dequeueReusableCell(withIdentifier: "member", for: indexPath) as! UserConnectionCell
-        cell.configure(state.records[indexPath.row])
+        let record = state.records[indexPath.row]
+        cell.configure(record, isUpdatingFollow: model.pendingUIDs.contains(record.uid))
+        cell.onToggleFollow = { [weak self, weak cell] in
+            guard let self, let cell else { return }
+            followTapped(record, sourceView: cell)
+        }
         return cell
     }
 
@@ -228,6 +233,38 @@ final class UserConnectionsViewController: UIViewController, UITableViewDataSour
         let state = model.state(for: kind(of: tableView))
         guard indexPath.row < state.records.count else { return }
         navigationController?.pushViewController(UserProfileViewController(uid: state.records[indexPath.row].uid), animated: true)
+    }
+
+    private func followTapped(_ record: UserConnectionRecord, sourceView: UIView) {
+        guard record.followed == true else {
+            toggleFollow(uid: record.uid, follow: true)
+            return
+        }
+        // 取消关注需要确认，避免列表滚动时误触
+        let name = record.name.isEmpty ? "UID \(record.uid)" : record.name
+        let sheet = UIAlertController(title: "不再关注「\(name)」？", message: nil, preferredStyle: .actionSheet)
+        sheet.addAction(UIAlertAction(title: "取消关注", style: .destructive) { [weak self] _ in
+            self?.toggleFollow(uid: record.uid, follow: false)
+        })
+        sheet.addAction(UIAlertAction(title: "取消", style: .cancel))
+        sheet.popoverPresentationController?.sourceView = sourceView
+        sheet.popoverPresentationController?.sourceRect = sourceView.bounds
+        present(sheet, animated: true)
+    }
+
+    private func toggleFollow(uid: Int, follow: Bool) {
+        let model = model
+        Task { [weak self] in
+            let failure = await model.toggleFollow(uid: uid)
+            AppLog.info(.account, "关注变更结束: uid=\(uid), follow=\(follow), failure=\(failure ?? "nil"), pageAlive=\(self != nil)")
+            guard let self else { return }
+            if let failure {
+                BottomToast.show(failure, style: .failure, in: view)
+            } else {
+                UISelectionFeedbackGenerator().selectionChanged()
+                BottomToast.show(follow ? "已关注" : "已取消关注", in: view)
+            }
+        }
     }
 
     // 表格也会走这些回调，只处理分页容器

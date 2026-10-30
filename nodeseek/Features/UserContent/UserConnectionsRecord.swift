@@ -18,11 +18,13 @@ nonisolated struct UserConnectionRecord: Decodable, Equatable, Sendable {
     let postCount: Int?
     let commentCount: Int?
     let fans: Int?
+    /// 当前账号是否已关注此人；被关注列表里可能为 false（未回关）
+    var followed: Bool?
 
     enum CodingKeys: String, CodingKey {
         case uid = "member_id"
         case name = "member_name"
-        case rank, coin, stardust, bio, fans
+        case rank, coin, stardust, bio, fans, followed
         case postCount = "nPost"
         case commentCount = "nComment"
     }
@@ -30,6 +32,7 @@ nonisolated struct UserConnectionRecord: Decodable, Equatable, Sendable {
 
 protocol UserConnectionsLoading {
     func loadConnections(kind: UserConnectionKind) async throws -> [UserConnectionRecord]
+    func setFollowing(_ follow: Bool, uid: Int) async throws
 }
 
 extension NodeSeekUserContentClient: UserConnectionsLoading {}
@@ -41,12 +44,15 @@ final class UserConnectionsViewModel {
         var hasLoaded = false
         var isLoading = false
         var errorMessage: String?
+        /// 另一个列表里关注状态变了，这个列表下次切过来时静默刷新
+        var isStale = false
         var showsSkeleton: Bool { !hasLoaded && errorMessage == nil }
     }
 
     private let client: any UserConnectionsLoading
     private var states: [UserConnectionKind: State] = [:]
     private var generations: [UserConnectionKind: UUID] = [:]
+    private(set) var pendingUIDs: Set<Int> = []
     var onChange: ((UserConnectionKind) -> Void)?
 
     init(client: any UserConnectionsLoading) { self.client = client }
@@ -55,10 +61,11 @@ final class UserConnectionsViewModel {
 
     func load(_ kind: UserConnectionKind, refresh: Bool = false) async {
         var state = state(for: kind)
-        guard refresh || (!state.isLoading && !state.hasLoaded) else { return }
+        guard refresh || state.isStale || (!state.isLoading && !state.hasLoaded) else { return }
         let token = UUID()
         generations[kind] = token
         state.isLoading = true
+        state.isStale = false
         state.errorMessage = nil
         states[kind] = state
         onChange?(kind)
@@ -74,5 +81,43 @@ final class UserConnectionsViewModel {
         state.isLoading = false
         states[kind] = state
         onChange?(kind)
+    }
+
+    /// 切换关注状态，成功后两个列表里同一个人一起更新；失败返回提示文案。
+    /// 取消关注后先保留在列表里，方便马上点回来，下次刷新才移除。
+    func toggleFollow(uid: Int) async -> String? {
+        guard !pendingUIDs.contains(uid) else { return nil }
+        let follow = !(currentRecord(uid: uid)?.followed ?? false)
+        pendingUIDs.insert(uid)
+        notifyAll()
+        defer {
+            pendingUIDs.remove(uid)
+            notifyAll()
+        }
+        do {
+            try await client.setFollowing(follow, uid: uid)
+        } catch {
+            return error.localizedDescription
+        }
+        for kind in UserConnectionKind.allCases {
+            guard var state = states[kind] else { continue }
+            var touched = false
+            for index in state.records.indices where state.records[index].uid == uid {
+                state.records[index].followed = follow
+                touched = true
+            }
+            // 新关注的人不在「关注」列表里，标记下次切过去时刷新
+            if !touched, state.hasLoaded { state.isStale = true }
+            states[kind] = state
+        }
+        return nil
+    }
+
+    private func currentRecord(uid: Int) -> UserConnectionRecord? {
+        UserConnectionKind.allCases.lazy.compactMap { self.states[$0]?.records.first { $0.uid == uid } }.first
+    }
+
+    private func notifyAll() {
+        UserConnectionKind.allCases.forEach { onChange?($0) }
     }
 }
