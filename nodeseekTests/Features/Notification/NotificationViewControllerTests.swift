@@ -172,6 +172,20 @@ struct NotificationViewControllerTests {
         #expect(screen.table.numberOfRows(inSection: 0) == 0)
     }
 
+    @Test func failedLoadWhileLoggedOutShowsLoginPrompt() async throws {
+        let loads = NotificationLoadQueue<[NodeSeekNotificationRecord]>()
+        let client = StubNotificationViewClient(unreadCount: .zero, atMeLoads: loads)
+        let screen = try makeNotificationScreen(client: client, isLoggedIn: false)
+        defer { screen.window.isHidden = true }
+        let initial = try await nextLoadID(in: loads)
+        await loads.fail(id: initial)
+
+        let loginView = try #require(screen.controller.view.notificationTestView(identifier: "notification-login-view"))
+        let errorView = try #require(screen.controller.view.notificationTestView(identifier: "notification-error-view"))
+        try await waitUntil { loginView.isHidden == false }
+        #expect(errorView.isHidden)
+    }
+
     @Test func failedSingleMarkReadRestoresUnreadCountAndRowState() async throws {
         let client = StubNotificationViewClient(
             unreadCount: NodeSeekNotificationUnreadCount(message: 0, atMe: 1, reply: 0, all: 1),
@@ -452,10 +466,15 @@ private struct NotificationScreen {
 
 @MainActor
 private func makeNotificationScreen(
-    client: NodeSeekNotificationClientProtocol, initialTab: NodeSeekNotificationTab = .atMe
+    client: NodeSeekNotificationClientProtocol,
+    initialTab: NodeSeekNotificationTab = .atMe,
+    isLoggedIn: Bool = true
 ) throws -> NotificationScreen {
     let controller = NotificationViewController(
-        initialTab: initialTab, client: client, currentAccountStore: makeCurrentAccountStore()
+        initialTab: initialTab,
+        client: client,
+        currentAccountStore: makeCurrentAccountStore(),
+        isLoggedIn: { isLoggedIn }
     )
     let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
     window.rootViewController = UINavigationController(rootViewController: controller)
@@ -475,6 +494,14 @@ private func makeMessageRecord() -> NodeSeekMessageConversationRecord {
 }
 
 private extension UIView {
+    func notificationTestView(identifier: String) -> UIView? {
+        if accessibilityIdentifier == identifier { return self }
+        for subview in subviews {
+            if let match = subview.notificationTestView(identifier: identifier) { return match }
+        }
+        return nil
+    }
+
     func firstSubview<View: UIView>(of type: View.Type) -> View? {
         if let view = self as? View {
             return view
