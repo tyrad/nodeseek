@@ -10,12 +10,11 @@ final class MeViewController: UIViewController {
     private enum Layout {
         static let horizontalInset: CGFloat = 16
         static let groupSpacing: CGFloat = 12
-        /// 返回本页时，距上次加载超过这个时间才重新请求资料
-        static let reloadInterval: TimeInterval = 30
     }
 
     private let accountController: PostListSideMenuAccountController
     private let client: NodeSeekUserContentClient
+    private let notificationClient: NodeSeekNotificationClientProtocol
     private let router = PostListRouter()
     private let visitedStore: VisitedPostStoreProtocol
 
@@ -23,8 +22,10 @@ final class MeViewController: UIViewController {
     private var profile: UserProfileRecord?
     private var progress: UserTodayProgressRecord?
     private var loadTask: Task<Void, Never>?
-    private var lastLoadDate: Date?
-    private var loadedUID: Int?
+    private var loadingUID: Int?
+    private var unreadCountTask: Task<Void, Never>?
+    /// 登录页是 push 进来的，关闭时本页还不在 window 上，所以用出现/消失自己记可见状态
+    private var isPageVisible = false
 
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
@@ -38,10 +39,12 @@ final class MeViewController: UIViewController {
     init(
         accountController: PostListSideMenuAccountController? = nil,
         client: NodeSeekUserContentClient? = nil,
+        notificationClient: NodeSeekNotificationClientProtocol? = nil,
         visitedStore: VisitedPostStoreProtocol? = nil
     ) {
         self.accountController = accountController ?? PostListSideMenuAccountController()
         self.client = client ?? NodeSeekUserContentClient()
+        self.notificationClient = notificationClient ?? NodeSeekNotificationClient()
         self.visitedStore = visitedStore ?? VisitedPostStore.shared
         super.init(nibName: nil, bundle: nil)
         title = "我的"
@@ -53,6 +56,7 @@ final class MeViewController: UIViewController {
 
     deinit {
         loadTask?.cancel()
+        unreadCountTask?.cancel()
     }
 
     override func viewDidLoad() {
@@ -65,12 +69,11 @@ final class MeViewController: UIViewController {
         setupActions()
         render()
 
-        accountController.canRefresh = { [weak self] in
-            self?.view.window != nil
-        }
-        // 页面可见时，登录窗口关闭后立即刷新账号
+        // 刷新只由本页出现和登录关闭触发；不能用 view.window 判断，
+        // 出现回调和登录关闭时本页都还不在 window 上，会把刷新丢掉
+        accountController.canRefresh = { true }
         accountController.isSideMenuVisible = { [weak self] in
-            self?.view.window != nil
+            self?.isPageVisible ?? false
         }
         accountController.onAccountChanged = { [weak self] account in
             self?.accountDidChange(account)
@@ -80,8 +83,16 @@ final class MeViewController: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        isPageVisible = true
+        // 每次出现都刷新：账号走缓存（登录后已标记过期），资料与通知未读数直接请求
         accountController.refreshIfNeeded()
-        loadProfileIfNeeded(force: false)
+        loadProfile()
+        refreshNotificationUnreadCount()
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        isPageVisible = false
     }
 
     // MARK: - Setup
@@ -152,26 +163,33 @@ final class MeViewController: UIViewController {
         if uidChanged || account.isLoggedIn == false {
             profile = nil
             progress = nil
-            loadedUID = nil
         }
         render()
-        loadProfileIfNeeded(force: uidChanged)
+        // 登录、退出或切换账号后，资料和通知角标跟着更新
+        if uidChanged {
+            loadProfile()
+            refreshNotificationUnreadCount()
+        }
     }
 
-    private func loadProfileIfNeeded(force: Bool) {
-        guard account.isLoggedIn, let uid = account.nodeSeekUID else { return }
-        if force == false, loadedUID == uid, let lastLoadDate,
-           Date().timeIntervalSince(lastLoadDate) < Layout.reloadInterval {
+    private func loadProfile() {
+        guard account.isLoggedIn, let uid = account.nodeSeekUID else {
+            loadTask?.cancel()
+            loadingUID = nil
             return
         }
-        lastLoadDate = Date()
+        // 同一账号已在请求中就不重复发
+        guard loadingUID != uid else { return }
         loadTask?.cancel()
+        loadingUID = uid
         loadTask = Task { [weak self, client] in
+            defer {
+                if Task.isCancelled == false { self?.loadingUID = nil }
+            }
             do {
                 let profile = try await client.loadProfile(uid: uid)
                 guard !Task.isCancelled, let self else { return }
                 self.profile = profile
-                self.loadedUID = uid
                 self.render()
                 // 进度失败不影响资料展示，只是不显示今日摘要
                 let progress = try? await client.loadTodayProgress(uid: uid)
@@ -180,9 +198,22 @@ final class MeViewController: UIViewController {
                 self.render()
             } catch {
                 guard !Task.isCancelled else { return }
-                // 允许下次出现时重试
-                self?.lastLoadDate = nil
                 AppLog.warning(.account, "我的页资料加载失败: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// 通知 Tab 角标靠未读数事件更新；首页不在前台时由本页补一次。
+    private func refreshNotificationUnreadCount() {
+        guard account.isLoggedIn, unreadCountTask == nil else { return }
+        unreadCountTask = Task { [weak self, notificationClient] in
+            defer { self?.unreadCountTask = nil }
+            do {
+                let unreadCount = try await notificationClient.loadUnreadCount()
+                guard !Task.isCancelled else { return }
+                NodeSeekNotificationUnreadCountEvent.post(unreadCount)
+            } catch {
+                AppLog.debug(.account, "我的页通知未读数加载失败: \(error.localizedDescription)")
             }
         }
     }
@@ -238,7 +269,6 @@ final class MeViewController: UIViewController {
     @objc private func checkInTapped() {
         guard requireLogin() else { return }
         // 签到在网页签到页完成，返回本页时会重新加载今日签到结果
-        lastLoadDate = nil
         router.navigateToCheckIn(boardURL: NodeSeekSite.boardURL)
     }
 
@@ -319,8 +349,8 @@ final class MeViewController: UIViewController {
 
 // MARK: - 资料卡
 
-/// 账号 + 五格数字 + 升级进度合成一张卡；未登录时显示登录引导。
-private final class MeProfileCardView: UIView {
+/// 账号 + 五格数字 + 升级进度合成一张卡，整卡可点；未登录时显示登录引导。
+private final class MeProfileCardView: UIControl {
     var onTap: (() -> Void)?
     var onLoginTap: (() -> Void)?
 
@@ -329,7 +359,7 @@ private final class MeProfileCardView: UIView {
         withConfiguration: UIImage.SymbolConfiguration(pointSize: 26, weight: .regular)
     )
 
-    private let headerControl = UIControl()
+    private let headerView = UIView()
     private let avatarImageView = UIImageView()
     private let nameLabel = UILabel()
     private let metaLabel = UILabel()
@@ -352,11 +382,14 @@ private final class MeProfileCardView: UIView {
         layer.cornerRadius = 18
         layer.cornerCurve = .continuous
         accessibilityIdentifier = "me-profile-card"
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+        addTarget(self, action: #selector(cardTapped), for: .touchUpInside)
         setupHeader()
         setupStats()
         setupLevel()
 
-        let stack = UIStackView(arrangedSubviews: [headerControl, statsSeparator, statsStack, levelSeparator, levelContainer])
+        let stack = UIStackView(arrangedSubviews: [headerView, statsSeparator, statsStack, levelSeparator, levelContainer])
         stack.axis = .vertical
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
@@ -372,6 +405,24 @@ private final class MeProfileCardView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    override var isHighlighted: Bool {
+        didSet {
+            guard oldValue != isHighlighted else { return }
+            UIView.animate(withDuration: isHighlighted ? 0.05 : 0.2) {
+                self.backgroundColor = self.isHighlighted ? .tertiarySystemGroupedBackground : .secondarySystemGroupedBackground
+            }
+        }
+    }
+
+    /// 除了“登录”按钮，卡片内任意位置的点按都交给整卡处理。
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        guard let hitView = super.hitTest(point, with: event) else { return nil }
+        if loginButton.isHidden == false, hitView.isDescendant(of: loginButton) {
+            return hitView
+        }
+        return self
+    }
+
     func renderLoggedIn(account: AccountResponse, profile: UserProfileRecord?, progress: UserTodayProgressRecord?) {
         nameLabel.text = profile?.name ?? account.displayName
         if let profile {
@@ -383,7 +434,6 @@ private final class MeProfileCardView: UIView {
         }
         chevronView.isHidden = false
         loginButton.isHidden = true
-        headerControl.accessibilityLabel = "账号信息，\(nameLabel.text ?? "")"
 
         ImageLoad.url(account.avatarURL)
             .toAvatar(requestID: account.profileURL?.lastPathComponent ?? account.displayName)
@@ -393,6 +443,7 @@ private final class MeProfileCardView: UIView {
             ["Lv \($0.rank)", "\($0.coin)", "\($0.stardust)", "\($0.fans)", "\($0.follows)"]
         } ?? Array(repeating: "–", count: 5)
         zip(statViews, values).forEach { $0.setValue($1) }
+        updateAccessibility(loggedIn: true)
         statsSeparator.isHidden = false
         statsStack.isHidden = false
 
@@ -418,7 +469,7 @@ private final class MeProfileCardView: UIView {
         metaLabel.text = "登录后查看等级、鸡腿和今日进度"
         chevronView.isHidden = true
         loginButton.isHidden = false
-        headerControl.accessibilityLabel = "登录账号"
+        updateAccessibility(loggedIn: false)
         AvatarImageLoader.shared.cancel(on: avatarImageView)
         avatarImageView.image = Self.defaultAvatarImage
         statsSeparator.isHidden = true
@@ -477,21 +528,15 @@ private final class MeProfileCardView: UIView {
         row.translatesAutoresizingMaskIntoConstraints = false
         avatarImageView.isUserInteractionEnabled = false
         chevronView.isUserInteractionEnabled = false
-        headerControl.addSubview(row)
-        headerControl.isAccessibilityElement = true
-        headerControl.accessibilityTraits = .button
-        headerControl.accessibilityIdentifier = "me-profile-header"
-        headerControl.addTarget(self, action: #selector(headerTapped), for: .touchUpInside)
-        headerControl.addTarget(self, action: #selector(headerHighlight), for: [.touchDown, .touchDragEnter])
-        headerControl.addTarget(self, action: #selector(headerUnhighlight), for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit])
+        headerView.addSubview(row)
 
         NSLayoutConstraint.activate([
             avatarImageView.widthAnchor.constraint(equalToConstant: 64),
             avatarImageView.heightAnchor.constraint(equalToConstant: 64),
-            row.leadingAnchor.constraint(equalTo: headerControl.leadingAnchor, constant: 16),
-            row.trailingAnchor.constraint(equalTo: headerControl.trailingAnchor, constant: -16),
-            row.topAnchor.constraint(equalTo: headerControl.topAnchor, constant: 16),
-            row.bottomAnchor.constraint(equalTo: headerControl.bottomAnchor, constant: -14)
+            row.leadingAnchor.constraint(equalTo: headerView.leadingAnchor, constant: 16),
+            row.trailingAnchor.constraint(equalTo: headerView.trailingAnchor, constant: -16),
+            row.topAnchor.constraint(equalTo: headerView.topAnchor, constant: 16),
+            row.bottomAnchor.constraint(equalTo: headerView.bottomAnchor, constant: -14)
         ])
     }
 
@@ -533,22 +578,24 @@ private final class MeProfileCardView: UIView {
         ])
     }
 
-    @objc private func headerTapped() {
+    /// 整卡作为一个无障碍元素：读名字、UID 和五格数字。
+    private func updateAccessibility(loggedIn: Bool) {
+        guard loggedIn else {
+            accessibilityLabel = "未登录，登录后查看等级、鸡腿和今日进度"
+            accessibilityHint = "点按登录"
+            return
+        }
+        let stats = statViews.compactMap(\.accessibilityLabel).joined(separator: "，")
+        accessibilityLabel = [nameLabel.text, metaLabel.text, stats].compactMap { $0 }.joined(separator: "，")
+        accessibilityHint = "点按查看个人主页"
+    }
+
+    @objc private func cardTapped() {
         onTap?()
     }
 
     @objc private func loginTapped() {
         onLoginTap?()
-    }
-
-    @objc private func headerHighlight() {
-        headerControl.backgroundColor = .systemFill
-    }
-
-    @objc private func headerUnhighlight() {
-        UIView.animate(withDuration: 0.2) { [headerControl] in
-            headerControl.backgroundColor = .clear
-        }
     }
 }
 

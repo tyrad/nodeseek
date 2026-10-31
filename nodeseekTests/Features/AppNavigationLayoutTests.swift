@@ -88,6 +88,19 @@ struct AppNavigationLayoutTests {
         #expect(view.layoutTestView(identifier: "me-check-in-row")?.accessibilityLabel == "每日签到，签到")
     }
 
+    @Test func meProfileCardHandlesTapsAnywhereExceptLoginButton() throws {
+        let viewController = MeViewController()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.view.layoutIfNeeded()
+        let card = try #require(viewController.view.layoutTestView(identifier: "me-profile-card") as? UIControl)
+        let loginButton = try #require(viewController.view.layoutTestButton(identifier: "me-login-button"))
+
+        // 头像、文字等非按钮区域都落到整卡
+        #expect(card.hitTest(CGPoint(x: 20, y: card.bounds.midY), with: nil) === card)
+        let loginCenter = loginButton.convert(CGPoint(x: loginButton.bounds.midX, y: loginButton.bounds.midY), to: card)
+        #expect(card.hitTest(loginCenter, with: nil)?.isDescendant(of: loginButton) == true)
+    }
+
     @Test func tabBarShowsNotificationUnreadBadge() throws {
         let tabBarController = MainTabBarController()
         let viewControllers = try #require(tabBarController.viewControllers)
