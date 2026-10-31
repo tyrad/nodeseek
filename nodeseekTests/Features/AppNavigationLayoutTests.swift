@@ -74,6 +74,20 @@ struct AppNavigationLayoutTests {
         #expect(settings.hasConfirmedChoice)
     }
 
+    @Test func mePageShowsGuestStateWithLoginButtonAndEntries() throws {
+        let viewController = MeViewController()
+        viewController.loadViewIfNeeded()
+        let view = try #require(viewController.view)
+
+        let loginButton = try #require(view.layoutTestButton(identifier: "me-login-button"))
+        #expect(loginButton.isHidden == false)
+        for identifier in ["me-discussions-row", "me-comments-row", "me-collections-row", "me-check-in-row", "me-recent-row"] {
+            #expect(view.layoutTestView(identifier: identifier) != nil)
+        }
+        // 未签到 / 未登录时签到行显示“签到”胶囊
+        #expect(view.layoutTestView(identifier: "me-check-in-row")?.accessibilityLabel == "每日签到，签到")
+    }
+
     @Test func tabBarShowsNotificationUnreadBadge() throws {
         let tabBarController = MainTabBarController()
         let viewControllers = try #require(tabBarController.viewControllers)
