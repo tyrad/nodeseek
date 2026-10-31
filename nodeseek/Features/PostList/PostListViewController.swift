@@ -30,7 +30,6 @@ class PostListViewController: UIViewController {
 
     private enum FloatingControlLayout {
         static let sortToggleBottomInset: CGFloat = 204
-        static let composeButtonSize: CGFloat = 56
         static let composeButtonTrailing: CGFloat = 20
         static let composeButtonBottom: CGFloat = 16
         /// 滚动超过这个距离才切换发帖按钮显隐，避免手指轻微抖动时闪烁。
@@ -644,8 +643,7 @@ class PostListViewController: UIViewController {
                 equalTo: view.safeAreaLayoutGuide.bottomAnchor,
                 constant: -FloatingControlLayout.composeButtonBottom
             ),
-            composeButton.widthAnchor.constraint(equalToConstant: FloatingControlLayout.composeButtonSize),
-            composeButton.heightAnchor.constraint(equalToConstant: FloatingControlLayout.composeButtonSize)
+            composeButton.heightAnchor.constraint(equalToConstant: PostListComposeButton.height)
         ])
         pageContainerViewController.onListScroll = { [weak self] scrollView in
             self?.handleListScroll(scrollView)
