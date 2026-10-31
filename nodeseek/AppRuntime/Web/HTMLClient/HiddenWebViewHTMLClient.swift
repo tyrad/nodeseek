@@ -889,22 +889,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     }
 
     private func readOuterHTML() async throws -> String {
-        let htmlAny = try await webView.evaluateJavaScript(
-            """
-            (() => {
-              const html = document.documentElement.outerHTML;
-              try {
-                if (!window.__config__) {
-                  return html;
-                }
-                const json = JSON.stringify(window.__config__).replace(/</g, '\\\\u003c');
-                return html + '\\n<script id="nodeseek-captured-config" type="application/json">' + json + '</script>';
-              } catch (error) {
-                return html;
-              }
-            })()
-            """
-        )
+        let htmlAny = try await webView.evaluateJavaScript(NodeSeekPageScripts.outerHTMLWithCapturedConfig)
         return htmlAny as? String ?? ""
     }
 

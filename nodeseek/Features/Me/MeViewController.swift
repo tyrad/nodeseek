@@ -186,13 +186,14 @@ final class MeViewController: UIViewController {
             defer {
                 if Task.isCancelled == false { self?.loadingUID = nil }
             }
+            // 资料和今日进度并行请求；进度失败不影响资料展示，只是不显示今日摘要
+            async let progressResult = try? client.loadTodayProgress(uid: uid)
             do {
                 let profile = try await client.loadProfile(uid: uid)
                 guard !Task.isCancelled, let self else { return }
                 self.profile = profile
                 self.render()
-                // 进度失败不影响资料展示，只是不显示今日摘要
-                let progress = try? await client.loadTodayProgress(uid: uid)
+                let progress = await progressResult
                 guard !Task.isCancelled else { return }
                 self.progress = progress
                 self.render()
@@ -287,6 +288,12 @@ final class MeViewController: UIViewController {
 
     private func showLogin() {
         router.navigateToLogin { [weak self] in
+            // 登录页关闭时已把账号写进缓存，先用缓存立刻切换，再后台强制刷新确认
+            Task { [weak self] in
+                guard let account = await CurrentAccountStore.shared.snapshot()?.account,
+                      account.isLoggedIn else { return }
+                self?.accountDidChange(account)
+            }
             self?.accountController.refreshIfNeeded(force: true)
             self?.reloadHomeList()
         }
@@ -370,7 +377,7 @@ private final class MeProfileCardView: UIControl {
 
     private let statsSeparator = MeSeparatorView()
     private let statsStack = UIStackView()
-    private let statViews: [MeStatView] = ["等级", "鸡腿", "星辰", "粉丝", "关注"].map(MeStatView.init(title:))
+    private let statViews: [MeStatView] = ["等级", "鸡腿", "星辰", "粉丝", "关注"].map { MeStatView(title: $0) }
 
     private let levelSeparator = MeSeparatorView()
     private let levelContainer = UIView()
