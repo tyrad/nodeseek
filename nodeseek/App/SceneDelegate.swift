@@ -27,8 +27,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                     window.rootViewController = appRouter.makeRootViewController()
                     window.layoutIfNeeded()
                 }
-                // 推送冷启动不走这里，避免新功能页挡住跳转
-                if let root = window.rootViewController {
+                // 推送冷启动不走这里，避免选择页和新功能页挡住跳转；
+                // 同一次启动只弹一个，新功能页留到下次启动
+                if let root = window.rootViewController,
+                   LayoutChooserViewController.presentIfNeeded(from: root) == false {
                     WhatsNewModule.presentIfNeeded(from: root)
                 }
             }

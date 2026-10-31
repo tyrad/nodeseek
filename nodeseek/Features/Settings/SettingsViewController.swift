@@ -112,6 +112,7 @@ class SettingsViewController: UITableViewController {
     }
 
     private enum ReadingRow: Int, CaseIterable {
+        case navigationLayout
         case categoryPreferences
         case homeSearchEntry
         case textSize
@@ -345,6 +346,8 @@ class SettingsViewController: UITableViewController {
 
     private func readingCell(for indexPath: IndexPath) -> UITableViewCell {
         switch ReadingRow(rawValue: indexPath.row) {
+        case .navigationLayout:
+            return navigationLayoutCell()
         case .categoryPreferences:
             return categoryPreferencesCell(for: indexPath)
         case .homeSearchEntry:
@@ -473,6 +476,17 @@ class SettingsViewController: UITableViewController {
         cell.accessoryView = searchEntrySwitch
         cell.selectionStyle = .none
         cell.accessibilityIdentifier = "settings-home-search-entry-cell"
+        return cell
+    }
+
+    private func navigationLayoutCell() -> UITableViewCell {
+        let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
+        cell.textLabel?.text = "界面布局"
+        cell.detailTextLabel?.text = AppNavigationLayoutSettings.shared.layout.title
+        cell.detailTextLabel?.textColor = .secondaryLabel
+        cell.imageView?.image = UIImage(systemName: "rectangle.split.3x1")
+        cell.accessoryType = .disclosureIndicator
+        cell.accessibilityIdentifier = "settings-navigation-layout-cell"
         return cell
     }
 
@@ -644,6 +658,8 @@ class SettingsViewController: UITableViewController {
 
     private func handleReadingSelection(at indexPath: IndexPath) {
         switch ReadingRow(rawValue: indexPath.row) {
+        case .navigationLayout:
+            navigationController?.pushViewController(LayoutChooserViewController(mode: .settings), animated: true)
         case .categoryPreferences:
             showPostCategoryPreferences()
         case .textSize:

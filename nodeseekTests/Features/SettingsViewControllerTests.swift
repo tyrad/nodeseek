@@ -44,7 +44,7 @@ struct SettingsViewControllerTests {
             let tableView = try #require(viewController.tableView)
             #expect(viewController.title == "设置")
             #expect(tableView.numberOfSections == 7)
-            #expect(tableView.numberOfRows(inSection: 0) == 6)
+            #expect(tableView.numberOfRows(inSection: 0) == 7)
             #expect(tableView.numberOfRows(inSection: 1) == 3)
             #expect(tableView.numberOfRows(inSection: 2) == 1)
             #expect(tableView.numberOfRows(inSection: 3) == 1)
@@ -80,19 +80,19 @@ struct SettingsViewControllerTests {
             ))
             let categoryPreferencesCell = try #require(tableView.dataSource?.tableView(
                 tableView,
-                cellForRowAt: IndexPath(row: 0, section: 0)
+                cellForRowAt: IndexPath(row: 1, section: 0)
             ))
             let textSizeCell = try #require(tableView.dataSource?.tableView(
                 tableView,
-                cellForRowAt: IndexPath(row: 2, section: 0)
+                cellForRowAt: IndexPath(row: 3, section: 0)
             ))
             let searchEntryCell = try #require(tableView.dataSource?.tableView(
                 tableView,
-                cellForRowAt: IndexPath(row: 1, section: 0)
+                cellForRowAt: IndexPath(row: 2, section: 0)
             ))
             let signatureCell = try #require(tableView.dataSource?.tableView(
                 tableView,
-                cellForRowAt: IndexPath(row: 3, section: 0)
+                cellForRowAt: IndexPath(row: 4, section: 0)
             ))
             let debugCell = try #require(tableView.dataSource?.tableView(
                 tableView,
@@ -169,13 +169,13 @@ struct SettingsViewControllerTests {
         )
         controller.loadViewIfNeeded()
         let tableView = try #require(controller.tableView)
-        let cell = controller.tableView(tableView, cellForRowAt: IndexPath(row: 4, section: 0))
+        let cell = controller.tableView(tableView, cellForRowAt: IndexPath(row: 5, section: 0))
         let control = try #require(cell.accessoryView as? UISwitch)
         #expect(cell.textLabel?.text == "深色模式图片变暗")
         #expect(control.isOn)
-        #expect(tableView.numberOfRows(inSection: 0) == 6)
+        #expect(tableView.numberOfRows(inSection: 0) == 7)
 
-        let levelCell = controller.tableView(tableView, cellForRowAt: IndexPath(row: 5, section: 0))
+        let levelCell = controller.tableView(tableView, cellForRowAt: IndexPath(row: 6, section: 0))
         let levelControl = try #require(levelCell.accessoryView as? UISegmentedControl)
         #expect(levelCell.textLabel?.text == "变暗程度")
         #expect(levelControl.numberOfSegments == 3)
@@ -187,11 +187,11 @@ struct SettingsViewControllerTests {
         control.isOn = false
         control.sendActions(for: .valueChanged)
         #expect(!DetailImageDimmingSettings(userDefaults: defaults).isEnabled)
-        #expect(tableView.numberOfRows(inSection: 0) == 5)
+        #expect(tableView.numberOfRows(inSection: 0) == 6)
         control.isOn = true
         control.sendActions(for: .valueChanged)
         #expect(DetailImageDimmingSettings(userDefaults: defaults).isEnabled)
-        #expect(tableView.numberOfRows(inSection: 0) == 6)
+        #expect(tableView.numberOfRows(inSection: 0) == 7)
         #expect(DetailImageDimmingSettings(userDefaults: defaults).level == .strong)
     }
 
@@ -220,7 +220,7 @@ struct SettingsViewControllerTests {
 
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 3, section: 0)
+            cellForRowAt: IndexPath(row: 4, section: 0)
         ))
         let signatureSwitch = try #require(cell.accessoryView as? UISwitch)
         #expect(signatureSwitch.isOn == true)
@@ -265,7 +265,7 @@ struct SettingsViewControllerTests {
 
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 1, section: 0)
+            cellForRowAt: IndexPath(row: 2, section: 0)
         ))
         #expect(cell.textLabel?.text == "首页搜索入口")
         let searchEntrySwitch = try #require(cell.accessoryView as? UISwitch)
@@ -317,7 +317,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 2, section: 0)
+            didSelectRowAt: IndexPath(row: 3, section: 0)
         )
 
         #expect(navigationController.topViewController is SettingsTextSizeViewController)
@@ -395,7 +395,7 @@ struct SettingsViewControllerTests {
 
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 0, section: 0)
+            cellForRowAt: IndexPath(row: 1, section: 0)
         ))
         #expect(cell.textLabel?.text == "首页分类")
         #expect(cell.detailTextLabel?.text == "显示 15 个，隐藏 1 个")
@@ -403,7 +403,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 0)
+            didSelectRowAt: IndexPath(row: 1, section: 0)
         )
 
         #expect(navigationController.topViewController is PostCategoryPreferencesViewController)
@@ -426,7 +426,7 @@ struct SettingsViewControllerTests {
         viewController.view.layoutIfNeeded()
         viewController.tableView.layoutIfNeeded()
 
-        let indexPath = IndexPath(row: 0, section: 0)
+        let indexPath = IndexPath(row: 1, section: 0)
         let initialCell = try #require(viewController.tableView.cellForRow(at: indexPath))
         #expect(initialCell.detailTextLabel?.text == "全部、日常、技术等 16 个")
         let initialRequestCount = viewController.categoryPreferencesCellRequestCount
@@ -973,7 +973,7 @@ private final class SpySettingsViewController: SettingsViewController {
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = super.tableView(tableView, cellForRowAt: indexPath)
-        if indexPath == IndexPath(row: 0, section: 0) {
+        if indexPath == IndexPath(row: 1, section: 0) {
             categoryPreferencesCellRequestCount += 1
         }
         return cell
