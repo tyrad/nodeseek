@@ -58,6 +58,32 @@ struct PostTextureListViewTests {
         #expect(CGFloat(tableView.numberOfRows(inSection: 0)) * minimumSkeletonHeight >= tableView.bounds.height)
     }
 
+    @Test func shortFirstPageRequestsNextPageOnlyOnce() async throws {
+        let view = PostTextureListView()
+        let delegate = SpyPostTextureListViewDelegate()
+        view.delegate = delegate
+        view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        view.setItems([
+            PostListItem(post: PostSummary(
+                id: "1",
+                title: "标题",
+                url: URL(string: "https://www.nodeseek.com/post-1-1")!,
+                authorName: "ipv4",
+                nodeName: "技术",
+                replyCount: 1,
+                lastActivityText: "刚刚",
+                isPinned: false
+            ), isVisited: false)
+        ])
+        view.layoutIfNeeded()
+
+        try await Task.sleep(nanoseconds: 100_000_000)
+        let tableView = try #require(view.firstSubview(of: UITableView.self))
+        tableView.delegate?.scrollViewDidScroll?(tableView)
+
+        #expect(delegate.approachBottomCount == 1)
+    }
+
     @Test func retryButtonNotifiesDelegateAfterFirstPageError() throws {
         let view = PostTextureListView()
         let delegate = SpyPostTextureListViewDelegate()
@@ -74,6 +100,7 @@ struct PostTextureListViewTests {
 
 private final class SpyPostTextureListViewDelegate: PostTextureListViewDelegate {
     private(set) var retryRequestCount = 0
+    private(set) var approachBottomCount = 0
 
     func postTextureListView(_ textureListView: PostTextureListView, didSelectPostAt index: Int) {}
 
@@ -83,7 +110,9 @@ private final class SpyPostTextureListViewDelegate: PostTextureListViewDelegate 
         retryRequestCount += 1
     }
 
-    func postTextureListView(_ textureListView: PostTextureListView, didApproachBottomAt index: Int, totalCount: Int) {}
+    func postTextureListView(_ textureListView: PostTextureListView, didApproachBottomAt index: Int, totalCount: Int) {
+        approachBottomCount += 1
+    }
 }
 
 private extension UIView {

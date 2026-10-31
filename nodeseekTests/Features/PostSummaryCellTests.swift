@@ -1,5 +1,5 @@
 //
-//  PostSummaryCellNodeTests.swift
+//  PostSummaryCellTests.swift
 //  nodeseekTests
 //
 //  Created by Codex on 2026/4/28.
@@ -10,7 +10,7 @@ import UIKit
 @testable import nodeseek
 
 @MainActor
-struct PostSummaryCellNodeTests {
+struct PostSummaryCellTests {
     @Test func metadataTextOmitsNodeNameAndWideSeparators() {
         let post = PostSummary(
             id: "1",
@@ -23,7 +23,7 @@ struct PostSummaryCellNodeTests {
             lastActivityText: "22s ago"
         )
 
-        let text = PostSummaryCellNode.metadataAttributedText(for: post).string
+        let text = PostSummaryText.metadataAttributedText(for: post).string
 
         #expect(text.contains("mist"))
         #expect(text.contains("34"))
@@ -45,7 +45,7 @@ struct PostSummaryCellNodeTests {
             lastActivityText: "1min ago"
         )
 
-        let text = PostSummaryCellNode.metadataAttributedText(for: post).string
+        let text = PostSummaryText.metadataAttributedText(for: post).string
 
         #expect(!text.contains("未知用户"))
         #expect(text.contains("10"))
@@ -65,8 +65,8 @@ struct PostSummaryCellNodeTests {
             viewCount: 475454,
             lastActivityText: "6h 30min ago"
         )
-        let titleText = PostSummaryCellNode.titleAttributedText(for: post)
-        let metadataText = PostSummaryCellNode.metadataAttributedText(for: post)
+        let titleText = PostSummaryText.titleAttributedText(for: post)
+        let metadataText = PostSummaryText.metadataAttributedText(for: post)
 
         #expect(PostListCellStyle.Typography.titleMaximumNumberOfLines == 0)
         #expect(titleText.string == post.title)
@@ -103,7 +103,7 @@ struct PostSummaryCellNodeTests {
             lastActivityText: "just now"
         )
 
-        let titleText = PostSummaryCellNode.titleAttributedText(for: post, isVisited: true)
+        let titleText = PostSummaryText.titleAttributedText(for: post, isVisited: true)
 
         #expect(titleText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor == .secondaryLabel)
     }
@@ -122,7 +122,7 @@ struct PostSummaryCellNodeTests {
             try SpecialFollowKeywordRule(keyword: "nodeimage", colorHex: "#34C759")
         ]
 
-        let titleText = PostSummaryCellNode.titleAttributedText(for: post, specialFollowRules: rules)
+        let titleText = PostSummaryText.titleAttributedText(for: post, specialFollowRules: rules)
 
         let hitBackgroundColor = try #require(titleText.attribute(.backgroundColor, at: 0, effectiveRange: nil) as? UIColor)
         let hitTextColor = try #require(titleText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
@@ -148,7 +148,7 @@ struct PostSummaryCellNodeTests {
             try SpecialFollowKeywordRule(keyword: "mist", colorHex: "#FF9500")
         ]
 
-        let metadataText = PostSummaryCellNode.metadataAttributedText(for: post, specialFollowRules: rules)
+        let metadataText = PostSummaryText.metadataAttributedText(for: post, specialFollowRules: rules)
 
         let hitBackgroundColor = try #require(metadataText.attribute(.backgroundColor, at: 0, effectiveRange: nil) as? UIColor)
         let hitTextColor = try #require(metadataText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
@@ -174,7 +174,7 @@ struct PostSummaryCellNodeTests {
             isPinned: true
         )
 
-        let titleText = PostSummaryCellNode.titleAttributedText(for: post)
+        let titleText = PostSummaryText.titleAttributedText(for: post)
         let firstAttachment = titleText.attribute(
             NSAttributedString.Key.attachment,
             at: 0,
@@ -200,7 +200,7 @@ struct PostSummaryCellNodeTests {
             requiredReadingLevel: 3
         )
 
-        let titleText = PostSummaryCellNode.titleAttributedText(for: post)
+        let titleText = PostSummaryText.titleAttributedText(for: post)
         let attachmentRange = (titleText.string as NSString).range(of: "\u{FFFC}", options: .backwards)
         try #require(attachmentRange.location != NSNotFound)
         let lockAttachment = titleText.attribute(
@@ -214,7 +214,7 @@ struct PostSummaryCellNodeTests {
     }
 
     @Test func listSymbolAttachmentsUseRasterizedBitmaps() {
-        // 附件必须是位图。矢量系统符号在 Texture 后台绘制时会闪退。
+        // 附件必须是位图。矢量系统符号并发绘制时会闪退。
         let post = PostSummary(
             id: "9",
             title: "栅格化符号",
@@ -230,9 +230,9 @@ struct PostSummaryCellNodeTests {
         )
 
         let images = attachmentImages(
-            in: PostSummaryCellNode.titleAttributedText(for: post)
+            in: PostSummaryText.titleAttributedText(for: post)
         ) + attachmentImages(
-            in: PostSummaryCellNode.metadataAttributedText(for: post)
+            in: PostSummaryText.metadataAttributedText(for: post)
         )
 
         #expect(images.count == 4)
@@ -258,8 +258,8 @@ struct PostSummaryCellNodeTests {
         )
 
         DispatchQueue.concurrentPerform(iterations: 32) { _ in
-            let titleImages = attachmentImages(in: PostSummaryCellNode.titleAttributedText(for: post))
-            let metadataImages = attachmentImages(in: PostSummaryCellNode.metadataAttributedText(for: post))
+            let titleImages = attachmentImages(in: PostSummaryText.titleAttributedText(for: post))
+            let metadataImages = attachmentImages(in: PostSummaryText.metadataAttributedText(for: post))
             #expect(titleImages.count == 2)
             #expect(metadataImages.count == 2)
             for image in titleImages + metadataImages {
@@ -282,15 +282,16 @@ struct PostSummaryCellNodeTests {
             isPinned: true,
             isLocked: true
         )
-        let node = PostSummaryCellNode(post: post)
+        let cell = PostSummaryCell(style: .default, reuseIdentifier: PostSummaryCell.reuseIdentifier)
+        cell.configure(with: PostListItem(post: post, isVisited: false))
 
-        let initialTitle = node.debugTitleAttributedText
-        let initialMetadata = node.debugMetadataAttributedText
+        let initialTitle = cell.debugTitleAttributedText
+        let initialMetadata = cell.debugMetadataAttributedText
 
-        node.refreshAppearanceForCurrentTraits()
+        cell.applyCurrentTheme()
 
-        #expect(node.debugTitleAttributedText !== initialTitle)
-        #expect(node.debugMetadataAttributedText !== initialMetadata)
+        #expect(cell.debugTitleAttributedText !== initialTitle)
+        #expect(cell.debugMetadataAttributedText !== initialMetadata)
     }
 }
 

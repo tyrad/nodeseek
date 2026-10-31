@@ -1,154 +1,14 @@
 //
-//  PostSummaryCellNode.swift
+//  PostSummaryText.swift
 //  nodeseek
 //
 //  Created by Codex on 2026/4/27.
 //
 
-import AsyncDisplayKit
 import UIKit
 
-final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
-
-    private enum Layout {
-        static let verticalSpacing: CGFloat = 5
-        static let contentInset = UIEdgeInsets(
-            top: PostListCellStyle.Layout.verticalContentInset,
-            left: 16,
-            bottom: PostListCellStyle.Layout.verticalContentInset,
-            right: 12
-        )
-    }
-
-    private let post: PostSummary
-    private let isVisited: Bool
-    private let avatarLoader = AvatarImageLoader.shared
-    private var hasRequestedAvatar = false
-    private var hasDisplayableAuthor: Bool {
-        AuthorDisplayPolicy.isDisplayable(post.authorName)
-    }
-
-    private lazy var avatarNode: ASDisplayNode = {
-        let node = ASDisplayNode(viewBlock: { [weak self] in
-            let imageView = UIImageView()
-            imageView.contentMode = .scaleAspectFill
-            imageView.layer.cornerRadius = PostListCellStyle.Avatar.cornerRadius
-            imageView.layer.masksToBounds = true
-            imageView.backgroundColor = .systemGray5
-            self?.avatarImageView = imageView
-            return imageView
-        })
-        node.style.preferredSize = CGSize(
-            width: PostListCellStyle.Avatar.size,
-            height: PostListCellStyle.Avatar.size
-        )
-        return node
-    }()
-
-    private let titleNode = ASTextNode()
-    private let metadataNode = ASTextNode()
-    private weak var avatarImageView: UIImageView?
-    private let themeTraitObserver = ThemeTraitObserver()
-
-    convenience init(post: PostSummary) {
-        self.init(post: post, isVisited: false)
-    }
-
-    convenience init(item: PostListItem) {
-        self.init(post: item.post, isVisited: item.isVisited)
-    }
-
-    init(post: PostSummary, isVisited: Bool) {
-        self.post = post
-        self.isVisited = isVisited
-        super.init()
-        automaticallyManagesSubnodes = true
-        selectionStyle = .none
-        backgroundColor = .clear
-        applyCurrentTheme()
-    }
-
-    override func didLoad() {
-        super.didLoad()
-        themeTraitObserver.install(on: self)
-        requestAvatarIfNeeded()
-    }
-
-    override func didEnterDisplayState() {
-        super.didEnterDisplayState()
-        requestAvatarIfNeeded()
-    }
-
-    override func didExitDisplayState() {
-        super.didExitDisplayState()
-        cancelAvatarLoad()
-        hasRequestedAvatar = false
-    }
-
-    deinit {
-        cancelAvatarLoad()
-    }
-
-    override func layoutSpecThatFits(_ constrainedSize: ASSizeRange) -> ASLayoutSpec {
-        titleNode.style.flexShrink = 1
-        metadataNode.style.flexShrink = 1
-
-        let textStack = ASStackLayoutSpec.vertical()
-        textStack.spacing = Layout.verticalSpacing
-        textStack.children = [titleNode, metadataNode]
-        textStack.style.flexGrow = 1
-        textStack.style.flexShrink = 1
-
-        let contentStack = ASStackLayoutSpec.horizontal()
-        contentStack.spacing = PostListCellStyle.Layout.horizontalSpacing
-        contentStack.alignItems = .start
-        contentStack.children = hasDisplayableAuthor ? [avatarNode, textStack] : [textStack]
-
-        return ASInsetLayoutSpec(insets: Layout.contentInset, child: contentStack)
-    }
-
-    func applyCurrentTheme() {
-        configureText()
-    }
-
-    private func configureText() {
-        let specialFollowRules = SpecialFollowKeywordStore.shared.rules
-        titleNode.maximumNumberOfLines = PostListCellStyle.Typography.titleMaximumNumberOfLines
-        titleNode.truncationMode = .byTruncatingTail
-        titleNode.attributedText = Self.titleAttributedText(
-            for: post,
-            isVisited: isVisited,
-            specialFollowRules: specialFollowRules
-        )
-
-        metadataNode.maximumNumberOfLines = PostListCellStyle.Typography.metadataMaximumNumberOfLines
-        metadataNode.truncationMode = .byTruncatingTail
-        metadataNode.attributedText = Self.metadataAttributedText(for: post, specialFollowRules: specialFollowRules)
-    }
-
-    var debugTitleAttributedText: NSAttributedString? {
-        titleNode.attributedText
-    }
-
-    var debugMetadataAttributedText: NSAttributedString? {
-        metadataNode.attributedText
-    }
-
-    private func requestAvatarIfNeeded() {
-        guard hasDisplayableAuthor else { return }
-        guard !hasRequestedAvatar else { return }
-        guard let avatarImageView else { return }
-        hasRequestedAvatar = true
-        ImageLoad.url(post.avatarURL)
-            .toAvatar(requestID: post.id)
-            .into(avatarImageView)
-    }
-
-    private func cancelAvatarLoad() {
-        guard let avatarImageView else { return }
-        avatarLoader.cancel(on: avatarImageView)
-    }
-
+/// 帖子列表行的标题与元信息富文本，首页、搜索列表共用。
+enum PostSummaryText {
     static func metadataAttributedText(
         for post: PostSummary,
         specialFollowRules: [SpecialFollowKeywordRule] = []
@@ -250,7 +110,7 @@ final class PostSummaryCellNode: ASCellNode, ThemeRefreshableNode {
         return title
     }
 
-    // 列表 cell 在后台创建，不能在那里第一次画矢量符号；主线程预热后后台只复用位图。
+    // 首屏或字号变化后先统一预热，滚动时只复用缓存位图。
     static func prewarmSymbolImages() {
         ListSymbolImageRasterizer.shared.prewarm(
             titleFont: PostListCellStyle.Typography.titleFont,
@@ -343,7 +203,7 @@ enum PostListCellStyle {
 typealias PostSummaryCellStyle = PostListCellStyle
 
 /// 把列表系统符号预先画成位图。
-/// Texture 会在后台绘制文本节点；直接画矢量符号会进系统矢量渲染，多线程并发时偶发闪退。
+/// 系统矢量符号绘制不是线程安全的；位图可缓存，也能被任意线程的富文本安全复用。
 private final class ListSymbolImageRasterizer: @unchecked Sendable {
     static let shared = ListSymbolImageRasterizer()
 
@@ -383,7 +243,7 @@ private final class ListSymbolImageRasterizer: @unchecked Sendable {
         }
         lock.unlock()
 
-        // 不回主线程等待。cell 在后台 nodeBlock 里创建，主线程若正在等 Texture 会互相卡住。
+        // 不回主线程等待，避免调用方在主线程同步等待时互相卡住。
         return rasterizeQueue.sync {
             lock.lock()
             if let cached = cache[key] {
@@ -451,7 +311,7 @@ private final class ListSymbolImageRasterizer: @unchecked Sendable {
             ))
         }
 
-        // 只把确认后的位图放进附件。矢量图留给后台绘制仍会崩。
+        // 只把确认后的位图放进附件，矢量图在并发绘制时仍可能崩。
         guard rasterized.cgImage != nil, rasterized.isSymbolImage == false else {
             return nil
         }

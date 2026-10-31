@@ -5,7 +5,6 @@
 //  Created by Codex on 2026/4/27.
 //
 
-import AsyncDisplayKit
 import UIKit
 import Foundation
 
@@ -25,7 +24,7 @@ final class PostTextureListView: UIView {
 
     weak var delegate: PostTextureListViewDelegate?
 
-    private let tableNode = ASTableNode(style: .plain)
+    private let tableView = UITableView(frame: .zero, style: .plain)
     private let refreshControl = UIRefreshControl()
     private var displayMode: DisplayMode = .content
     private var items: [PostListItem] = []
@@ -120,21 +119,23 @@ final class PostTextureListView: UIView {
         if displayMode != .content {
             self.items = items
             displayMode = .content
-            tableNode.reloadData()
+            reloadTable()
             return
         }
 
         if let appendIndexPaths = makeAppendIndexPaths(from: self.items, to: items) {
             self.items = items
-            // 分页追加发生在滚动底部，关闭 row 插入动画可以避免 Texture 调整 contentOffset 时牵动上方内容。
-            tableNode.performBatch(animated: false, updates: { [weak self] in
-                self?.tableNode.insertRows(at: appendIndexPaths, with: .none)
-            })
+            // 分页追加发生在滚动底部，关闭 row 插入动画可以避免调整 contentOffset 时牵动上方内容。
+            UIView.performWithoutAnimation {
+                tableView.performBatchUpdates {
+                    tableView.insertRows(at: appendIndexPaths, with: .none)
+                }
+            }
             return
         }
 
         self.items = items
-        tableNode.reloadData()
+        reloadTable()
     }
 
     func updateVisitedState(at index: Int, isVisited: Bool) {
@@ -143,7 +144,10 @@ final class PostTextureListView: UIView {
         let existing = items[index]
         guard existing.isVisited != isVisited else { return }
         items[index] = PostListItem(post: existing.post, isVisited: isVisited)
-        tableNode.reloadRows(at: [IndexPath(row: index, section: 0)], with: .none)
+        let indexPath = IndexPath(row: index, section: 0)
+        if let cell = tableView.cellForRow(at: indexPath) as? PostSummaryCell {
+            cell.configure(with: items[index])
+        }
     }
 
     func showLoadingSkeleton() {
@@ -153,13 +157,13 @@ final class PostTextureListView: UIView {
         lastBatchFetchRequestedItemCount = nil
         skeletonRowCount = currentSkeletonRowCount()
         hideLoadingMore()
-        tableNode.reloadData()
+        reloadTable()
     }
 
     func hideLoadingSkeleton() {
         guard displayMode == .skeleton else { return }
         displayMode = .content
-        tableNode.reloadData()
+        reloadTable()
     }
 
     func showFirstPageError(message: String) {
@@ -170,7 +174,7 @@ final class PostTextureListView: UIView {
         hideRefreshing()
         errorMessageLabel.text = message
         errorStackView.isHidden = false
-        tableNode.reloadData()
+        reloadTable()
     }
 
     func hideFirstPageError() {
@@ -180,7 +184,7 @@ final class PostTextureListView: UIView {
         }
         displayMode = .content
         hideErrorView()
-        tableNode.reloadData()
+        reloadTable()
     }
 
     func showLoadingMore() {
@@ -197,27 +201,30 @@ final class PostTextureListView: UIView {
     }
 
     func scrollToTop(animated: Bool) {
-        tableNode.setContentOffset(.zero, animated: animated)
+        tableView.setContentOffset(.zero, animated: animated)
     }
 
     func refreshVisibleAppearanceForCurrentTraits() {
-        tableNode.visibleNodes.forEach { node in
-            (node as? ThemeRefreshableNode)?.refreshAppearanceForCurrentTraits()
+        tableView.visibleCells.forEach { cell in
+            (cell as? PostSummaryCell)?.applyCurrentTheme()
         }
     }
 
     private func setupUI() {
-        // 主线程预热列表符号位图，避免首屏 cell 后台构建时第一次画矢量符号。
-        PostSummaryCellNode.prewarmSymbolImages()
-        tableNode.dataSource = self
-        tableNode.delegate = self
-        tableNode.leadingScreensForBatching = leadingScreensForBatching
-        tableNode.view.separatorStyle = .singleLine
-        tableNode.view.showsVerticalScrollIndicator = true
-        tableNode.view.tableFooterView = loadMoreContainer
+        PostSummaryText.prewarmSymbolImages()
+        tableView.dataSource = self
+        tableView.delegate = self
+        tableView.register(PostSummaryCell.self, forCellReuseIdentifier: PostSummaryCell.reuseIdentifier)
+        tableView.register(PostSummarySkeletonCell.self, forCellReuseIdentifier: PostSummarySkeletonCell.reuseIdentifier)
+        tableView.rowHeight = UITableView.automaticDimension
+        tableView.estimatedRowHeight = estimatedSkeletonRowHeight
+        tableView.backgroundColor = .clear
+        tableView.separatorStyle = .singleLine
+        tableView.showsVerticalScrollIndicator = true
+        tableView.tableFooterView = loadMoreContainer
         refreshControl.addTarget(self, action: #selector(handlePullToRefresh), for: .valueChanged)
-        tableNode.view.refreshControl = refreshControl
-        tableNode.view.translatesAutoresizingMaskIntoConstraints = false
+        tableView.refreshControl = refreshControl
+        tableView.translatesAutoresizingMaskIntoConstraints = false
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(appTextSizeDidChange(_:)),
@@ -231,13 +238,13 @@ final class PostTextureListView: UIView {
             object: SpecialFollowKeywordStore.shared
         )
 
-        addSubview(tableNode.view)
+        addSubview(tableView)
         addSubview(errorStackView)
         NSLayoutConstraint.activate([
-            tableNode.view.leadingAnchor.constraint(equalTo: leadingAnchor),
-            tableNode.view.trailingAnchor.constraint(equalTo: trailingAnchor),
-            tableNode.view.topAnchor.constraint(equalTo: topAnchor),
-            tableNode.view.bottomAnchor.constraint(equalTo: bottomAnchor),
+            tableView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            tableView.topAnchor.constraint(equalTo: topAnchor),
+            tableView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
             errorStackView.centerXAnchor.constraint(equalTo: centerXAnchor),
             errorStackView.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -273,9 +280,9 @@ final class PostTextureListView: UIView {
             return
         }
         guard displayMode == .content else { return }
-        // 字号变了缓存键会变，先预热再刷新，避免后台构建时第一次栅格化。
-        PostSummaryCellNode.prewarmSymbolImages()
-        tableNode.reloadData()
+        // 字号变了缓存键会变，先预热再刷新。
+        PostSummaryText.prewarmSymbolImages()
+        reloadTable()
     }
 
     @objc private func specialFollowKeywordsDidChange(_ notification: Notification) {
@@ -286,7 +293,7 @@ final class PostTextureListView: UIView {
             return
         }
         guard displayMode == .content else { return }
-        tableNode.reloadData()
+        reloadTable()
     }
 
     @objc private func retryFirstPageTapped() {
@@ -299,19 +306,24 @@ final class PostTextureListView: UIView {
         let targetRowCount = currentSkeletonRowCount()
         guard targetRowCount != skeletonRowCount else { return }
         skeletonRowCount = targetRowCount
-        tableNode.reloadData()
+        reloadTable()
+    }
+
+    private func reloadTable() {
+        tableView.reloadData()
+        scheduleBatchFetchCheck()
     }
 
     private func currentSkeletonRowCount() -> Int {
-        let visibleHeight = max(bounds.height, tableNode.view.bounds.height)
+        let visibleHeight = max(bounds.height, tableView.bounds.height)
         guard visibleHeight > 0 else { return minimumSkeletonRowCount }
         let visibleRows = Int(ceil(visibleHeight / estimatedSkeletonRowHeight)) + 1
         return max(minimumSkeletonRowCount, visibleRows)
     }
 }
 
-extension PostTextureListView: ASTableDataSource {
-    func tableNode(_ tableNode: ASTableNode, numberOfRowsInSection section: Int) -> Int {
+extension PostTextureListView: UITableViewDataSource {
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         switch displayMode {
         case .content:
             return items.count
@@ -322,58 +334,57 @@ extension PostTextureListView: ASTableDataSource {
         }
     }
 
-    func tableNode(_ tableNode: ASTableNode, nodeBlockForRowAt indexPath: IndexPath) -> ASCellNodeBlock {
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         switch displayMode {
         case .content:
-            let item = items[indexPath.row]
-            return {
-                PostSummaryCellNode(item: item)
-            }
-        case .skeleton:
-            return {
-                PostSummarySkeletonCellNode()
-            }
-        case .firstPageError:
-            return {
-                ASCellNode()
-            }
+            let cell = tableView.dequeueReusableCell(
+                withIdentifier: PostSummaryCell.reuseIdentifier,
+                for: indexPath
+            )
+            (cell as? PostSummaryCell)?.configure(with: items[indexPath.row])
+            return cell
+        case .skeleton, .firstPageError:
+            return tableView.dequeueReusableCell(
+                withIdentifier: PostSummarySkeletonCell.reuseIdentifier,
+                for: indexPath
+            )
         }
     }
 }
 
-extension PostTextureListView: ASTableDelegate {
-    func tableNode(_ tableNode: ASTableNode, didSelectRowAt indexPath: IndexPath) {
+extension PostTextureListView: UITableViewDelegate {
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         guard displayMode == .content else { return }
-        tableNode.deselectRow(at: indexPath, animated: true)
+        tableView.deselectRow(at: indexPath, animated: true)
         delegate?.postTextureListView(self, didSelectPostAt: indexPath.row)
     }
 
-    func shouldBatchFetch(for tableNode: ASTableNode) -> Bool {
-        canRequestBatchFetch()
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        requestBatchFetchIfNeeded()
     }
 
-    func tableNode(_ tableNode: ASTableNode, willBeginBatchFetchWith context: ASBatchContext) {
+    /// 距离底部不足 leadingScreensForBatching 屏时提前请求下一页。
+    private func requestBatchFetchIfNeeded() {
+        guard canRequestBatchFetch() else { return }
+        let viewportHeight = tableView.bounds.height
+        guard viewportHeight > 0 else { return }
+        let remainingDistance = tableView.contentSize.height - (tableView.contentOffset.y + viewportHeight)
+        guard remainingDistance <= viewportHeight * leadingScreensForBatching else { return }
+
+        let totalCount = items.count
+        lastBatchFetchRequestedItemCount = totalCount
+        AppLog.info(.postList, "提前触发帖子列表分页: itemCount=\(totalCount), leadingScreens=\(leadingScreensForBatching)")
+        delegate?.postTextureListView(
+            self,
+            didApproachBottomAt: max(totalCount - 1, 0),
+            totalCount: totalCount
+        )
+    }
+
+    /// 内容变化后补一次检查：首屏内容不足一屏时，没有滚动也要能继续加载。
+    fileprivate func scheduleBatchFetchCheck() {
         DispatchQueue.main.async { [weak self] in
-            guard let self else {
-                context.completeBatchFetching(true)
-                return
-            }
-
-            guard self.canRequestBatchFetch() else {
-                AppLog.debug(.postList, "忽略 Texture 分页触发: itemCount=\(self.items.count), lastRequested=\(self.lastBatchFetchRequestedItemCount ?? -1)")
-                context.completeBatchFetching(true)
-                return
-            }
-
-            let totalCount = self.items.count
-            self.lastBatchFetchRequestedItemCount = totalCount
-            AppLog.info(.postList, "Texture 提前触发帖子列表分页: itemCount=\(totalCount), leadingScreens=\(self.leadingScreensForBatching)")
-            self.delegate?.postTextureListView(
-                self,
-                didApproachBottomAt: max(totalCount - 1, 0),
-                totalCount: totalCount
-            )
-            context.completeBatchFetching(true)
+            self?.requestBatchFetchIfNeeded()
         }
     }
 
