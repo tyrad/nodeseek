@@ -61,13 +61,14 @@ struct WebViewFallbackHTMLClient: HTMLClient {
         await prepareCookiesForHTTPLoad(reason: "primary-before-get", url: url)
         AppLog.info(.service, "HTTP优先加载开始 method=GET url=\(url.absoluteString)")
         let primaryResponse = try await primaryClient.get(url)
-        log(response: primaryResponse, phase: "primary")
+        let primaryChallenge = await detectChallenge(in: primaryResponse)
+        log(response: primaryResponse, phase: "primary", challenge: primaryChallenge)
 
-        guard shouldFallback(response: primaryResponse) else {
+        guard shouldFallback(challenge: primaryChallenge) else {
             return primaryResponse
         }
 
-        return try await fallbackAndRetryGet(url: url, primaryResponse: primaryResponse)
+        return try await fallbackAndRetryGet(url: url, primaryResponse: primaryResponse, primaryChallenge: primaryChallenge)
     }
 
     @MainActor
@@ -75,12 +76,16 @@ struct WebViewFallbackHTMLClient: HTMLClient {
         await prepareCookiesForHTTPLoad(reason: "primary-before-post", url: url)
         AppLog.info(.service, "HTTP优先加载开始 method=POST url=\(url.absoluteString)")
         let response = try await primaryClient.post(url, formFields: formFields)
-        log(response: response, phase: "primary-post")
+        log(response: response, phase: "primary-post", challenge: await detectChallenge(in: response))
         return response
     }
 
-    private func fallbackAndRetryGet(url: URL, primaryResponse: HTMLResponse) async throws -> HTMLResponse {
-        if let challenge = challengeDetector.detect(response: primaryResponse) {
+    private func fallbackAndRetryGet(
+        url: URL,
+        primaryResponse: HTMLResponse,
+        primaryChallenge: ChallengeKind?
+    ) async throws -> HTMLResponse {
+        if let challenge = primaryChallenge {
             AppLog.warning(.service, "HTTP命中验证，准备 WebView fallback: \(challenge.logDescription)")
         }
 
@@ -91,7 +96,8 @@ struct WebViewFallbackHTMLClient: HTMLClient {
             AppLog.error(.service, "WebView fallback 失败，返回 HTTP 原始结果: \(error.localizedDescription)")
             return primaryResponse
         }
-        log(response: fallbackResponse, phase: "webview-fallback")
+        let fallbackChallenge = await detectChallenge(in: fallbackResponse)
+        log(response: fallbackResponse, phase: "webview-fallback", challenge: fallbackChallenge)
         await prepareCookiesForHTTPLoad(reason: "after-webview-fallback", url: url)
 
         AppLog.info(.service, "WebView fallback 后重试 HTTP GET: \(url.absoluteString)")
@@ -99,19 +105,19 @@ struct WebViewFallbackHTMLClient: HTMLClient {
         do {
             retryResponse = try await primaryClient.get(url)
         } catch {
-            if challengeDetector.detect(response: fallbackResponse) == nil {
+            if fallbackChallenge == nil {
                 AppLog.error(.service, "WebView fallback 后 HTTP 重试失败，返回 WebView 结果: \(error.localizedDescription)")
                 return fallbackResponse
             }
             AppLog.error(.service, "WebView fallback 后 HTTP 重试失败，返回 HTTP 原始结果: \(error.localizedDescription)")
             return primaryResponse
         }
-        log(response: retryResponse, phase: "retry")
+        log(response: retryResponse, phase: "retry", challenge: await detectChallenge(in: retryResponse))
         return retryResponse
     }
 
-    private func shouldFallback(response: HTMLResponse) -> Bool {
-        guard let challenge = challengeDetector.detect(response: response) else {
+    private func shouldFallback(challenge: ChallengeKind?) -> Bool {
+        guard let challenge else {
             return false
         }
 
@@ -130,8 +136,16 @@ struct WebViewFallbackHTMLClient: HTMLClient {
         await cookieSession.prepareHTTPLoad()
     }
 
-    private func log(response: HTMLResponse, phase: String) {
-        let challengeDescription = challengeDetector.detect(response: response)?.logDescription ?? "none"
+    /// 检测要在整页 HTML 上做字符串查找，耗时几十毫秒；放在主线程会让滑动中的分页掉帧。
+    private func detectChallenge(in response: HTMLResponse) async -> ChallengeKind? {
+        let challengeDetector = challengeDetector
+        return await Task.detached(priority: .userInitiated) {
+            challengeDetector.detect(response: response)
+        }.value
+    }
+
+    private func log(response: HTMLResponse, phase: String, challenge: ChallengeKind?) {
+        let challengeDescription = challenge?.logDescription ?? "none"
         AppLog.info(
             .service,
             "HTML加载结果 phase=\(phase) status=\(response.statusCode) htmlLength=\(response.html.utf8.count) finalURL=\(response.finalURL.absoluteString) challenge=\(challengeDescription)"
