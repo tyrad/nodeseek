@@ -19,10 +19,40 @@ final class AvatarImageProcessorTests: XCTestCase {
         XCTAssertFalse(options.backgroundDecode)
     }
 
+    func testAvatarOptionsUseDecodingCacheSerializer() {
+        let downloader = ImageDownloader(name: "AvatarImageProcessorTests")
+        let options = KingfisherParsedOptionsInfo(AvatarImageLoadingOptions.makeOptions(downloader: downloader))
+
+        XCTAssertTrue(options.cacheSerializer is AvatarCacheSerializer)
+        XCTAssertTrue(options.targetCache === AvatarImageLoadingOptions.cache)
+    }
+
+    func testCacheSerializerRestoresImageWithScale() throws {
+        let data = Self.pngData(size: CGSize(width: 12, height: 12))
+        let options = KingfisherParsedOptionsInfo([.scaleFactor(3)])
+        let image = try XCTUnwrap(AvatarCacheSerializer.default.image(with: data, options: options))
+
+        XCTAssertEqual(image.scale, 3, accuracy: 0.1)
+        XCTAssertEqual(image.size.width * 3, CGFloat(image.cgImage?.width ?? 0), accuracy: 0.5)
+        // 读出即为 8 位 sRGB 位图，上屏不再解码或转换颜色。
+        XCTAssertEqual(image.cgImage?.bitsPerComponent, 8)
+        XCTAssertEqual(image.cgImage?.colorSpace?.name, CGColorSpace.sRGB)
+    }
+
+    func testSVGRasterizesToStandardRange() throws {
+        let processor = AvatarImageProcessor(size: CGSize(width: 56, height: 56))
+        let image = try XCTUnwrap(processor.process(
+            item: .data(Self.svgData()),
+            options: KingfisherParsedOptionsInfo(nil)
+        ))
+
+        XCTAssertEqual(image.cgImage?.bitsPerComponent, 8)
+    }
+
     func testProcessorIdentifierChangesWhenDecodePolicyChanges() {
         let processor = AvatarImageProcessor(size: CGSize(width: 56, height: 56))
 
-        XCTAssertTrue(processor.identifier.contains("v2"))
+        XCTAssertTrue(processor.identifier.contains("v3"))
     }
 
     func testProcessorRendersSVGToAvatarSize() throws {

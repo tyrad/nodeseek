@@ -23,6 +23,7 @@ final class AvatarImageLoader {
     private let downloader: ImageDownloader
     private let cookieSession: NodeSeekCookieSessionManaging
     private var activeRequestTokens: [ObjectIdentifier: UUID] = [:]
+    private var activePrefetchers: [UUID: ImagePrefetcher] = [:]
 
     convenience init() {
         self.init(cookieSession: NodeSeekCookieSession())
@@ -35,6 +36,29 @@ final class AvatarImageLoader {
     init(cookieSession: NodeSeekCookieSessionManaging) {
         self.cookieSession = cookieSession
         self.downloader = AvatarImageLoadingOptions.makeDownloader()
+    }
+
+    /// 提前把头像放进内存缓存：磁盘已有的直接读入内存，没有的先下载。
+    /// 滚到对应行时直接命中内存，不再在主线程查磁盘，也不会出现淡入。
+    func prefetch(_ urls: [URL?]) {
+        var seen = Set<URL>()
+        let resolved = urls
+            .compactMap { ImageURLResolver.resolve($0) }
+            .filter { seen.insert($0).inserted }
+        guard !resolved.isEmpty else { return }
+
+        let key = UUID()
+        let prefetcher = ImagePrefetcher(
+            urls: resolved,
+            options: kingfisherOptions + [.alsoPrefetchToMemory],
+            completionHandler: { _, _, _ in
+                Task { @MainActor in
+                    self.activePrefetchers.removeValue(forKey: key)
+                }
+            }
+        )
+        activePrefetchers[key] = prefetcher
+        prefetcher.start()
     }
 
     func cancel(on imageView: UIImageView) {

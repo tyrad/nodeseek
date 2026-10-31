@@ -124,13 +124,16 @@ final class PostTextureListView: UIView {
             self.items = items
             displayMode = .content
             resetLayoutCache()
+            prefetchAvatars(for: items)
             reloadTable()
             return
         }
 
         if let appendIndexPaths = makeAppendIndexPaths(from: self.items, to: items) {
             self.items = items
-            prefetchLayouts(for: Array(items[appendIndexPaths[0].row...]))
+            let appendedItems = Array(items[appendIndexPaths[0].row...])
+            prefetchLayouts(for: appendedItems)
+            prefetchAvatars(for: appendedItems)
             // 分页追加发生在滚动底部，关闭 row 插入动画可以避免调整 contentOffset 时牵动上方内容。
             UIView.performWithoutAnimation {
                 tableView.performBatchUpdates {
@@ -142,6 +145,7 @@ final class PostTextureListView: UIView {
 
         self.items = items
         resetLayoutCache()
+        prefetchAvatars(for: items)
         reloadTable()
     }
 
@@ -375,6 +379,13 @@ final class PostTextureListView: UIView {
                 }
             }
         }
+    }
+
+    private func prefetchAvatars(for items: [PostListItem]) {
+        let urls = items
+            .filter { AuthorDisplayPolicy.isDisplayable($0.post.authorName) }
+            .map(\.post.avatarURL)
+        AvatarImageLoader.shared.prefetch(urls)
     }
 
     private func currentSkeletonRowCount() -> Int {

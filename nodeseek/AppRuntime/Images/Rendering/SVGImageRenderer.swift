@@ -86,6 +86,8 @@ enum SVGImageRenderer {
 
         let format = UIGraphicsImageRendererFormat.preferred()
         format.opaque = false
+        // 广色域屏幕默认画成 16 位 P3，上屏时还要在主线程转换；头像是纯色块，标准 sRGB 足够。
+        format.preferredRange = .standard
         return UIGraphicsImageRenderer(size: size, format: format).image { context in
             svgImage.render(
                 to: context.cgContext,

@@ -23,7 +23,8 @@ final class DefaultSettingsCacheManager: SettingsCacheManaging {
         let detailSize = UInt64(max(DetailImageLoader.shared.detailImageCacheByteSize(), 0))
         let rawImageSize = UInt64(max(ImageDataLoader.shared.cacheByteSize(), 0))
         let kingfisherSize = (try? await ImageCache.default.diskStorageSize) ?? 0
-        return detailSize + rawImageSize + UInt64(kingfisherSize)
+        let avatarSize = (try? await AvatarImageLoadingOptions.cache.diskStorageSize) ?? 0
+        return detailSize + rawImageSize + UInt64(kingfisherSize) + UInt64(avatarSize)
     }
 
     func clearPreservingCookies() async throws {
@@ -31,6 +32,8 @@ final class DefaultSettingsCacheManager: SettingsCacheManaging {
         try ImageDataLoader.shared.clearCache()
         ImageCache.default.clearMemoryCache()
         await ImageCache.default.clearDiskCache()
+        AvatarImageLoadingOptions.cache.clearMemoryCache()
+        await AvatarImageLoadingOptions.cache.clearDiskCache()
         URLCache.shared.removeAllCachedResponses()
         await clearWebViewCachesPreservingCookies()
     }

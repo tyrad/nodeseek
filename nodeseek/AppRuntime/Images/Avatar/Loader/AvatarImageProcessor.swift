@@ -14,7 +14,7 @@ struct AvatarImageProcessor: ImageProcessor {
 
     init(size: CGSize) {
         self.size = size
-        self.identifier = "com.nodeseek.avatar.v2(\(Int(size.width))x\(Int(size.height)))"
+        self.identifier = "com.nodeseek.avatar.v3(\(Int(size.width))x\(Int(size.height)))"
     }
 
     func process(item: ImageProcessItem, options: KingfisherParsedOptionsInfo) -> KFCrossPlatformImage? {
