@@ -88,6 +88,7 @@ final class PostListSortToggleButton: UIButton {
     func applyDockedEdge(_ edge: FloatingAdsorbableEdges) {
         dockedEdge = edge
         applyFloatingDockedCorners(for: edge)
+        setNeedsLayout()
     }
 
     func applyAlpha(expanded: Bool) {
@@ -116,6 +117,25 @@ final class PostListSortToggleButton: UIButton {
         animationGroup.duration = Layout.jellyDuration
         animationGroup.isRemovedOnCompletion = true
         layer.add(animationGroup, forKey: Layout.jellyAnimationKey)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // 按钮浮在滚动列表上方；给定阴影路径，避免每帧离屏计算阴影形状。
+        layer.shadowPath = UIBezierPath(
+            roundedRect: bounds,
+            byRoundingCorners: roundedRectCorners(for: layer.maskedCorners),
+            cornerRadii: CGSize(width: layer.cornerRadius, height: layer.cornerRadius)
+        ).cgPath
+    }
+
+    private func roundedRectCorners(for maskedCorners: CACornerMask) -> UIRectCorner {
+        var corners: UIRectCorner = []
+        if maskedCorners.contains(.layerMinXMinYCorner) { corners.insert(.topLeft) }
+        if maskedCorners.contains(.layerMaxXMinYCorner) { corners.insert(.topRight) }
+        if maskedCorners.contains(.layerMinXMaxYCorner) { corners.insert(.bottomLeft) }
+        if maskedCorners.contains(.layerMaxXMaxYCorner) { corners.insert(.bottomRight) }
+        return corners
     }
 
     private func configureAppearance() {
