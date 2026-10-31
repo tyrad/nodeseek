@@ -27,7 +27,7 @@ enum SVGImageRenderer {
     static func image(from data: Data, size: CGSize) -> UIImage? {
         withSVGImage(from: data) { svgImage in
             svgImage.size = size
-            return svgImage.uiImage
+            return rasterize(svgImage)
         }
     }
 
@@ -35,7 +35,7 @@ enum SVGImageRenderer {
         withSVGImage(from: data) { svgImage in
             let sourceSize = svgImage.hasSize() ? svgImage.size : fallbackSize
             svgImage.size = normalizedSize(sourceSize, fallbackSize: fallbackSize, maxPixelSide: maxPixelSide)
-            return svgImage.uiImage
+            return rasterize(svgImage)
         }
     }
 
@@ -62,7 +62,9 @@ enum SVGImageRenderer {
         from data: Data,
         _ body: @escaping (SVGKImage) -> Result?
     ) -> Result? {
-        let render: () -> Result? = {
+        // SVG 头像解析绘制要几到十几毫秒，放主线程会让列表快速滑动时持续掉帧。
+        // SVGKit 内部状态不保证并发安全，所以统一放到串行队列。
+        renderQueue.sync {
             #if DEBUG
             renderThreadObserver?(Thread.isMainThread)
             #endif
@@ -71,16 +73,28 @@ enum SVGImageRenderer {
             }
             return body(svgImage)
         }
+    }
 
-        if Thread.isMainThread {
-            return render()
-        }
+    private static let renderQueue = DispatchQueue(label: "com.nodeseek.app.svgkit.render", qos: .userInitiated)
 
-        var result: Result?
-        DispatchQueue.main.sync {
-            result = render()
+    /// 不用 `svgImage.uiImage`：SVGKit 导出时会读取 `UIScreen.main.scale`，后台调用会触发主线程检查警告。
+    /// 这里自己创建画布，倍率取系统推荐格式，绘制逻辑与 SVGKit 导出一致。
+    private static func rasterize(_ svgImage: SVGKImage) -> UIImage? {
+        guard svgImage.hasSize() else { return nil }
+        let size = svgImage.size
+        guard size.width > 0, size.height > 0 else { return nil }
+
+        let format = UIGraphicsImageRendererFormat.preferred()
+        format.opaque = false
+        return UIGraphicsImageRenderer(size: size, format: format).image { context in
+            svgImage.render(
+                to: context.cgContext,
+                antiAliased: true,
+                curveFlatnessFactor: 1.0,
+                interpolationQuality: .default,
+                flipYaxis: false
+            )
         }
-        return result
     }
 
     private static func normalizedSize(

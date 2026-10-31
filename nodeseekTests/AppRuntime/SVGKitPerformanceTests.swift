@@ -14,7 +14,7 @@ final class SVGKitPerformanceTests: XCTestCase {
     private let avatarRenderSize = CGSize(width: 56, height: 56)
     private lazy var svgData: Data = makeAvatarLikeSVGData()
 
-    func testSVGKitRenderingRunsOnMainThreadWhenRequestedFromBackgroundQueue() {
+    func testSVGKitRenderingStaysOffMainThreadWhenRequestedFromBackgroundQueue() {
         let expectation = expectation(description: "后台请求完成")
         var observedMainThread = false
 
@@ -28,7 +28,7 @@ final class SVGKitPerformanceTests: XCTestCase {
         }
 
         wait(for: [expectation], timeout: 3)
-        XCTAssertTrue(observedMainThread)
+        XCTAssertFalse(observedMainThread)
     }
 
     func testSVGKitParseAndRasterizePerformance() throws {
