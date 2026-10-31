@@ -296,6 +296,8 @@ final class MeViewController: UIViewController {
         router.navigateToSettings(
             onLogout: { [weak self] in
                 NodeSeekNotificationUnreadCountEvent.post(.zero)
+                // 本地账号已清掉，先直接切到未登录，不等网络确认
+                self?.accountDidChange(AccountResponse(displayName: "游客", isLoggedIn: false))
                 self?.accountController.refreshIfNeeded(force: true)
                 self?.reloadHomeList()
             },
