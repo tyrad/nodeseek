@@ -11,6 +11,11 @@ final class PostTextureListHostViewController: UIViewController {
     private let presenter: PostTextureListHostPresenterProtocol
     private let listView = PostTextureListView()
 
+    var onListScroll: ((UIScrollView) -> Void)? {
+        get { listView.onScroll }
+        set { listView.onScroll = newValue }
+    }
+
     init(
         category: PostListCategoryItem,
         presenter: PostTextureListHostPresenterProtocol
