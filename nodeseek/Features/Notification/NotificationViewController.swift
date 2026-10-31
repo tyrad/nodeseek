@@ -36,6 +36,7 @@ final class NotificationViewController: UIViewController {
     private var unreadCount: NodeSeekNotificationUnreadCount = .zero
     private var currentUserID: Int?
     private var loadToken = 0
+    private var hasAppeared = false
 
     init(
         initialTab: NodeSeekNotificationTab = .atMe,
@@ -56,6 +57,18 @@ final class NotificationViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
+        loadCurrentUserID()
+        loadUnreadCount()
+        loadSelectedTab(showLoading: true)
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 首次出现已在 viewDidLoad 加载；之后每次回到本页（切 Tab、从详情返回）都静默刷新
+        guard hasAppeared else {
+            hasAppeared = true
+            return
+        }
         loadCurrentUserID()
         loadUnreadCount()
         loadSelectedTab(showLoading: true)
