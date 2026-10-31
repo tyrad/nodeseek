@@ -7,18 +7,10 @@
 
 import UIKit
 
+/// 帖子行。不用 Auto Layout，直接按 `PostSummaryLayout` 摆放，
+/// 行高和文字由列表在后台提前算好，滚动时主线程不再重复测量。
 final class PostSummaryCell: UITableViewCell {
     static let reuseIdentifier = "PostSummaryCell"
-
-    private enum Layout {
-        static let verticalSpacing: CGFloat = 5
-        static let contentInset = UIEdgeInsets(
-            top: PostListCellStyle.Layout.verticalContentInset,
-            left: 16,
-            bottom: PostListCellStyle.Layout.verticalContentInset,
-            right: 12
-        )
-    }
 
     private let avatarImageView: UIImageView = {
         let imageView = UIImageView()
@@ -26,7 +18,6 @@ final class PostSummaryCell: UITableViewCell {
         imageView.layer.cornerRadius = PostListCellStyle.Avatar.cornerRadius
         imageView.layer.masksToBounds = true
         imageView.backgroundColor = .systemGray5
-        imageView.translatesAutoresizingMaskIntoConstraints = false
         return imageView
     }()
 
@@ -44,18 +35,8 @@ final class PostSummaryCell: UITableViewCell {
         return label
     }()
 
-    private lazy var textStackView: UIStackView = {
-        let stack = UIStackView(arrangedSubviews: [titleLabel, metadataLabel])
-        stack.axis = .vertical
-        stack.spacing = Layout.verticalSpacing
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        return stack
-    }()
-
-    private var textLeadingWithAvatar: NSLayoutConstraint!
-    private var textLeadingWithoutAvatar: NSLayoutConstraint!
-    private var avatarBottomConstraint: NSLayoutConstraint!
     private var item: PostListItem?
+    private var layout: PostSummaryLayout?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -71,6 +52,7 @@ final class PostSummaryCell: UITableViewCell {
         AvatarImageLoader.shared.cancel(on: avatarImageView)
         avatarImageView.image = nil
         item = nil
+        layout = nil
     }
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -80,16 +62,14 @@ final class PostSummaryCell: UITableViewCell {
         applyCurrentTheme()
     }
 
-    func configure(with item: PostListItem) {
+    /// `layout` 由列表提供；为空时按当前宽度同步补算。
+    func configure(with item: PostListItem, layout: PostSummaryLayout? = nil) {
         let previousPostID = self.item?.post.id
         self.item = item
-        applyCurrentTheme()
+        apply(layout ?? makeLayout(for: item, width: contentView.bounds.width))
 
         let hasDisplayableAuthor = AuthorDisplayPolicy.isDisplayable(item.post.authorName)
         avatarImageView.isHidden = !hasDisplayableAuthor
-        textLeadingWithAvatar.isActive = hasDisplayableAuthor
-        textLeadingWithoutAvatar.isActive = !hasDisplayableAuthor
-        avatarBottomConstraint.isActive = hasDisplayableAuthor
 
         // 同一帖子仅刷新访问状态时不重复请求头像。
         guard hasDisplayableAuthor, previousPostID != item.post.id || avatarImageView.image == nil else { return }
@@ -100,16 +80,18 @@ final class PostSummaryCell: UITableViewCell {
 
     func applyCurrentTheme() {
         guard let item else { return }
-        let specialFollowRules = SpecialFollowKeywordStore.shared.rules
-        titleLabel.attributedText = PostSummaryText.titleAttributedText(
-            for: item.post,
-            isVisited: item.isVisited,
-            specialFollowRules: specialFollowRules
-        )
-        metadataLabel.attributedText = PostSummaryText.metadataAttributedText(
-            for: item.post,
-            specialFollowRules: specialFollowRules
-        )
+        apply(makeLayout(for: item, width: contentView.bounds.width))
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard let item else { return }
+        // 列表给的排版和实际宽度不一致时（如旋转、分屏）才补算。
+        if let layout, layout.context.width == contentView.bounds.width {
+            applyFrames()
+        } else {
+            apply(makeLayout(for: item, width: contentView.bounds.width))
+        }
     }
 
     var debugTitleAttributedText: NSAttributedString? {
@@ -120,43 +102,35 @@ final class PostSummaryCell: UITableViewCell {
         metadataLabel.attributedText
     }
 
+    private func makeLayout(for item: PostListItem, width: CGFloat) -> PostSummaryLayout {
+        PostSummaryLayout.make(
+            item: item,
+            context: .current(width: width, traitCollection: traitCollection)
+        )
+    }
+
+    private func apply(_ layout: PostSummaryLayout) {
+        self.layout = layout
+        titleLabel.attributedText = layout.title
+        metadataLabel.attributedText = layout.metadata
+        applyFrames()
+    }
+
+    private func applyFrames() {
+        guard let layout else { return }
+        if let avatarFrame = layout.avatarFrame {
+            avatarImageView.frame = avatarFrame
+        }
+        titleLabel.frame = layout.titleFrame
+        metadataLabel.frame = layout.metadataFrame
+    }
+
     private func setupUI() {
         selectionStyle = .none
         backgroundColor = .clear
         separatorInset = .zero
         contentView.addSubview(avatarImageView)
-        contentView.addSubview(textStackView)
-
-        let inset = Layout.contentInset
-        textLeadingWithAvatar = textStackView.leadingAnchor.constraint(
-            equalTo: avatarImageView.trailingAnchor,
-            constant: PostListCellStyle.Layout.horizontalSpacing
-        )
-        textLeadingWithoutAvatar = textStackView.leadingAnchor.constraint(
-            equalTo: contentView.leadingAnchor,
-            constant: inset.left
-        )
-        avatarBottomConstraint = contentView.bottomAnchor.constraint(
-            greaterThanOrEqualTo: avatarImageView.bottomAnchor,
-            constant: inset.bottom
-        )
-
-        NSLayoutConstraint.activate([
-            avatarImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: inset.left),
-            avatarImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: inset.top),
-            avatarImageView.widthAnchor.constraint(equalToConstant: PostListCellStyle.Avatar.size),
-            avatarImageView.heightAnchor.constraint(equalToConstant: PostListCellStyle.Avatar.size),
-            avatarBottomConstraint,
-
-            textLeadingWithAvatar,
-            textStackView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: inset.top),
-            textStackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -inset.right),
-            contentView.bottomAnchor.constraint(greaterThanOrEqualTo: textStackView.bottomAnchor, constant: inset.bottom)
-        ])
-
-        // 让行高贴合头像和文字中较高的一侧，而不是被拉伸。
-        let compactHeight = contentView.heightAnchor.constraint(equalToConstant: 0)
-        compactHeight.priority = .fittingSizeLevel
-        compactHeight.isActive = true
+        contentView.addSubview(titleLabel)
+        contentView.addSubview(metadataLabel)
     }
 }

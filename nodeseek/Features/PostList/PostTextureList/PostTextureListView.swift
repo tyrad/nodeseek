@@ -34,6 +34,10 @@ final class PostTextureListView: UIView {
     private let leadingScreensForBatching: CGFloat = 2.0
     private var skeletonRowCount: Int = 8
     private var lastBatchFetchRequestedItemCount: Int?
+    // 行排版缓存，按帖子 ID 存；数据到达时在后台提前算好，滚动时直接取行高和文字。
+    private var layoutCache: [String: PostSummaryLayout] = [:]
+    private let layoutQueue = DispatchQueue(label: "com.nodeseek.app.post-list-layout", qos: .userInitiated)
+    private var layoutWidth: CGFloat = 0
 
     private let loadMoreIndicator: UIActivityIndicatorView = {
         let indicator = UIActivityIndicatorView(style: .medium)
@@ -119,12 +123,14 @@ final class PostTextureListView: UIView {
         if displayMode != .content {
             self.items = items
             displayMode = .content
+            resetLayoutCache()
             reloadTable()
             return
         }
 
         if let appendIndexPaths = makeAppendIndexPaths(from: self.items, to: items) {
             self.items = items
+            prefetchLayouts(for: Array(items[appendIndexPaths[0].row...]))
             // 分页追加发生在滚动底部，关闭 row 插入动画可以避免调整 contentOffset 时牵动上方内容。
             UIView.performWithoutAnimation {
                 tableView.performBatchUpdates {
@@ -135,6 +141,7 @@ final class PostTextureListView: UIView {
         }
 
         self.items = items
+        resetLayoutCache()
         reloadTable()
     }
 
@@ -146,7 +153,7 @@ final class PostTextureListView: UIView {
         items[index] = PostListItem(post: existing.post, isVisited: isVisited)
         let indexPath = IndexPath(row: index, section: 0)
         if let cell = tableView.cellForRow(at: indexPath) as? PostSummaryCell {
-            cell.configure(with: items[index])
+            cell.configure(with: items[index], layout: layout(for: items[index]))
         }
     }
 
@@ -205,6 +212,7 @@ final class PostTextureListView: UIView {
     }
 
     func refreshVisibleAppearanceForCurrentTraits() {
+        resetLayoutCache()
         tableView.visibleCells.forEach { cell in
             (cell as? PostSummaryCell)?.applyCurrentTheme()
         }
@@ -216,6 +224,7 @@ final class PostTextureListView: UIView {
         tableView.delegate = self
         tableView.register(PostSummaryCell.self, forCellReuseIdentifier: PostSummaryCell.reuseIdentifier)
         tableView.register(PostSummarySkeletonCell.self, forCellReuseIdentifier: PostSummarySkeletonCell.reuseIdentifier)
+        // 帖子行高由 heightForRowAt 提供，骨架行仍按约束自适应。
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = estimatedSkeletonRowHeight
         tableView.backgroundColor = .clear
@@ -282,6 +291,7 @@ final class PostTextureListView: UIView {
         guard displayMode == .content else { return }
         // 字号变了缓存键会变，先预热再刷新。
         PostSummaryText.prewarmSymbolImages()
+        resetLayoutCache()
         reloadTable()
     }
 
@@ -293,6 +303,7 @@ final class PostTextureListView: UIView {
             return
         }
         guard displayMode == .content else { return }
+        resetLayoutCache()
         reloadTable()
     }
 
@@ -302,6 +313,14 @@ final class PostTextureListView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        let width = currentLayoutWidth()
+        if width != layoutWidth {
+            layoutWidth = width
+            if displayMode == .content, !items.isEmpty {
+                resetLayoutCache()
+                tableView.reloadData()
+            }
+        }
         guard displayMode == .skeleton else { return }
         let targetRowCount = currentSkeletonRowCount()
         guard targetRowCount != skeletonRowCount else { return }
@@ -312,6 +331,50 @@ final class PostTextureListView: UIView {
     private func reloadTable() {
         tableView.reloadData()
         scheduleBatchFetchCheck()
+    }
+
+    /// 行内容实际可用宽度；横屏时 cell 内容区会避开安全区。
+    private func currentLayoutWidth() -> CGFloat {
+        max(0, tableView.bounds.width - tableView.safeAreaInsets.left - tableView.safeAreaInsets.right)
+    }
+
+    private func currentLayoutContext() -> PostSummaryLayout.Context? {
+        let width = currentLayoutWidth()
+        guard width > 0 else { return nil }
+        return .current(width: width, traitCollection: tableView.traitCollection)
+    }
+
+    /// 取某行排版：缓存命中直接用，否则在主线程同步补算（后台还没算到这一行时）。
+    private func layout(for item: PostListItem) -> PostSummaryLayout? {
+        guard let context = currentLayoutContext() else { return nil }
+        if let cached = layoutCache[item.post.id], cached.matches(item, context: context) {
+            return cached
+        }
+        let layout = PostSummaryLayout.make(item: item, context: context)
+        layoutCache[item.post.id] = layout
+        return layout
+    }
+
+    private func resetLayoutCache() {
+        layoutCache.removeAll()
+        prefetchLayouts(for: items)
+    }
+
+    private func prefetchLayouts(for items: [PostListItem]) {
+        guard let context = currentLayoutContext() else { return }
+        let pending = items.filter { layoutCache[$0.post.id]?.matches($0, context: context) != true }
+        guard !pending.isEmpty else { return }
+        layoutQueue.async { [weak self] in
+            let layouts = pending.map { PostSummaryLayout.make(item: $0, context: context) }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                for layout in layouts {
+                    // 期间已被主线程补算或条件已变的不覆盖。
+                    guard self.layoutCache[layout.item.post.id]?.matches(layout.item, context: layout.context) != true else { continue }
+                    self.layoutCache[layout.item.post.id] = layout
+                }
+            }
+        }
     }
 
     private func currentSkeletonRowCount() -> Int {
@@ -341,7 +404,8 @@ extension PostTextureListView: UITableViewDataSource {
                 withIdentifier: PostSummaryCell.reuseIdentifier,
                 for: indexPath
             )
-            (cell as? PostSummaryCell)?.configure(with: items[indexPath.row])
+            let item = items[indexPath.row]
+            (cell as? PostSummaryCell)?.configure(with: item, layout: layout(for: item))
             return cell
         case .skeleton, .firstPageError:
             return tableView.dequeueReusableCell(
@@ -353,6 +417,16 @@ extension PostTextureListView: UITableViewDataSource {
 }
 
 extension PostTextureListView: UITableViewDelegate {
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        guard displayMode == .content, items.indices.contains(indexPath.row),
+              let layout = layout(for: items[indexPath.row]) else {
+            return UITableView.automaticDimension
+        }
+        // 设置行高时分割线占用行内高度，需要加回来，保持与自适应行高一致。
+        let separatorHeight = tableView.separatorStyle == .none ? 0 : 1 / layout.context.displayScale
+        return layout.height + separatorHeight
+    }
+
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         guard displayMode == .content else { return }
         tableView.deselectRow(at: indexPath, animated: true)
