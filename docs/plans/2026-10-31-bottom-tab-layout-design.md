@@ -2,6 +2,8 @@
 
 设计稿：
 - 多 Tab 布局：`docs/plans/assets/bottom-tab-mockup.png`（第四版）
+- 我的页：`docs/plans/assets/me-page-mockup.png`、`docs/plans/assets/me-page-v2-mockup.png`
+- 悬浮发帖：`docs/plans/assets/compose-button-mockup.png`
 - 布局选择页：`docs/plans/assets/layout-chooser-mockup.png`
 
 ## 目标
@@ -73,6 +75,7 @@
 
 ## 实现备注（2026-10-31）
 
-- 「我的」页第一版：账号卡片沿用侧边栏的头像 + 名字 + 统计文字，点进原生个人页看五格数字和今日进度；签到行进入现有签到页，暂不做行内签到按钮。
+- 「我的」页定稿方案 B（`docs/plans/assets/me-page-v2-mockup.png` 第三张）：资料卡合并账号、五格数字（等级 / 鸡腿 / 星辰 / 粉丝 / 关注）与升级进度条，今日 评论 / 发帖 进度做成进度条旁的一行摘要，避免与个人页重复；我的内容行右侧显示数量；签到行未签到显示描边「签到」，已签到显示「今日 +N 鸡腿」，点按进入现有签到页。
+- 悬浮发帖定稿方案 C（`docs/plans/assets/compose-button-mockup.png`）：玻璃胶囊 + 图标与「发帖」文字，iOS 26 用系统液态玻璃，更早系统用模糊材质 + 细描边。
 - 选择页缩略图暂用设计稿渲染图（`docs/plans/assets/layout-preview-render.html`），后续可换成真机截图。
 - 1.2.0 的「新功能」条目在版本号升到 1.2.0 时再补。
