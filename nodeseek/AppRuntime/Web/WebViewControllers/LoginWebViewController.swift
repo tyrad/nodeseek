@@ -8,7 +8,6 @@ import WebKit
 
 final class LoginWebViewController: BaseWebViewController {
     private let onClose: @MainActor () -> Void
-    private let readsAccountOnClose: Bool
 
     private let hintContainerView: UIView = {
         let view = UIView()
@@ -45,11 +44,9 @@ final class LoginWebViewController: BaseWebViewController {
     init(
         cookieSession: NodeSeekCookieSessionManaging? = nil,
         automaticallyLoadsPage: Bool = true,
-        readsAccountOnClose: Bool = true,
         onClose: @escaping @MainActor () -> Void = {}
     ) {
         self.onClose = onClose
-        self.readsAccountOnClose = readsAccountOnClose
         super.init(
             initialURL: NodeSeekSite.loginURL,
             pageTitle: "登录 NodeSeek",
@@ -119,44 +116,9 @@ final class LoginWebViewController: BaseWebViewController {
         Task { @MainActor [weak self] in
             guard let self else { return }
             await webViewContext.captureWebViewSession()
-            await saveAccountFromCurrentPage()
             NotificationCenter.default.post(name: .nodeSeekLoginSessionDidClose, object: nil)
             onClose()
             closeSelf()
-        }
-    }
-
-    /// 登录成功后当前页面里已有账号信息，直接解析存入缓存，
-    /// 各页面关闭后可立刻显示登录状态，不必等隐藏 WebView 重新抓首页（要好几秒）。
-    /// 解析不到（未登录或页面不含账号）就什么都不做，照旧由后台刷新确认。
-    private func saveAccountFromCurrentPage() async {
-        guard readsAccountOnClose, let html = await readCurrentPageHTML(), html.isEmpty == false else {
-            return
-        }
-        let account = await Task.detached(priority: .userInitiated) {
-            try? KannaNodeSeekParser(baseURL: NodeSeekSite.baseURL).parseAccount(html: html)
-        }.value
-        guard let account, account.isLoggedIn, account.profileURL != nil else { return }
-        await CurrentAccountStore.shared.save(account)
-        AppLog.debug(.account, "login: 关闭时从页面取到账号 -> \(account.displayName)")
-    }
-
-    /// 页面异常时 evaluateJavaScript 可能迟迟不回调，最多等 0.8 秒，避免关闭按钮卡住。
-    private func readCurrentPageHTML() async -> String? {
-        await withCheckedContinuation { continuation in
-            var isResumed = false
-            let finish: @MainActor (String?) -> Void = { html in
-                guard isResumed == false else { return }
-                isResumed = true
-                continuation.resume(returning: html)
-            }
-            webView.evaluateJavaScript(NodeSeekPageScripts.outerHTMLWithCapturedConfig) { result, _ in
-                MainActor.assumeIsolated { finish(result as? String) }
-            }
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 800_000_000)
-                finish(nil)
-            }
         }
     }
 

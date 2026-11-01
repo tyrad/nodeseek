@@ -18,8 +18,6 @@ protocol PostPageContainerViewControllerDelegate: AnyObject {
 final class PostPageContainerViewController: UIPageViewController {
 
     weak var eventDelegate: PostPageContainerViewControllerDelegate?
-    /// 当前分类列表的纵向滚动，用于首页悬浮按钮跟随滚动显隐。
-    var onListScroll: ((UIScrollView) -> Void)?
 
     var categories: [PostListCategoryItem] = []
     var hostViewControllers: [PostListCategoryItem: PostTextureListHostViewController] = [:]
@@ -65,11 +63,6 @@ final class PostPageContainerViewController: UIPageViewController {
                     delegate: self
                 )
                 newHosts[category] = host
-            }
-        }
-        for host in newHosts.values {
-            host.onListScroll = { [weak self] scrollView in
-                self?.onListScroll?(scrollView)
             }
         }
         hostViewControllers = newHosts

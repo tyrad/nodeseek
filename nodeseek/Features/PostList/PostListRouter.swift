@@ -13,7 +13,7 @@ class PostListRouter: PostListRouterProtocol {
     weak var viewController: UIViewController?
     
     // MARK: - Static Methods
-    static func createModule(layout: AppNavigationLayout = .reading) -> UIViewController {
+    static func createModule() -> UIViewController {
         let router = PostListRouter()
         let presenter = PostListPresenter(
             router: router,
@@ -22,7 +22,6 @@ class PostListRouter: PostListRouterProtocol {
         
         let view = PostListViewController(
             presenter: presenter,
-            layout: layout,
             visitedStore: VisitedPostStore.shared
         )
         

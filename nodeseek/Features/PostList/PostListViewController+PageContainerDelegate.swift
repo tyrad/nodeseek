@@ -47,8 +47,6 @@ extension PostListViewController: PostPageContainerViewControllerDelegate {
     }
 
     func postPageContainerViewControllerDidRequestLeadingSideMenu(_ containerView: PostPageContainerViewController) {
-        // 多 Tab 模式没有侧边栏
-        guard layout == .reading else { return }
         menuButtonFeedbackGenerator.impactOccurred()
         sideMenuViewController.show(animated: true)
     }

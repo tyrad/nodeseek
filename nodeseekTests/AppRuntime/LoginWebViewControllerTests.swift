@@ -36,7 +36,7 @@ struct LoginWebViewControllerTests {
     @Test func closeSyncsCookiesAndCallsCompletion() async throws {
         let cookieSession = SpyLoginCookieSession()
         var closeCount = 0
-        let viewController = LoginWebViewController(cookieSession: cookieSession, readsAccountOnClose: false) {
+        let viewController = LoginWebViewController(cookieSession: cookieSession) {
             closeCount += 1
         }
         viewController.loadViewIfNeeded()
@@ -50,29 +50,11 @@ struct LoginWebViewControllerTests {
         #expect(closeCount == 1)
     }
 
-    @Test func closeStillCompletesWhenPageAccountCannotBeRead() async throws {
-        let cookieSession = SpyLoginCookieSession()
-        var closeCount = 0
-        // 没加载页面时读取页面账号拿不到结果，关闭流程靠超时继续
-        let viewController = LoginWebViewController(cookieSession: cookieSession, automaticallyLoadsPage: false) {
-            closeCount += 1
-        }
-        viewController.loadViewIfNeeded()
-
-        let closeButton = try #require(viewController.navigationItem.rightBarButtonItem)
-        let action = try #require(closeButton.action)
-        _ = (closeButton.target as AnyObject).perform(action)
-        try await Task.sleep(nanoseconds: 1_500_000_000)
-
-        #expect(cookieSession.captureWebViewSessionCount == 1)
-        #expect(closeCount == 1)
-    }
-
     @Test func closeCancelsPendingInitialCookieSync() async throws {
         let cookieSession = SpyLoginCookieSession()
         cookieSession.suspendWebViewPreparation = true
         var closeCount = 0
-        let viewController = LoginWebViewController(cookieSession: cookieSession, readsAccountOnClose: false) {
+        let viewController = LoginWebViewController(cookieSession: cookieSession) {
             closeCount += 1
         }
         viewController.loadViewIfNeeded()

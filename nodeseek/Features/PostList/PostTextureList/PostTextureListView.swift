@@ -23,7 +23,6 @@ final class PostTextureListView: UIView {
     }
 
     weak var delegate: PostTextureListViewDelegate?
-    var onScroll: ((UIScrollView) -> Void)?
 
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let refreshControl = UIRefreshControl()
@@ -447,7 +446,6 @@ extension PostTextureListView: UITableViewDelegate {
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         requestBatchFetchIfNeeded()
-        onScroll?(scrollView)
     }
 
     /// 距离底部不足 leadingScreensForBatching 屏时提前请求下一页。
