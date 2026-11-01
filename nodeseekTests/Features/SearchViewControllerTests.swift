@@ -145,6 +145,35 @@ struct SearchViewControllerTests {
         #expect(store.records().first?.category == .all)
         #expect(preferenceStore.category() == .all)
     }
+
+    @Test func submittingSearchKeepsFormPositionAndIgnoresEmptyQuery() throws {
+        let store = makeSearchHistoryStore()
+        let service = NodeSeekService(
+            htmlClient: StaticSearchHTMLClient(html: "<html><body></body></html>"),
+            parser: EmptyPostListParser()
+        )
+        let viewController = SearchViewController(
+            service: service,
+            searchHistoryStore: store,
+            searchPreferenceStore: makeSearchPreferenceStore()
+        )
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.view.layoutIfNeeded()
+        let keywordTextField = try #require(viewController.view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
+        let searchButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "search-submit-button"))
+        let initialTop = try inputRowTop(in: viewController.view)
+
+        keywordTextField.text = "   "
+        searchButton.sendActions(for: .touchUpInside)
+        #expect(store.records().isEmpty)
+        #expect(viewController.presentedViewController == nil)
+
+        keywordTextField.text = "美西"
+        searchButton.sendActions(for: .touchUpInside)
+        viewController.view.layoutIfNeeded()
+        #expect(abs(try inputRowTop(in: viewController.view) - initialTop) < 0.5)
+    }
 }
 
 private func makeSearchHistoryStore() -> SearchHistoryStore {

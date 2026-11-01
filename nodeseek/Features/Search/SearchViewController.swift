@@ -32,7 +32,6 @@ final class SearchViewController: UIViewController {
     private var isLoadingFirstPage = false
     private var isRefreshing = false
     private var isLoadingMore = false
-    private var formTopConstraint: NSLayoutConstraint?
     private var loadTask: Task<Void, Never>?
 
     private let formContainerView: UIView = {
@@ -230,14 +229,9 @@ final class SearchViewController: UIViewController {
         view.addSubview(listView)
         formContainerView.addSubview(formStackView)
 
-        let formTopConstraint = formContainerView.topAnchor.constraint(
-            equalTo: view.safeAreaLayoutGuide.topAnchor,
-            constant: 104
-        )
-        formTopConstraint.isActive = true
-        self.formTopConstraint = formTopConstraint
-
         NSLayoutConstraint.activate([
+            // 搜索框固定在顶部：搜索时不再移动布局，避免和键盘收起动画叠在一起。
+            formContainerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
             formContainerView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),
             formContainerView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
 
@@ -308,16 +302,11 @@ final class SearchViewController: UIViewController {
         categorySelectorButton.menu = makeCategoryMenu()
     }
 
-    private func pinFormToTopIfNeeded() {
+    private func showResultsIfNeeded() {
         guard !hasSearched else { return }
         hasSearched = true
-        formTopConstraint?.constant = 16
         listView.isHidden = false
         recentSearchesContainerView.isHidden = true
-
-        UIView.animate(withDuration: 0.24, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) {
-            self.view.layoutIfNeeded()
-        }
     }
 
     private func makeCategoryMenu() -> UIMenu {
@@ -344,15 +333,16 @@ final class SearchViewController: UIViewController {
     private func submitSearch() {
         let query = keywordTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !query.isEmpty else {
-            showError(message: "请输入搜索关键字。")
+            // 空关键字只聚焦输入框，不在键盘弹起时弹窗，减少键盘视图切换。
+            keywordTextField.becomeFirstResponder()
             return
         }
 
-        view.endEditing(true)
+        keywordTextField.resignFirstResponder()
         searchHistoryStore.record(query: query, category: selectedCategory)
         searchPreferenceStore.rememberCategory(selectedCategory)
         renderRecentSearches()
-        pinFormToTopIfNeeded()
+        showResultsIfNeeded()
         startFirstPageLoad(request: SearchRequest(query: query, category: selectedCategory))
     }
 
