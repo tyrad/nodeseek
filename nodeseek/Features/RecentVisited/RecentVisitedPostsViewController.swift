@@ -9,6 +9,9 @@ import UIKit
 
 final class RecentVisitedPostsViewController: UITableViewController {
     var onSelectRecord: ((VisitedPostRecord) -> Void)?
+    /// 作为底部 Tab 常驻时，每次回到本页都重新读取，显示刚看过的帖子。
+    var reloadsOnAppear = false
+    private var hasAppeared = false
 
     private let visitedStore: VisitedPostStoreProtocol
     private var records: [VisitedPostRecord] = []
@@ -46,6 +49,17 @@ final class RecentVisitedPostsViewController: UITableViewController {
         )
         navigationItem.rightBarButtonItem?.accessibilityLabel = "清扫浏览记录"
         loadNextPageIfNeeded()
+        renderEmptyStateIfNeeded()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        defer { hasAppeared = true }
+        guard reloadsOnAppear, hasAppeared else { return }
+        records.removeAll()
+        hasMoreRecords = true
+        loadNextPageIfNeeded()
+        tableView.reloadData()
         renderEmptyStateIfNeeded()
     }
 

@@ -1,0 +1,167 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>我的页设计</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#e9ebee;font-family:-apple-system,"PingFang SC","SF Pro Text",sans-serif;padding:48px 48px 40px;color:#111;width:1872px;-webkit-font-smoothing:antialiased}
+h1{font-size:32px;font-weight:700;letter-spacing:-.5px}
+.sub{color:#6b6b70;font-size:15px;margin:6px 0 22px}
+.rules{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:40px}
+.rule{background:#fff;border-radius:16px;padding:14px 16px;font-size:13px;line-height:1.55;color:#48484c}
+.rule b{display:block;color:#111;font-size:14px;margin-bottom:4px}
+.row{display:flex;gap:48px}.cell{width:390px}
+.cap{margin-top:18px;font-size:13.5px;line-height:1.65;color:#3a3a3e}.cap b{display:block;font-size:16px;margin-bottom:4px;color:#111}
+.num{font-variant-numeric:tabular-nums}
+.phone{--bg:#fff;--bg2:#f2f2f7;--card:#fff;--label:#000;--label2:rgba(60,60,67,.6);--label3:rgba(60,60,67,.3);--sep:rgba(60,60,67,.12);--fill:rgba(120,120,128,.12);--glass:rgba(255,255,255,.72);--glass-b:rgba(0,0,0,.06);--red:#FF3B30;--orange:#FF9500;--indigo:#5856D6;--sortbg:#3a3a3c;
+position:relative;width:390px;height:844px;border-radius:55px;background:var(--bg);color:var(--label);overflow:hidden;box-shadow:0 0 0 10px #18181a,0 30px 60px rgba(0,0,0,.25)}
+.phone.grouped{--bg:#f2f2f7}
+.phone.dark{--bg:#000;--bg2:#000;--card:#1c1c1e;--label:#fff;--label2:rgba(235,235,245,.6);--label3:rgba(235,235,245,.3);--sep:rgba(84,84,88,.55);--fill:rgba(120,120,128,.3);--glass:rgba(40,40,42,.72);--glass-b:rgba(255,255,255,.08);--red:#FF453A;--sortbg:#48484a}
+svg{display:block;flex:none}
+.status{height:54px;display:flex;align-items:center;justify-content:space-between;padding:8px 36px 0 48px;font-weight:600;font-size:17px}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:124px;height:36px;border-radius:20px;background:#000;z-index:5}
+.bat{width:25px;height:12px;border:1.5px solid currentColor;border-radius:4px;position:relative}
+.bat::after{content:"";position:absolute;inset:1.5px;width:72%;background:currentColor;border-radius:1.5px}
+.home{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:var(--label);z-index:9}
+/* 首页顶部 */
+.top{height:52px;display:flex;align-items:center;padding:0 12px 0 20px;gap:4px}
+.cats{flex:1;display:flex;gap:22px;font-size:19px;color:var(--label2);white-space:nowrap;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent)}
+.cats .on{color:var(--label);font-weight:600;position:relative}
+.cats .on::after{content:"";position:absolute;left:50%;transform:translateX(-50%);bottom:-9px;width:26px;height:3px;border-radius:2px;background:var(--label)}
+.ib{width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--label)}
+.post{display:flex;gap:12px;padding:12px 20px 12px 16px;position:relative}
+.post+.post::before{content:"";position:absolute;left:0;right:0;top:0;height:.5px;background:var(--sep)}
+.av{width:40px;height:40px;border-radius:10px;flex:none;background:var(--tone);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.92);font-size:16px;font-weight:600}
+.pt{font-size:17px;line-height:23px}
+.pm{display:flex;align-items:center;gap:10px;margin-top:5px;font-size:13px;color:var(--label2)}
+.pm span{display:flex;align-items:center;gap:3px}
+.sort{position:absolute;right:0;bottom:300px;width:52px;height:44px;border-radius:22px 0 0 22px;background:var(--sortbg);display:flex;align-items:center;padding-left:15px;color:#fff;opacity:.92}
+/* 浮动玻璃 Tab 栏 */
+.fade{position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(transparent,var(--bg) 70%);pointer-events:none}
+.tabs{position:absolute;left:20px;right:20px;bottom:26px;height:62px;border-radius:31px;background:var(--glass);border:.5px solid var(--glass-b);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 6px 24px rgba(0,0,0,.13),0 0 0 .5px rgba(0,0,0,.04);display:flex;align-items:center;padding:4px}
+.tab{flex:1;height:54px;border-radius:27px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10.5px;font-weight:600;color:var(--label);position:relative}
+.tab.on{background:var(--fill)}
+.tab:not(.on){color:var(--label2)}
+.bd{position:absolute;top:5px;left:calc(50% + 5px);min-width:17px;height:17px;padding:0 5px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.fab{position:absolute;right:20px;bottom:106px;width:56px;height:56px;border-radius:28px;background:var(--label);color:var(--bg);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.dark .fab{box-shadow:none}
+/* 大标题页 */
+.nav{height:52px;display:flex;align-items:center;justify-content:flex-end;padding:0 16px;gap:8px}
+.gbtn{height:40px;min-width:40px;border-radius:20px;background:var(--card);display:flex;align-items:center;justify-content:center;gap:5px;font-size:14.5px;font-weight:600;padding:0 10px}
+.big{font-size:34px;font-weight:700;letter-spacing:-.4px;padding:0 20px 12px}
+.seg{margin:0 16px 4px;background:var(--fill);border-radius:10px;padding:2px;display:flex;font-size:13.5px;font-weight:500}
+.seg div{flex:1;text-align:center;line-height:30px;border-radius:8px}
+.seg .on{background:var(--card);font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.gtitle{display:flex;justify-content:space-between;margin:20px 32px 7px;font-size:13px;color:var(--label2)}
+.card{margin:0 16px;background:var(--card);border-radius:14px;overflow:hidden}
+.nt{display:flex;gap:12px;padding:12px 16px;position:relative}
+.nt+.nt::before{content:"";position:absolute;left:64px;right:0;top:0;height:.5px;background:var(--sep)}
+.nt .av{width:36px;height:36px;border-radius:9px;font-size:14px}
+.nt .w{font-size:15px;font-weight:600;display:flex;align-items:center;gap:6px}
+.nt .w small{font-weight:400;font-size:13px;color:var(--label2)}
+.nt .w i{margin-left:auto;width:8px;height:8px;border-radius:4px;background:var(--red)}
+.nt .x{font-size:15px;line-height:21px;margin-top:3px}
+.nt .s{font-size:13px;color:var(--label2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:270px}
+.head{display:flex;gap:14px;align-items:center;padding:0 20px}
+.head .av{width:64px;height:64px;border-radius:15px;font-size:22px}
+.head h2{font-size:22px;font-weight:700}
+.head .m{font-size:13px;color:var(--label2);margin-top:3px}
+.head .go{margin-left:auto;color:var(--label3)}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);margin:16px 16px 0;background:var(--card);border-radius:14px;padding:13px 0 11px}
+.stat{text-align:center;position:relative}
+.stat+.stat::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:.5px;background:var(--sep)}
+.stat b{display:block;font-size:19px;font-weight:700}
+.stat span{font-size:12px;color:var(--label2)}
+.item{display:flex;align-items:center;height:46px;padding:0 14px 0 16px;font-size:16px;position:relative}
+.item+.item::before{content:"";position:absolute;left:50px;right:0;top:0;height:.5px;background:var(--sep)}
+.item .ic{margin-right:14px}
+.item .t{flex:1}.item .n{color:var(--label2);margin-right:8px;font-size:15px}
+.chk{height:28px;padding:0 12px;border-radius:14px;background:var(--label);color:var(--bg);font-size:13px;font-weight:600;display:flex;align-items:center;margin-right:2px}
+
+body{width:1446px}
+.phone{--indigo:#5856D6;--orange:#FF9500;--blue:#007AFF;--teal:#30B0C7;--pink:#FF2D55}
+.phone.dark{--indigo:#5E5CE6;--orange:#FF9F0A;--blue:#0A84FF;--teal:#40C8E0;--pink:#FF375F}
+.hd{display:flex;align-items:center;justify-content:space-between;padding:6px 20px 14px}
+.hd h1{font-size:34px;font-weight:700;letter-spacing:-.4px}
+.glass{width:40px;height:40px;border-radius:20px;background:var(--card);display:flex;align-items:center;justify-content:center}
+.pc{margin:0 16px;background:var(--card);border-radius:18px;overflow:hidden}
+.pr{display:flex;align-items:center;gap:14px;padding:16px 16px 14px}
+.pr .av{width:64px;height:64px;border-radius:16px;font-size:24px}
+.pr h2{font-size:22px;font-weight:700;letter-spacing:-.2px;display:flex;align-items:center;gap:6px}
+.pr .m{font-size:13px;color:var(--label2);margin-top:4px}
+.pr .go{margin-left:auto;display:flex;align-items:center;gap:2px;font-size:13px;color:var(--label2)}
+.g5{display:grid;grid-template-columns:repeat(5,1fr);border-top:.5px solid var(--sep);padding:12px 0 12px}
+.g5 div{text-align:center;position:relative}
+.g5 div+div::before{content:"";position:absolute;left:0;top:5px;bottom:5px;width:.5px;background:var(--sep)}
+.g5 b{display:block;font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.g5 span{font-size:12px;color:var(--label2)}
+.st{display:flex;justify-content:space-between;align-items:baseline;margin:20px 32px 8px;font-size:13px;color:var(--label2)}
+.prog{margin:0 16px;background:var(--card);border-radius:18px;padding:14px 16px 16px}
+.lvl{display:flex;justify-content:space-between;align-items:baseline;font-size:15px}
+.lvl b{font-weight:700}.lvl span{font-size:13px;color:var(--label2);font-variant-numeric:tabular-nums}
+.bar{height:6px;border-radius:3px;background:var(--fill);overflow:hidden;margin-top:9px}
+.bar i{display:block;height:100%;border-radius:3px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.tile{background:var(--bg2);border-radius:12px;padding:10px 12px 11px}
+.dark .tile{background:rgba(120,120,128,.16)}
+.tile .t{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600}
+.tile .v{font-size:13px;color:var(--label2);font-weight:500;font-variant-numeric:tabular-nums}
+.tile .v.done{color:var(--label);font-weight:700}
+.tile .bar{margin-top:8px;height:5px}
+.cbtn{height:24px;padding:0 10px;border-radius:12px;background:var(--label);color:var(--bg);font-size:12.5px;font-weight:700;display:flex;align-items:center}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 16px}
+.ct{background:var(--card);border-radius:16px;padding:13px 14px 12px}
+.ct .ic{color:var(--label)}
+.ct b{display:block;font-size:20px;font-weight:700;margin-top:10px;font-variant-numeric:tabular-nums}
+.ct span{font-size:13px;color:var(--label2)}
+.ct.off b{color:var(--label3)}
+.lst{margin:12px 16px 0;background:var(--card);border-radius:16px;overflow:hidden}
+.li{display:flex;align-items:center;height:48px;padding:0 14px 0 16px;font-size:16px;gap:14px}
+.li .t{flex:1}
+.login{padding:18px 16px 16px;display:flex;align-items:center;gap:14px}
+.login .av{width:64px;height:64px;border-radius:16px;background:var(--fill);display:flex;align-items:center;justify-content:center;color:var(--label3)}
+.login h2{font-size:20px;font-weight:700}.login .m{font-size:13px;color:var(--label2);margin-top:4px;line-height:1.4}
+.lbtn{margin-left:auto;height:34px;padding:0 16px;border-radius:17px;background:var(--label);color:var(--bg);font-size:15px;font-weight:600;display:flex;align-items:center;flex:none}
+.hint{margin:10px 32px 0;font-size:13px;color:var(--label2);line-height:1.5}
+</style></head><body>
+<h1>“我的”页 · 设计稿</h1>
+<p class="sub">与原生个人页定稿同一套视觉：灰底白卡、圆角 18、黑白高对比；只有进度条带系统色。设置收在右上角齿轮。</p>
+<div class="rules">
+  <div class="rule"><b>账号卡</b>头像 64 + 名字 22pt 粗体 + UID · 加入天数；下半部五格数字（等级 / 鸡腿 / 星辰 / 粉丝 / 关注），点卡片进入个人主页。</div>
+  <div class="rule"><b>今日进度</b>升级进度条（indigo）+ 2×2 小格：签到 / 发帖 / 评论 / 投喂。未签到时“签到”格显示黑色“签到”小按钮，点了直接签。</div>
+  <div class="rule"><b>我的内容</b>帖子 / 评论 / 收藏做成三个并排小卡，大数字一眼看到；下方列表放最近浏览。</div>
+  <div class="rule"><b>未登录</b>账号卡换成“登录”引导；进度卡隐藏；内容小卡数字变灰，点按先去登录。</div>
+</div>
+<div class="row" id="row"></div>
+<script>
+const S=(p,w=22,sw=1.7,f='none')=>`<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="${f}" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const P={search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',grid:'<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>',
+pen:'<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',sort:'<path d="M8 4v16M4 8l4-4 4 4M16 20V4M12 16l4 4 4-4"/>',
+eye:'<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',bub:'<path d="M4 5h16v11H9l-5 4z"/>',
+doc:'<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M9 8h6M9 12h6M9 16h3"/>',star:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>',seal:'<circle cx="12" cy="12" r="8.5"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+check:'<path d="m4 12 5 5L20 6"/>',chev:'<path d="m9 6 6 6-6 6"/>',pin:'<path d="M15 3l6 6-3 1-4 4 1 5-2 1-4-4-5 5M9 12l3-4 1-3z"/>',
+house:'<path d="M4 11 12 4l8 7v9h-5.5v-6h-5v6H4z"/>',bell:'<path d="M12 3.5a6 6 0 0 0-6 6V15l-2 3.5h16L18 15V9.5a6 6 0 0 0-6-6z"/><path d="M9.5 21a2.5 2.5 0 0 0 5 0"/>',person:'<circle cx="12" cy="8" r="4.2"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7z"/>'};
+const ST=`<div class="island"></div><div class="status"><span>9:41</span><div class="bat"></div></div>`;
+const tabbar=on=>`<div class="tabs">${[['house','首页'],['bell','通知'],['person','我的']].map(([i,t],k)=>`<div class="tab ${k==on?'on':''}">${S(P[i],24,1.7,k==on?'currentColor':'none')}${t}${k==1&&on!=1?'<span class="bd">3</span>':''}</div>`).join('')}</div>${on==0?`<div class="fab">${S(P.pen,24,2)}</div>`:''}<div class="home"></div>`;
+
+const ch=`<span style="color:var(--label3)">${S(P.chev,15,2)}</span>`;
+const prog=(signed)=>`<div class="st"><span>今日进度</span><span>10 月 31 日</span></div>
+<div class="prog"><div class="lvl"><b>距 Lv 5 还差 742 鸡腿</b><span>1758 / 2500</span></div><div class="bar"><i style="width:70%;background:var(--indigo)"></i></div>
+<div class="g2">
+<div class="tile"><div class="t">签到${signed?'<span class="v done">+6 ✓</span>':'<span class="cbtn">签到</span>'}</div><div class="bar"><i style="width:${signed?100:0}%;background:var(--orange)"></i></div></div>
+<div class="tile"><div class="t">发帖<span class="v">0 / 20</span></div><div class="bar"><i style="width:0%;background:var(--blue)"></i></div></div>
+<div class="tile"><div class="t">评论<span class="v">3 / 20</span></div><div class="bar"><i style="width:15%;background:var(--teal)"></i></div></div>
+<div class="tile"><div class="t">免费投喂<span class="v">0 / 3</span></div><div class="bar"><i style="width:0%;background:var(--pink)"></i></div></div>
+</div></div>`;
+const content=(off)=>`<div class="st"><span>我的内容</span></div><div class="g3">
+<div class="ct ${off?'off':''}"><span class="ic">${S(P.doc,22)}</span><b>${off?'–':'19'}</b><span>帖子</span></div>
+<div class="ct ${off?'off':''}"><span class="ic">${S(P.bub,22)}</span><b>${off?'–':'550'}</b><span>评论</span></div>
+<div class="ct ${off?'off':''}"><span class="ic">${S('<path d="M6 3h12v18l-6-4-6 4z"/>',22)}</span><b>${off?'–':'58'}</b><span>收藏</span></div></div>
+<div class="lst"><div class="li">${S(P.clock,21)}<span class="t">最近浏览</span>${ch}</div></div>`;
+const me=(d,signed)=>`<div class="phone grouped ${d?'dark':''}">${ST}<div class="hd"><h1>我的</h1><div class="glass">${S(P.gear,20)}</div></div>
+<div class="pc"><div class="pr"><div class="av" style="--tone:#7a5a3e">缭</div><div><h2>缭雾</h2><div class="m">UID 31037 · 加入 551 天</div></div><span class="go">主页${S(P.chev,14,2)}</span></div>
+<div class="g5">${[['Lv 4','等级'],['1758','鸡腿'],['11','星辰'],['3','粉丝'],['0','关注']].map(s=>`<div><b>${s[0]}</b><span>${s[1]}</span></div>`).join('')}</div></div>
+${prog(signed)}${content(false)}<div class="fade"></div>${tabbar(2)}</div>`;
+const guest=`<div class="phone grouped">${ST}<div class="hd"><h1>我的</h1><div class="glass">${S(P.gear,20)}</div></div>
+<div class="pc"><div class="login"><div class="av">${S(P.person,30,1.6)}</div><div><h2>未登录</h2><div class="m">登录后查看等级、鸡腿<br>和今日进度</div></div><span class="lbtn">登录</span></div></div>
+${content(true)}<p class="hint">帖子、评论、收藏和签到需要登录；最近浏览保存在本机，不登录也能看。</p><div class="fade"></div>${tabbar(2)}</div>`;
+const cap=(t,s)=>`<div class="cap"><b>${t}</b>${s}</div>`;
+document.getElementById('row').innerHTML=[[me(0,0),cap('① 已登录 · 未签到','“签到”格是黑色小按钮，点按直接签到，成功后变为“+6 ✓”。')],[me(1,1),cap('② 已登录 · 已签到 · 深色','系统动态色；进度条用系统色的深色变体。')],[guest,cap('③ 未登录','只保留登录引导、灰掉的内容入口和最近浏览。')]].map(x=>`<div class="cell">${x.join('')}</div>`).join('');
+</script></body></html>

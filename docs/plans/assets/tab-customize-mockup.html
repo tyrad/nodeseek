@@ -1,0 +1,237 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>自定义底部栏</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#e9ebee;font-family:-apple-system,"PingFang SC","SF Pro Text",sans-serif;padding:48px 48px 40px;color:#111;width:1872px;-webkit-font-smoothing:antialiased}
+h1{font-size:32px;font-weight:700;letter-spacing:-.5px}
+.sub{color:#6b6b70;font-size:15px;margin:6px 0 22px}
+.rules{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:40px}
+.rule{background:#fff;border-radius:16px;padding:14px 16px;font-size:13px;line-height:1.55;color:#48484c}
+.rule b{display:block;color:#111;font-size:14px;margin-bottom:4px}
+.row{display:flex;gap:48px}.cell{width:390px}
+.cap{margin-top:18px;font-size:13.5px;line-height:1.65;color:#3a3a3e}.cap b{display:block;font-size:16px;margin-bottom:4px;color:#111}
+.num{font-variant-numeric:tabular-nums}
+.phone{--bg:#fff;--bg2:#f2f2f7;--card:#fff;--label:#000;--label2:rgba(60,60,67,.6);--label3:rgba(60,60,67,.3);--sep:rgba(60,60,67,.12);--fill:rgba(120,120,128,.12);--glass:rgba(255,255,255,.72);--glass-b:rgba(0,0,0,.06);--red:#FF3B30;--orange:#FF9500;--indigo:#5856D6;--sortbg:#3a3a3c;
+position:relative;width:390px;height:844px;border-radius:55px;background:var(--bg);color:var(--label);overflow:hidden;box-shadow:0 0 0 10px #18181a,0 30px 60px rgba(0,0,0,.25)}
+.phone.grouped{--bg:#f2f2f7}
+.phone.dark{--bg:#000;--bg2:#000;--card:#1c1c1e;--label:#fff;--label2:rgba(235,235,245,.6);--label3:rgba(235,235,245,.3);--sep:rgba(84,84,88,.55);--fill:rgba(120,120,128,.3);--glass:rgba(40,40,42,.72);--glass-b:rgba(255,255,255,.08);--red:#FF453A;--sortbg:#48484a}
+svg{display:block;flex:none}
+.status{height:54px;display:flex;align-items:center;justify-content:space-between;padding:8px 36px 0 48px;font-weight:600;font-size:17px}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:124px;height:36px;border-radius:20px;background:#000;z-index:5}
+.bat{width:25px;height:12px;border:1.5px solid currentColor;border-radius:4px;position:relative}
+.bat::after{content:"";position:absolute;inset:1.5px;width:72%;background:currentColor;border-radius:1.5px}
+.home{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:var(--label);z-index:9}
+/* 首页顶部 */
+.top{height:52px;display:flex;align-items:center;padding:0 12px 0 20px;gap:4px}
+.cats{flex:1;display:flex;gap:22px;font-size:19px;color:var(--label2);white-space:nowrap;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent)}
+.cats .on{color:var(--label);font-weight:600;position:relative}
+.cats .on::after{content:"";position:absolute;left:50%;transform:translateX(-50%);bottom:-9px;width:26px;height:3px;border-radius:2px;background:var(--label)}
+.ib{width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--label)}
+.post{display:flex;gap:12px;padding:12px 20px 12px 16px;position:relative}
+.post+.post::before{content:"";position:absolute;left:0;right:0;top:0;height:.5px;background:var(--sep)}
+.av{width:40px;height:40px;border-radius:10px;flex:none;background:var(--tone);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.92);font-size:16px;font-weight:600}
+.pt{font-size:17px;line-height:23px}
+.pm{display:flex;align-items:center;gap:10px;margin-top:5px;font-size:13px;color:var(--label2)}
+.pm span{display:flex;align-items:center;gap:3px}
+.sort{position:absolute;right:0;bottom:300px;width:52px;height:44px;border-radius:22px 0 0 22px;background:var(--sortbg);display:flex;align-items:center;padding-left:15px;color:#fff;opacity:.92}
+/* 浮动玻璃 Tab 栏 */
+.fade{position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(transparent,var(--bg) 70%);pointer-events:none}
+.tabs{position:absolute;left:20px;right:20px;bottom:26px;height:62px;border-radius:31px;background:var(--glass);border:.5px solid var(--glass-b);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 6px 24px rgba(0,0,0,.13),0 0 0 .5px rgba(0,0,0,.04);display:flex;align-items:center;padding:4px}
+.tab{flex:1;height:54px;border-radius:27px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10.5px;font-weight:600;color:var(--label);position:relative}
+.tab.on{background:var(--fill)}
+.tab:not(.on){color:var(--label2)}
+.bd{position:absolute;top:5px;left:calc(50% + 5px);min-width:17px;height:17px;padding:0 5px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.fab{position:absolute;right:20px;bottom:106px;width:56px;height:56px;border-radius:28px;background:var(--label);color:var(--bg);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.dark .fab{box-shadow:none}
+/* 大标题页 */
+.nav{height:52px;display:flex;align-items:center;justify-content:flex-end;padding:0 16px;gap:8px}
+.gbtn{height:40px;min-width:40px;border-radius:20px;background:var(--card);display:flex;align-items:center;justify-content:center;gap:5px;font-size:14.5px;font-weight:600;padding:0 10px}
+.big{font-size:34px;font-weight:700;letter-spacing:-.4px;padding:0 20px 12px}
+.seg{margin:0 16px 4px;background:var(--fill);border-radius:10px;padding:2px;display:flex;font-size:13.5px;font-weight:500}
+.seg div{flex:1;text-align:center;line-height:30px;border-radius:8px}
+.seg .on{background:var(--card);font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.gtitle{display:flex;justify-content:space-between;margin:20px 32px 7px;font-size:13px;color:var(--label2)}
+.card{margin:0 16px;background:var(--card);border-radius:14px;overflow:hidden}
+.nt{display:flex;gap:12px;padding:12px 16px;position:relative}
+.nt+.nt::before{content:"";position:absolute;left:64px;right:0;top:0;height:.5px;background:var(--sep)}
+.nt .av{width:36px;height:36px;border-radius:9px;font-size:14px}
+.nt .w{font-size:15px;font-weight:600;display:flex;align-items:center;gap:6px}
+.nt .w small{font-weight:400;font-size:13px;color:var(--label2)}
+.nt .w i{margin-left:auto;width:8px;height:8px;border-radius:4px;background:var(--red)}
+.nt .x{font-size:15px;line-height:21px;margin-top:3px}
+.nt .s{font-size:13px;color:var(--label2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:270px}
+.head{display:flex;gap:14px;align-items:center;padding:0 20px}
+.head .av{width:64px;height:64px;border-radius:15px;font-size:22px}
+.head h2{font-size:22px;font-weight:700}
+.head .m{font-size:13px;color:var(--label2);margin-top:3px}
+.head .go{margin-left:auto;color:var(--label3)}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);margin:16px 16px 0;background:var(--card);border-radius:14px;padding:13px 0 11px}
+.stat{text-align:center;position:relative}
+.stat+.stat::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:.5px;background:var(--sep)}
+.stat b{display:block;font-size:19px;font-weight:700}
+.stat span{font-size:12px;color:var(--label2)}
+.item{display:flex;align-items:center;height:46px;padding:0 14px 0 16px;font-size:16px;position:relative}
+.item+.item::before{content:"";position:absolute;left:50px;right:0;top:0;height:.5px;background:var(--sep)}
+.item .ic{margin-right:14px}
+.item .t{flex:1}.item .n{color:var(--label2);margin-right:8px;font-size:15px}
+.chk{height:28px;padding:0 12px;border-radius:14px;background:var(--label);color:var(--bg);font-size:13px;font-weight:600;display:flex;align-items:center;margin-right:2px}
+
+body{width:1446px}
+.mini{width:146px;height:316px;border-radius:20px;overflow:hidden;position:relative;margin:0 auto}
+.mini>.phone{transform:scale(.374);transform-origin:0 0;box-shadow:none;border-radius:0}
+.ch{padding:0 20px}
+.ch h2{font-size:30px;font-weight:700;letter-spacing:-.4px;text-align:center;margin-top:18px}
+.ch p.d{font-size:15px;color:var(--label2);text-align:center;margin-top:8px;line-height:1.5}
+.opts{display:flex;gap:12px;margin-top:24px}
+.opt{flex:1;background:var(--card);border-radius:18px;padding:14px 10px 16px;border:2px solid transparent;position:relative}
+.opt.on{border-color:var(--label)}
+.opt .mini{box-shadow:0 0 0 .5px var(--sep),0 4px 14px rgba(0,0,0,.08)}
+.opt h3{font-size:17px;font-weight:700;text-align:center;margin-top:14px}
+.opt .x{font-size:13px;color:var(--label2);text-align:center;margin-top:5px;line-height:1.45;padding:0 4px}
+.radio{width:24px;height:24px;border-radius:12px;border:1.5px solid var(--label3);margin:12px auto 0;display:flex;align-items:center;justify-content:center}
+.opt.on .radio{background:var(--label);border-color:var(--label);color:var(--bg)}
+.cta{position:absolute;left:20px;right:20px;bottom:44px}
+.cta .b{height:52px;border-radius:26px;background:var(--label);color:var(--bg);font-size:17px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.cta .f{font-size:13px;color:var(--label2);text-align:center;margin-top:12px}
+.lvbtn{color:var(--label)}
+.sett .card{margin-bottom:0}
+.item .v{color:var(--label2);font-size:15px;margin-right:6px}
+.sheetbg{position:absolute;inset:0;background:rgba(0,0,0,.25)}
+
+body{width:2238px}
+.rules{grid-template-columns:repeat(5,1fr)}
+.cust .nav{justify-content:space-between}
+.cust .big{font-size:30px;padding-bottom:4px}
+.cust .lead{font-size:14px;color:var(--label2);padding:0 20px;line-height:1.5}
+.pv{margin:12px 16px 0;height:112px;border-radius:18px;background:var(--bg2);position:relative;overflow:hidden;box-shadow:inset 0 0 0 .5px var(--sep)}
+.grouped .pv{background:var(--card)}
+.pv .tabs{left:10px;right:10px;bottom:10px}
+.pv .ghost{position:absolute;left:18px;right:18px;top:12px}
+.pv .ghost i{display:block;height:10px;border-radius:5px;background:var(--fill);margin-bottom:10px}
+.cnt{font-variant-numeric:tabular-nums;color:var(--label2)}
+.ti{display:flex;align-items:center;height:44px;padding:0 14px 0 12px;font-size:16px;position:relative}
+.ti+.ti::before{content:"";position:absolute;left:52px;right:0;top:0;height:.5px;background:var(--sep)}
+.ti .op{width:24px;height:24px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;margin-right:12px;flex:none}
+.op.rm{background:var(--red)}.op.add{background:#34C759}.op.lock{background:transparent;color:var(--label3)}
+.op.dis{background:var(--fill);color:var(--label3)}
+.ti .ic{margin-right:10px;color:var(--label)}
+.ti .t{flex:1}
+.ti .tag{font-size:12px;color:var(--label2);background:var(--fill);border-radius:6px;padding:2px 6px;margin-right:10px}
+.ti .grip{color:var(--label3)}
+.ti.off .t,.ti.off .ic{color:var(--label3)}
+.foot{font-size:12.5px;color:var(--label2);padding:7px 32px 0;line-height:1.5}
+.cta2{position:absolute;left:0;right:0;bottom:0;padding:14px 20px 34px;background:linear-gradient(transparent,var(--bg) 22%)}
+.cta2 .b{height:52px;border-radius:26px;background:var(--label);color:var(--bg);font-size:17px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.cta2 .l{font-size:15px;color:var(--label2);text-align:center;margin-top:12px}
+.toast{position:absolute;left:50%;transform:translateX(-50%);bottom:112px;background:var(--label);color:var(--bg);font-size:13.5px;padding:9px 14px;border-radius:18px;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.lc{display:flex;gap:10px;margin:0 16px}
+.lc .opt{padding:10px 8px 12px}
+.lc .mini{width:110px;height:238px;border-radius:16px}
+.lc .mini>.phone{transform:scale(.282)}
+.lc h3{font-size:15px;margin-top:10px}
+.lc .radio{margin-top:8px;width:22px;height:22px}
+.recent .rv{display:flex;gap:12px;padding:12px 16px;position:relative}
+.recent .rv+.rv::before{content:"";position:absolute;left:16px;right:0;top:0;height:.5px;background:var(--sep)}
+.recent .pt{font-size:16px;line-height:22px}
+</style></head><body>
+<h1>多 Tab 模式 · 自定义底部栏</h1>
+<p class="sub">在布局选择页选中“多 Tab 模式”后，按钮变为“下一步”，进入自定义底部栏；之后可在 设置 › 阅读 › 界面布局 › 底部栏 再改。</p>
+<div class="rules">
+  <div class="rule"><b>默认三项</b>首页、通知、我的默认显示；不改直接点“开始使用”或右上角“跳过”即为默认组合，和现在一致。</div>
+  <div class="rule"><b>固定项</b>首页固定在最左、我的固定在最右，不能移除——设置入口在“我的”，去掉会找不到设置。通知可以关掉。</div>
+  <div class="rule"><b>可选项</b>最近浏览、我的帖子、我的收藏、我的评论、搜一搜。中间各项可拖动排序。</div>
+  <div class="rule"><b>数量上限</b>底部最多 5 项（再多系统会折叠成“更多”，且标签过挤）。满 5 项后“添加”置灰并提示。</div>
+  <div class="rule"><b>入口不搬家</b>加到底部的入口，在“我的”页里仍保留原位置，避免用户找不到；底部栏改动即时生效，不重建首页。</div>
+</div>
+<div class="row" id="row"></div>
+<script>
+const S=(p,w=22,sw=1.7,f='none')=>`<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="${f}" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const P={search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',grid:'<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>',
+pen:'<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',sort:'<path d="M8 4v16M4 8l4-4 4 4M16 20V4M12 16l4 4 4-4"/>',
+eye:'<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',bub:'<path d="M4 5h16v11H9l-5 4z"/>',
+doc:'<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M9 8h6M9 12h6M9 16h3"/>',star:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>',seal:'<circle cx="12" cy="12" r="8.5"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+check:'<path d="m4 12 5 5L20 6"/>',chev:'<path d="m9 6 6 6-6 6"/>',pin:'<path d="M15 3l6 6-3 1-4 4 1 5-2 1-4-4-5 5M9 12l3-4 1-3z"/>',
+house:'<path d="M4 11 12 4l8 7v9h-5.5v-6h-5v6H4z"/>',bell:'<path d="M12 3.5a6 6 0 0 0-6 6V15l-2 3.5h16L18 15V9.5a6 6 0 0 0-6-6z"/><path d="M9.5 21a2.5 2.5 0 0 0 5 0"/>',person:'<circle cx="12" cy="8" r="4.2"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7z"/>'};
+const ST=`<div class="island"></div><div class="status"><span>9:41</span><div class="bat"></div></div>`;
+const tabbar=on=>`<div class="tabs">${[['house','首页'],['bell','通知'],['person','我的']].map(([i,t],k)=>`<div class="tab ${k==on?'on':''}">${S(P[i],24,1.7,k==on?'currentColor':'none')}${t}${k==1&&on!=1?'<span class="bd">3</span>':''}</div>`).join('')}</div>${on==0?`<div class="fab">${S(P.pen,24,2)}</div>`:''}<div class="home"></div>`;
+const T=['#46536b','#7a5a3e','#3f6b5c','#6b4a63','#5b6b8a','#8a6a3a','#4f5d4a','#6a4f8a','#3e5f73'];
+const posts=[[1,'酒','iLatency 公测，一个新的社区内 Ping 站，邀你共建','酒神','195899','555','7h ago'],[0,'s','有哥们把反诈逆向了','sivn','123','5','3s ago'],[0,'t','ACCK 首发 US 三网各自优化 CN2 9929 CMIN2 NQ 测试','tongshuai','171','12','5s ago'],[0,'C','25 出 euserv 德鸡一只','Cynthia','74','8','7s ago'],[0,'大','【抽奖】甲骨文东京免费号（hotmail 原邮）1 个','大香蕉哥哥','3069','629','13s ago'],[0,'a','兄弟们，我强烈建议大家都去让 AI 把自己上网的小鸡做个调优','astom','749','13','17s ago'],[0,'m','【收】溢价 2400 求妈咪 GoMa HKG.Pulse.Mini','mzxy','270','14','19s ago'],[0,'我','日本 8 核 64G 1T SSD 的机器大概多少钱啊？','我有八个肾','5','0','24s ago']];
+const home=d=>`<div class="phone ${d?'dark':''}">${ST}<div class="top"><div class="cats"><span class="on">全部</span><span>日常</span><span>技术</span><span>情报</span><span>测评</span><span>交易</span></div><div class="ib">${S(P.grid,21)}</div><div class="ib">${S(P.search,22,1.9)}</div></div><div style="height:6px"></div>
+${posts.map((p,i)=>`<div class="post"><div class="av" style="--tone:${T[i]}">${p[1]}</div><div style="flex:1"><div class="pt">${p[0]?'<span style="display:inline-block;vertical-align:-3px;margin-right:4px;color:var(--label2)">'+S(P.pin,17)+'</span>':''}${p[2]}</div><div class="pm"><span>${p[3]}</span><span>${S(P.eye,14)}${p[4]}</span><span>${S(P.bub,13)}${p[5]}</span><span>${p[6]}</span></div></div></div>`).join('')}
+<div class="sort">${S(P.sort,20,1.9)}</div><div class="fade"></div>${tabbar(0)}</div>`;
+const N1=[['s','sivn','回复了你','3 分钟前','面板我推荐 1Panel，界面比较清爽。','大家的 VPS 一般用什么面板管理？',1],['C','Cynthia','@ 了你','12 分钟前','@mist 你之前那台德鸡还在吗？','25 出 euserv 德鸡一只',1],['a','astom','回复了你','40 分钟前','调完确实快了不少，感谢分享。','兄弟们，我强烈建议大家都去让 AI 把…',1]];
+const N2=[['t','tongshuai','回复了你','昨天','已上车，感谢楼主。','ACCK 首发 US 三网各自优化 CN2 9929',0],['m','mzxy','回复了你','2 天前','可以小刀吗？','【收】溢价 2400 求妈咪 GoMa',0]];
+const nrow=(n,i)=>`<div class="nt"><div class="av" style="--tone:${T[i]}">${n[0]}</div><div style="flex:1;min-width:0"><div class="w">${n[1]}<small>${n[2]} · ${n[3]}</small>${n[6]?'<i></i>':''}</div><div class="x">${n[4]}</div><div class="s">${n[5]}</div></div></div>`;
+const noti=`<div class="phone grouped">${ST}<div class="nav"><div class="gbtn">${S(P.check,17,2.2)}全部已读</div></div><div class="big">通知</div>
+<div class="seg"><div class="on">回复</div><div>提及</div><div>私信</div></div>
+<div class="gtitle"><span>今天</span></div><div class="card">${N1.map((n,i)=>nrow(n,i+1)).join('')}</div>
+<div class="gtitle"><span>更早</span></div><div class="card">${N2.map((n,i)=>nrow(n,i+5)).join('')}</div>
+<div class="fade"></div>${tabbar(1)}</div>`;
+const it=(i,t,r)=>`<div class="item"><span class="ic">${S(P[i],21)}</span><span class="t">${t}</span>${r}</div>`;
+const ch=`<span style="color:var(--label3)">${S(P.chev,16,2)}</span>`;
+const me=`<div class="phone grouped">${ST}<div class="nav"><div class="gbtn" style="padding:0">${S(P.gear,20)}</div></div><div class="big">我的</div>
+<div class="head"><div class="av" style="--tone:#7a5a3e">缭</div><div><h2>缭雾</h2><div class="m">UID 31037 · 加入 551 天</div></div><span class="go">${S(P.chev,18,2)}</span></div>
+<div class="stats">${[['Lv 4','等级'],['1758','鸡腿'],['11','星辰'],['3','粉丝'],['0','关注']].map(s=>`<div class="stat"><b class="num">${s[0]}</b><span>${s[1]}</span></div>`).join('')}</div>
+<div class="gtitle"><span>我的内容</span></div><div class="card">${it('doc','我的帖子',`<span class="n num">19</span>${ch}`)}${it('bub','我的评论',`<span class="n num">550</span>${ch}`)}${it('star','我的收藏',`<span class="n num">58</span>${ch}`)}</div>
+<div class="gtitle"><span>常用</span></div><div class="card">${it('seal','每日签到','<span class="chk">签到</span>')}${it('clock','最近浏览',ch)}</div>
+<div class="fade"></div>${tabbar(2)}</div>`;
+
+const reading=`<div class="phone">${ST}<div class="top"><div class="ib" style="margin-left:-8px">${S('<path d="M4 7h16M4 12h16M4 17h16"/>',24,1.9)}</div><div class="cats"><span class="on">全部</span><span>日常</span><span>技术</span><span>情报</span><span>测评</span><span>交易</span></div><div class="ib">${S(P.search,22,1.9)}</div></div><div style="height:6px"></div>
+${posts.map((p,i)=>`<div class="post"><div class="av" style="--tone:${T[i]}">${p[1]}</div><div style="flex:1"><div class="pt">${p[2]}</div><div class="pm"><span>${p[3]}</span><span>${S(P.eye,14)}${p[4]}</span><span>${S(P.bub,13)}${p[5]}</span><span>${p[6]}</span></div></div></div>`).join('')}<div class="sort">${S(P.sort,20,1.9)}</div><div class="home"></div></div>`;
+const tabsMode=home(0);
+const chooser=(d,sel)=>`<div class="phone grouped ${d?'dark':''}">${ST}<div class="ch"><h2>选择浏览方式</h2><p class="d">两种布局功能完全一样，<br>以后可在设置里随时切换</p>
+<div class="opts"><div class="opt ${sel==0?'on':''}"><div class="mini">${d?reading.replace('class="phone"','class="phone dark"'):reading}</div><h3>阅读模式</h3><div class="x">入口收在侧边栏，<br>列表满屏，专心看帖</div><div class="radio">${sel==0?S(P.check,14,3):''}</div></div>
+<div class="opt ${sel==1?'on':''}"><div class="mini">${d?home(1):tabsMode}</div><h3>多 Tab 模式</h3><div class="x">首页、通知、我的<br>在底部一点即达</div><div class="radio">${sel==1?S(P.check,14,3):''}</div></div></div></div>
+<div class="cta"><div class="b">开始使用</div><div class="f">设置 › 阅读 › 界面布局 可再修改</div></div><div class="home"></div></div>`;
+const sett=`<div class="phone grouped">${ST}<div class="nav" style="justify-content:space-between"><div class="gbtn" style="padding:0">${S('<path d="M15 5l-7 7 7 7"/>',20,2.2)}</div></div><div class="big">设置</div>
+<div class="gtitle"><span>阅读</span></div><div class="card">
+<div class="item" style="background:var(--fill)"><span class="t">界面布局</span><span class="v">多 Tab 模式</span><span style="color:var(--label3)">${S(P.chev,16,2)}</span></div>
+<div class="item"><span class="t">首页分类</span><span style="color:var(--label3)">${S(P.chev,16,2)}</span></div>
+<div class="item"><span class="t">首页搜索入口</span><span style="color:var(--label3)">${S(P.chev,16,2)}</span></div>
+<div class="item"><span class="t">字体大小</span><span style="color:var(--label3)">${S(P.chev,16,2)}</span></div>
+<div class="item"><span class="t">签名显示</span><span style="color:var(--label3)">${S(P.chev,16,2)}</span></div></div>
+<div class="gtitle"><span>功能</span></div><div class="card"><div class="item"><span class="t">NodeImage 图床</span><span style="color:var(--label3)">${S(P.chev,16,2)}</span></div><div class="item"><span class="t">特别关注</span><span style="color:var(--label3)">${S(P.chev,16,2)}</span></div></div>
+<div class="home"></div></div>`;
+
+Object.assign(P,{plus:'<path d="M12 6v12M6 12h12"/>',minus:'<path d="M6 12h12"/>',grip:'<path d="M5 9h14M5 15h14"/>',lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',back:'<path d="M15 5l-7 7 7 7"/>'});
+const ALL={home:['house','首页'],noti:['bell','通知'],me:['person','我的'],recent:['clock','最近浏览'],posts:['doc','我的帖子'],fav:['star','我的收藏'],cmt:['bub','我的评论'],search:['search','搜一搜']};
+const bar=(keys,on=0,badge=true)=>`<div class="tabs">${keys.map((k,i)=>{const [ic,t]=ALL[k];return `<div class="tab ${i==on?'on':''}">${S(P[ic],keys.length>4?22:24,1.7,i==on&&ic!='search'&&ic!='clock'?'currentColor':'none')}${t}${k=='noti'&&badge&&i!=on?'<span class="bd">3</span>':''}</div>`}).join('')}</div>`;
+const preview=keys=>`<div class="pv"><div class="ghost"><i style="width:70%"></i><i style="width:45%"></i><i style="width:82%"></i></div>${bar(keys)}</div>`;
+const row=(k,mode,extra='')=>{const [ic,t]=ALL[k];
+ const op=mode=='lock'?`<span class="op lock">${S(P.lock,17,1.8)}</span>`:mode=='rm'?`<span class="op rm">${S(P.minus,14,3)}</span>`:mode=='dis'?`<span class="op dis">${S(P.plus,14,3)}</span>`:`<span class="op add">${S(P.plus,14,3)}</span>`;
+ const right=mode=='rm'?`<span class="grip">${S(P.grip,20,1.8)}</span>`:mode=='lock'?`<span class="tag">固定</span>`:'';
+ return `<div class="ti ${mode=='dis'?'off':''}">${op}<span class="ic">${S(P[ic],20)}</span><span class="t">${t}</span>${extra}${right}</div>`;};
+const cust=(d,shown,avail,full)=>`<div class="phone grouped cust ${d?'dark':''}">${ST}
+<div class="nav"><div class="gbtn" style="padding:0">${S(P.back,20,2.2)}</div><div style="font-size:16px;font-weight:500">跳过</div></div>
+<div style="font-size:13px;color:var(--label2);padding:0 20px 2px">第 2 步，共 2 步</div><div class="big">自定义底部栏</div><div class="lead">选出最常用的入口，放到底部一点即达。</div>
+${preview(shown)}
+<div class="gtitle"><span>已显示</span><span class="cnt">${shown.length} / 5</span></div>
+<div class="card">${shown.map(k=>row(k,(k=='home'||k=='me')?'lock':'rm')).join('')}</div>
+<div class="gtitle"><span>可添加</span></div>
+<div class="card">${avail.map(k=>row(k,full?'dis':'add')).join('')}</div>
+${full?'<div class="toast">底部最多 5 项</div>':''}
+<div class="cta2"><div class="b">开始使用</div></div><div class="home"></div></div>`;
+const chooserNext=`<div class="phone grouped">${ST}<div class="ch"><h2>选择浏览方式</h2><p class="d">两种布局功能完全一样，<br>以后可在设置里随时切换</p>
+<div class="opts"><div class="opt"><div class="mini">${reading}</div><h3>阅读模式</h3><div class="x">入口收在侧边栏，<br>列表满屏，专心看帖</div><div class="radio"></div></div>
+<div class="opt on"><div class="mini">${home(0)}</div><h3>多 Tab 模式</h3><div class="x">首页、通知、我的<br>在底部一点即达</div><div class="radio">${S(P.check,14,3)}</div></div></div></div>
+<div class="cta"><div class="b">下一步</div><div class="f">下一步可自定义底部栏，也可直接跳过</div></div><div class="home"></div></div>`;
+const RV=[['iLatency 公测，一个新的社区内 Ping 站，邀你共建','酒神','刚刚'],['ACCK 首发 US 三网各自优化 CN2 9929 CMIN2 NQ 测试','tongshuai','5 分钟前'],['25 出 euserv 德鸡一只','Cynthia','1 小时前'],['兄弟们，我强烈建议大家都去让 AI 把自己上网的小鸡做个调优','astom','昨天'],['日本 8 核 64G 1T SSD 的机器大概多少钱啊？','我有八个肾','昨天'],['【抽奖】甲骨文东京免费号（hotmail 原邮）1 个','大香蕉哥哥','2 天前']];
+const result=`<div class="phone grouped recent">${ST}<div class="nav"><div class="gbtn">清空</div></div><div class="big">最近浏览</div>
+<div class="gtitle"><span>今天</span></div><div class="card">${RV.slice(0,3).map((r,i)=>`<div class="rv"><div class="av" style="--tone:${T[i]}">${r[1][0]}</div><div style="flex:1"><div class="pt">${r[0]}</div><div class="pm"><span>${r[1]}</span><span>${r[2]}</span></div></div></div>`).join('')}</div>
+<div class="gtitle"><span>更早</span></div><div class="card">${RV.slice(3).map((r,i)=>`<div class="rv"><div class="av" style="--tone:${T[i+3]}">${r[1][0]}</div><div style="flex:1"><div class="pt">${r[0]}</div><div class="pm"><span>${r[1]}</span><span>${r[2]}</span></div></div></div>`).join('')}</div>
+<div class="fade"></div>${bar(['home','noti','recent','posts','me'],2)}<div class="home"></div></div>`;
+const layoutSetting=`<div class="phone grouped">${ST}<div class="nav" style="justify-content:space-between"><div class="gbtn" style="padding:0">${S(P.back,20,2.2)}</div></div><div class="big">界面布局</div>
+<div class="lc"><div class="opt" style="flex:1"><div class="mini">${reading}</div><h3>阅读模式</h3><div class="radio"></div></div>
+<div class="opt on" style="flex:1"><div class="mini">${home(0)}</div><h3>多 Tab 模式</h3><div class="radio">${S(P.check,13,3)}</div></div></div>
+<div class="gtitle"><span>多 Tab 模式</span></div><div class="card">
+<div class="item"><span class="t">底部栏</span><span class="v">首页、通知、最近浏览…</span><span style="color:var(--label3)">${S(P.chev,16,2)}</span></div></div>
+<div class="foot">底部栏只在多 Tab 模式下生效；切回阅读模式会保留你的设置。</div>
+<div class="home"></div></div>`;
+const cap=(t,s)=>`<div class="cap"><b>${t}</b>${s}</div>`;
+document.getElementById('row').innerHTML=[
+ [chooserNext,cap('① 选中多 Tab 后变“下一步”','阅读模式仍是“开始使用”直接进入；多 Tab 多一步自定义。')],
+ [cust(0,['home','noti','recent','me'],['posts','fav','cmt','search'],false),cap('② 自定义底部栏 · 浅色','顶部实时预览底栏效果；“已显示”里红色减号移除、右侧拖动排序，首页/我的带锁固定；“可添加”点绿色加号加入。')],
+ [cust(1,['home','noti','recent','posts','me'],['fav','cmt','search'],true),cap('③ 已满 5 项 · 深色','“可添加”整体置灰，点按时轻提示“底部最多 5 项”。')],
+ [result,cap('④ 使用效果','底栏五项：首页 / 通知 / 最近浏览 / 我的帖子 / 我的；新加的 Tab 直接复用现有页面，进入二级页时隐藏底栏。')],
+ [layoutSetting,cap('⑤ 设置里再改','设置 › 阅读 › 界面布局：上方切换布局，下方“底部栏”进入同一自定义页（无步骤提示与“跳过”，改完即生效）。')]
+].map(x=>`<div class="cell">${x.join('')}</div>`).join('');
+</script></body></html>

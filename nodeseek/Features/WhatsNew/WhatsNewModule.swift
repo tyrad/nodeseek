@@ -23,6 +23,32 @@ enum WhatsNewModule {
     /// ])
     /// ```
     static let catalog: [WhatsNew] = [
+        release("1.2.0", features: [
+            feature(
+                systemName: "square.grid.2x2.fill",
+                tint: .systemBlue,
+                title: "多 Tab 模式",
+                subtitle: "首页、通知、我的在底部一点即达"
+            ),
+            feature(
+                systemName: "slider.horizontal.3",
+                tint: .systemOrange,
+                title: "自定义底部栏",
+                subtitle: "最近浏览、我的帖子等可放到底部"
+            ),
+            feature(
+                systemName: "person.crop.circle.fill",
+                tint: .systemIndigo,
+                title: "全新我的页",
+                subtitle: "等级、鸡腿和升级进度一目了然"
+            ),
+            feature(
+                systemName: "square.and.pencil",
+                tint: .systemPink,
+                title: "悬浮发帖",
+                subtitle: "首页右下角随时发帖"
+            )
+        ]),
         release("1.1.0", features: [
             feature(
                 systemName: "person.crop.circle.fill",

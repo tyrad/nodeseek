@@ -2753,6 +2753,48 @@ struct PostDetailViewControllerTests {
         #expect(cachedHeight < uncachedHeight)
     }
 
+    @Test func cellShrinksAfterInlineImageWithoutSizeLoads() throws {
+        // 回归：post-1022915 四楼「文字+无尺寸小图」加载后 cell 仍停在占位高度。
+        let imageURL = try #require(URL(string: "https://cdn.nodeimage.com/i/eB0aGOtTVdI0wVT4mNmW0daMuYYRrVZo.webp"))
+        let blocks = DTCoreTextHTMLContentRenderer().render(
+            fragment: "<p>万圣夜<img src=\"\(imageURL.absoluteString)\" alt=\"image\" class=\"\"></p>",
+            baseURL: URL(string: "https://www.nodeseek.com")!,
+            maxImageWidth: 343
+        )
+        let attributedText = try #require(blocks.compactMap { block -> NSAttributedString? in
+            guard case .text(let text) = block else { return nil }
+            return text
+        }.first)
+        let textNode = DetailRichTextNode(
+            attributedText: attributedText,
+            onImageTapped: { _, _ in },
+            onLayoutInvalidated: {}
+        )
+        let cell = ASCellNode()
+        cell.addSubnode(textNode)
+        cell.layoutSpecBlock = { _, _ in
+            ASInsetLayoutSpec(insets: UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16), child: textNode)
+        }
+        let constrainedSize = ASSizeRange(
+            min: CGSize(width: 375, height: 0),
+            max: CGSize(width: 375, height: CGFloat.greatestFiniteMagnitude)
+        )
+
+        let placeholderHeight = cell.layoutThatFits(constrainedSize).size.height
+        let imageSize = CGSize(width: 80, height: 80)
+        let displaySize = DetailImageLayout.presentation(for: imageSize, maxWidth: 343, kind: .normal).size
+        let didUpdate = textNode.updateAttachmentLayout(
+            matching: imageURL,
+            originalSize: imageSize,
+            displaySize: displaySize
+        )
+        let loadedHeight = cell.layoutThatFits(constrainedSize).size.height
+
+        #expect(didUpdate)
+        #expect(loadedHeight < placeholderHeight)
+        #expect(loadedHeight <= displaySize.height + 60)
+    }
+
     @Test func rendererSplitsWideBlockImageBeforeFollowingText() throws {
         let imageURL = try #require(URL(string: "https://i.111666.best/image/wide.webp"))
         let blocks = DTCoreTextHTMLContentRenderer().render(

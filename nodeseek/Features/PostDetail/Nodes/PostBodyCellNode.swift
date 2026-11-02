@@ -870,16 +870,21 @@ final class DetailRichTextNode: ASDisplayNode {
         attributedTextLock.lock()
         failedImageURLs.insert(url)
         attributedTextLock.unlock()
+        invalidateLayoutThroughCell()
+        onLayoutInvalidated()
+    }
+
+    /// Texture 的 setNeedsLayout 不会向上失效，附件尺寸变化后要一路清到 cell，
+    /// 否则 relayoutItems 仍拿到 cell 加载前的缓存高度。
+    private func invalidateLayoutThroughCell() {
         invalidateCalculatedLayout()
         setNeedsLayout()
-        // 附件缩小后也要清父容器缓存，否则 cell 仍保留加载前的高度。
         var ancestor = supernode
         while let node = ancestor {
             node.invalidateCalculatedLayout()
             if node is ASCellNode { break }
             ancestor = node.supernode
         }
-        onLayoutInvalidated()
     }
 
     override func didExitVisibleState() {
@@ -923,8 +928,7 @@ final class DetailRichTextNode: ASDisplayNode {
             logDiagnostics(
                 "node attachment updated url=\(url.absoluteString) original=\(Self.string(from: originalSize)) display=\(Self.string(from: displaySize))"
             )
-            invalidateCalculatedLayout()
-            setNeedsLayout()
+            invalidateLayoutThroughCell()
         } else {
             logDiagnostics(
                 "node attachment update missed url=\(url.absoluteString) original=\(Self.string(from: originalSize)) display=\(Self.string(from: displaySize)) attachments=\(Self.attachmentDiagnostics(in: attributedText))"

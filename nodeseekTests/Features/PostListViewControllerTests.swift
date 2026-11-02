@@ -11,6 +11,27 @@ import UIKit
 
 @MainActor
 struct PostListViewControllerTests {
+    @Test func tabsLayoutReplacesSideMenuWithFloatingComposeButton() throws {
+        let presenter = SpyPostListPresenter()
+        let viewController = makePostListViewController(presenter: presenter, layout: .tabs)
+        viewController.loadViewIfNeeded()
+
+        #expect(viewController.view.firstButton(accessibilityIdentifier: "post-list-menu-button") == nil)
+        #expect(viewController.view.firstView(accessibilityIdentifier: "post-list-side-menu") == nil)
+        #expect(viewController.children.contains { $0 is PostListSideMenuViewController } == false)
+        let composeButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-compose-button"))
+        #expect(composeButton.accessibilityLabel == "发帖")
+    }
+
+    @Test func readingLayoutKeepsSideMenuWithoutComposeButton() throws {
+        let presenter = SpyPostListPresenter()
+        let viewController = makePostListViewController(presenter: presenter)
+        viewController.loadViewIfNeeded()
+
+        #expect(viewController.view.firstButton(accessibilityIdentifier: "post-list-menu-button") != nil)
+        #expect(viewController.view.firstButton(accessibilityIdentifier: "post-list-compose-button") == nil)
+    }
+
     @Test func sortToggleButtonPeeksFromRightAndExpandsOnTap() throws {
         let presenter = SpyPostListPresenter()
         let viewController = makePostListViewController(presenter: presenter)
@@ -854,6 +875,7 @@ struct PostListViewControllerTests {
 
 private func makePostListViewController(
     presenter: SpyPostListPresenter,
+    layout: AppNavigationLayout = .reading,
     floatingPositionStore: FloatingControlPositionStoring = InMemoryFloatingControlPositionStore(),
     searchEntrySettings: PostListSearchEntrySettings = makePostListSearchEntrySettings(),
     autoCheckInRunner: @escaping @MainActor (UIViewController?, AutoCheckInTrigger) async -> Void = { _, _ in },
@@ -863,6 +885,7 @@ private func makePostListViewController(
 ) -> PostListViewController {
     PostListViewController(
         presenter: presenter,
+        layout: layout,
         floatingPositionStore: floatingPositionStore,
         searchEntrySettings: searchEntrySettings,
         autoCheckInRunner: autoCheckInRunner,

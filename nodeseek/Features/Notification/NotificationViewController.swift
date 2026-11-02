@@ -14,6 +14,7 @@ final class NotificationViewController: UIViewController {
         case content
         case loading
         case error
+        case loginRequired
     }
 
     private let client: NodeSeekNotificationClientProtocol
@@ -22,6 +23,9 @@ final class NotificationViewController: UIViewController {
     private let refreshControl = UIRefreshControl()
     private let segmentedControl = UISegmentedControl()
     private let errorView = UserContentErrorView(accessibilityIdentifier: "notification-error-view")
+    private let loginPromptView = NotificationLoginPromptView()
+    /// 加载失败时判断是否因为未登录；可注入，测试里不走网络
+    private let isLoggedIn: @MainActor () async -> Bool
     private let loadingView = NotificationLoadingView()
     private let emptyLabel = UILabel()
     private var browserButton: UIBarButtonItem?
@@ -36,12 +40,15 @@ final class NotificationViewController: UIViewController {
     private var unreadCount: NodeSeekNotificationUnreadCount = .zero
     private var currentUserID: Int?
     private var loadToken = 0
+    private var hasAppeared = false
 
     init(
         initialTab: NodeSeekNotificationTab = .atMe,
         client: NodeSeekNotificationClientProtocol? = nil,
-        currentAccountStore: CurrentAccountStore = .shared
+        currentAccountStore: CurrentAccountStore = .shared,
+        isLoggedIn: (@MainActor () async -> Bool)? = nil
     ) {
+        self.isLoggedIn = isLoggedIn ?? { await TabLayoutAccountGate.isLoggedIn() }
         self.selectedTab = initialTab
         self.client = client ?? NodeSeekNotificationClient()
         self.currentAccountStore = currentAccountStore
@@ -61,6 +68,18 @@ final class NotificationViewController: UIViewController {
         loadSelectedTab(showLoading: true)
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 首次出现已在 viewDidLoad 加载；之后每次回到本页（切 Tab、从详情返回）都静默刷新
+        guard hasAppeared else {
+            hasAppeared = true
+            return
+        }
+        loadCurrentUserID()
+        loadUnreadCount()
+        loadSelectedTab(showLoading: true)
+    }
+
     private func setupUI() {
         view.backgroundColor = .systemBackground
         configureNavigationItems()
@@ -73,6 +92,10 @@ final class NotificationViewController: UIViewController {
             self?.loadSelectedTab(showLoading: true)
         }
 
+        loginPromptView.onLogin = { [weak self] in
+            self?.showLogin()
+        }
+
         let segmentedContainer = UIView()
         segmentedContainer.translatesAutoresizingMaskIntoConstraints = false
         segmentedContainer.backgroundColor = .systemBackground
@@ -81,6 +104,7 @@ final class NotificationViewController: UIViewController {
         view.addSubview(segmentedContainer)
         view.addSubview(tableView)
         view.addSubview(errorView)
+        view.addSubview(loginPromptView)
 
         NSLayoutConstraint.activate([
             segmentedContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -100,7 +124,12 @@ final class NotificationViewController: UIViewController {
             errorView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             errorView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             errorView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
-            errorView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32)
+            errorView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32),
+
+            loginPromptView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            loginPromptView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            loginPromptView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
+            loginPromptView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32)
         ])
 
         applyDisplayState()
@@ -257,25 +286,57 @@ final class NotificationViewController: UIViewController {
 
     private func showError(_ message: String, tab: NodeSeekNotificationTab, token: Int) {
         guard token == loadToken, tab == selectedTab else { return }
-        refreshControl.endRefreshing()
-        displayMode = .error
-        errorView.messageLabel.text = message
-        applyDisplayState()
+        // 未登录时接口只会返回 500 之类的错误，改为提示登录，避免看起来像故障
+        Task { [weak self] in
+            guard let self else { return }
+            let loggedIn = await isLoggedIn()
+            guard token == loadToken, tab == selectedTab else { return }
+            refreshControl.endRefreshing()
+            if loggedIn {
+                displayMode = .error
+                errorView.messageLabel.text = message
+            } else {
+                displayMode = .loginRequired
+            }
+            applyDisplayState()
+        }
+    }
+
+    private func showLogin() {
+        let loginViewController = LoginWebViewController { [weak self] in
+            // 本页在导航栈里时返回会经 viewWillAppear 刷新；弹出的情况在这里补一次
+            guard let self, self.navigationController == nil else { return }
+            self.loadUnreadCount()
+            self.loadSelectedTab(showLoading: true)
+        }
+        if let navigationController {
+            navigationController.pushViewController(loginViewController, animated: true)
+        } else {
+            present(UINavigationController(rootViewController: loginViewController), animated: true)
+        }
     }
 
     private func applyDisplayState() {
         switch displayMode {
         case .content:
             errorView.isHidden = true
+            loginPromptView.isHidden = true
             loadingView.stopAnimating()
             tableView.backgroundView = currentRecordCount == 0 ? emptyBackgroundView() : nil
         case .loading:
             errorView.isHidden = true
+            loginPromptView.isHidden = true
             loadingView.startAnimating()
             tableView.backgroundView = loadingView
         case .error:
             loadingView.stopAnimating()
             errorView.isHidden = false
+            loginPromptView.isHidden = true
+            tableView.backgroundView = nil
+        case .loginRequired:
+            loadingView.stopAnimating()
+            errorView.isHidden = true
+            loginPromptView.isHidden = false
             tableView.backgroundView = nil
         }
         // 标签和显示状态变化时，同步清除表格缓存的旧行数与预取状态。
@@ -668,5 +729,63 @@ private final class NotificationLoadingView: UIView {
 
     func stopAnimating() {
         indicator.stopAnimating()
+    }
+}
+
+/// 未登录时的通知页占位：说明 + 登录按钮。
+private final class NotificationLoginPromptView: UIStackView {
+    var onLogin: (() -> Void)?
+
+    init() {
+        super.init(frame: .zero)
+        axis = .vertical
+        alignment = .center
+        spacing = 10
+        isHidden = true
+        accessibilityIdentifier = "notification-login-view"
+        translatesAutoresizingMaskIntoConstraints = false
+
+        let iconView = UIImageView(image: UIImage(systemName: "bell"))
+        iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 34, weight: .regular)
+        iconView.tintColor = .tertiaryLabel
+
+        let titleLabel = UILabel()
+        titleLabel.text = "登录后查看通知"
+        titleLabel.font = .preferredFont(forTextStyle: .headline)
+        titleLabel.textColor = .label
+        titleLabel.adjustsFontForContentSizeCategory = true
+
+        let messageLabel = UILabel()
+        messageLabel.text = "@我、回复和私信都需要登录"
+        messageLabel.font = .preferredFont(forTextStyle: .subheadline)
+        messageLabel.textColor = .secondaryLabel
+        messageLabel.textAlignment = .center
+        messageLabel.numberOfLines = 0
+        messageLabel.adjustsFontForContentSizeCategory = true
+
+        var configuration = UIButton.Configuration.filled()
+        configuration.title = "登录"
+        configuration.baseBackgroundColor = .label
+        configuration.baseForegroundColor = .systemBackground
+        configuration.cornerStyle = .capsule
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 24, bottom: 8, trailing: 24)
+        let loginButton = UIButton(configuration: configuration)
+        loginButton.accessibilityIdentifier = "notification-login-button"
+        loginButton.addTarget(self, action: #selector(loginTapped), for: .touchUpInside)
+
+        addArrangedSubview(iconView)
+        setCustomSpacing(14, after: iconView)
+        addArrangedSubview(titleLabel)
+        addArrangedSubview(messageLabel)
+        setCustomSpacing(18, after: messageLabel)
+        addArrangedSubview(loginButton)
+    }
+
+    required init(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    @objc private func loginTapped() {
+        onLogin?()
     }
 }

@@ -30,10 +30,17 @@ class PostListViewController: UIViewController {
 
     private enum FloatingControlLayout {
         static let sortToggleBottomInset: CGFloat = 204
+        static let composeButtonTrailing: CGFloat = 20
+        static let composeButtonBottom: CGFloat = 16
+        /// 滚动超过这个距离才切换发帖按钮显隐，避免手指轻微抖动时闪烁。
+        static let composeToggleScrollDelta: CGFloat = 6
+        /// 同一次拖动中累计超过这个距离才切换，过滤手指抖动和松手时的回带。
+        static let composeToggleDragDistance: CGFloat = 24
     }
 
     // MARK: - Properties
     let presenter: PostListPresenterProtocol
+    let layout: AppNavigationLayout
     private let searchEntrySettings: PostListSearchEntrySettings
     let detailTestURLProvider: () -> String
     let autoCheckInRunner: @MainActor (UIViewController?, AutoCheckInTrigger) async -> Void
@@ -51,6 +58,9 @@ class PostListViewController: UIViewController {
     private var tabScrollTrailingToSafeAreaConstraint: NSLayoutConstraint?
     private var tabScrollTrailingToSearchButtonConstraint: NSLayoutConstraint?
     var isSortToggleExpanded = false
+    private var isComposeButtonHidden = false
+    /// 本次拖动中上一次切换发帖按钮时的手指位置。
+    private var composeDragAnchorY: CGFloat?
     let sideMenuViewController: PostListSideMenuViewController
     let menuButtonFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
     private let categoryReselectFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
@@ -173,6 +183,9 @@ class PostListViewController: UIViewController {
     private let floatingSortToggleContainer: FloatingControlContainerView
 
     let sortToggleButton = PostListSortToggleButton()
+
+    /// 多 Tab 模式首页右下角的悬浮发帖按钮。
+    private let composeButton = PostListComposeButton()
     
     private let tabScrollView: UIScrollView = {
         let scrollView = UIScrollView()
@@ -196,6 +209,7 @@ class PostListViewController: UIViewController {
     // MARK: - Initialization
     init(
         presenter: PostListPresenterProtocol,
+        layout: AppNavigationLayout = .reading,
         visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore(),
         floatingPositionStore: FloatingControlPositionStoring = UserDefaultsFloatingControlPositionStore(),
         searchEntrySettings: PostListSearchEntrySettings = .shared,
@@ -210,6 +224,7 @@ class PostListViewController: UIViewController {
         }
     ) {
         self.presenter = presenter
+        self.layout = layout
         self.searchEntrySettings = searchEntrySettings
         self.detailTestURLProvider = detailTestURLProvider
         self.autoCheckInRunner = autoCheckInRunner
@@ -291,9 +306,11 @@ class PostListViewController: UIViewController {
         addChild(pageContainerViewController)
         let pageContainerView = pageContainerViewController.view!
         pageContainerView.translatesAutoresizingMaskIntoConstraints = false
-        compactTopButton.addTarget(self, action: #selector(leftButtonTapped), for: .touchUpInside)
-        compactTopButton.addTarget(self, action: #selector(prepareMenuButtonFeedback), for: .touchDown)
-        compactTopButton.addSubview(compactTopButtonUnreadBadgeView)
+        if layout == .reading {
+            compactTopButton.addTarget(self, action: #selector(leftButtonTapped), for: .touchUpInside)
+            compactTopButton.addTarget(self, action: #selector(prepareMenuButtonFeedback), for: .touchDown)
+            compactTopButton.addSubview(compactTopButtonUnreadBadgeView)
+        }
         categoryEditButton.addTarget(self, action: #selector(categoryEditButtonTapped), for: .touchUpInside)
         topSearchButton.addTarget(self, action: #selector(topSearchButtonTapped), for: .touchUpInside)
         sortToggleButton.addTarget(self, action: #selector(sortToggleButtonTapped), for: .touchUpInside)
@@ -302,7 +319,9 @@ class PostListViewController: UIViewController {
         }
         floatingSortToggleContainer.hostControl(sortToggleButton)
         view.addSubview(pageContainerView)
-        view.addSubview(compactTopButton)
+        if layout == .reading {
+            view.addSubview(compactTopButton)
+        }
         view.addSubview(sortToggleAnchorView)
         view.addSubview(floatingSortToggleContainer)
         view.addSubview(tabScrollView)
@@ -336,16 +355,6 @@ class PostListViewController: UIViewController {
             pageContainerView.topAnchor.constraint(equalTo: tabScrollView.bottomAnchor, constant: TopBarLayout.contentSpacing),
             pageContainerView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            compactTopButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
-            compactTopButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: TopBarLayout.topOffset),
-            compactTopButton.widthAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
-            compactTopButton.heightAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
-
-            compactTopButtonUnreadBadgeView.widthAnchor.constraint(equalToConstant: 8),
-            compactTopButtonUnreadBadgeView.heightAnchor.constraint(equalToConstant: 8),
-            compactTopButtonUnreadBadgeView.topAnchor.constraint(equalTo: compactTopButton.topAnchor, constant: 8),
-            compactTopButtonUnreadBadgeView.trailingAnchor.constraint(equalTo: compactTopButton.trailingAnchor, constant: -8),
-
             categoryEditButton.widthAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
             categoryEditButton.heightAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
 
@@ -367,7 +376,6 @@ class PostListViewController: UIViewController {
             sortToggleWidthConstraint,
             sortToggleAnchorView.heightAnchor.constraint(equalToConstant: PostListSortToggleButton.height),
 
-            tabScrollView.leadingAnchor.constraint(equalTo: compactTopButton.trailingAnchor, constant: 8),
             tabScrollTrailingToSafeAreaConstraint,
             tabScrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: TopBarLayout.topOffset),
             tabScrollView.heightAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
@@ -380,7 +388,26 @@ class PostListViewController: UIViewController {
         ])
         pageContainerViewController.didMove(toParent: self)
 
-        installSideMenuController()
+        switch layout {
+        case .reading:
+            NSLayoutConstraint.activate([
+                compactTopButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
+                compactTopButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: TopBarLayout.topOffset),
+                compactTopButton.widthAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
+                compactTopButton.heightAnchor.constraint(equalToConstant: TopBarLayout.controlSize),
+
+                compactTopButtonUnreadBadgeView.widthAnchor.constraint(equalToConstant: 8),
+                compactTopButtonUnreadBadgeView.heightAnchor.constraint(equalToConstant: 8),
+                compactTopButtonUnreadBadgeView.topAnchor.constraint(equalTo: compactTopButton.topAnchor, constant: 8),
+                compactTopButtonUnreadBadgeView.trailingAnchor.constraint(equalTo: compactTopButton.trailingAnchor, constant: -8),
+
+                tabScrollView.leadingAnchor.constraint(equalTo: compactTopButton.trailingAnchor, constant: 8)
+            ])
+            installSideMenuController()
+        case .tabs:
+            tabScrollView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12).isActive = true
+            installComposeButton()
+        }
         observeSearchEntrySettings()
         observeNotificationReadState()
         observeNotificationUnreadCount()
@@ -393,6 +420,20 @@ class PostListViewController: UIViewController {
     // MARK: - Actions
     @objc private func prepareMenuButtonFeedback() {
         menuButtonFeedbackGenerator.prepare()
+    }
+
+    @objc private func composeButtonTapped() {
+        AppLog.info(.postList, "首页悬浮发帖按钮点击")
+        Task { @MainActor [weak self] in
+            let isLoggedIn = await TabLayoutAccountGate.isLoggedIn()
+            guard let self else { return }
+            if isLoggedIn {
+                presenter.didTapNewDiscussion()
+            } else {
+                AppLog.warning(.postList, "首页悬浮发帖按钮未登录，触发登录")
+                presenter.didTapLogin()
+            }
+        }
     }
 
     @objc private func leftButtonTapped() {
@@ -593,6 +634,79 @@ class PostListViewController: UIViewController {
         )
     }
 
+    private func installComposeButton() {
+        composeButton.addTarget(self, action: #selector(composeButtonTapped), for: .touchUpInside)
+        view.addSubview(composeButton)
+        NSLayoutConstraint.activate([
+            composeButton.trailingAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.trailingAnchor,
+                constant: -FloatingControlLayout.composeButtonTrailing
+            ),
+            composeButton.bottomAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor,
+                constant: -FloatingControlLayout.composeButtonBottom
+            ),
+            composeButton.heightAnchor.constraint(equalToConstant: PostListComposeButton.height)
+        ])
+        pageContainerViewController.onListScroll = { [weak self] scrollView in
+            self?.handleListScroll(scrollView)
+        }
+    }
+
+    /// 向下滚动收起发帖按钮，向上滚动或回到顶部时再出现。
+    /// 方向只看手指拖动的累计距离：行高校正、回弹会改动 contentOffset，按逐帧位移判断会让按钮来回闪。
+    private func handleListScroll(_ scrollView: UIScrollView) {
+        let offsetY = scrollView.contentOffset.y + scrollView.adjustedContentInset.top
+        if offsetY <= FloatingControlLayout.composeToggleScrollDelta {
+            composeDragAnchorY = nil
+            setComposeButtonHidden(false, animated: true)
+            return
+        }
+        guard scrollView.isTracking else {
+            composeDragAnchorY = nil
+            return
+        }
+
+        let translationY = scrollView.panGestureRecognizer.translation(in: scrollView.superview).y
+        guard let anchorY = composeDragAnchorY else {
+            composeDragAnchorY = translationY
+            return
+        }
+        let distance = translationY - anchorY
+        if distance < -FloatingControlLayout.composeToggleDragDistance {
+            // 手指上推：内容向下，收起
+            composeDragAnchorY = translationY
+            setComposeButtonHidden(true, animated: true)
+        } else if distance > FloatingControlLayout.composeToggleDragDistance {
+            composeDragAnchorY = translationY
+            setComposeButtonHidden(false, animated: true)
+        }
+    }
+
+    private func setComposeButtonHidden(_ hidden: Bool, animated: Bool) {
+        guard isComposeButtonHidden != hidden else { return }
+        isComposeButtonHidden = hidden
+        composeButton.isUserInteractionEnabled = !hidden
+        let animations = { [composeButton] in
+            composeButton.alpha = hidden ? 0 : 1
+            composeButton.transform = hidden
+                ? CGAffineTransform(translationX: 0, y: 24).scaledBy(x: 0.6, y: 0.6)
+                : .identity
+        }
+        guard animated else {
+            animations()
+            return
+        }
+        UIView.animate(
+            withDuration: 0.25,
+            delay: 0,
+            usingSpringWithDamping: 0.85,
+            initialSpringVelocity: 0,
+            options: [.allowUserInteraction, .beginFromCurrentState],
+            animations: animations
+        )
+    }
+
     private func installSideMenuController() {
         sideMenuViewController.onLoginTapped = { [weak self] in
             self?.presenter.didTapLogin()
@@ -637,6 +751,14 @@ class PostListViewController: UIViewController {
             sideMenuViewController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         sideMenuViewController.didMove(toParent: self)
+    }
+}
+
+extension PostListViewController: TabReselectHandling {
+    /// 已在首页时再点“首页”Tab：回到顶部并重新显示发帖按钮。
+    func handleTabReselect() {
+        pageContainerViewController.scrollToTop(for: selectedCategory, animated: true)
+        setComposeButtonHidden(false, animated: true)
     }
 }
 
