@@ -41,6 +41,12 @@ enum WhatsNewModule {
                 tint: .systemIndigo,
                 title: "全新我的页",
                 subtitle: "等级、鸡腿和升级进度一目了然"
+            ),
+            feature(
+                systemName: "magnifyingglass.circle.fill",
+                tint: .systemTeal,
+                title: "搜一搜升级",
+                subtitle: "帖子、用户、谷歌一处切换"
             )
         ]),
         release("1.1.0", features: [
