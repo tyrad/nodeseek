@@ -191,7 +191,7 @@ class PostListRouter: PostListRouterProtocol {
         viewController?.navigationController?.pushViewController(detailViewController, animated: true)
     }
 
-    private static func postSummary(from record: VisitedPostRecord) -> PostSummary {
+    static func postSummary(from record: VisitedPostRecord) -> PostSummary {
         PostSummary(
             id: record.postID,
             title: record.title,

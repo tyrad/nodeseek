@@ -18,6 +18,8 @@ final class LayoutChooserViewController: UIViewController {
     private let settings: AppNavigationLayoutSettings
     private var selectedLayout: AppNavigationLayout
     private var cards: [AppNavigationLayout: LayoutOptionCard] = [:]
+    private let footnoteLabel = UILabel()
+    private let tabItemsRow = TabItemsSummaryRow()
 
     private let scrollView: UIScrollView = {
         let scrollView = UIScrollView()
@@ -68,6 +70,14 @@ final class LayoutChooserViewController: UIViewController {
         applySelection()
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        if mode == .upgradePrompt {
+            navigationController?.setNavigationBarHidden(true, animated: animated)
+        }
+        tabItemsRow.setSummary(settings.tabItems.map(\.title).joined(separator: "、"))
+    }
+
     private func setupUI() {
         let titleLabel = UILabel()
         titleLabel.text = "选择浏览方式"
@@ -112,6 +122,18 @@ final class LayoutChooserViewController: UIViewController {
             contentStack.setCustomSpacing(16, after: subtitleLabel)
         }
         contentStack.addArrangedSubview(cardStack)
+        if mode == .settings {
+            tabItemsRow.addTarget(self, action: #selector(tabItemsRowTapped), for: .touchUpInside)
+            let rowFootnote = UILabel()
+            rowFootnote.text = "底部栏只在多 Tab 模式下生效；切回阅读模式会保留你的设置。"
+            rowFootnote.font = .preferredFont(forTextStyle: .footnote)
+            rowFootnote.textColor = .secondaryLabel
+            rowFootnote.numberOfLines = 0
+            contentStack.setCustomSpacing(24, after: cardStack)
+            contentStack.addArrangedSubview(tabItemsRow)
+            contentStack.setCustomSpacing(8, after: tabItemsRow)
+            contentStack.addArrangedSubview(rowFootnote)
+        }
 
         view.addSubview(scrollView)
         scrollView.addSubview(contentStack)
@@ -131,7 +153,6 @@ final class LayoutChooserViewController: UIViewController {
         switch mode {
         case .upgradePrompt:
             startButton.addTarget(self, action: #selector(startTapped), for: .touchUpInside)
-            let footnoteLabel = UILabel()
             footnoteLabel.text = "设置 › 阅读 › 界面布局 可再修改"
             footnoteLabel.font = .preferredFont(forTextStyle: .footnote)
             footnoteLabel.textColor = .secondaryLabel
@@ -159,6 +180,11 @@ final class LayoutChooserViewController: UIViewController {
         for (layout, card) in cards {
             card.isSelected = layout == selectedLayout
         }
+        guard mode == .upgradePrompt else { return }
+        // 多 Tab 模式多一步自定义底部栏
+        let isTabs = selectedLayout == .tabs
+        startButton.configuration?.title = isTabs ? "下一步" : "开始使用"
+        footnoteLabel.text = isTabs ? "下一步可自定义底部栏，也可直接跳过" : "设置 › 阅读 › 界面布局 可再修改"
     }
 
     @objc private func cardTapped(_ sender: LayoutOptionCard) {
@@ -174,8 +200,27 @@ final class LayoutChooserViewController: UIViewController {
     }
 
     @objc private func startTapped() {
+        guard selectedLayout == .tabs, let navigationController else {
+            finishChoice(tabItems: nil)
+            return
+        }
+        let customizeViewController = TabBarCustomizeViewController(mode: .onboarding, settings: settings)
+        customizeViewController.onFinish = { [weak self] items in
+            self?.finishChoice(tabItems: items)
+        }
+        navigationController.pushViewController(customizeViewController, animated: true)
+    }
+
+    @objc private func tabItemsRowTapped() {
+        navigationController?.pushViewController(TabBarCustomizeViewController(mode: .settings, settings: settings), animated: true)
+    }
+
+    private func finishChoice(tabItems: [MainTabItem]?) {
+        if let tabItems {
+            settings.setTabItems(tabItems)
+        }
         settings.markChoiceConfirmed()
-        AppLog.info(.postList, "升级布局选择: \(selectedLayout.rawValue)")
+        AppLog.info(.postList, "升级布局选择: \(selectedLayout.rawValue), 底部栏: \(settings.tabItems.map(\.rawValue))")
         if selectedLayout == settings.layout {
             dismiss(animated: true)
         } else {
@@ -199,7 +244,13 @@ extension LayoutChooserViewController {
             ?? ""
         guard presenter.presentedViewController == nil,
               settings.needsChoicePrompt(currentVersion: version) else { return false }
-        presenter.present(LayoutChooserViewController(mode: .upgradePrompt, settings: settings), animated: true)
+        // 放进导航栈，多 Tab 模式的第 2 步需要 push
+        let navigationController = UINavigationController(
+            rootViewController: LayoutChooserViewController(mode: .upgradePrompt, settings: settings)
+        )
+        navigationController.modalPresentationStyle = .fullScreen
+        navigationController.isModalInPresentation = true
+        presenter.present(navigationController, animated: true)
         return true
     }
 }
@@ -298,5 +349,67 @@ final class LayoutOptionCard: UIControl {
         )
         radioView.tintColor = isSelected ? .label : .tertiaryLabel
         accessibilityTraits = isSelected ? [.button, .selected] : .button
+    }
+}
+
+/// 设置里的“底部栏”行：标题 + 当前组合 + 箭头。
+final class TabItemsSummaryRow: UIControl {
+    private let valueLabel = UILabel()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        accessibilityIdentifier = "layout-tab-items-row"
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+        backgroundColor = .secondarySystemGroupedBackground
+        layer.cornerRadius = 12
+        layer.cornerCurve = .continuous
+
+        let titleLabel = UILabel()
+        titleLabel.text = "底部栏"
+        titleLabel.font = .preferredFont(forTextStyle: .body)
+        titleLabel.textColor = .label
+        titleLabel.setContentHuggingPriority(.required, for: .horizontal)
+        titleLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        valueLabel.font = .preferredFont(forTextStyle: .subheadline)
+        valueLabel.textColor = .secondaryLabel
+        valueLabel.textAlignment = .right
+        valueLabel.lineBreakMode = .byTruncatingTail
+
+        let chevron = UIImageView(image: UIImage(
+            systemName: "chevron.right",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        ))
+        chevron.tintColor = .tertiaryLabel
+        chevron.setContentHuggingPriority(.required, for: .horizontal)
+
+        let stack = UIStackView(arrangedSubviews: [titleLabel, valueLabel, chevron])
+        stack.axis = .horizontal
+        stack.alignment = .center
+        stack.spacing = 8
+        stack.isUserInteractionEnabled = false
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
+            stack.topAnchor.constraint(equalTo: topAnchor, constant: 12),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12),
+            heightAnchor.constraint(greaterThanOrEqualToConstant: 48)
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var isHighlighted: Bool {
+        didSet { backgroundColor = isHighlighted ? .systemFill : .secondarySystemGroupedBackground }
+    }
+
+    func setSummary(_ summary: String) {
+        valueLabel.text = summary
+        accessibilityLabel = "底部栏，\(summary)"
     }
 }
