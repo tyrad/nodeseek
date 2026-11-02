@@ -41,12 +41,6 @@ enum WhatsNewModule {
                 tint: .systemIndigo,
                 title: "全新我的页",
                 subtitle: "等级、鸡腿和升级进度一目了然"
-            ),
-            feature(
-                systemName: "square.and.pencil",
-                tint: .systemPink,
-                title: "悬浮发帖",
-                subtitle: "首页右下角随时发帖"
             )
         ]),
         release("1.1.0", features: [
