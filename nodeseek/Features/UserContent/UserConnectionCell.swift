@@ -64,7 +64,8 @@ final class UserConnectionCell: UITableViewCell {
         onToggleFollow = nil
     }
 
-    func configure(_ record: UserConnectionRecord, isUpdatingFollow: Bool = false) {
+    func configure(_ record: UserConnectionRecord, isUpdatingFollow: Bool = false, showsFollowButton: Bool = true) {
+        followButton.isHidden = !showsFollowButton
         configureFollowButton(followed: record.followed ?? false, busy: isUpdatingFollow)
         AvatarImageLoader.shared.cancel(on: avatar)
         nameLabel.text = record.name.isEmpty ? "UID \(record.uid)" : record.name

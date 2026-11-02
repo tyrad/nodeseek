@@ -7,16 +7,49 @@
 
 import Foundation
 
+/// 搜索范围，对应网页搜索弹窗的「帖子 / 用户 / 谷歌」三个 Tab。
+enum SearchScope: String, Codable, CaseIterable, Sendable {
+    case post
+    case user
+    case google
+
+    var title: String {
+        switch self {
+        case .post: return "帖子"
+        case .user: return "用户"
+        case .google: return "谷歌"
+        }
+    }
+}
+
 struct SearchHistoryRecord: Codable, Equatable, Sendable {
     let query: String
     let category: PostListCategory
+    let scope: SearchScope
+
+    init(query: String, category: PostListCategory, scope: SearchScope = .post) {
+        self.query = query
+        // 分类只对帖子搜索有意义，其他范围统一记成全部，便于去重
+        self.category = scope == .post ? category : .all
+        self.scope = scope
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // 旧版本记录没有 scope 字段，全部视为帖子搜索
+        self.init(
+            query: try container.decode(String.self, forKey: .query),
+            category: try container.decode(PostListCategory.self, forKey: .category),
+            scope: try container.decodeIfPresent(SearchScope.self, forKey: .scope) ?? .post
+        )
+    }
 
     var displayTitle: String {
-        switch category {
-        case .all:
-            return query
-        default:
-            return "\(category.title) · \(query)"
+        switch scope {
+        case .post:
+            return category == .all ? query : "\(category.title) · \(query)"
+        case .user, .google:
+            return "\(scope.title) · \(query)"
         }
     }
 }
@@ -41,11 +74,11 @@ final class SearchHistoryStore {
         return (try? JSONDecoder().decode([SearchHistoryRecord].self, from: data)) ?? []
     }
 
-    func record(query: String, category: PostListCategory) {
+    func record(query: String, category: PostListCategory, scope: SearchScope = .post) {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedQuery.isEmpty else { return }
 
-        let newRecord = SearchHistoryRecord(query: normalizedQuery, category: category)
+        let newRecord = SearchHistoryRecord(query: normalizedQuery, category: category, scope: scope)
         var nextRecords = records().filter { existing in
             existing != newRecord
         }

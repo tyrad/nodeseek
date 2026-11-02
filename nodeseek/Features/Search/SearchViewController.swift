@@ -5,6 +5,7 @@
 //  Created by Codex on 2026/5/3.
 //
 
+import SafariServices
 import UIKit
 
 final class SearchViewController: UIViewController {
@@ -18,17 +19,21 @@ final class SearchViewController: UIViewController {
     private let visitedStore: VisitedPostStoreProtocol
     private let searchHistoryStore: SearchHistoryStore
     private let searchPreferenceStore: SearchPreferenceStore
+    private let userSearcher: any UserSearchLoading
+    private let isLoggedIn: @MainActor () async -> Bool
     private let categories = PostListCategory.allCases.filter { category in
         category != .df && category != .award
     }
 
+    private var selectedScope: SearchScope = .post
     private var selectedCategory: PostListCategory = .all
     private var activeRequest: SearchRequest?
+    private var activeUserQuery: String?
+    private var userSearchTask: Task<Void, Never>?
     private var items: [PostListItem] = []
     private var loadedIDs: Set<String> = []
     private var nextPage = 2
     private var hasMorePages = true
-    private var hasSearched = false
     private var isLoadingFirstPage = false
     private var isRefreshing = false
     private var isLoadingMore = false
@@ -38,6 +43,14 @@ final class SearchViewController: UIViewController {
         let view = UIView()
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
+    }()
+
+    private let scopeControl: UISegmentedControl = {
+        let control = UISegmentedControl(items: SearchScope.allCases.map(\.title))
+        control.selectedSegmentIndex = 0
+        control.accessibilityIdentifier = "search-scope-control"
+        control.translatesAutoresizingMaskIntoConstraints = false
+        return control
     }()
 
     private let categorySelectorButton: UIButton = {
@@ -113,9 +126,10 @@ final class SearchViewController: UIViewController {
     }()
 
     private lazy var formStackView: UIStackView = {
-        let stack = UIStackView(arrangedSubviews: [inputRowStackView])
+        let stack = UIStackView(arrangedSubviews: [scopeControl, inputRowStackView])
         stack.axis = .vertical
         stack.alignment = .fill
+        stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
         return stack
     }()
@@ -176,18 +190,29 @@ final class SearchViewController: UIViewController {
         return view
     }()
 
+    private let userResultsView: SearchUserResultsView = {
+        let view = SearchUserResultsView()
+        view.isHidden = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
     init(
         service: NodeSeekService = SearchViewController.makeDefaultService(),
         sessionStore: NodeSeekSessionStore = .shared,
         visitedStore: VisitedPostStoreProtocol? = nil,
         searchHistoryStore: SearchHistoryStore = SearchHistoryStore(),
-        searchPreferenceStore: SearchPreferenceStore = SearchPreferenceStore()
+        searchPreferenceStore: SearchPreferenceStore = SearchPreferenceStore(),
+        userSearcher: (any UserSearchLoading)? = nil,
+        isLoggedIn: (@MainActor () async -> Bool)? = nil
     ) {
         self.service = service
         self.sessionStore = sessionStore
         self.visitedStore = visitedStore ?? VisitedPostStore.shared
         self.searchHistoryStore = searchHistoryStore
         self.searchPreferenceStore = searchPreferenceStore
+        self.userSearcher = userSearcher ?? NodeSeekUserContentClient()
+        self.isLoggedIn = isLoggedIn ?? { await TabLayoutAccountGate.isLoggedIn() }
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -201,6 +226,7 @@ final class SearchViewController: UIViewController {
 
     deinit {
         loadTask?.cancel()
+        userSearchTask?.cancel()
     }
 
     override func viewDidLoad() {
@@ -208,7 +234,7 @@ final class SearchViewController: UIViewController {
         setupUI()
         let rememberedCategory = searchPreferenceStore.category()
         applySelectedCategory(categories.contains(rememberedCategory) ? rememberedCategory : .all)
-        renderRecentSearches()
+        applyScope(.post)
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -221,12 +247,17 @@ final class SearchViewController: UIViewController {
         view.backgroundColor = .systemBackground
         keywordTextField.delegate = self
         listView.delegate = self
+        userResultsView.onSelectUser = { [weak self] record in
+            self?.navigationController?.pushViewController(UserProfileViewController(uid: record.uid), animated: true)
+        }
+        scopeControl.addTarget(self, action: #selector(scopeControlChanged), for: .valueChanged)
         searchButton.addTarget(self, action: #selector(searchButtonTapped), for: .touchUpInside)
         clearRecentSearchesButton.addTarget(self, action: #selector(clearRecentSearchesButtonTapped), for: .touchUpInside)
 
         view.addSubview(formContainerView)
         view.addSubview(recentSearchesContainerView)
         view.addSubview(listView)
+        view.addSubview(userResultsView)
         formContainerView.addSubview(formStackView)
 
         NSLayoutConstraint.activate([
@@ -251,7 +282,12 @@ final class SearchViewController: UIViewController {
             listView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             listView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             listView.topAnchor.constraint(equalTo: formContainerView.bottomAnchor, constant: 12),
-            listView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            listView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            userResultsView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            userResultsView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            userResultsView.topAnchor.constraint(equalTo: formContainerView.bottomAnchor, constant: 12),
+            userResultsView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
     }
 
@@ -261,7 +297,7 @@ final class SearchViewController: UIViewController {
         let records = searchHistoryStore.records().filter { record in
             categories.contains(record.category)
         }
-        recentSearchesContainerView.isHidden = hasSearched || records.isEmpty
+        recentSearchesContainerView.isHidden = isShowingResults || records.isEmpty
         guard !recentSearchesContainerView.isHidden else { return }
 
         let buttons = records.enumerated().map { index, record in
@@ -302,11 +338,42 @@ final class SearchViewController: UIViewController {
         categorySelectorButton.menu = makeCategoryMenu()
     }
 
-    private func showResultsIfNeeded() {
-        guard !hasSearched else { return }
-        hasSearched = true
-        listView.isHidden = false
-        recentSearchesContainerView.isHidden = true
+    /// 当前 Tab 有搜索结果时展示结果，否则展示搜索历史；切换 Tab 不丢已有结果。
+    private var isShowingResults: Bool {
+        switch selectedScope {
+        case .post: return activeRequest != nil
+        case .user: return activeUserQuery != nil
+        case .google: return false
+        }
+    }
+
+    private func updateContentVisibility() {
+        listView.isHidden = !(selectedScope == .post && activeRequest != nil)
+        userResultsView.isHidden = !(selectedScope == .user && activeUserQuery != nil)
+        renderRecentSearches()
+    }
+
+    private func applyScope(_ scope: SearchScope) {
+        selectedScope = scope
+        if let index = SearchScope.allCases.firstIndex(of: scope) {
+            scopeControl.selectedSegmentIndex = index
+        }
+        // 分类只对帖子搜索生效，其他 Tab 隐藏分类按钮，输入框自动占满
+        categorySelectorButton.isHidden = scope != .post
+        switch scope {
+        case .post: keywordTextField.placeholder = "输入关键字"
+        case .user: keywordTextField.placeholder = "输入用户名"
+        case .google: keywordTextField.placeholder = "用谷歌搜索本站"
+        }
+        updateContentVisibility()
+    }
+
+    /// 与网页一致：site 限定本站后交给谷歌搜索
+    static func googleSearchURL(query: String) -> URL? {
+        var components = URLComponents(string: "https://www.google.com/search")
+        let host = NodeSeekSite.baseURL.host ?? "www.nodeseek.com"
+        components?.queryItems = [URLQueryItem(name: "q", value: "site:\(host) \(query)")]
+        return components?.url
     }
 
     private func makeCategoryMenu() -> UIMenu {
@@ -319,6 +386,12 @@ final class SearchViewController: UIViewController {
             }
         }
         return UIMenu(title: "选择分类", options: .singleSelection, children: actions)
+    }
+
+    @objc private func scopeControlChanged() {
+        let index = scopeControl.selectedSegmentIndex
+        guard SearchScope.allCases.indices.contains(index) else { return }
+        applyScope(SearchScope.allCases[index])
     }
 
     @objc private func searchButtonTapped() {
@@ -339,17 +412,50 @@ final class SearchViewController: UIViewController {
         }
 
         keywordTextField.resignFirstResponder()
-        searchHistoryStore.record(query: query, category: selectedCategory)
-        searchPreferenceStore.rememberCategory(selectedCategory)
-        renderRecentSearches()
-        showResultsIfNeeded()
-        startFirstPageLoad(request: SearchRequest(query: query, category: selectedCategory))
+        searchHistoryStore.record(query: query, category: selectedCategory, scope: selectedScope)
+        switch selectedScope {
+        case .post:
+            searchPreferenceStore.rememberCategory(selectedCategory)
+            startFirstPageLoad(request: SearchRequest(query: query, category: selectedCategory))
+        case .user:
+            startUserSearch(query: query)
+        case .google:
+            if let url = Self.googleSearchURL(query: query) {
+                present(SFSafariViewController(url: url), animated: true)
+            }
+        }
+        updateContentVisibility()
     }
 
     private func submitSearch(record: SearchHistoryRecord) {
         keywordTextField.text = record.query
-        applySelectedCategory(record.category)
+        if record.scope == .post {
+            applySelectedCategory(record.category)
+        }
+        applyScope(record.scope)
         submitSearch()
+    }
+
+    private func startUserSearch(query: String) {
+        userSearchTask?.cancel()
+        activeUserQuery = query
+        userResultsView.setState(.loading)
+        userSearchTask = Task { [weak self, userSearcher] in
+            do {
+                let records = try await userSearcher.findMembers(keyword: query)
+                guard let self, !Task.isCancelled, self.activeUserQuery == query else { return }
+                self.userResultsView.setState(.loaded(records))
+            } catch is CancellationError {
+                return
+            } catch {
+                guard let self, !Task.isCancelled, self.activeUserQuery == query else { return }
+                // 游客请求时站点直接返回 HTTP 500，这里换成可理解的提示
+                let message = await self.isLoggedIn() ? error.localizedDescription : "登录后才能搜索用户"
+                guard !Task.isCancelled, self.activeUserQuery == query else { return }
+                // 限流等接口提示原样展示，不弹窗打断
+                self.userResultsView.setState(.failed(message))
+            }
+        }
     }
 
     private func startFirstPageLoad(request: SearchRequest) {

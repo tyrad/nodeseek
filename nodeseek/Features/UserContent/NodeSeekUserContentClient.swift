@@ -155,6 +155,24 @@ final class NodeSeekUserContentClient {
         )
     }
 
+    /// 按用户名模糊搜索，接口与网页 /member?q= 页一致；站点限流（每 2 秒一次）时抛出接口原文提示
+    func findMembers(keyword: String) async throws -> [UserConnectionRecord] {
+        // 关键字作为路径的一段，斜杠也要转义，否则会被当成多级路径
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "/")
+        let encoded = keyword.addingPercentEncoding(withAllowedCharacters: allowed) ?? keyword
+        let url = URL(string: baseURL.absoluteString + "/api/account/find/" + encoded) ?? baseURL
+        var request = URLRequest(url: url)
+        var referer = URLComponents(url: baseURL.appendingPathComponent("member"), resolvingAgainstBaseURL: false)
+        referer?.queryItems = [URLQueryItem(name: "q", value: keyword)]
+        WebRequestFingerprint.applyJSONHeaders(to: &request, referer: referer?.url ?? baseURL)
+        let response = try await decode(ConnectionsResponse.self, from: request)
+        guard response.success else {
+            throw response.message.map(UserContentClientError.rejected) ?? UserContentClientError.unsuccessfulResponse
+        }
+        return response.memberList ?? []
+    }
+
     /// 今日进度只对当前登录用户有效，两个接口与网页进度页一致
     func loadTodayProgress(uid: Int) async throws -> UserTodayProgressRecord {
         async let progressResponse = decode(
@@ -374,4 +392,5 @@ private struct CreditResponse: Decodable {
 private struct ConnectionsResponse: Decodable {
     let success: Bool
     let memberList: [UserConnectionRecord]?
+    let message: String?
 }

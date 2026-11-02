@@ -174,6 +174,138 @@ struct SearchViewControllerTests {
         viewController.view.layoutIfNeeded()
         #expect(abs(try inputRowTop(in: viewController.view) - initialTop) < 0.5)
     }
+
+    @Test func scopeControlSwitchesBetweenPostUserAndGoogle() throws {
+        let viewController = SearchViewController(searchHistoryStore: makeSearchHistoryStore())
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.view.layoutIfNeeded()
+
+        let scopeControl = try #require(viewController.view.firstView(accessibilityIdentifier: "search-scope-control") as? UISegmentedControl)
+        let categoryButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "search-category-selector-button"))
+        let keywordTextField = try #require(viewController.view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
+
+        #expect((0..<scopeControl.numberOfSegments).map { scopeControl.titleForSegment(at: $0) } == ["帖子", "用户", "谷歌"])
+        #expect(scopeControl.selectedSegmentIndex == 0)
+        #expect(categoryButton.isHidden == false)
+
+        scopeControl.selectedSegmentIndex = 1
+        scopeControl.sendActions(for: .valueChanged)
+        #expect(categoryButton.isHidden)
+        #expect(keywordTextField.placeholder == "输入用户名")
+
+        scopeControl.selectedSegmentIndex = 2
+        scopeControl.sendActions(for: .valueChanged)
+        #expect(categoryButton.isHidden)
+        #expect(keywordTextField.placeholder == "用谷歌搜索本站")
+    }
+
+    @Test func userScopeSearchShowsMembersAndRecordsHistory() async throws {
+        let store = makeSearchHistoryStore()
+        let searcher = StubUserSearcher(result: .success([
+            UserConnectionRecord(uid: 9, name: "酒神", rank: 6, coin: 18010, stardust: 1387, bio: "人生得意须尽欢", postCount: 374, commentCount: 4790, fans: 365, followed: false)
+        ]))
+        let viewController = SearchViewController(
+            searchHistoryStore: store,
+            searchPreferenceStore: makeSearchPreferenceStore(),
+            userSearcher: searcher
+        )
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.view.layoutIfNeeded()
+        let scopeControl = try #require(viewController.view.firstView(accessibilityIdentifier: "search-scope-control") as? UISegmentedControl)
+        let keywordTextField = try #require(viewController.view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
+        let searchButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "search-submit-button"))
+        let resultsView = try #require(viewController.view.firstView(accessibilityIdentifier: "search-user-results") as? SearchUserResultsView)
+
+        scopeControl.selectedSegmentIndex = 1
+        scopeControl.sendActions(for: .valueChanged)
+        keywordTextField.text = "酒神"
+        searchButton.sendActions(for: .touchUpInside)
+
+        #expect(resultsView.isHidden == false)
+        #expect(store.records() == [SearchHistoryRecord(query: "酒神", category: .all, scope: .user)])
+        try await waitUntil { resultsView.state != .loading }
+        #expect(searcher.keywords == ["酒神"])
+        if case .loaded(let records) = resultsView.state {
+            #expect(records.map(\.uid) == [9])
+        } else {
+            Issue.record("用户搜索结果未加载: \(resultsView.state)")
+        }
+
+        // 切回帖子 Tab 时没有帖子结果，显示历史，用户结果被隐藏但保留
+        scopeControl.selectedSegmentIndex = 0
+        scopeControl.sendActions(for: .valueChanged)
+        #expect(resultsView.isHidden)
+        #expect(viewController.view.firstView(accessibilityIdentifier: "search-history-container")?.isHidden == false)
+    }
+
+    @Test func userScopeSearchShowsRateLimitMessage() async throws {
+        let searcher = StubUserSearcher(result: .failure(UserContentClientError.rejected("每隔2秒可以操作一次")))
+        let viewController = SearchViewController(
+            searchHistoryStore: makeSearchHistoryStore(),
+            searchPreferenceStore: makeSearchPreferenceStore(),
+            userSearcher: searcher,
+            isLoggedIn: { true }
+        )
+        viewController.loadViewIfNeeded()
+        let scopeControl = try #require(viewController.view.firstView(accessibilityIdentifier: "search-scope-control") as? UISegmentedControl)
+        let keywordTextField = try #require(viewController.view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
+        let resultsView = try #require(viewController.view.firstView(accessibilityIdentifier: "search-user-results") as? SearchUserResultsView)
+
+        scopeControl.selectedSegmentIndex = 1
+        scopeControl.sendActions(for: .valueChanged)
+        keywordTextField.text = "tyrad"
+        _ = viewController.textFieldShouldReturn(keywordTextField)
+
+        try await waitUntil { resultsView.state != .loading }
+        #expect(resultsView.state == .failed("每隔2秒可以操作一次"))
+        #expect(viewController.presentedViewController == nil)
+    }
+
+    @Test func userScopeSearchAsGuestAsksToLogIn() async throws {
+        let searcher = StubUserSearcher(result: .failure(UserContentClientError.httpStatus(500)))
+        let viewController = SearchViewController(
+            searchHistoryStore: makeSearchHistoryStore(),
+            searchPreferenceStore: makeSearchPreferenceStore(),
+            userSearcher: searcher,
+            isLoggedIn: { false }
+        )
+        viewController.loadViewIfNeeded()
+        let scopeControl = try #require(viewController.view.firstView(accessibilityIdentifier: "search-scope-control") as? UISegmentedControl)
+        let keywordTextField = try #require(viewController.view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
+        let resultsView = try #require(viewController.view.firstView(accessibilityIdentifier: "search-user-results") as? SearchUserResultsView)
+
+        scopeControl.selectedSegmentIndex = 1
+        scopeControl.sendActions(for: .valueChanged)
+        keywordTextField.text = "Lloyd"
+        _ = viewController.textFieldShouldReturn(keywordTextField)
+
+        try await waitUntil { resultsView.state != .loading }
+        #expect(resultsView.state == .failed("登录后才能搜索用户"))
+    }
+
+    @Test func googleSearchURLLimitsToNodeSeekSite() throws {
+        let url = try #require(SearchViewController.googleSearchURL(query: "ns connect"))
+        let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
+        #expect(components.host == "www.google.com")
+        #expect(components.queryItems?.first { $0.name == "q" }?.value == "site:www.nodeseek.com ns connect")
+    }
+
+    @Test func historyRecordsKeepScopeAndDecodeLegacyRecordsAsPost() throws {
+        let legacy = #"[{"query":"美西","category":"tech"}]"#.data(using: .utf8)!
+        let suiteName = "search-history-tests-\(UUID().uuidString)"
+        let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+        userDefaults.set(legacy, forKey: "history")
+        let store = SearchHistoryStore(userDefaults: userDefaults, storageKey: "history")
+
+        #expect(store.records() == [SearchHistoryRecord(query: "美西", category: .tech, scope: .post)])
+
+        store.record(query: "酒神", category: .tech, scope: .user)
+        store.record(query: "ns", category: .all, scope: .google)
+        store.record(query: "酒神", category: .all, scope: .post)
+        #expect(store.records().map(\.displayTitle) == ["酒神", "谷歌 · ns", "用户 · 酒神", "技术 · 美西"])
+    }
 }
 
 private func makeSearchHistoryStore() -> SearchHistoryStore {
@@ -186,6 +318,32 @@ private func makeSearchPreferenceStore() -> SearchPreferenceStore {
     let suiteName = "search-preference-tests-\(UUID().uuidString)"
     let userDefaults = UserDefaults(suiteName: suiteName)!
     return SearchPreferenceStore(userDefaults: userDefaults, categoryStorageKey: "category")
+}
+
+private final class StubUserSearcher: UserSearchLoading, @unchecked Sendable {
+    let result: Result<[UserConnectionRecord], Error>
+    private(set) var keywords: [String] = []
+
+    init(result: Result<[UserConnectionRecord], Error>) {
+        self.result = result
+    }
+
+    func findMembers(keyword: String) async throws -> [UserConnectionRecord] {
+        keywords.append(keyword)
+        return try result.get()
+    }
+}
+
+@MainActor
+private func waitUntil(timeout: TimeInterval = 2, _ condition: () -> Bool) async throws {
+    let deadline = Date().addingTimeInterval(timeout)
+    while !condition() {
+        guard Date() < deadline else {
+            Issue.record("等待条件超时")
+            return
+        }
+        try await Task.sleep(nanoseconds: 10_000_000)
+    }
 }
 
 private struct StaticSearchHTMLClient: HTMLClient {
@@ -226,6 +384,20 @@ private extension UIView {
 
         for subview in subviews {
             if let matched = subview.firstButton(accessibilityIdentifier: accessibilityIdentifier) {
+                return matched
+            }
+        }
+
+        return nil
+    }
+
+    func firstView(accessibilityIdentifier: String) -> UIView? {
+        if self.accessibilityIdentifier == accessibilityIdentifier {
+            return self
+        }
+
+        for subview in subviews {
+            if let matched = subview.firstView(accessibilityIdentifier: accessibilityIdentifier) {
                 return matched
             }
         }
