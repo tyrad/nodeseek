@@ -105,14 +105,19 @@ enum WhatsNewModule {
 
     static var hasContent: Bool { !catalog.isEmpty }
 
-    /// 当前版本有内容且未展示过时返回，否则返回 nil。
+    /// 取不高于当前版本的最新一条介绍，未展示过时返回，否则返回 nil。
+    /// 例如 1.2.1 没有单独条目时沿用 1.2.0 的介绍，已在 1.2.0 看过的用户不会重复弹出。
     static func whatsNewToPresent(
         currentVersion: WhatsNew.Version = .current(),
         versionStore: WhatsNewVersionStore,
         catalog: [WhatsNew] = catalog
     ) -> WhatsNew? {
-        guard let whatsNew = catalog.first(where: { $0.version == currentVersion }) else { return nil }
+        guard let whatsNew = latestRelease(upTo: currentVersion, in: catalog) else { return nil }
         return versionStore.hasPresented(whatsNew) ? nil : whatsNew
+    }
+
+    static func latestRelease(upTo version: WhatsNew.Version, in catalog: [WhatsNew]) -> WhatsNew? {
+        catalog.filter { $0.version <= version }.max { $0.version < $1.version }
     }
 
     /// 启动后自动弹出，同一版本只弹一次。
@@ -132,7 +137,7 @@ enum WhatsNewModule {
     @MainActor
     static func makeViewController() -> UIViewController? {
         let current = WhatsNew.Version.current()
-        guard let whatsNew = catalog.first(where: { $0.version == current }) ?? catalog.first else { return nil }
+        guard let whatsNew = latestRelease(upTo: current, in: catalog) ?? catalog.first else { return nil }
         return WhatsNewViewController(whatsNew: whatsNew)
     }
 

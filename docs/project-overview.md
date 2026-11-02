@@ -187,7 +187,7 @@ xcodebuild -showdestinations -project nodeseek.xcodeproj -scheme nodeseek
 展示规则：
 
 - 内容写在 `WhatsNewModule.catalog`，用 `release("x.y.z", features: [...])` 新增一个版本，新版本插在最前面。
-- 版本号必须与 `MARKETING_VERSION` 完全一致，否则不会弹出。
+- 弹出的是「不高于当前 `MARKETING_VERSION` 的最新一条」，每条只弹一次；小版本（如 1.2.1）没有单独条目时沿用上一条（1.2.0），已看过的用户不会重复弹出。
 - 只修 bug、没有用户可感知变化的版本不加条目；`catalog` 为空时不弹出，设置 › 关于 里的「新功能」入口也隐藏。
 - 开屏动画结束后自动弹出，每个版本只弹一次；推送冷启动、或当前已有其他弹窗时不弹。
 - 新安装用户目前也会弹出，暂不区分。
