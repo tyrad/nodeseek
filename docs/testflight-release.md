@@ -46,20 +46,20 @@
 1. 确认证书和 profile 已经通过 `fastlane match appstore` 写入私有 match 仓库。
 2. 在 GitHub 创建 `app-store` environment，并开启人工审批。
 3. 确认 App Store Connect 中已经创建外部测试组 `Public Beta`，并按需开启 Public Link。
-4. 打 tag 触发发布：
+4. 先提交修改 `MARKETING_VERSION`（例如 `build(release): 版本升至 1.0.0`），再打同版本号的 tag 触发发布：
 
 ```bash
 git tag ios/v1.0.0
 git push origin ios/v1.0.0
 ```
 
-5. workflow 会校验 tag 指向 `main` 历史中的 commit，版本号从 tag 解析，build number 自动使用北京时间 `yyyyMMddHHmmss`，例如 `20260508135000`。
+5. workflow 会校验 tag 指向 `main` 历史中的 commit，版本号读取工程里的 `MARKETING_VERSION`，并校验与 tag 一致（不一致直接失败），build number 自动使用北京时间 `yyyyMMddHHmmss`，例如 `20260508135000`。
 6. workflow 会构建并上传 TestFlight。Simulator 测试不在发布 workflow 中执行，避免公开发布链路等待过久；需要时可本地或单独 CI 执行 `fastlane tests`。
 7. 上传成功后，workflow summary 会生成可复制的 Public Beta 测试信息。
 8. 维护者进入 App Store Connect，选择这个 build，确认测试信息并手动提交 Beta App Review。
 9. 构建会把 GitHub run 信息写入 `Info.plist`，并上传 `build/build-provenance.json` artifact。
 
-手动触发 `TestFlight` workflow 仍然可用，需要输入 version；build number 默认同样自动使用北京时间 `yyyyMMddHHmmss`。只有补救或调试时才手动覆盖 build number，并且必须保证它大于 App Store Connect 中同版本已有 build。
+手动触发 `TestFlight` workflow 仍然可用，版本号同样取工程里的 `MARKETING_VERSION`，不能在表单里填写（工程的 Info.plist 由 `MARKETING_VERSION` 生成，外部传入的版本会被覆盖）；build number 默认同样自动使用北京时间 `yyyyMMddHHmmss`。只有补救或调试时才手动覆盖 build number，并且必须保证它大于 App Store Connect 中同版本已有 build。
 
 ## Public Beta 前置条件
 

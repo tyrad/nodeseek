@@ -6,10 +6,6 @@ on:
       - "ios/v*"
   workflow_dispatch:
     inputs:
-      version:
-        description: "Marketing version, for example 1.0.1"
-        required: true
-        type: string
       build_number:
         description: "Optional App Store build number override. Defaults to Asia/Shanghai yyyyMMddHHmmss."
         required: false
@@ -58,12 +54,20 @@ jobs:
       - name: Prepare release inputs
         id: release
         env:
-          MANUAL_VERSION: ${{ inputs.version }}
           MANUAL_BUILD_NUMBER: ${{ inputs.build_number }}
         run: |
           set -euo pipefail
 
           generated_build_number="$(TZ=Asia/Shanghai date +%Y%m%d%H%M%S)"
+
+          # 版本号只认工程里的 MARKETING_VERSION：Info.plist 由它生成，构建时外部传入的版本会被覆盖
+          project_versions="$(grep -o 'MARKETING_VERSION = [^;]*' nodeseek.xcodeproj/project.pbxproj | sed 's/MARKETING_VERSION = //' | sort -u)"
+          if [[ -z "${project_versions}" || "$(printf '%s\n' "${project_versions}" | wc -l | tr -d ' ')" != "1" ]]; then
+            echo "MARKETING_VERSION must be set to exactly one value in project.pbxproj, got:" >&2
+            printf '%s\n' "${project_versions}" >&2
+            exit 1
+          fi
+          version="${project_versions}"
 
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             tag="${GITHUB_REF_NAME}"
@@ -78,10 +82,13 @@ jobs:
               exit 1
             fi
 
-            version="${tag#ios/v}"
+            tag_version="${tag#ios/v}"
+            if [[ "${tag_version}" != "${version}" ]]; then
+              echo "Tag version ${tag_version} does not match MARKETING_VERSION ${version}. Bump the project version before tagging." >&2
+              exit 1
+            fi
             build_number="${generated_build_number}"
           else
-            version="${MANUAL_VERSION}"
             build_number="${MANUAL_BUILD_NUMBER:-${generated_build_number}}"
           fi
 
@@ -100,7 +107,7 @@ jobs:
           echo "Release version=${version} build_number=${build_number}"
 
       - name: Build and upload to TestFlight
-        run: bundle exec fastlane beta version:${{ steps.release.outputs.version }} build_number:${{ steps.release.outputs.build_number }}
+        run: bundle exec fastlane beta build_number:${{ steps.release.outputs.build_number }}
         env:
           APP_IDENTIFIER: ${{ vars.APP_IDENTIFIER || 'com.mistj.nodeseek' }}
           APP_STORE_CONNECT_APP_ID: ${{ vars.APP_STORE_CONNECT_APP_ID }}
