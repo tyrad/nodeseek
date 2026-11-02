@@ -5,6 +5,7 @@
 - 我的页：`docs/plans/assets/me-page-mockup.png`、`docs/plans/assets/me-page-v2-mockup.png`
 - 悬浮发帖：`docs/plans/assets/compose-button-mockup.png`
 - 布局选择页：`docs/plans/assets/layout-chooser-mockup.png`
+- 自定义底部栏：`docs/plans/assets/tab-customize-mockup.png`
 
 ## 目标
 
@@ -79,3 +80,13 @@
 - 悬浮发帖定稿方案 C（`docs/plans/assets/compose-button-mockup.png`）：玻璃胶囊 + 图标与「发帖」文字，iOS 26 用系统液态玻璃，更早系统用模糊材质 + 细描边。
 - 选择页缩略图暂用设计稿渲染图（`docs/plans/assets/layout-preview-render.html`），后续可换成真机截图。
 - 1.2.0 的「新功能」条目在版本号升到 1.2.0 时再补。
+
+## 自定义底部栏（2026-11-02）
+
+- 布局选择页选中「多 Tab 模式」时，底部按钮变为「下一步」，进入「自定义底部栏」（第 2 步）；右上角「跳过」使用默认组合。选「阅读模式」仍直接「开始使用」。
+- 默认三项：首页、通知、我的。首页固定最左、我的固定最右，不可移除（设置入口在「我的」）；通知可关闭。
+- 可添加：最近浏览、我的帖子、我的收藏、我的评论、搜一搜。中间各项可拖动排序；底部最多 5 项，满了「添加」置灰并提示「底部最多 5 项」。
+- 加到底部的入口在「我的」页仍保留原位置。新 Tab 直接复用现有页面，进入二级页隐藏底栏。
+- 设置 › 阅读 › 界面布局 下方新增「底部栏」，进入同一页面（无步骤提示与「跳过」），改动即时生效；已存在的 Tab 保留原导航栈，不重建。
+- 存储：`AppNavigationLayoutSettings.tabItems`（UserDefaults 字符串数组），读取时自动纠正（首页在前、我的在后、去重、最多 5 项）。切回阅读模式保留该设置。
+- 添加按钮使用系统绿色（iOS 编辑列表的标准插入样式，属于状态色），移除用系统红色。
