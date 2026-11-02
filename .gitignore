@@ -40,3 +40,6 @@ fastlane/app_privacy_details.json
 fastlane/app_rating_config.json
 fastlane/metadata/
 fastlane/screenshots/
+
+# App Store Connect CLI 本地发布进度
+.asc/
