@@ -40,22 +40,56 @@ struct AppNavigationLayoutTests {
         #expect(settings.needsChoicePrompt(currentVersion: "1.2.0") == false)
     }
 
-    @Test func settingsChooserAppliesLayoutImmediately() throws {
+    @Test func settingsChooserAppliesLayoutAfterConfirm() throws {
         let settings = makeSettings()
         let viewController = LayoutChooserViewController(mode: .settings, settings: settings)
         viewController.loadViewIfNeeded()
 
         #expect(viewController.view.layoutTestButton(identifier: "layout-chooser-start-button") == nil)
+        let confirmButton = try #require(viewController.view.layoutTestButton(identifier: "layout-chooser-confirm-button"))
+        let tabItemsRow = try #require(viewController.view.layoutTestView(identifier: "layout-tab-items-row"))
         let readingCard = try #require(viewController.view.layoutTestView(identifier: "layout-option-reading") as? LayoutOptionCard)
         let tabsCard = try #require(viewController.view.layoutTestView(identifier: "layout-option-tabs") as? LayoutOptionCard)
         #expect(readingCard.isSelected)
-        #expect(tabsCard.isSelected == false)
+        // 当前就是阅读模式：没有确认按钮，也不显示底部栏
+        #expect(confirmButton.isHidden)
+        #expect(tabItemsRow.isHidden)
 
         tabsCard.sendActions(for: .touchUpInside)
+        #expect(tabsCard.isSelected)
+        #expect(settings.layout == .reading)
+        #expect(confirmButton.isHidden == false)
+        #expect(tabItemsRow.isHidden == false)
+
+        // 选回当前布局，确认按钮收起
+        readingCard.sendActions(for: .touchUpInside)
+        #expect(confirmButton.isHidden)
+        #expect(tabItemsRow.isHidden)
+
+        tabsCard.sendActions(for: .touchUpInside)
+        confirmButton.sendActions(for: .touchUpInside)
         #expect(settings.layout == .tabs)
         #expect(settings.hasConfirmedChoice)
-        #expect(tabsCard.isSelected)
-        #expect(readingCard.isSelected == false)
+    }
+
+    @Test func settingsChooserConfirmButtonDoesNotCoverContentOnSmallScreen() throws {
+        let settings = makeSettings()
+        let viewController = LayoutChooserViewController(mode: .settings, settings: settings)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 568))
+        window.rootViewController = viewController
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+
+        try #require(viewController.view.layoutTestView(identifier: "layout-option-tabs") as? LayoutOptionCard).sendActions(for: .touchUpInside)
+        viewController.view.layoutIfNeeded()
+
+        let confirmButton = try #require(viewController.view.layoutTestButton(identifier: "layout-chooser-confirm-button"))
+        let tabItemsRow = try #require(viewController.view.layoutTestView(identifier: "layout-tab-items-row"))
+        let scrollView = try #require(tabItemsRow.superview?.superview as? UIScrollView)
+        // 列表区域止于按钮上方，内容超出时可滚动到底部栏行
+        #expect(scrollView.frame.maxY <= confirmButton.frame.minY)
+        let rowBottom = tabItemsRow.convert(tabItemsRow.bounds, to: scrollView).maxY
+        #expect(rowBottom <= scrollView.contentSize.height)
     }
 
     @Test func upgradeChooserWaitsForStartButton() throws {
@@ -242,6 +276,7 @@ struct AppNavigationLayoutTests {
     @Test func settingsChooserShowsTabItemsSummary() throws {
         let settings = makeSettings()
         settings.setTabItems([.home, .notification, .recent, .me])
+        settings.setLayout(.tabs)
         let viewController = LayoutChooserViewController(mode: .settings, settings: settings)
         viewController.loadViewIfNeeded()
         viewController.beginAppearanceTransition(true, animated: false)

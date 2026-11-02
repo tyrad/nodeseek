@@ -10,7 +10,7 @@ final class LayoutChooserViewController: UIViewController {
     enum Mode {
         /// 升级后弹出：选好后点“开始使用”生效。
         case upgradePrompt
-        /// 设置里进入：点选即生效。
+        /// 设置里进入：选好后点“确认切换”生效。
         case settings
     }
 
@@ -20,6 +20,26 @@ final class LayoutChooserViewController: UIViewController {
     private var cards: [AppNavigationLayout: LayoutOptionCard] = [:]
     private let footnoteLabel = UILabel()
     private let tabItemsRow = TabItemsSummaryRow()
+    private let tabItemsFootnoteLabel = UILabel()
+    private var scrollBottomToViewConstraint: NSLayoutConstraint?
+    private var scrollBottomToConfirmConstraint: NSLayoutConstraint?
+
+    private let confirmButton: UIButton = {
+        var configuration = UIButton.Configuration.filled()
+        configuration.baseBackgroundColor = .label
+        configuration.baseForegroundColor = .systemBackground
+        configuration.cornerStyle = .capsule
+        configuration.title = "确认切换"
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = .systemFont(ofSize: 17, weight: .semibold)
+            return outgoing
+        }
+        let button = UIButton(configuration: configuration)
+        button.accessibilityIdentifier = "layout-chooser-confirm-button"
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
 
     private let scrollView: UIScrollView = {
         let scrollView = UIScrollView()
@@ -116,7 +136,7 @@ final class LayoutChooserViewController: UIViewController {
             contentStack.addArrangedSubview(subtitleLabel)
             contentStack.setCustomSpacing(24, after: subtitleLabel)
         case .settings:
-            subtitleLabel.text = "点选后立即切换，登录状态不受影响"
+            subtitleLabel.text = "选好后点“确认切换”，登录状态不受影响"
             subtitleLabel.font = .preferredFont(forTextStyle: .footnote)
             contentStack.addArrangedSubview(subtitleLabel)
             contentStack.setCustomSpacing(16, after: subtitleLabel)
@@ -124,15 +144,14 @@ final class LayoutChooserViewController: UIViewController {
         contentStack.addArrangedSubview(cardStack)
         if mode == .settings {
             tabItemsRow.addTarget(self, action: #selector(tabItemsRowTapped), for: .touchUpInside)
-            let rowFootnote = UILabel()
-            rowFootnote.text = "底部栏只在多 Tab 模式下生效；切回阅读模式会保留你的设置。"
-            rowFootnote.font = .preferredFont(forTextStyle: .footnote)
-            rowFootnote.textColor = .secondaryLabel
-            rowFootnote.numberOfLines = 0
+            tabItemsFootnoteLabel.text = "底部栏的调整会立即保存，切回阅读模式也会保留。"
+            tabItemsFootnoteLabel.font = .preferredFont(forTextStyle: .footnote)
+            tabItemsFootnoteLabel.textColor = .secondaryLabel
+            tabItemsFootnoteLabel.numberOfLines = 0
             contentStack.setCustomSpacing(24, after: cardStack)
             contentStack.addArrangedSubview(tabItemsRow)
             contentStack.setCustomSpacing(8, after: tabItemsRow)
-            contentStack.addArrangedSubview(rowFootnote)
+            contentStack.addArrangedSubview(tabItemsFootnoteLabel)
         }
 
         view.addSubview(scrollView)
@@ -171,7 +190,20 @@ final class LayoutChooserViewController: UIViewController {
                 footnoteLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8)
             ]
         case .settings:
-            constraints.append(scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor))
+            // 按钮单独占底部一块，列表在它上方滚动，小屏也不会被挡住
+            confirmButton.addTarget(self, action: #selector(confirmTapped), for: .touchUpInside)
+            view.addSubview(confirmButton)
+            let toView = scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            let toConfirm = scrollView.bottomAnchor.constraint(equalTo: confirmButton.topAnchor, constant: -12)
+            scrollBottomToViewConstraint = toView
+            scrollBottomToConfirmConstraint = toConfirm
+            constraints += [
+                toView,
+                confirmButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 20),
+                confirmButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
+                confirmButton.heightAnchor.constraint(equalToConstant: 52),
+                confirmButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12)
+            ]
         }
         NSLayoutConstraint.activate(constraints)
     }
@@ -180,11 +212,31 @@ final class LayoutChooserViewController: UIViewController {
         for (layout, card) in cards {
             card.isSelected = layout == selectedLayout
         }
-        guard mode == .upgradePrompt else { return }
+        guard mode == .upgradePrompt else {
+            applySettingsSelection()
+            return
+        }
         // 多 Tab 模式多一步自定义底部栏
         let isTabs = selectedLayout == .tabs
         startButton.configuration?.title = isTabs ? "下一步" : "开始使用"
         footnoteLabel.text = isTabs ? "下一步可自定义底部栏，也可直接跳过" : "设置 › 阅读 › 界面布局 可再修改"
+    }
+
+    /// 设置页：选中多 Tab 才显示底部栏行；选中项与当前布局不同时才显示“确认切换”。
+    private func applySettingsSelection() {
+        let showsTabItems = selectedLayout == .tabs
+        tabItemsRow.isHidden = !showsTabItems
+        tabItemsFootnoteLabel.isHidden = !showsTabItems
+
+        let needsConfirm = selectedLayout != settings.layout
+        confirmButton.isHidden = !needsConfirm
+        if needsConfirm {
+            scrollBottomToViewConstraint?.isActive = false
+            scrollBottomToConfirmConstraint?.isActive = true
+        } else {
+            scrollBottomToConfirmConstraint?.isActive = false
+            scrollBottomToViewConstraint?.isActive = true
+        }
     }
 
     @objc private func cardTapped(_ sender: LayoutOptionCard) {
@@ -192,11 +244,13 @@ final class LayoutChooserViewController: UIViewController {
         UISelectionFeedbackGenerator().selectionChanged()
         selectedLayout = sender.layout
         applySelection()
-        if mode == .settings {
-            settings.markChoiceConfirmed()
-            // 根界面会被替换，当前页面随之关闭
-            settings.setLayout(selectedLayout)
-        }
+    }
+
+    @objc private func confirmTapped() {
+        guard selectedLayout != settings.layout else { return }
+        settings.markChoiceConfirmed()
+        // 根界面会被替换，当前页面随之关闭
+        settings.setLayout(selectedLayout)
     }
 
     @objc private func startTapped() {
