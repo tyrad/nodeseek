@@ -34,6 +34,8 @@ class PostListViewController: UIViewController {
         static let composeButtonBottom: CGFloat = 16
         /// 滚动超过这个距离才切换发帖按钮显隐，避免手指轻微抖动时闪烁。
         static let composeToggleScrollDelta: CGFloat = 6
+        /// 同一次拖动中累计超过这个距离才切换，过滤手指抖动和松手时的回带。
+        static let composeToggleDragDistance: CGFloat = 24
     }
 
     // MARK: - Properties
@@ -57,7 +59,8 @@ class PostListViewController: UIViewController {
     private var tabScrollTrailingToSearchButtonConstraint: NSLayoutConstraint?
     var isSortToggleExpanded = false
     private var isComposeButtonHidden = false
-    private var lastListScrollOffsetY: CGFloat?
+    /// 本次拖动中上一次切换发帖按钮时的手指位置。
+    private var composeDragAnchorY: CGFloat?
     let sideMenuViewController: PostListSideMenuViewController
     let menuButtonFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
     private let categoryReselectFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
@@ -651,25 +654,31 @@ class PostListViewController: UIViewController {
     }
 
     /// 向下滚动收起发帖按钮，向上滚动或回到顶部时再出现。
+    /// 方向只看手指拖动的累计距离：行高校正、回弹会改动 contentOffset，按逐帧位移判断会让按钮来回闪。
     private func handleListScroll(_ scrollView: UIScrollView) {
         let offsetY = scrollView.contentOffset.y + scrollView.adjustedContentInset.top
-        let previousOffsetY = lastListScrollOffsetY
-        lastListScrollOffsetY = offsetY
-
         if offsetY <= FloatingControlLayout.composeToggleScrollDelta {
+            composeDragAnchorY = nil
             setComposeButtonHidden(false, animated: true)
             return
         }
-        // 底部回弹时内容会往回走，不当作向上滚动
-        let maxOffsetY = scrollView.contentSize.height + scrollView.adjustedContentInset.top
-            + scrollView.adjustedContentInset.bottom - scrollView.bounds.height
-        guard offsetY < maxOffsetY, scrollView.isTracking || scrollView.isDecelerating,
-              let previousOffsetY else { return }
+        guard scrollView.isTracking else {
+            composeDragAnchorY = nil
+            return
+        }
 
-        let delta = offsetY - previousOffsetY
-        if delta > FloatingControlLayout.composeToggleScrollDelta {
+        let translationY = scrollView.panGestureRecognizer.translation(in: scrollView.superview).y
+        guard let anchorY = composeDragAnchorY else {
+            composeDragAnchorY = translationY
+            return
+        }
+        let distance = translationY - anchorY
+        if distance < -FloatingControlLayout.composeToggleDragDistance {
+            // 手指上推：内容向下，收起
+            composeDragAnchorY = translationY
             setComposeButtonHidden(true, animated: true)
-        } else if delta < -FloatingControlLayout.composeToggleScrollDelta {
+        } else if distance > FloatingControlLayout.composeToggleDragDistance {
+            composeDragAnchorY = translationY
             setComposeButtonHidden(false, animated: true)
         }
     }
