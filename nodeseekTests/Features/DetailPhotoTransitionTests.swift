@@ -19,23 +19,58 @@ final class DetailPhotoTransitionTests: XCTestCase {
         XCTAssertEqual(fade?.transitionDuration(using: nil), DetailPhotoTransitionTiming.duration)
     }
 
-    func testZoomViewCarriesDimmingOverlay() {
+    func testZoomViewKeepsDetailImageDimmedAndDropsStyleWhenOpening() {
         let source = fixture(
             url: URL(string: "https://www.nodeseek.com/a.png")!,
             frame: CGRect(x: 0, y: 0, width: 40, height: 40)
         )
         source.contentMode = .scaleAspectFit
+        source.backgroundColor = .secondarySystemBackground
+        source.layer.cornerRadius = 8
         DetailImageDimmingView.install(on: source)
 
-        let zoomView = DetailPhotoZoomView.make(from: source)
+        let zoomView = DetailPhotoZoomView.make(from: source, copiesStyle: false)
 
         XCTAssertTrue(zoomView.image === source.image)
         XCTAssertEqual(zoomView.contentMode, .scaleAspectFit)
         XCTAssertTrue(zoomView.clipsToBounds)
+        // 打开时不带底色和圆角，否则留白处的灰边和圆角会被一路放大。
+        XCTAssertNil(zoomView.backgroundColor)
+        XCTAssertEqual(zoomView.layer.cornerRadius, 0)
         // 遮罩要盖住整张临时图，并随缩放一起变化。
         let overlays = zoomView.subviews.compactMap { $0 as? DetailImageDimmingView }
         XCTAssertEqual(overlays.count, 1)
         XCTAssertEqual(overlays.first?.autoresizingMask, [.flexibleWidth, .flexibleHeight])
+        XCTAssertEqual(overlays.first?.alpha, 1)
+    }
+
+    func testZoomViewFromUndimmedAvatarFadesDimmingIn() {
+        let avatar = fixture(
+            url: URL(string: "https://www.nodeseek.com/avatar.png")!,
+            frame: CGRect(x: 0, y: 0, width: 40, height: 40)
+        )
+        XCTAssertFalse(DetailPhotoZoomView.isDimmed(avatar))
+
+        let zoomView = DetailPhotoZoomView.make(from: avatar, copiesStyle: false)
+        let overlay = zoomView.subviews.compactMap { $0 as? DetailImageDimmingView }.first
+        XCTAssertEqual(overlay?.alpha, 0)
+
+        DetailPhotoZoomView.setDimmed(true, on: zoomView)
+        XCTAssertEqual(overlay?.alpha, 1)
+    }
+
+    func testZoomViewCopiesStyleWhenClosing() {
+        let source = fixture(
+            url: URL(string: "https://www.nodeseek.com/a.png")!,
+            frame: CGRect(x: 0, y: 0, width: 40, height: 40)
+        )
+        source.backgroundColor = .black
+        source.layer.cornerRadius = 6
+
+        let zoomView = DetailPhotoZoomView.make(from: source, copiesStyle: true)
+
+        XCTAssertEqual(zoomView.backgroundColor, .black)
+        XCTAssertEqual(zoomView.layer.cornerRadius, 6)
     }
 
     func testAnchorIsConsumedOnce() {

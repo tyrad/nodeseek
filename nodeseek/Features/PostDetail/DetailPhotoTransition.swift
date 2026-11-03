@@ -152,15 +152,30 @@ final class DetailPhotoBrowserController: JXPhotoBrowserViewController {
 }
 
 /// 缩放转场用的临时图片。库自带的临时图没有变暗遮罩，深色模式下进出大图会闪亮一下。
+/// 头像这类起点本身不变暗，遮罩要从起点状态过渡到终点状态，不能一律压暗。
 enum DetailPhotoZoomView {
-    static func make(from imageView: UIImageView) -> UIImageView {
-        let zoomView = UIImageView(image: imageView.image)
-        zoomView.contentMode = imageView.contentMode
+    /// 打开时沿用库的做法，不带源图的底色和圆角，避免灰边和圆角被一路放大。
+    static func make(from source: UIImageView, copiesStyle: Bool) -> UIImageView {
+        let zoomView = UIImageView(image: source.image)
+        zoomView.contentMode = source.contentMode
         zoomView.clipsToBounds = true
-        zoomView.layer.cornerRadius = imageView.layer.cornerRadius
-        zoomView.backgroundColor = imageView.backgroundColor
+        if copiesStyle {
+            zoomView.clipsToBounds = source.clipsToBounds
+            zoomView.layer.cornerRadius = source.layer.cornerRadius
+            zoomView.backgroundColor = source.backgroundColor
+        }
         DetailImageDimmingView.install(on: zoomView)
+        setDimmed(isDimmed(source), on: zoomView)
         return zoomView
+    }
+
+    static func isDimmed(_ view: UIView?) -> Bool {
+        view?.subviews.contains { $0 is DetailImageDimmingView } ?? false
+    }
+
+    /// 放在动画块里调用，遮罩透明度会随缩放一起过渡。
+    static func setDimmed(_ dimmed: Bool, on zoomView: UIView) {
+        zoomView.subviews.first { $0 is DetailImageDimmingView }?.alpha = dimmed ? 1 : 0
     }
 }
 
@@ -206,7 +221,9 @@ private final class DetailPhotoZoomPresentAnimator: NSObject, UIViewControllerAn
             endFrame = CGRect(x: (size.width - width) / 2, y: (size.height - height) / 2, width: width, height: height)
         }
 
-        let zoomView = DetailPhotoZoomView.make(from: thumbnailView)
+        let zoomView = DetailPhotoZoomView.make(from: thumbnailView, copiesStyle: false)
+        // 目标图还没出现时不知道终点状态，保持起点不变。
+        let endsDimmed = targetView.map { DetailPhotoZoomView.isDimmed($0) } ?? DetailPhotoZoomView.isDimmed(thumbnailView)
         thumbnailView.isHidden = true
         targetView?.isHidden = true
         toView.backgroundColor = .clear
@@ -215,6 +232,7 @@ private final class DetailPhotoZoomPresentAnimator: NSObject, UIViewControllerAn
 
         UIView.animate(withDuration: duration, animations: {
             zoomView.frame = endFrame
+            DetailPhotoZoomView.setDimmed(endsDimmed, on: zoomView)
             toView.backgroundColor = .black
         }) { finished in
             targetView?.isHidden = false
@@ -262,8 +280,8 @@ private final class DetailPhotoZoomDismissAnimator: JXZoomDismissAnimator {
             return
         }
 
-        let zoomView = DetailPhotoZoomView.make(from: sourceView)
-        zoomView.clipsToBounds = sourceView.clipsToBounds
+        let zoomView = DetailPhotoZoomView.make(from: sourceView, copiesStyle: true)
+        let endsDimmed = DetailPhotoZoomView.isDimmed(thumbnailView)
         let startFrame = sourceView.convert(sourceView.bounds, to: container)
         let endFrame = thumbnailView.convert(thumbnailView.bounds, to: container)
         sourceView.isHidden = true
@@ -273,6 +291,7 @@ private final class DetailPhotoZoomDismissAnimator: JXZoomDismissAnimator {
 
         UIView.animate(withDuration: duration, animations: {
             zoomView.frame = endFrame
+            DetailPhotoZoomView.setDimmed(endsDimmed, on: zoomView)
             fromView.alpha = 0
         }) { _ in
             thumbnailView.isHidden = false
