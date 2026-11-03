@@ -67,6 +67,8 @@ final class NewDiscussionViewController: UIViewController {
 
     private weak var settingsViewController: NewDiscussionSettingsViewController?
     private var lastState: NewDiscussionViewState?
+    private var isResolvingClose = false
+    private var inputSession = 0
 
     init(presenter: NewDiscussionPresenterProtocol) {
         self.presenter = presenter
@@ -97,7 +99,7 @@ final class NewDiscussionViewController: UIViewController {
         super.viewWillDisappear(animated)
         // 关闭时输入框还在编辑的话，键盘上方的工具条会残留在下层页面上，先统一收起。
         if navigationController?.isBeingDismissed == true || isBeingDismissed {
-            view.endEditing(true)
+            hideComposerInput()
         }
     }
 
@@ -493,9 +495,11 @@ final class NewDiscussionViewController: UIViewController {
             if bodyTextView.inputView === stickerPanel {
                 showKeyboard()
             } else {
+                let session = inputSession
                 Task { [weak self] in
                     guard let self else { return }
                     await stickerCookieSession.prepareMediaRequest()
+                    guard session == inputSession, view.window != nil else { return }
                     switchBodyInput(to: stickerPanel, active: .sticker)
                 }
             }
@@ -701,58 +705,129 @@ final class NewDiscussionViewController: UIViewController {
     // MARK: - 关闭与发布
 
     private func closeTapped() {
+        guard !isResolvingClose, presentedViewController == nil else { return }
+        hideComposerInput()
         // 还在撤销窗口里的丢弃先执行，关闭判断才基于最新状态。
         draftStrip.commitPendingDiscard()
         switch presenter.closeDecision() {
         case .blocked:
             return
         case .close:
+            isResolvingClose = true
             presenter.close(savingDraft: false)
         case .askSaveOrDiscard:
             let sheet = UIAlertController(title: nil, message: "草稿会保存在本机，下次打开发帖页时可以恢复", preferredStyle: .actionSheet)
-            sheet.addAction(UIAlertAction(title: "保存草稿并关闭", style: .default) { [weak self] _ in
+            sheet.addAction(closeAction(in: sheet, title: "保存草稿并关闭", style: .default) { [weak self] _ in
                 self?.presenter.close(savingDraft: true)
             })
-            sheet.addAction(UIAlertAction(title: "放弃草稿", style: .destructive) { [weak self] _ in
+            sheet.addAction(closeAction(in: sheet, title: "放弃草稿", style: .destructive) { [weak self] _ in
                 self?.presenter.close(savingDraft: false)
             })
-            sheet.addAction(UIAlertAction(title: "继续编辑", style: .cancel))
+            sheet.addAction(closeAction(in: sheet, title: "继续编辑", style: .cancel))
             presentActionSheet(sheet)
         case .askSaveEdit:
             let sheet = UIAlertController(title: nil, message: "修改还没有保存", preferredStyle: .actionSheet)
-            sheet.addAction(UIAlertAction(title: "保存修改", style: .default) { [weak self] _ in
+            sheet.addAction(closeAction(in: sheet, title: "保存修改", style: .default) { [weak self] _ in
                 self?.presenter.didTapPublish()
             })
-            sheet.addAction(UIAlertAction(title: "留着下次继续", style: .default) { [weak self] _ in
+            sheet.addAction(closeAction(in: sheet, title: "留着下次继续", style: .default) { [weak self] _ in
                 self?.presenter.close(savingDraft: true)
             })
-            sheet.addAction(UIAlertAction(title: "放弃修改", style: .destructive) { [weak self] _ in
+            sheet.addAction(closeAction(in: sheet, title: "放弃修改", style: .destructive) { [weak self] _ in
                 self?.presenter.close(savingDraft: false)
             })
-            sheet.addAction(UIAlertAction(title: "继续编辑", style: .cancel))
+            sheet.addAction(closeAction(in: sheet, title: "继续编辑", style: .cancel))
             presentActionSheet(sheet)
         case .askReplaceOldDraft:
             let sheet = UIAlertController(title: nil, message: "本机只保存一份草稿，上次的草稿还没有处理", preferredStyle: .actionSheet)
-            sheet.addAction(UIAlertAction(title: "保存新内容（替换旧草稿）", style: .default) { [weak self] _ in
+            sheet.addAction(closeAction(in: sheet, title: "保存新内容（替换旧草稿）", style: .default) { [weak self] _ in
                 self?.presenter.close(savingDraft: true)
             })
-            sheet.addAction(UIAlertAction(title: "保留旧草稿", style: .destructive) { [weak self] _ in
+            sheet.addAction(closeAction(in: sheet, title: "保留旧草稿", style: .destructive) { [weak self] _ in
                 self?.presenter.closeKeepingPendingDraft()
             })
-            sheet.addAction(UIAlertAction(title: "继续编辑", style: .cancel))
+            sheet.addAction(closeAction(in: sheet, title: "继续编辑", style: .cancel))
             presentActionSheet(sheet)
         }
     }
 
     private func presentActionSheet(_ sheet: UIAlertController) {
-        view.endEditing(true)
-        sheet.popoverPresentationController?.barButtonItem = navigationItem.leftBarButtonItem
+        // iPhone 不给锚点，系统才会从底部弹出 Action Sheet；iPad 必须指定锚点。
+        if traitCollection.userInterfaceIdiom == .pad {
+            sheet.popoverPresentationController?.barButtonItem = navigationItem.leftBarButtonItem
+        }
         present(sheet, animated: true)
     }
 
     private func publishTapped() {
-        view.endEditing(true)
+        guard !isResolvingClose, presentedViewController == nil else { return }
+        hideComposerInput()
         presenter.didTapPublish()
+    }
+
+    /// 先结束确认框的转场，再让 presenter 关闭编辑页或开始提交。
+    private func closeAction(
+        in sheet: UIAlertController,
+        title: String,
+        style: UIAlertAction.Style,
+        handler: ((UIAlertAction) -> Void)? = nil
+    ) -> UIAlertAction {
+        UIAlertAction(title: title, style: style) { [weak self, weak sheet] action in
+            guard let self, let sheet, !isResolvingClose else { return }
+            isResolvingClose = true
+            hideComposerInput()
+            let finish = { [weak self] in
+                guard let self else { return }
+                handler?(action)
+                // 取消和提交校验失败后仍允许继续操作；退出期间由生命周期阻止重入。
+                isResolvingClose = isBeingDismissed || navigationController?.isBeingDismissed == true
+            }
+            // 系统通常在确认框收起后才回调；已收起时对它调用 dismiss 不保证执行 completion，直接放到下一轮主循环。
+            if sheet.presentingViewController != nil {
+                sheet.dismiss(animated: true, completion: finish)
+            } else {
+                DispatchQueue.main.async(execute: finish)
+            }
+        }
+    }
+
+    private func hideComposerInput() {
+        // 使尚未完成的表情加载失效，避免确认框出现后又抢回输入焦点。
+        inputSession += 1
+        // 系统弹出确认框时会把最后一套键盘面板重新显示出来（真机日志：此时没有任何第一响应者）。
+        // 所以要在失焦前把面板和工具条从输入框上拆掉并刷新，再用空输入框把系统记住的那套清空。
+        for textView in [titleTextView, bodyTextView] {
+            textView.inputView = nil
+            textView.inputAccessoryView = nil
+            if textView.isFirstResponder {
+                textView.reloadInputViews()
+            }
+        }
+        view.endEditing(true)
+        // 焦点可能不在本页视图树里（如链接条输入框），兜底让全局第一响应者放弃焦点。
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        resetKeyboardInputViews()
+        linkBar.isHidden = true
+        toolbar.setActive(.keyboard)
+    }
+
+    /// 用一个没有任何面板的隐藏输入框接一下焦点再放掉，让系统键盘层记住的是空面板，而不是表情面板和工具条。
+    private func resetKeyboardInputViews() {
+        let field = UITextField(frame: .zero)
+        // 隐藏视图可能拿不到焦点，用透明代替。
+        field.alpha = 0
+        field.inputView = UIView(frame: .zero)
+        field.inputAccessoryView = nil
+        field.autocorrectionType = .no
+        view.addSubview(field)
+        field.becomeFirstResponder()
+        field.resignFirstResponder()
+        field.removeFromSuperview()
+    }
+
+    /// 关闭确认、关闭转场期间不允许输入框重新获得焦点，包括系统在确认框收起后自动恢复焦点。
+    private var isClosingComposer: Bool {
+        isResolvingClose || presentedViewController is UIAlertController
     }
 
     private func showMessage(title: String?, message: String) {
@@ -976,6 +1051,14 @@ extension NewDiscussionViewController: UITextViewDelegate {
                 MarkdownSnippetInserter.blockStyle(at: bodyTextView.selectedRange.location, in: bodyTextView.text)
             )
         }
+    }
+
+    func textViewShouldBeginEditing(_ textView: UITextView) -> Bool {
+        let allowed = !isClosingComposer && !(isBeingDismissed || navigationController?.isBeingDismissed == true)
+        if allowed, textView.inputAccessoryView == nil {
+            textView.inputAccessoryView = toolbar
+        }
+        return allowed
     }
 
     func textViewDidBeginEditing(_ textView: UITextView) {
