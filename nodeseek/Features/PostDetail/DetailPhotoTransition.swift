@@ -151,15 +151,136 @@ final class DetailPhotoBrowserController: JXPhotoBrowserViewController {
     }
 }
 
-private final class DetailPhotoZoomPresentAnimator: JXZoomPresentAnimator {
-    override func transitionDuration(using ctx: UIViewControllerContextTransitioning?) -> TimeInterval {
-        DetailPhotoTransitionTiming.duration
+/// 缩放转场用的临时图片。库自带的临时图没有变暗遮罩，深色模式下进出大图会闪亮一下。
+enum DetailPhotoZoomView {
+    static func make(from imageView: UIImageView) -> UIImageView {
+        let zoomView = UIImageView(image: imageView.image)
+        zoomView.contentMode = imageView.contentMode
+        zoomView.clipsToBounds = true
+        zoomView.layer.cornerRadius = imageView.layer.cornerRadius
+        zoomView.backgroundColor = imageView.backgroundColor
+        DetailImageDimmingView.install(on: zoomView)
+        return zoomView
     }
 }
 
+/// 照搬 JXZoomPresentAnimator，只换掉临时缩放图，保证全程和详情页亮度一致。
+private final class DetailPhotoZoomPresentAnimator: NSObject, UIViewControllerAnimatedTransitioning {
+    func transitionDuration(using ctx: UIViewControllerContextTransitioning?) -> TimeInterval {
+        DetailPhotoTransitionTiming.duration
+    }
+
+    func animateTransition(using ctx: UIViewControllerContextTransitioning) {
+        let container = ctx.containerView
+        let duration = transitionDuration(using: ctx)
+        guard let toVC = ctx.viewController(forKey: .to) as? JXPhotoBrowserViewController,
+              let toView = ctx.view(forKey: .to) else {
+            ctx.completeTransition(false)
+            return
+        }
+
+        container.addSubview(toView)
+        toView.frame = ctx.finalFrame(for: toVC)
+        toView.layoutIfNeeded()
+        toVC.scrollToInitialIndexIfNeeded()
+        toVC.collectionView.layoutIfNeeded()
+
+        guard let thumbnailView = toVC.delegate?.photoBrowser(toVC, thumbnailViewAt: toVC.initialIndex) as? UIImageView,
+              thumbnailView.bounds.width > 0, thumbnailView.bounds.height > 0 else {
+            fadeIn(toView, duration: duration, ctx: ctx)
+            return
+        }
+
+        let targetView = toVC.visibleCell()?.transitionImageView
+        let startFrame = thumbnailView.convert(thumbnailView.bounds, to: container)
+        let endFrame: CGRect
+        if let targetView, targetView.bounds.size != .zero {
+            endFrame = targetView.convert(targetView.bounds, to: container)
+        } else {
+            // 大图还没布局好时，按缩略图比例居中放大。
+            let size = container.bounds.size
+            let origin = thumbnailView.bounds.size
+            let scale = min(size.width / origin.width, size.height / origin.height)
+            let width = origin.width * scale
+            let height = origin.height * scale
+            endFrame = CGRect(x: (size.width - width) / 2, y: (size.height - height) / 2, width: width, height: height)
+        }
+
+        let zoomView = DetailPhotoZoomView.make(from: thumbnailView)
+        thumbnailView.isHidden = true
+        targetView?.isHidden = true
+        toView.backgroundColor = .clear
+        zoomView.frame = startFrame
+        container.addSubview(zoomView)
+
+        UIView.animate(withDuration: duration, animations: {
+            zoomView.frame = endFrame
+            toView.backgroundColor = .black
+        }) { finished in
+            targetView?.isHidden = false
+            thumbnailView.isHidden = false
+            zoomView.removeFromSuperview()
+            ctx.completeTransition(finished)
+        }
+    }
+
+    private func fadeIn(_ view: UIView, duration: TimeInterval, ctx: UIViewControllerContextTransitioning) {
+        view.alpha = 0
+        UIView.animate(withDuration: duration, animations: {
+            view.alpha = 1
+        }) { finished in
+            ctx.completeTransition(finished)
+        }
+    }
+}
+
+/// 照搬 JXZoomDismissAnimator，只换掉临时缩放图；淡出分支沿用父类实现。
 private final class DetailPhotoZoomDismissAnimator: JXZoomDismissAnimator {
     override func transitionDuration(using ctx: UIViewControllerContextTransitioning?) -> TimeInterval {
         DetailPhotoTransitionTiming.duration
+    }
+
+    override func animateTransition(using ctx: UIViewControllerContextTransitioning) {
+        let container = ctx.containerView
+        let duration = transitionDuration(using: ctx)
+        guard let fromVC = ctx.viewController(forKey: .from) as? JXPhotoBrowserViewController,
+              let fromView = ctx.view(forKey: .from) else {
+            ctx.completeTransition(false)
+            return
+        }
+
+        if let toView = ctx.view(forKey: .to) {
+            container.insertSubview(toView, belowSubview: fromView)
+            toView.alpha = 1
+            toView.layoutIfNeeded()
+        }
+
+        let pageIndex = fromVC.pageIndex
+        guard let sourceView = fromVC.visibleCell()?.transitionImageView, sourceView.bounds.size != .zero,
+              let thumbnailView = fromVC.delegate?.photoBrowser(fromVC, thumbnailViewAt: pageIndex) else {
+            animateFadeOut(view: fromView, duration: duration, ctx: ctx)
+            return
+        }
+
+        let zoomView = DetailPhotoZoomView.make(from: sourceView)
+        zoomView.clipsToBounds = sourceView.clipsToBounds
+        let startFrame = sourceView.convert(sourceView.bounds, to: container)
+        let endFrame = thumbnailView.convert(thumbnailView.bounds, to: container)
+        sourceView.isHidden = true
+        thumbnailView.isHidden = true
+        zoomView.frame = startFrame
+        container.addSubview(zoomView)
+
+        UIView.animate(withDuration: duration, animations: {
+            zoomView.frame = endFrame
+            fromView.alpha = 0
+        }) { _ in
+            thumbnailView.isHidden = false
+            fromVC.delegate?.photoBrowser(fromVC, setThumbnailHidden: false, at: pageIndex)
+            zoomView.removeFromSuperview()
+            fromView.removeFromSuperview()
+            ctx.completeTransition(true)
+        }
     }
 }
 

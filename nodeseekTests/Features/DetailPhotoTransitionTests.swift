@@ -19,6 +19,25 @@ final class DetailPhotoTransitionTests: XCTestCase {
         XCTAssertEqual(fade?.transitionDuration(using: nil), DetailPhotoTransitionTiming.duration)
     }
 
+    func testZoomViewCarriesDimmingOverlay() {
+        let source = fixture(
+            url: URL(string: "https://www.nodeseek.com/a.png")!,
+            frame: CGRect(x: 0, y: 0, width: 40, height: 40)
+        )
+        source.contentMode = .scaleAspectFit
+        DetailImageDimmingView.install(on: source)
+
+        let zoomView = DetailPhotoZoomView.make(from: source)
+
+        XCTAssertTrue(zoomView.image === source.image)
+        XCTAssertEqual(zoomView.contentMode, .scaleAspectFit)
+        XCTAssertTrue(zoomView.clipsToBounds)
+        // 遮罩要盖住整张临时图，并随缩放一起变化。
+        let overlays = zoomView.subviews.compactMap { $0 as? DetailImageDimmingView }
+        XCTAssertEqual(overlays.count, 1)
+        XCTAssertEqual(overlays.first?.autoresizingMask, [.flexibleWidth, .flexibleHeight])
+    }
+
     func testAnchorIsConsumedOnce() {
         let url = URL(string: "https://www.nodeseek.com/a.png")!
         let view = UIImageView()
