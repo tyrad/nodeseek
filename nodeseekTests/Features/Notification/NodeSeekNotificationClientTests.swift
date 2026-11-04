@@ -12,6 +12,19 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct NodeSeekNotificationClientTests {
+    @Test func errorLogSummaryExtractsOnlySafeErrorFields() {
+        let data = Data(#"{"code":403,"message":"Invalid origin","data":{"content":"private notification"},"token":"private-token"}"#.utf8)
+        #expect(NotificationErrorLogSummary.describe(data) == "jsonObject=true, code=403, message=Invalid origin")
+        let sensitive = Data(#"{"message":"token=abc123 user@example.com https://example.com/?secret=abc\nDenied"}"#.utf8)
+        let summary = NotificationErrorLogSummary.describe(sensitive)
+        #expect(!summary.contains("abc123"))
+        #expect(!summary.contains("user@example.com"))
+        #expect(!summary.contains("https://"))
+        #expect(!summary.contains("\n"))
+        #expect(summary.contains("Denied"))
+        #expect(NotificationErrorLogSummary.describe(Data("<html>private</html>".utf8)) == "jsonObject=false")
+    }
+
     @Test func loadsAtMeNotificationsFromJSONAPI() async throws {
         let counter = CookiePrepareCounter()
         let client = makeClient(
@@ -106,87 +119,45 @@ struct NodeSeekNotificationClientTests {
         }
     }
 
-    @Test func marksAtMeNotificationViewedOverHTTPWithNotificationIDBody() async throws {
+    @Test func marksViewedDirectlyThroughWebView() async throws {
         let submitter = SpyNotificationMarkViewedSubmitter()
-        let client = makeClient(responseBody: #"{"success":true}"#, markViewedSubmitter: submitter)
-
+        let client = makeClient(responseBody: "invalid", markViewedSubmitter: submitter)
         try await client.markViewed(ids: [0, 3056861], tab: .atMe)
-
-        let request = try #require(MockNotificationURLProtocol.lastRequest)
-        #expect(request.httpMethod == "POST")
-        #expect(request.url?.absoluteString == "https://www.nodeseek.com/api/notification/at-me/markViewed")
-        #expect(request.value(forHTTPHeaderField: "Referer") == "https://www.nodeseek.com/notification#/atMe")
-        let bodyData = try #require(MockNotificationURLProtocol.lastRequestBody)
-        let json = try #require(JSONSerialization.jsonObject(with: bodyData) as? [String: [Int]])
-        #expect(json["atMe"] == [3056861])
         let submissions = await submitter.submissions()
-        #expect(submissions.isEmpty)
-    }
-
-    @Test func skipsMarkViewedWhenNotificationIDsAreInvalid() async throws {
-        let submitter = SpyNotificationMarkViewedSubmitter()
-        let client = makeClient(responseBody: #"{"success":true}"#, markViewedSubmitter: submitter)
-
-        try await client.markViewed(ids: [0, -1], tab: .atMe)
-
-        let submissions = await submitter.submissions()
-        #expect(submissions.isEmpty)
-    }
-
-    @Test func marksAllRepliesViewedOverHTTP() async throws {
-        let submitter = SpyNotificationMarkViewedSubmitter()
-        let client = makeClient(responseBody: #"{"success":true}"#, markViewedSubmitter: submitter)
-
-        try await client.markAllViewed(tab: .reply)
-
-        let request = try #require(MockNotificationURLProtocol.lastRequest)
-        #expect(request.httpMethod == "POST")
-        #expect(request.url?.absoluteString == "https://www.nodeseek.com/api/notification/reply-to-me/markViewed?all=true")
-        #expect(request.httpBody == nil)
-        #expect(request.value(forHTTPHeaderField: "Referer") == "https://www.nodeseek.com/notification#/reply")
-        let submissions = await submitter.submissions()
-        #expect(submissions.isEmpty)
-    }
-
-    @Test func fallsBackToWebViewWhenMarkViewedHTTPHitsChallengeHTML() async throws {
-        let submitter = SpyNotificationMarkViewedSubmitter()
-        let client = makeClient(
-            responseBody: """
-            <html>
-              <head><title>Just a moment...</title></head>
-              <body>
-                <script>window._cf_chl_opt = {}</script>
-              </body>
-            </html>
-            """,
-            markViewedSubmitter: submitter
-        )
-
-        try await client.markViewed(ids: [3056861], tab: .atMe)
-
-        let submissions = await submitter.submissions()
+        #expect(submissions.count == 1)
         let submission = try #require(submissions.first)
         #expect(submission.request.apiPath == "/api/notification/at-me/markViewed")
         #expect(submission.referer.absoluteString == "https://www.nodeseek.com/notification#/atMe")
-        let bodyJSON = try #require(submission.request.bodyJSON)
-        let bodyData = Data(bodyJSON.utf8)
-        let json = try #require(JSONSerialization.jsonObject(with: bodyData) as? [String: [Int]])
+        let body = try #require(submission.request.bodyJSON)
+        let json = try #require(JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: [Int]])
         #expect(json["atMe"] == [3056861])
+        #expect(MockNotificationURLProtocol.lastRequest == nil)
     }
 
-    @Test func doesNotFallBackToWebViewWhenMarkViewedHTTPReturnsBusinessFailure() async throws {
+    @Test func marksAllDirectlyThroughWebView() async throws {
         let submitter = SpyNotificationMarkViewedSubmitter()
-        let client = makeClient(
-            responseBody: #"{"success":false,"message":"请先登录"}"#,
-            markViewedSubmitter: submitter
-        )
-
-        await #expect(throws: NodeSeekNotificationClientError.unsuccessfulResponse("请先登录")) {
-            try await client.markViewed(ids: [3056861], tab: .atMe)
-        }
-
+        let client = makeClient(responseBody: "invalid", markViewedSubmitter: submitter)
+        try await client.markAllViewed(tab: .reply)
         let submissions = await submitter.submissions()
-        #expect(submissions.isEmpty)
+        #expect(submissions.count == 1)
+        #expect(submissions.first?.request.apiPath == "/api/notification/reply-to-me/markViewed?all=true")
+        #expect(submissions.first?.request.bodyJSON == nil)
+        #expect(MockNotificationURLProtocol.lastRequest == nil)
+    }
+
+    @Test func skipsInvalidIDs() async throws {
+        let submitter = SpyNotificationMarkViewedSubmitter()
+        let client = makeClient(responseBody: "invalid", markViewedSubmitter: submitter)
+        try await client.markViewed(ids: [0, -1], tab: .atMe)
+        #expect(await submitter.submissions().isEmpty)
+        #expect(MockNotificationURLProtocol.lastRequest == nil)
+    }
+
+    @Test func translatesPageTimeoutToRetryMessage() async throws {
+        let client = makeClient(responseBody: "invalid", markViewedSubmitter: TimeoutNotificationSubmitter())
+        await #expect(throws: NodeSeekNotificationClientError.unsuccessfulResponse("请求超时，请重试")) {
+            try await client.markAllViewed(tab: .atMe)
+        }
     }
 
     @Test func loadsMessageConversationsAndResolvesParticipant() async throws {
@@ -339,5 +310,11 @@ private final class MockNotificationURLProtocol: URLProtocol, @unchecked Sendabl
             data.append(buffer, count: count)
         }
         return data.isEmpty ? nil : data
+    }
+}
+
+private struct TimeoutNotificationSubmitter: NodeSeekNotificationMarkViewedSubmitting {
+    func submit(_ request: NodeSeekNotificationMarkViewedRequest, referer: URL) async throws {
+        throw HiddenWebViewHTMLClientError.timeout
     }
 }

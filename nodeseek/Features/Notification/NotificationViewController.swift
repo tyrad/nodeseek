@@ -30,6 +30,7 @@ final class NotificationViewController: UIViewController {
     private let emptyLabel = UILabel()
     private var browserButton: UIBarButtonItem?
     private var markAllButton: UIBarButtonItem?
+    private var isMarkingAllRead = false
 
     private var selectedTab: NodeSeekNotificationTab
     private var displayMode: DisplayMode = .content
@@ -368,7 +369,7 @@ final class NotificationViewController: UIViewController {
     }
 
     private func updateMarkAllButton() {
-        markAllButton?.isEnabled = currentUnreadCount > 0
+        markAllButton?.isEnabled = !isMarkingAllRead && currentUnreadCount > 0
     }
 
     private var currentUnreadCount: Int {
@@ -426,6 +427,10 @@ final class NotificationViewController: UIViewController {
     }
 
     @objc private func markAllReadTapped() {
+        guard !isMarkingAllRead else { return }
+        BottomToast.show("正在标记已读…", style: .progress, in: view)
+        isMarkingAllRead = true
+        updateMarkAllButton()
         let tab = selectedTab
         let previousUnreadCount = unreadCount
         let previousAtMeRecords = atMeRecords
@@ -435,8 +440,13 @@ final class NotificationViewController: UIViewController {
         markAllLocally(tab: tab)
         Task { [weak self] in
             guard let self else { return }
+            defer {
+                isMarkingAllRead = false
+                updateMarkAllButton()
+            }
             do {
                 try await client.markAllViewed(tab: tab)
+                BottomToast.show("已全部标为已读", in: view)
                 refreshUnreadCountAfterReadStateChange()
             } catch {
                 unreadCount = previousUnreadCount
@@ -448,7 +458,7 @@ final class NotificationViewController: UIViewController {
                 if selectedTab == tab {
                     tableView.reloadData()
                 }
-                showErrorMessage(error.localizedDescription)
+                BottomToast.show(error.localizedDescription, style: .failure, in: view)
             }
         }
     }
@@ -490,10 +500,12 @@ final class NotificationViewController: UIViewController {
     ) {
         let previousUnreadCount = unreadCount
         guard markRecordLocally(id: id, tab: tab) else { return }
+        if showFailure { BottomToast.show("正在标记已读…", style: .progress, in: view) }
         Task { [weak self] in
             guard let self else { return }
             do {
                 try await client.markViewed(ids: [id], tab: tab)
+                if showFailure { BottomToast.show("已标为已读", in: view) }
                 refreshUnreadCountAfterReadStateChange()
             } catch {
                 if rollbackOnFailure {
@@ -508,7 +520,7 @@ final class NotificationViewController: UIViewController {
                     loadUnreadCount()
                 }
                 if showFailure {
-                    showErrorMessage(error.localizedDescription)
+                    BottomToast.show(error.localizedDescription, style: .failure, in: view)
                 }
             }
         }

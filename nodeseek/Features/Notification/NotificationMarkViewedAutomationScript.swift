@@ -48,7 +48,7 @@ enum NotificationMarkViewedAutomationScript {
         const response = await window.fetch(apiPath, options);
         const body = await response.text();
         const json = parseJSON(body);
-        const ok = response.status >= 200 && response.status < 300 && json.success !== false;
+        const ok = response.status >= 200 && response.status < 300 && json && json.success === true;
         finish({
           ok,
           statusCode: response.status,

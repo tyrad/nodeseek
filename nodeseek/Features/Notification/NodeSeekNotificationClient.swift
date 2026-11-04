@@ -115,66 +115,32 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
         _ request: NodeSeekNotificationMarkViewedRequest,
         referer: URL
     ) async throws {
+        let operationID = UUID().uuidString
+        let startedAt = Date()
+        AppLog.info(.service, "通知已读操作开始 id=\(operationID), path=\(request.apiPath)")
+        defer {
+            AppLog.info(.service, "通知已读操作结束 id=\(operationID), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))")
+        }
         do {
-            try await submitMarkViewedOverHTTP(request, referer: referer)
-            AppLog.info(.service, "通知标记已读 HTTP 成功: path=\(request.apiPath)")
-        } catch let error as NodeSeekNotificationClientError {
-            switch error {
-            case .unsuccessfulResponse:
-                throw error
-            case .httpStatus:
-                AppLog.warning(
-                    .service,
-                    "通知标记已读 HTTP 失败，回退 WebView: path=\(request.apiPath), error=\(error.localizedDescription)"
-                )
-                try await markViewedSubmitter.submit(request, referer: referer)
-            }
-        } catch {
-            AppLog.warning(
-                .service,
-                "通知标记已读 HTTP 失败，回退 WebView: path=\(request.apiPath), error=\(error.localizedDescription)"
-            )
             try await markViewedSubmitter.submit(request, referer: referer)
+            AppLog.info(.service, "通知已读 WebView 成功 id=\(operationID)")
+        } catch {
+            let failure = error as NSError
+            AppLog.error(.service, "通知已读 WebView 失败 id=\(operationID), domain=\(failure.domain), code=\(failure.code), error=\(error.localizedDescription)")
+            if case HiddenWebViewHTMLClientError.timeout = error {
+                throw NodeSeekNotificationClientError.unsuccessfulResponse("请求超时，请重试")
+            }
+            if let failure = error as? URLError, failure.code == .timedOut {
+                throw NodeSeekNotificationClientError.unsuccessfulResponse("请求超时，请重试")
+            }
+            if let failure = error as? NodeSeekNotificationClientError { throw failure }
+            throw NodeSeekNotificationClientError.unsuccessfulResponse("标记已读失败，请稍后重试")
         }
-    }
-
-    private func submitMarkViewedOverHTTP(
-        _ request: NodeSeekNotificationMarkViewedRequest,
-        referer: URL
-    ) async throws {
-        let urlRequest = makeHTTPMarkViewedRequest(request, referer: referer)
-        let response = try await decode(ActionResponse.self, from: urlRequest)
-        guard response.success else {
-            logBusinessFailure(for: urlRequest, message: response.message)
-            throw NodeSeekNotificationClientError.unsuccessfulResponse(response.message)
-        }
-    }
-
-    private func makeHTTPMarkViewedRequest(
-        _ request: NodeSeekNotificationMarkViewedRequest,
-        referer: URL
-    ) -> URLRequest {
-        var path = request.apiPath
-        var queryItems: [URLQueryItem]?
-        if let queryStart = path.firstIndex(of: "?") {
-            let query = String(path[path.index(after: queryStart)...])
-            path = String(path[..<queryStart])
-            queryItems = URLComponents(string: "https://nodeseek.invalid?\(query)")?.queryItems
-        }
-        return makeRequest(
-            path: path,
-            queryItems: queryItems,
-            method: "POST",
-            body: request.bodyJSON.flatMap { $0.data(using: .utf8) },
-            referer: referer
-        )
     }
 
     private func makeRequest(
         path: String,
         queryItems: [URLQueryItem]? = nil,
-        method: String = "GET",
-        body: Data? = nil,
         referer: URL
     ) -> URLRequest {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
@@ -182,8 +148,6 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
         components?.queryItems = queryItems
         let url = components?.url ?? baseURL.appendingPathComponent(path)
         var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.httpBody = body
         WebRequestFingerprint.applyJSONHeaders(to: &request, referer: referer)
         return request
     }
@@ -207,8 +171,12 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
             throw error
         }
 
+        if let response = urlResponse as? HTTPURLResponse {
+            AppLog.info(.service, "通知接口响应元信息 path=\(request.url?.path ?? "nil"), status=\(response.statusCode), contentType=\(response.mimeType ?? "nil"), bytes=\(data.count), redirected=\(response.url != request.url)")
+        }
         if let httpResponse = urlResponse as? HTTPURLResponse,
            (200..<300).contains(httpResponse.statusCode) == false {
+            AppLog.warning(.service, "通知接口错误详情 path=\(request.url?.path ?? "nil"), \(NotificationErrorLogSummary.describe(data))")
             AppLog.warning(
                 .service,
                 "通知接口响应异常 method=\(method), url=\(target), status=\(httpResponse.statusCode), bytes=\(data.count), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))"
@@ -249,6 +217,45 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
     @MainActor
     private static func prepareDefaultHTTPLoad() async {
         await NodeSeekCookieSession().prepareHTTPLoad()
+    }
+}
+
+enum NotificationErrorLogSummary {
+    static func describe(_ data: Data) -> String {
+        // 仅提取错误字段，避免把通知正文、嵌套对象或 HTML 写入日志。
+        guard data.count <= 65_536,
+              let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            return "jsonObject=false"
+        }
+        let fields = ["code", "errorCode", "message", "msg", "error"].compactMap { key -> String? in
+            guard let value = object[key] else { return nil }
+            let text: String
+            if let string = value as? String {
+                text = string
+            } else if let number = value as? NSNumber {
+                text = number.stringValue
+            } else {
+                return nil
+            }
+            return "\(key)=\(redact(text))"
+        }
+        return "jsonObject=true, " + (fields.isEmpty ? "errorFields=none" : fields.joined(separator: ", "))
+    }
+
+    private static func redact(_ text: String) -> String {
+        var result = text
+        let patterns = [
+            #"(?i)(bearer\s+)[^\s,;]+"#,
+            #"(?i)(cookie|authorization|password|token|secret|session|api[_-]?key)\s*[:=]\s*[^\s,;]+"#,
+            #"https?://[^\s]+"#,
+            #"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"#,
+            #"[A-Za-z0-9_+/=-]{24,}"#
+        ]
+        for pattern in patterns {
+            result = result.replacingOccurrences(of: pattern, with: "[redacted]", options: .regularExpression)
+        }
+        result = result.components(separatedBy: .controlCharacters).joined(separator: " ")
+        return String(result.prefix(240))
     }
 }
 
@@ -330,11 +337,6 @@ private struct MessageListResponse: Decodable {
 private struct UnreadCountResponse: Decodable {
     let success: Bool
     let unreadCount: NodeSeekNotificationUnreadCount
-}
-
-private struct ActionResponse: Decodable {
-    let success: Bool
-    let message: String?
 }
 
 extension NodeSeekNotificationUnreadCount: Decodable {

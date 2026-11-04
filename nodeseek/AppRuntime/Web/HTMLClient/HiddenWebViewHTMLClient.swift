@@ -360,6 +360,9 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         isolatedLoaders.removeValue(forKey: id)
     }
 
+    private var loadLogID = "none"
+    private var loadStartedAt = Date()
+    private var loadPhase = "idle"
     private var timeoutInterval: TimeInterval = 20
     private let webView: WKWebView
     private let cookieSession: NodeSeekCookieSessionManaging
@@ -400,6 +403,9 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     func load(request: URLRequest, timeoutInterval: TimeInterval) async throws -> HTMLResponse {
         self.timeoutInterval = timeoutInterval
         resetForNextRequest()
+        loadLogID = UUID().uuidString
+        loadStartedAt = Date()
+        loadPhase = "preparingCookies"
         initialURL = request.url
         updateDebugOverlayIfNeeded()
         AppLog.info(.webView, "开始加载页面: \(request.url?.absoluteString ?? "nil"), timeout: \(Int(self.timeoutInterval))s")
@@ -414,6 +420,8 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
 
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
+            loadPhase = "waitingNavigation"
+            AppLog.info(.webView, "页面加载开始 id=\(loadLogID), path=\(request.url?.path ?? "nil"), timeout=\(timeoutInterval)s")
             scheduleTimeout()
             let navigation = webView.load(request)
             if navigation == nil {
@@ -673,6 +681,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         reusesLoadedPage: Bool = true
     ) async throws -> [String: Any] {
         // 要读页面数据（比如编辑前读原文）时必须重新加载，复用的页面里是旧数据。
+        AppLog.info(.webView, "自动化准备页面 action=\(actionName), path=\(pageURL.path)")
         let response = reusesLoadedPage
             ? try await loadAutomationPageIfNeeded(
                 pageURL: pageURL,
@@ -689,6 +698,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
             ]
         }
 
+        AppLog.info(.webView, "自动化页面已就绪，开始脚本 action=\(actionName), loadID=\(loadLogID), status=\(response.statusCode)")
         try Task.checkCancellation()
         var scriptArguments = arguments
         scriptArguments["timeoutMs"] = max(5_000, Int(timeoutInterval * 1_000))
@@ -778,9 +788,21 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
             && lhsComponents.percentEncodedQuery == rhsComponents.percentEncodedQuery
     }
 
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        loadPhase = "provisional"
+        AppLog.info(.webView, "页面导航开始 id=\(loadLogID), elapsedMs=\(AppLog.elapsedMilliseconds(since: loadStartedAt))")
+    }
+
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        loadPhase = "committed"
+        AppLog.info(.webView, "页面主文档已提交 id=\(loadLogID), elapsedMs=\(AppLog.elapsedMilliseconds(since: loadStartedAt))")
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         AppLog.info(.webView, "WebView didFinish: \(webView.url?.absoluteString ?? "nil")")
         guard continuation != nil else { return }
+        loadPhase = "pollingHTML"
+        AppLog.info(.webView, "页面加载完成，开始检查 HTML id=\(loadLogID), elapsedMs=\(AppLog.elapsedMilliseconds(since: loadStartedAt))")
         htmlPollingTask?.cancel()
         htmlPollingTask = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -864,7 +886,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
     }
 
     private func timeout() {
-        AppLog.error(.webView, "隐藏 WebView 抓取超时")
+        AppLog.error(.webView, "隐藏 WebView 抓取超时 id=\(loadLogID), phase=\(loadPhase), path=\(webView.url?.path ?? "nil"), status=\(statusCode), isLoading=\(webView.isLoading), progress=\(webView.estimatedProgress), challengePollCount=\(challengePollCount), elapsedMs=\(AppLog.elapsedMilliseconds(since: loadStartedAt))")
         resolve(.failure(HiddenWebViewHTMLClientError.timeout))
     }
 
@@ -883,7 +905,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
             AppLog.info(.webView, "抓取完成: status=\(response.statusCode), htmlLength=\(response.html.count), finalURL=\(response.finalURL.absoluteString)")
             continuation.resume(returning: response)
         case .failure(let error):
-            AppLog.error(.webView, "抓取失败收敛: \(error.localizedDescription)")
+            AppLog.error(.webView, "抓取失败收敛 id=\(loadLogID), phase=\(loadPhase), domain=\((error as NSError).domain), code=\((error as NSError).code), elapsedMs=\(AppLog.elapsedMilliseconds(since: loadStartedAt)), error=\(error.localizedDescription)")
             continuation.resume(throwing: error)
         }
     }
