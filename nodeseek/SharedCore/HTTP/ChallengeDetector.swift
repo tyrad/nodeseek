@@ -10,6 +10,10 @@ import Foundation
 nonisolated struct ChallengeDetector: Sendable {
 
     func detect(response: HTMLResponse) -> ChallengeKind? {
+        response.cachedChallenge { detectUncached(response: response) }
+    }
+
+    private func detectUncached(response: HTMLResponse) -> ChallengeKind? {
         if Self.containsLoginRequiredHTML(response.html) {
             return .loginRequired(response.finalURL)
         }

@@ -15,6 +15,25 @@ import Testing
 
 @MainActor
 struct ChallengeDetectorTests {
+    @Test func cachesCleanResultAcrossResponseCopies() {
+        let response = HTMLResponse(statusCode: 200, headers: [:], finalURL: URL(string: "https://www.nodeseek.com/page-1")!, html: "<div class=\"post-list\"></div>")
+        #expect(ChallengeDetector().detect(response: response) == nil)
+        let copy = response
+        var recomputed = false
+        let result = copy.cachedChallenge { recomputed = true; return .blocked(response.finalURL) }
+        #expect(result == nil)
+        #expect(!recomputed)
+    }
+
+    @Test func cachedChallengeDoesNotLeakToNewResponse() {
+        let url = URL(string: "https://www.nodeseek.com/page-1")!
+        let blocked = HTMLResponse(statusCode: 403, headers: [:], finalURL: url, html: "denied")
+        #expect(ChallengeDetector().detect(response: blocked) == .blocked(url))
+        #expect(ChallengeDetector().detect(response: blocked) == .blocked(url))
+        let clean = HTMLResponse(statusCode: 200, headers: [:], finalURL: url, html: "<div class=\"post-list\"></div>")
+        #expect(ChallengeDetector().detect(response: clean) == nil)
+    }
+
     @Test func detectsCloudflareChallengeFromRealResponseShape() throws {
         let html = try FixtureLoader.html(named: "cloudflare-challenge")
         let url = URL(string: "https://www.nodeseek.com/")!
