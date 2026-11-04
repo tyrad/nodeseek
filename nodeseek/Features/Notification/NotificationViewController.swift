@@ -369,24 +369,8 @@ final class NotificationViewController: UIViewController {
     }
 
     private func updateMarkAllButton() {
-        markAllButton?.isEnabled = !isMarkingAllRead && currentUnreadCount > 0
-    }
-
-    private var currentUnreadCount: Int {
-        let count = unreadCount.count(for: selectedTab)
-        if count > 0 { return count }
-        return currentUnreadRecordCount
-    }
-
-    private var currentUnreadRecordCount: Int {
-        switch selectedTab {
-        case .atMe:
-            return atMeRecords.filter { !$0.isViewed }.count
-        case .reply:
-            return replyRecords.filter { !$0.isViewed }.count
-        case .message:
-            return messageRecords.filter { !$0.isViewed }.count
-        }
+        // 本地未读数可能与服务端不同步，始终允许点击，只在提交中防止重复触发。
+        markAllButton?.isEnabled = !isMarkingAllRead
     }
 
     private var currentRecordCount: Int {
