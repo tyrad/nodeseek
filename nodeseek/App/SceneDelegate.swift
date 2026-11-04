@@ -18,28 +18,27 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         let window = UIWindow(windowScene: windowScene)
         appRouter.window = window
         let launchedFromPush = connectionOptions.notificationResponse != nil
-        if launchedFromPush {
-            window.rootViewController = appRouter.makeRootViewController()
-        } else {
-            window.rootViewController = NodeSeekSplashViewController { [weak window, appRouter] in
-                guard let window else { return }
-                UIView.performWithoutAnimation {
-                    window.rootViewController = appRouter.makeRootViewController()
-                    window.layoutIfNeeded()
-                }
-                // 推送冷启动不走这里，避免选择页和新功能页挡住跳转；
-                // 同一次启动只弹一个，新功能页留到下次启动
-                if let root = window.rootViewController,
-                   LayoutChooserViewController.presentIfNeeded(from: root) == false {
-                    WhatsNewModule.presentIfNeeded(from: root)
-                }
-            }
-        }
+        window.rootViewController = appRouter.makeRootViewController()
         window.makeKeyAndVisible()
         self.window = window
 
+        // 窗口显示后异步预热 WebView，供验证页回退使用；推送冷启动不弹引导，避免挡住跳转。
+        DispatchQueue.main.async { [weak self, weak window] in
+            NodeSeekWebViewPrewarmer.prewarm()
+            guard !launchedFromPush, let self, let window, let root = window.rootViewController else { return }
+            self.presentOnboarding(from: root, in: window)
+        }
+
         if let response = connectionOptions.notificationResponse {
             PushNotificationDeepLink.handle(userInfo: response.notification.request.content.userInfo)
+        }
+    }
+
+    private func presentOnboarding(from root: UIViewController, in window: UIWindow) {
+        // 同一次启动只呈现一个引导；根界面已更换或已有弹窗时不抢占。
+        guard window.rootViewController === root, root.presentedViewController == nil else { return }
+        if !LayoutChooserViewController.presentIfNeeded(from: root) {
+            WhatsNewModule.presentIfNeeded(from: root)
         }
     }
 
@@ -75,9 +74,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     private func autoCheckInPresentationContext() -> UIViewController? {
         var controller = window?.rootViewController
-        guard let root = controller, (root is NodeSeekSplashViewController) == false else {
-            return nil
-        }
         while let presented = controller?.presentedViewController {
             controller = presented
         }

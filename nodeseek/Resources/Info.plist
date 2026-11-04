@@ -21,7 +21,12 @@
 	<key>NSCameraUsageDescription</key>
 	<string>拍照上传到 NodeImage 并插入回复</string>
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIColorName</key>
+		<string>SplashBackground</string>
+		<key>UIImageName</key>
+		<string>SplashLogo</string>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

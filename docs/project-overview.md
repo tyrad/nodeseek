@@ -35,7 +35,7 @@
 - `nodeseek/AppRuntime/UI/`：UIKit/Texture 共享控件和 UI 基础设施。
 - `nodeseek/AppRuntime/Services/`：依赖 App runtime、WebKit 或 Xcode App target 的服务实现。
 - `nodeseek/Features/`：VIPER feature 层。Presenter/Interactor 可以用 Xcode 单测；ViewController、Router、Texture node 走 App-hosted tests。
-- `nodeseek/App/`：App 生命周期、启动动画、根路由和模板 App 控制器。
+- `nodeseek/App/`：App 生命周期、根路由和模板 App 控制器。启动只用系统启动屏（Info.plist `UILaunchScreen` + `SplashLogo`/`SplashBackground` 资源），没有启动动画。
 - `nodeseek/Resources/`：Info.plist、Assets.xcassets 等 App 资源。注意 Info.plist 由 Xcode build setting 管理，不是 SwiftPM 资源。
 - `nodeseekTests/SharedCore/`：SharedCore 纯逻辑测试。能脱离 App host 的 Foundation/CoreGraphics/Kanna 测试优先纳入 SwiftPM。
 - `nodeseekTests/AppRuntime/`：AppRuntime 测试。UIKit、WebKit、DTCoreText、Texture、图片预览和 runtime 服务测试只走 Xcode App-hosted tests。
