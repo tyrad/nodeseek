@@ -13,13 +13,16 @@ enum BottomToast {
     enum Style {
         case success
         case failure
+        case progress
 
         var image: UIImage? {
-            UIImage(systemName: self == .success ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+            if self == .progress { return UIImage(systemName: "hourglass") }
+            return UIImage(systemName: self == .success ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
         }
 
         var tintColor: UIColor {
-            self == .success ? .systemGreen : .systemOrange
+            if self == .progress { return .systemBackground }
+            return self == .success ? .systemGreen : .systemOrange
         }
     }
 
@@ -35,11 +38,14 @@ enum BottomToast {
 
         let toast = makeToastView(message: message, style: style)
         view.addSubview(toast)
+        // 窗口安全区不包含 Tab 栏，需以当前页面可见的 Tab 栏顶部为基准。
+        let bottomAnchor = visibleTabBar(from: sourceView)?.topAnchor
+            ?? view.safeAreaLayoutGuide.bottomAnchor
         NSLayoutConstraint.activate([
             toast.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 24),
             toast.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -24),
             toast.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            toast.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12)
+            toast.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12)
         ])
         UIAccessibility.post(notification: .announcement, argument: message)
 
@@ -58,6 +64,22 @@ enum BottomToast {
                 toast.removeFromSuperview()
             }
         }
+    }
+
+    private static func visibleTabBar(from sourceView: UIView) -> UITabBar? {
+        var responder: UIResponder? = sourceView
+        while let current = responder {
+            if let controller = current as? UIViewController,
+               let tabBar = controller.tabBarController?.tabBar,
+               let window = sourceView.window,
+               tabBar.window === window,
+               !tabBar.isHidden, tabBar.alpha > 0,
+               tabBar.convert(tabBar.bounds, to: window).intersects(window.bounds) {
+                return tabBar
+            }
+            responder = current.next
+        }
+        return nil
     }
 
     private static func makeToastView(message: String, style: Style) -> UIView {
