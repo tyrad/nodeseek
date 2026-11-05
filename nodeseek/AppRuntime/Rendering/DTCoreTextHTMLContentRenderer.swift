@@ -181,7 +181,7 @@ struct DTCoreTextHTMLContentRenderer {
         let options: [String: Any] = [
             NSBaseURLDocumentOption: baseURL,
             DTDefaultFontSize: AppTypography.commentBodyFont().pointSize,
-            DTDefaultTextColor: UIColor.label,
+            DTDefaultTextColor: ReadingColors.text,
             DTDefaultLinkColor: NodeSeekLinkStyle.color,
             DTMaxImageSize: NSValue(cgSize: CGSize(width: maxImageWidth, height: DetailImageLayout.maxImageHeight)),
             DTUseiOS6Attributes: true

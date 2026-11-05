@@ -21,6 +21,7 @@ final class SpecialFollowKeywordsViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        tableView.backgroundColor = UIColor.systemGroupedBackground
         title = "特别关注"
         tableView.accessibilityIdentifier = "special-follow-keywords-table-view"
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "SpecialFollowKeywordCell")
@@ -55,12 +56,14 @@ final class SpecialFollowKeywordsViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let keyword = keywords[indexPath.row]
         let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = keyword.keyword
         cell.detailTextLabel?.text = keyword.colorHex
         cell.detailTextLabel?.textColor = .secondaryLabel
         cell.imageView?.image = colorSwatchImage(colorHex: keyword.colorHex)
         cell.accessoryType = .disclosureIndicator
         cell.accessibilityIdentifier = "special-follow-keyword-cell-\(indexPath.row)"
+
         return cell
     }
 

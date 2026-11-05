@@ -11,8 +11,8 @@ final class LogFileViewController: UIViewController {
     private let textView: UITextView = {
         let textView = UITextView()
         textView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        textView.textColor = .label
-        textView.backgroundColor = .systemBackground
+        textView.textColor = ReadingColors.text
+        textView.backgroundColor = UIColor.systemBackground
         textView.isEditable = false
         textView.isSelectable = true
         textView.alwaysBounceVertical = true
@@ -25,7 +25,7 @@ final class LogFileViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "文件日志"
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = UIColor.systemBackground
         navigationItem.largeTitleDisplayMode = .never
         navigationItem.rightBarButtonItems = [
             makeBarButton(

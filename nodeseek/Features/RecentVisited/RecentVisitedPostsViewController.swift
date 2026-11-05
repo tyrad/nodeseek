@@ -35,8 +35,14 @@ final class RecentVisitedPostsViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
-        tableView.backgroundColor = .systemBackground
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appTextSizeDidChange),
+            name: AppTextSizeSettings.didChangeNotification,
+            object: nil
+        )
+        view.backgroundColor = UIColor.systemBackground
+        tableView.backgroundColor = UIColor.systemBackground
         tableView.register(RecentVisitedPostCell.self, forCellReuseIdentifier: Self.cellIdentifier)
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 72
@@ -50,6 +56,10 @@ final class RecentVisitedPostsViewController: UITableViewController {
         navigationItem.rightBarButtonItem?.accessibilityLabel = "清扫浏览记录"
         loadNextPageIfNeeded()
         renderEmptyStateIfNeeded()
+    }
+
+    @objc private func appTextSizeDidChange() {
+        tableView.reloadData()
     }
 
     override func viewWillAppear(_ animated: Bool) {

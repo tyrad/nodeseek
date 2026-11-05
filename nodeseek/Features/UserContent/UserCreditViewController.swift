@@ -33,11 +33,11 @@ final class UserCreditViewController: UIViewController, UITableViewDataSource, U
         super.viewDidLoad()
         let appearance = UINavigationBarAppearance()
         appearance.configureWithDefaultBackground()
-        appearance.titleTextAttributes = [.foregroundColor: UIColor.label]
+        appearance.titleTextAttributes = [.foregroundColor: ReadingColors.text]
         navigationItem.standardAppearance = appearance
         navigationItem.scrollEdgeAppearance = appearance
-        view.backgroundColor = .systemGroupedBackground
-        tableView.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = UIColor.systemGroupedBackground
+        tableView.backgroundColor = UIColor.systemGroupedBackground
         tableView.accessibilityIdentifier = "credit-list"
         tableView.dataSource = self
         tableView.delegate = self
@@ -87,7 +87,7 @@ final class UserCreditViewController: UIViewController, UITableViewDataSource, U
         caption.textColor = .secondaryLabel
         caption.adjustsFontForContentSizeCategory = true
         balanceLabel.font = UIFontMetrics(forTextStyle: .title1).scaledFont(for: .monospacedDigitSystemFont(ofSize: 28, weight: .bold))
-        balanceLabel.textColor = .label
+        balanceLabel.textColor = ReadingColors.text
         balanceLabel.accessibilityIdentifier = "credit-balance"
         ownerLabel.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(for: .systemFont(ofSize: 12))
         ownerLabel.textColor = .secondaryLabel

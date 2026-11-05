@@ -392,7 +392,7 @@ class PostDetailViewController: UIViewController {
 
     let replyEditorContainer: UIView = {
         let view = UIView()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = UIColor.systemBackground
         view.layer.cornerRadius = 18
         view.layer.borderColor = UIColor.separator.cgColor
         view.layer.borderWidth = 1
@@ -687,13 +687,13 @@ class PostDetailViewController: UIViewController {
     }
 
     func setupUI() {
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = UIColor.systemBackground
         tableNode.dataSource = self
         tableNode.delegate = self
         tableNode.leadingScreensForBatching = leadingScreensForBatching
         // 屏幕上方的图片加载后变高时，保持当前可见内容位置不动。
         tableNode.automaticallyAdjustsContentOffset = true
-        tableNode.view.backgroundColor = .systemBackground
+        tableNode.view.backgroundColor = UIColor.systemBackground
         tableNode.view.separatorStyle = .none
         tableNode.view.showsVerticalScrollIndicator = true
         tableNode.view.tableFooterView = loadMoreCommentsContainer

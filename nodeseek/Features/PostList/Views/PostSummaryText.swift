@@ -66,7 +66,7 @@ enum PostSummaryText {
         let font = PostListCellStyle.Typography.titleFont
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: isVisited ? UIColor.secondaryLabel : UIColor.label
+            .foregroundColor: isVisited ? UIColor.secondaryLabel : ReadingColors.unreadTitle
         ]
         let title = NSMutableAttributedString()
 

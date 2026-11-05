@@ -54,7 +54,7 @@ final class PostDetailSkeletonCellNode: ASCellNode {
         super.init()
         automaticallyManagesSubnodes = true
         selectionStyle = .none
-        backgroundColor = .systemBackground
+        backgroundColor = UIColor.systemBackground
         configurePlaceholders()
     }
 

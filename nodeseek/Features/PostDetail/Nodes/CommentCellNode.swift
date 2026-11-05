@@ -289,7 +289,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
     }
 
     func applyCurrentTheme() {
-        backgroundColor = .systemBackground
+        backgroundColor = UIColor.systemBackground
         separatorNode.backgroundColor = .separator
         authorBadgeNodes.forEach { $0.applyCurrentTheme() }
         configureText()
@@ -301,7 +301,7 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
                 string: AuthorDisplayPolicy.displayName(from: comment.authorName) ?? "",
                 attributes: [
                     .font: AppTypography.commentAuthorFont(),
-                    .foregroundColor: UIColor.label
+                    .foregroundColor: ReadingColors.text
                 ]
             ),
             for: .normal

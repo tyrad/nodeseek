@@ -78,7 +78,7 @@ final class SearchViewController: UIViewController {
         let textField = UITextField()
         textField.placeholder = "输入关键字"
         textField.borderStyle = .none
-        textField.backgroundColor = .systemBackground
+        textField.backgroundColor = UIColor.systemBackground
         textField.layer.cornerRadius = 8
         textField.layer.borderWidth = 1.2
         textField.layer.borderColor = UIColor.systemGray3.cgColor
@@ -138,7 +138,7 @@ final class SearchViewController: UIViewController {
         let label = UILabel()
         label.text = "最近搜索"
         label.font = .systemFont(ofSize: 15, weight: .semibold)
-        label.textColor = .label
+        label.textColor = ReadingColors.text
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
@@ -244,7 +244,7 @@ final class SearchViewController: UIViewController {
 
     private func setupUI() {
         title = "搜一搜"
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = UIColor.systemBackground
         keywordTextField.delegate = self
         listView.delegate = self
         userResultsView.onSelectUser = { [weak self] record in

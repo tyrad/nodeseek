@@ -90,6 +90,7 @@ final class PushNotificationSettingsViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        tableView.backgroundColor = UIColor.systemGroupedBackground
         title = "推送通知"
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 88
@@ -226,17 +227,18 @@ final class PushNotificationSettingsViewController: UITableViewController {
 
     private func stepsCell() -> UITableViewCell {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = PushNotificationSettingsCopy.setupSteps
-        cell.textLabel?.textColor = .label
         cell.textLabel?.numberOfLines = 0
         cell.selectionStyle = .none
         cell.accessibilityIdentifier = "push-notification-setup-steps-cell"
+
         return cell
     }
 
     private func permissionCell(for row: PermissionRow) -> UITableViewCell {
         let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
-        cell.textLabel?.textColor = .label
+        cell.textLabel?.textColor = ReadingColors.text
         cell.detailTextLabel?.textColor = .secondaryLabel
         cell.detailTextLabel?.numberOfLines = 0
         switch row {
@@ -256,12 +258,13 @@ final class PushNotificationSettingsViewController: UITableViewController {
             cell.imageView?.image = UIImage(systemName: "gear")
             cell.accessibilityIdentifier = "push-notification-system-settings-cell"
         }
+
         return cell
     }
 
     private func tokenCell(for row: TokenRow?) -> UITableViewCell {
         let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
-        cell.textLabel?.textColor = .label
+        cell.textLabel?.textColor = ReadingColors.text
         cell.detailTextLabel?.textColor = .secondaryLabel
         cell.detailTextLabel?.numberOfLines = 0
         switch row {
@@ -293,12 +296,13 @@ final class PushNotificationSettingsViewController: UITableViewController {
         case .none:
             break
         }
+
         return cell
     }
 
     private func nsApnsCell(for row: NsApnsRow?) -> UITableViewCell {
         let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
-        cell.textLabel?.textColor = .label
+        cell.textLabel?.textColor = ReadingColors.text
         cell.detailTextLabel?.textColor = .secondaryLabel
         cell.detailTextLabel?.numberOfLines = 2
         switch row {
@@ -311,6 +315,7 @@ final class PushNotificationSettingsViewController: UITableViewController {
         case .none:
             break
         }
+
         return cell
     }
 

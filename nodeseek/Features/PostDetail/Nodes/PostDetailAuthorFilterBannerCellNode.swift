@@ -55,7 +55,7 @@ final class PostDetailAuthorFilterBannerCellNode: ASCellNode, ThemeRefreshableNo
     }
 
     func applyCurrentTheme() {
-        backgroundColor = .systemBackground
+        backgroundColor = UIColor.systemBackground
         containerNode.backgroundColor = .secondarySystemBackground
         let font = UIFont.preferredFont(forTextStyle: .footnote)
         iconNode.image = UIImage(

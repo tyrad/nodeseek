@@ -86,6 +86,7 @@ final class AvatarImageLoader {
         avatarURL: URL?,
         completion: Completion? = nil
     ) {
+        AvatarDimOverlayView.install(on: imageView)
         let requestToken = beginRequest(for: imageView)
         imageView.image = AvatarPlaceholderImage.image
 

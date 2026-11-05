@@ -248,7 +248,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
     }
 
     func applyCurrentTheme() {
-        backgroundColor = .systemBackground
+        backgroundColor = UIColor.systemBackground
         authorRiskWarningNode?.applyCurrentTheme()
         authorBadgeNodes.forEach { $0.applyCurrentTheme() }
         configureText()
@@ -302,7 +302,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
             string: content.title,
             attributes: [
                 .font: titleFont,
-                .foregroundColor: UIColor.label
+                .foregroundColor: ReadingColors.text
             ]
         )
 

@@ -47,7 +47,7 @@ final class PostListSideMenuViewController: UIViewController {
 
     private let sideMenuView: UIView = {
         let view = UIView()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = UIColor.systemBackground
         view.layer.shadowColor = UIColor.black.cgColor
         view.layer.shadowOpacity = 0.14
         view.layer.shadowRadius = 18
@@ -76,7 +76,7 @@ final class PostListSideMenuViewController: UIViewController {
         let label = UILabel()
         label.text = "未登录"
         label.font = .preferredFont(forTextStyle: .headline)
-        label.textColor = .label
+        label.textColor = ReadingColors.text
         label.numberOfLines = 1
         label.lineBreakMode = .byTruncatingTail
         label.accessibilityIdentifier = "post-list-side-menu-name-label"

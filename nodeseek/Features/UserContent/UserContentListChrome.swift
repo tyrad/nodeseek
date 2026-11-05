@@ -30,7 +30,7 @@ final class UserContentErrorView: UIStackView {
         let titleLabel = UILabel()
         titleLabel.text = "加载失败"
         titleLabel.font = .preferredFont(forTextStyle: .headline)
-        titleLabel.textColor = .label
+        titleLabel.textColor = ReadingColors.text
         titleLabel.adjustsFontForContentSizeCategory = true
 
         messageLabel.font = .preferredFont(forTextStyle: .subheadline)

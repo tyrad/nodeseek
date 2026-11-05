@@ -27,7 +27,7 @@ final class UserConnectionsViewController: UIViewController, UITableViewDataSour
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = UIColor.systemGroupedBackground
         tabs.selectedSegmentIndex = pageIndex(of: selectedKind)
         tabs.accessibilityIdentifier = "connections-tabs"
         tabs.addTarget(self, action: #selector(tabChanged), for: .valueChanged)
@@ -96,7 +96,7 @@ final class UserConnectionsViewController: UIViewController, UITableViewDataSour
     }
 
     private func configure(_ table: UITableView, kind: UserConnectionKind) {
-        table.backgroundColor = .systemGroupedBackground
+        table.backgroundColor = UIColor.systemGroupedBackground
         table.accessibilityIdentifier = "connections-list-\(kind)"
         table.dataSource = self
         table.delegate = self

@@ -84,7 +84,7 @@ final class LayoutChooserViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = UIColor.systemGroupedBackground
         view.accessibilityIdentifier = "layout-chooser"
         setupUI()
         applySelection()
@@ -102,7 +102,7 @@ final class LayoutChooserViewController: UIViewController {
         let titleLabel = UILabel()
         titleLabel.text = "选择浏览方式"
         titleLabel.font = .systemFont(ofSize: 30, weight: .bold)
-        titleLabel.textColor = .label
+        titleLabel.textColor = ReadingColors.text
         titleLabel.textAlignment = .center
 
         let subtitleLabel = UILabel()
@@ -340,7 +340,7 @@ final class LayoutOptionCard: UIControl {
         let titleLabel = UILabel()
         titleLabel.text = layout.title
         titleLabel.font = .systemFont(ofSize: 17, weight: .bold)
-        titleLabel.textColor = .label
+        titleLabel.textColor = ReadingColors.text
         titleLabel.textAlignment = .center
 
         let subtitleLabel = UILabel()
@@ -422,7 +422,7 @@ final class TabItemsSummaryRow: UIControl {
         let titleLabel = UILabel()
         titleLabel.text = "底部栏"
         titleLabel.font = .preferredFont(forTextStyle: .body)
-        titleLabel.textColor = .label
+        titleLabel.textColor = ReadingColors.text
         titleLabel.setContentHuggingPriority(.required, for: .horizontal)
         titleLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 

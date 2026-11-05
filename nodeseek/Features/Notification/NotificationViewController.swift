@@ -63,10 +63,20 @@ final class NotificationViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appTextSizeDidChange),
+            name: AppTextSizeSettings.didChangeNotification,
+            object: nil
+        )
         setupUI()
         loadCurrentUserID()
         loadUnreadCount()
         loadSelectedTab(showLoading: true)
+    }
+
+    @objc private func appTextSizeDidChange() {
+        tableView.reloadData()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -82,7 +92,7 @@ final class NotificationViewController: UIViewController {
     }
 
     private func setupUI() {
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = UIColor.systemBackground
         configureNavigationItems()
         configureSegmentedControl()
         configureTableView()
@@ -99,7 +109,7 @@ final class NotificationViewController: UIViewController {
 
         let segmentedContainer = UIView()
         segmentedContainer.translatesAutoresizingMaskIntoConstraints = false
-        segmentedContainer.backgroundColor = .systemBackground
+        segmentedContainer.backgroundColor = UIColor.systemBackground
         segmentedContainer.addSubview(segmentedControl)
 
         view.addSubview(segmentedContainer)
@@ -171,7 +181,7 @@ final class NotificationViewController: UIViewController {
 
     private func configureTableView() {
         tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.backgroundColor = .systemBackground
+        tableView.backgroundColor = UIColor.systemBackground
         tableView.separatorColor = .separator
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 82
@@ -695,7 +705,7 @@ private final class NotificationLoadingView: UIView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = .systemBackground
+        backgroundColor = UIColor.systemBackground
 
         label.text = "加载中"
         label.font = .preferredFont(forTextStyle: .subheadline)
@@ -748,7 +758,7 @@ private final class NotificationLoginPromptView: UIStackView {
         let titleLabel = UILabel()
         titleLabel.text = "登录后查看通知"
         titleLabel.font = .preferredFont(forTextStyle: .headline)
-        titleLabel.textColor = .label
+        titleLabel.textColor = ReadingColors.text
         titleLabel.adjustsFontForContentSizeCategory = true
 
         let messageLabel = UILabel()

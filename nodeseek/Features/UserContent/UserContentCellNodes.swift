@@ -211,7 +211,7 @@ enum UserContentText {
             string: title,
             attributes: [
                 .font: PostListCellStyle.Typography.titleFont,
-                .foregroundColor: UIColor.label
+                .foregroundColor: ReadingColors.text
             ]
         )
     }

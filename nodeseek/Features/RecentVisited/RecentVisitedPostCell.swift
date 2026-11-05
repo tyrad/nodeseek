@@ -31,8 +31,8 @@ final class RecentVisitedPostCell: UITableViewCell {
 
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.font = .preferredFont(forTextStyle: .body)
-        label.textColor = .label
+        label.font = AppTypography.font(basePointSize: 17)
+        label.textColor = ReadingColors.text
         label.numberOfLines = 2
         label.lineBreakMode = .byTruncatingTail
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -50,6 +50,7 @@ final class RecentVisitedPostCell: UITableViewCell {
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
+        backgroundColor = UIColor.systemBackground
         accessoryType = .disclosureIndicator
         selectionStyle = .default
         contentView.addSubview(avatarImageView)
@@ -90,6 +91,7 @@ final class RecentVisitedPostCell: UITableViewCell {
     }
 
     func configure(record: VisitedPostRecord, visitedText: String) {
+        titleLabel.font = AppTypography.font(basePointSize: 17)
         representedPostID = record.postID
         titleLabel.text = record.title
         visitedLabel.text = visitedText

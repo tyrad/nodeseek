@@ -18,7 +18,7 @@ final class UserCreditCell: UITableViewCell {
             $0.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(for: .systemFont(ofSize: 12))
             $0.textColor = .secondaryLabel
         }
-        [reasonLabel, changeLabel].forEach { $0.textColor = .label }
+        [reasonLabel, changeLabel].forEach { $0.textColor = ReadingColors.text }
         [reasonLabel, changeLabel, timeLabel, balanceLabel].forEach {
             $0.adjustsFontForContentSizeCategory = true
             $0.numberOfLines = 0

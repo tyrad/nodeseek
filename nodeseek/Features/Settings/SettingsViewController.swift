@@ -210,6 +210,7 @@ class SettingsViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        tableView.backgroundColor = UIColor.systemGroupedBackground
         title = "设置"
         tableView.accessibilityIdentifier = "settings-table-view"
         tableView.rowHeight = UITableView.automaticDimension
@@ -335,12 +336,14 @@ class SettingsViewController: UITableViewController {
 
     private func cacheCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = isClearingCache ? "正在清除缓存..." : "清除缓存"
         cell.detailTextLabel?.text = cacheDetailText
         cell.accessoryType = .disclosureIndicator
         cell.selectionStyle = isClearingCache ? .none : .default
         cell.isUserInteractionEnabled = !isClearingCache
         cell.accessibilityIdentifier = "settings-clear-cache-cell"
+
         return cell
     }
 
@@ -389,6 +392,7 @@ class SettingsViewController: UITableViewController {
 
     private func nodeImageAuthorizationCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         if hasNodeImageAuthorization {
             cell.textLabel?.text = "取消 NodeImage 授权"
             cell.textLabel?.textColor = .systemRed
@@ -396,16 +400,17 @@ class SettingsViewController: UITableViewController {
             cell.accessoryType = .none
         } else {
             cell.textLabel?.text = "NodeImage 授权"
-            cell.textLabel?.textColor = .label
             cell.imageView?.image = UIImage(systemName: "photo.badge.plus")
             cell.accessoryType = .disclosureIndicator
         }
         cell.accessibilityIdentifier = "settings-nodeimage-authorization-cell"
+
         return cell
     }
 
     private func signatureDisplayCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = "显示帖子签名"
         cell.imageView?.image = UIImage(systemName: "signature")
         let signatureSwitch = UISwitch()
@@ -415,11 +420,13 @@ class SettingsViewController: UITableViewController {
         cell.accessoryView = signatureSwitch
         cell.selectionStyle = .none
         cell.accessibilityIdentifier = "settings-post-signature-cell"
+
         return cell
     }
 
     private func imageDimmingCell() -> UITableViewCell {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = "深色模式图片变暗"
         cell.imageView?.image = UIImage(systemName: "moon")
         let dimmingSwitch = UISwitch()
@@ -430,11 +437,13 @@ class SettingsViewController: UITableViewController {
         cell.accessoryView = dimmingSwitch
         cell.selectionStyle = .none
         cell.accessibilityIdentifier = "settings-image-dimming-cell"
+
         return cell
     }
 
     private func imageDimmingLevelCell() -> UITableViewCell {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = "变暗程度"
         let levels = DetailImageDimmingSettings.Level.allCases
         let control = UISegmentedControl(items: levels.map(\.title))
@@ -446,6 +455,7 @@ class SettingsViewController: UITableViewController {
         cell.accessoryView = control
         cell.selectionStyle = .none
         cell.accessibilityIdentifier = "settings-image-dimming-level-cell"
+
         return cell
     }
 
@@ -467,6 +477,7 @@ class SettingsViewController: UITableViewController {
 
     private func homeSearchEntryCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = "首页搜索入口"
         cell.imageView?.image = UIImage(systemName: "magnifyingglass")
         let searchEntrySwitch = UISwitch()
@@ -476,22 +487,26 @@ class SettingsViewController: UITableViewController {
         cell.accessoryView = searchEntrySwitch
         cell.selectionStyle = .none
         cell.accessibilityIdentifier = "settings-home-search-entry-cell"
+
         return cell
     }
 
     private func navigationLayoutCell() -> UITableViewCell {
         let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = "界面布局"
         cell.detailTextLabel?.text = AppNavigationLayoutSettings.shared.layout.title
         cell.detailTextLabel?.textColor = .secondaryLabel
         cell.imageView?.image = UIImage(systemName: "rectangle.split.3x1")
         cell.accessoryType = .disclosureIndicator
         cell.accessibilityIdentifier = "settings-navigation-layout-cell"
+
         return cell
     }
 
     private func categoryPreferencesCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = "首页分类"
         cell.detailTextLabel?.text = categoryPreferenceDetailText
         cell.detailTextLabel?.textColor = .secondaryLabel
@@ -499,22 +514,26 @@ class SettingsViewController: UITableViewController {
         cell.imageView?.image = UIImage(systemName: "list.bullet.rectangle")
         cell.accessoryType = .disclosureIndicator
         cell.accessibilityIdentifier = "settings-post-category-preferences-cell"
+
         return cell
     }
 
     private func textSizeCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = "字体大小"
         cell.detailTextLabel?.text = textSizeSettings.displayText
         cell.detailTextLabel?.textColor = .secondaryLabel
         cell.imageView?.image = UIImage(systemName: "textformat.size")
         cell.accessoryType = .disclosureIndicator
         cell.accessibilityIdentifier = "settings-text-size-cell"
+
         return cell
     }
 
     private func specialFollowCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = "特别关注"
         cell.detailTextLabel?.text = specialFollowDetailText
         cell.detailTextLabel?.textColor = .secondaryLabel
@@ -522,57 +541,68 @@ class SettingsViewController: UITableViewController {
         cell.imageView?.image = UIImage(systemName: "star.circle")
         cell.accessoryType = .disclosureIndicator
         cell.accessibilityIdentifier = "settings-special-follow-cell"
+
         return cell
     }
 
     private func autoCheckInCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = "自动签到"
         cell.detailTextLabel?.text = "Beta · \(autoCheckInSummaryProvider())"
         cell.detailTextLabel?.textColor = .secondaryLabel
         cell.imageView?.image = UIImage(systemName: "checkmark.circle")
         cell.accessoryType = .disclosureIndicator
         cell.accessibilityIdentifier = "settings-auto-check-in-cell"
+
         return cell
     }
 
     private func pushNotificationCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = "推送通知"
         cell.detailTextLabel?.text = PushNotificationSettingsCopy.listSummary(for: pushAuthorizationStatus)
         cell.detailTextLabel?.textColor = .secondaryLabel
         cell.imageView?.image = UIImage(systemName: "bell")
         cell.accessoryType = .disclosureIndicator
         cell.accessibilityIdentifier = "settings-push-notification-cell"
+
         return cell
     }
 
     private func logoutCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = isLoggingOut ? "正在退出登录..." : "退出登录"
         cell.textLabel?.textColor = .systemRed
         cell.textLabel?.textAlignment = .center
         cell.selectionStyle = isLoggingOut ? .none : .default
         cell.isUserInteractionEnabled = !isLoggingOut
         cell.accessibilityIdentifier = "settings-logout-cell"
+
         return cell
     }
 
     private func aboutCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = "关于"
         cell.imageView?.image = UIImage(systemName: "info.circle")
         cell.accessoryType = .disclosureIndicator
         cell.accessibilityIdentifier = "settings-about-cell"
+
         return cell
     }
 
     private func debugEntryCell(for indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = "调试"
         cell.imageView?.image = UIImage(systemName: "hammer")
         cell.accessoryType = .disclosureIndicator
         cell.accessibilityIdentifier = "settings-debug-cell"
+
         return cell
     }
 
@@ -860,6 +890,7 @@ final class SettingsTextSizeViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        tableView.backgroundColor = UIColor.systemGroupedBackground
         title = "字体大小"
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 72
@@ -891,6 +922,7 @@ final class SettingsTextSizeViewController: UITableViewController {
             cell.onPointOffsetChanged = { [weak self] pointOffset in
                 self?.updateTextSize(pointOffset: pointOffset)
             }
+
             return cell
         case .preview:
             guard let cell = tableView.dequeueReusableCell(
@@ -949,6 +981,7 @@ final class SettingsAboutViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        tableView.backgroundColor = UIColor.systemGroupedBackground
         title = "关于"
         tableView.accessibilityIdentifier = "settings-about-table-view"
         tableView.rowHeight = UITableView.automaticDimension
@@ -963,6 +996,7 @@ final class SettingsAboutViewController: UITableViewController {
         let row = rows.indices.contains(indexPath.row) ? rows[indexPath.row] : nil
         let usesSubtitle = row == .repository || row == .githubURL
         let cell = UITableViewCell(style: usesSubtitle ? .subtitle : .value1, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.selectionStyle = .none
         cell.detailTextLabel?.textColor = .secondaryLabel
         cell.detailTextLabel?.numberOfLines = usesSubtitle ? 2 : 1
@@ -1003,6 +1037,7 @@ final class SettingsAboutViewController: UITableViewController {
         case .none:
             break
         }
+
         return cell
     }
 
@@ -1062,6 +1097,7 @@ final class SettingsDebugViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        tableView.backgroundColor = UIColor.systemGroupedBackground
         title = "调试"
         tableView.accessibilityIdentifier = "settings-debug-table-view"
     }
@@ -1072,6 +1108,7 @@ final class SettingsDebugViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         switch Row.visibleRows[indexPath.row] {
         case .fileLogging:
             cell.textLabel?.text = "记录日志"
@@ -1099,6 +1136,7 @@ final class SettingsDebugViewController: UITableViewController {
         #endif
         }
         cell.accessoryType = .disclosureIndicator
+
         return cell
     }
 
@@ -1152,6 +1190,7 @@ final class PostDetailDebugLinksViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        tableView.backgroundColor = UIColor.systemGroupedBackground
         title = "调试链接"
         tableView.accessibilityIdentifier = "post-detail-debug-links-table-view"
     }
@@ -1163,12 +1202,14 @@ final class PostDetailDebugLinksViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let link = links[indexPath.row]
         let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
         cell.textLabel?.text = link.title
         cell.detailTextLabel?.text = link.url.absoluteString
         cell.detailTextLabel?.textColor = .secondaryLabel
         cell.detailTextLabel?.numberOfLines = 2
         cell.accessoryType = .disclosureIndicator
         cell.accessibilityIdentifier = "post-detail-debug-link-cell-\(indexPath.row)"
+
         return cell
     }
 

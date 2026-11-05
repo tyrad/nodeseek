@@ -26,8 +26,8 @@ final class NotificationMentionCell: UITableViewCell {
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         selectionStyle = .default
-        backgroundColor = .systemBackground
-        contentView.backgroundColor = .systemBackground
+        backgroundColor = UIColor.systemBackground
+        contentView.backgroundColor = UIColor.systemBackground
         setupUI()
     }
 
@@ -60,6 +60,7 @@ final class NotificationMentionCell: UITableViewCell {
         onProfileTapped: @escaping () -> Void,
         onMarkReadTapped: @escaping () -> Void
     ) {
+        updateTypography()
         representedID = record.id
         self.onProfileTapped = onProfileTapped
         self.onMarkReadTapped = onMarkReadTapped
@@ -83,7 +84,15 @@ final class NotificationMentionCell: UITableViewCell {
             .into(avatarImageView)
     }
 
+    private func updateTypography() {
+        nameButton.titleLabel?.font = AppTypography.font(basePointSize: 15)
+        actionLabel.font = AppTypography.font(basePointSize: 15)
+        timeLabel.font = AppTypography.font(basePointSize: 12)
+        titleLabel.font = AppTypography.font(basePointSize: 17)
+    }
+
     private func setupUI() {
+        updateTypography()
         avatarImageView.translatesAutoresizingMaskIntoConstraints = false
         avatarImageView.contentMode = .scaleAspectFill
         avatarImageView.clipsToBounds = true
@@ -100,27 +109,23 @@ final class NotificationMentionCell: UITableViewCell {
         profileButton.accessibilityLabel = "打开用户主页"
         profileButton.addTarget(self, action: #selector(profileTapped), for: .touchUpInside)
 
-        nameButton.titleLabel?.font = .preferredFont(forTextStyle: .subheadline)
-        nameButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        nameButton.titleLabel?.adjustsFontForContentSizeCategory = false
         nameButton.contentHorizontalAlignment = .leading
-        nameButton.setTitleColor(.label, for: .normal)
+        nameButton.setTitleColor(ReadingColors.text, for: .normal)
         nameButton.addTarget(self, action: #selector(profileTapped), for: .touchUpInside)
         nameButton.setContentHuggingPriority(.required, for: .horizontal)
         nameButton.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
 
-        actionLabel.font = .preferredFont(forTextStyle: .subheadline)
         actionLabel.textColor = .secondaryLabel
-        actionLabel.adjustsFontForContentSizeCategory = true
+        actionLabel.adjustsFontForContentSizeCategory = false
         actionLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        titleLabel.font = .preferredFont(forTextStyle: .body)
-        titleLabel.textColor = .label
-        titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.textColor = ReadingColors.text
+        titleLabel.adjustsFontForContentSizeCategory = false
         titleLabel.numberOfLines = 2
 
-        timeLabel.font = .preferredFont(forTextStyle: .caption1)
         timeLabel.textColor = .secondaryLabel
-        timeLabel.adjustsFontForContentSizeCategory = true
+        timeLabel.adjustsFontForContentSizeCategory = false
 
         let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .regular)
         markReadButton.translatesAutoresizingMaskIntoConstraints = false
@@ -201,8 +206,8 @@ final class NotificationMessageCell: UITableViewCell {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         accessoryType = .disclosureIndicator
         selectionStyle = .default
-        backgroundColor = .systemBackground
-        contentView.backgroundColor = .systemBackground
+        backgroundColor = UIColor.systemBackground
+        contentView.backgroundColor = UIColor.systemBackground
         setupUI()
     }
 
@@ -229,6 +234,7 @@ final class NotificationMessageCell: UITableViewCell {
         currentUserID: Int?,
         timeText: String
     ) {
+        updateTypography()
         representedID = record.maxID
         let participantName = record.participantName(currentUserID: currentUserID)
         nameLabel.text = participantName
@@ -248,7 +254,14 @@ final class NotificationMessageCell: UITableViewCell {
             .into(avatarImageView)
     }
 
+    private func updateTypography() {
+        nameLabel.font = AppTypography.font(basePointSize: 17)
+        timeLabel.font = AppTypography.font(basePointSize: 12)
+        contentLabel.font = AppTypography.font(basePointSize: 15)
+    }
+
     private func setupUI() {
+        updateTypography()
         avatarImageView.translatesAutoresizingMaskIntoConstraints = false
         avatarImageView.contentMode = .scaleAspectFill
         avatarImageView.clipsToBounds = true
@@ -261,18 +274,15 @@ final class NotificationMessageCell: UITableViewCell {
         unreadDotView.layer.cornerRadius = 4
         unreadDotView.isHidden = true
 
-        nameLabel.font = .preferredFont(forTextStyle: .body)
-        nameLabel.textColor = .label
-        nameLabel.adjustsFontForContentSizeCategory = true
+        nameLabel.textColor = ReadingColors.text
+        nameLabel.adjustsFontForContentSizeCategory = false
 
-        contentLabel.font = .preferredFont(forTextStyle: .subheadline)
         contentLabel.textColor = .secondaryLabel
-        contentLabel.adjustsFontForContentSizeCategory = true
+        contentLabel.adjustsFontForContentSizeCategory = false
         contentLabel.numberOfLines = 2
 
-        timeLabel.font = .preferredFont(forTextStyle: .caption1)
         timeLabel.textColor = .secondaryLabel
-        timeLabel.adjustsFontForContentSizeCategory = true
+        timeLabel.adjustsFontForContentSizeCategory = false
 
         let textStack = UIStackView(arrangedSubviews: [nameLabel, contentLabel, timeLabel])
         textStack.translatesAutoresizingMaskIntoConstraints = false

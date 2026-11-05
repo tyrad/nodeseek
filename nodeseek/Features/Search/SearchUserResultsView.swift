@@ -40,10 +40,10 @@ final class SearchUserResultsView: UIView, UITableViewDataSource, UITableViewDel
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = .systemBackground
+        backgroundColor = UIColor.systemBackground
         accessibilityIdentifier = "search-user-results"
 
-        tableView.backgroundColor = .systemBackground
+        tableView.backgroundColor = UIColor.systemBackground
         tableView.dataSource = self
         tableView.delegate = self
         tableView.rowHeight = UITableView.automaticDimension
@@ -119,7 +119,7 @@ final class SearchUserResultsView: UIView, UITableViewDataSource, UITableViewDel
         let cell = tableView.dequeueReusableCell(withIdentifier: "member", for: indexPath) as! UserConnectionCell
         // 搜索结果只负责找人，关注操作留给个人页，避免这里再维护一套关注状态
         cell.configure(records[indexPath.row], showsFollowButton: false)
-        cell.backgroundColor = .systemBackground
+        cell.backgroundColor = UIColor.systemBackground
         return cell
     }
 

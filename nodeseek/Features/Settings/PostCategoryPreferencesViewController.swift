@@ -27,6 +27,7 @@ final class PostCategoryPreferencesViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        tableView.backgroundColor = UIColor.systemGroupedBackground
         title = "首页分类"
         tableView.accessibilityIdentifier = "post-category-preferences-table-view"
         tableView.allowsSelectionDuringEditing = true
@@ -81,7 +82,7 @@ final class PostCategoryPreferencesViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
-        cell.textLabel?.textColor = .label
+        cell.textLabel?.textColor = ReadingColors.text
         cell.detailTextLabel?.textColor = .secondaryLabel
         cell.detailTextLabel?.numberOfLines = 1
 

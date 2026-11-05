@@ -24,7 +24,7 @@ final class UserConnectionCell: UITableViewCell {
             avatar.heightAnchor.constraint(equalToConstant: 44)
         ])
         nameLabel.font = .preferredFont(forTextStyle: .headline)
-        nameLabel.textColor = .label
+        nameLabel.textColor = ReadingColors.text
         bioLabel.font = .preferredFont(forTextStyle: .footnote)
         bioLabel.textColor = .secondaryLabel
         statsLabel.font = .preferredFont(forTextStyle: .caption1)

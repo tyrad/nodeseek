@@ -301,7 +301,7 @@ class PostListViewController: UIViewController {
         navigationItem.title = nil
         navigationItem.leftBarButtonItem = nil
         
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = UIColor.systemBackground
         pageContainerViewController.eventDelegate = self
         addChild(pageContainerViewController)
         let pageContainerView = pageContainerViewController.view!
@@ -546,7 +546,7 @@ class PostListViewController: UIViewController {
     }
 
     private func refreshAppearanceForCurrentTraits() {
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = UIColor.systemBackground
         compactTopButton.tintColor = .label
         categoryEditButton.tintColor = .label
         topSearchButton.tintColor = .label

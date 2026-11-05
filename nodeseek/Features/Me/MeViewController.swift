@@ -62,11 +62,18 @@ final class MeViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         router.viewController = self
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = UIColor.systemGroupedBackground
         view.accessibilityIdentifier = "me-page"
         setupNavigationItem()
         setupLayout()
         setupActions()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appTextSizeDidChange),
+            name: AppTextSizeSettings.didChangeNotification,
+            object: nil
+        )
+        appTextSizeDidChange()
         render()
 
         // 刷新只由本页出现和登录关闭触发；不能用 view.window 判断，
@@ -79,6 +86,11 @@ final class MeViewController: UIViewController {
             self?.accountDidChange(account)
         }
         accountController.start()
+    }
+
+    @objc private func appTextSizeDidChange() {
+        profileCard.updateTextSize()
+        [discussionsRow, commentsRow, collectionsRow, recentRow].forEach { $0.updateTextSize() }
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -489,6 +501,11 @@ private final class MeProfileCardView: UIControl {
 
     // MARK: Setup
 
+    func updateTextSize() {
+        nameLabel.font = AppTypography.font(basePointSize: 22, weight: .bold)
+        metaLabel.font = AppTypography.font(basePointSize: 13)
+    }
+
     private func setupHeader() {
         avatarImageView.contentMode = .scaleAspectFill
         avatarImageView.clipsToBounds = true
@@ -499,7 +516,7 @@ private final class MeProfileCardView: UIControl {
         avatarImageView.translatesAutoresizingMaskIntoConstraints = false
 
         nameLabel.font = .systemFont(ofSize: 22, weight: .bold)
-        nameLabel.textColor = .label
+        nameLabel.textColor = ReadingColors.text
         metaLabel.font = .systemFont(ofSize: 13)
         metaLabel.textColor = .secondaryLabel
         metaLabel.numberOfLines = 2
@@ -562,7 +579,7 @@ private final class MeProfileCardView: UIControl {
 
     private func setupLevel() {
         levelTitleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
-        levelTitleLabel.textColor = .label
+        levelTitleLabel.textColor = ReadingColors.text
         todayLabel.font = .systemFont(ofSize: 12.5)
         todayLabel.textColor = .secondaryLabel
         todayLabel.textAlignment = .right
@@ -621,7 +638,7 @@ private final class MeStatView: UIView {
     init(title: String) {
         super.init(frame: .zero)
         valueLabel.font = .monospacedDigitSystemFont(ofSize: 19, weight: .bold)
-        valueLabel.textColor = .label
+        valueLabel.textColor = ReadingColors.text
         valueLabel.textAlignment = .center
         valueLabel.adjustsFontSizeToFitWidth = true
         valueLabel.minimumScaleFactor = 0.7
@@ -689,7 +706,7 @@ private final class MeListRowView: UIControl {
         iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 17, weight: .regular)
         titleLabel.text = title
         titleLabel.font = .preferredFont(forTextStyle: .body)
-        titleLabel.textColor = .label
+        titleLabel.textColor = ReadingColors.text
         valueLabel.font = .monospacedDigitSystemFont(ofSize: 15, weight: .regular)
         valueLabel.textColor = .secondaryLabel
         chevronView.tintColor = .tertiaryLabel
@@ -737,6 +754,10 @@ private final class MeListRowView: UIControl {
         didSet { backgroundColor = isHighlighted ? .systemFill : .clear }
     }
 
+    func updateTextSize() {
+        titleLabel.font = AppTypography.font(basePointSize: 17)
+    }
+
     /// 右侧灰字（数量或今日所得），nil 时只显示箭头。
     func setValue(_ value: String?) {
         valueLabel.text = value
@@ -768,7 +789,7 @@ private final class MeCapsuleLabel: UILabel {
     override init(frame: CGRect) {
         super.init(frame: frame)
         font = .systemFont(ofSize: 13, weight: .semibold)
-        textColor = .label
+        textColor = ReadingColors.text
         layer.borderWidth = 1
         clipsToBounds = true
         updateBorderColor()

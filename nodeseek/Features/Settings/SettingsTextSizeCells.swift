@@ -14,7 +14,7 @@ final class SettingsTextSizeAdjustmentCell: UITableViewCell {
         let label = UILabel()
         label.text = "字体大小"
         label.font = .systemFont(ofSize: 17, weight: .regular)
-        label.textColor = .label
+        label.textColor = ReadingColors.text
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
@@ -173,7 +173,7 @@ final class SettingsTextSizePreviewCell: UITableViewCell {
         listAvatarView.translatesAutoresizingMaskIntoConstraints = false
 
         listTitleLabel.text = "节点列表字体调整预览，标题可自然换行"
-        listTitleLabel.textColor = .label
+        listTitleLabel.textColor = ReadingColors.text
         listTitleLabel.numberOfLines = 0
         listTitleLabel.translatesAutoresizingMaskIntoConstraints = false
 
@@ -210,7 +210,7 @@ final class SettingsTextSizePreviewCell: UITableViewCell {
         commentAvatarView.translatesAutoresizingMaskIntoConstraints = false
 
         commentAuthorLabel.text = "ipv4"
-        commentAuthorLabel.textColor = .label
+        commentAuthorLabel.textColor = ReadingColors.text
         commentAuthorLabel.translatesAutoresizingMaskIntoConstraints = false
 
         commentMetaLabel.text = "#12  5min ago"
@@ -224,7 +224,7 @@ final class SettingsTextSizePreviewCell: UITableViewCell {
         headerStack.translatesAutoresizingMaskIntoConstraints = false
 
         commentBodyLabel.text = "评论正文跟随同一套 App 内字号，预览会随滑块实时变化。"
-        commentBodyLabel.textColor = .label
+        commentBodyLabel.textColor = ReadingColors.text
         commentBodyLabel.numberOfLines = 0
         commentBodyLabel.translatesAutoresizingMaskIntoConstraints = false
 

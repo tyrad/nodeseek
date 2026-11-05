@@ -31,7 +31,7 @@ final class PostTextureListHostViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = UIColor.systemBackground
         listView.delegate = self
         listView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(listView)

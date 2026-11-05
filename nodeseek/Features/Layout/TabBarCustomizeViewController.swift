@@ -69,7 +69,7 @@ final class TabBarCustomizeViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = UIColor.systemGroupedBackground
         view.accessibilityIdentifier = "tab-customize"
         navigationItem.largeTitleDisplayMode = .never
         setupTableView()
@@ -349,6 +349,7 @@ extension TabBarCustomizeViewController: UITableViewDataSource, UITableViewDeleg
             let item = availableItems[indexPath.row]
             cell.configure(item: item, action: isFull ? .addDisabled : .add) { [weak self] in self?.addItem(item) }
         }
+
         return cell
     }
 

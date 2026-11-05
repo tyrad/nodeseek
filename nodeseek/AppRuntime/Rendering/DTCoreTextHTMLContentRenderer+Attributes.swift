@@ -12,7 +12,7 @@ import UIKit
 extension DTCoreTextHTMLContentRenderer {
     private var blockquoteTextColor: UIColor {
         UIColor { traits in
-            traits.userInterfaceStyle == .dark ? UIColor.secondaryLabel : UIColor.label
+            traits.userInterfaceStyle == .dark ? UIColor.secondaryLabel : ReadingColors.text
         }
     }
 
@@ -36,7 +36,7 @@ extension DTCoreTextHTMLContentRenderer {
 
     func normalizeBaseTextAttributes(in attributed: NSMutableAttributedString) {
         let fullRange = NSRange(location: 0, length: attributed.length)
-        let bodyColor = UIColor.label
+        let bodyColor = ReadingColors.text
 
         let bodyFont = AppTypography.commentBodyFont()
         attributed.enumerateAttribute(.font, in: fullRange) { value, range, _ in
@@ -157,7 +157,7 @@ extension DTCoreTextHTMLContentRenderer {
     func normalizedTextColor(from color: UIColor) -> UIColor {
         guard let components = rgbComponents(from: color) else { return color }
         if isNearGray(components, target: 17) {
-            return .label
+            return ReadingColors.text
         }
         if isNearGray(components, target: 85) {
             return .secondaryLabel

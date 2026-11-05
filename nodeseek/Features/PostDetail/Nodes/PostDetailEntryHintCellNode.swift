@@ -51,7 +51,7 @@ final class PostDetailEntryHintCellNode: ASCellNode, ThemeRefreshableNode {
     }
 
     func applyCurrentTheme() {
-        backgroundColor = .systemBackground
+        backgroundColor = UIColor.systemBackground
         containerNode.backgroundColor = .secondarySystemBackground
         textNode.attributedText = NSAttributedString(
             string: "当前从第 \(page) 页进入",

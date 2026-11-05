@@ -28,7 +28,7 @@ final class UserStardustCell: UITableViewCell {
         [reasonLabel, changeLabel, timeLabel, balanceLabel].forEach {
             $0.adjustsFontForContentSizeCategory = true
             $0.numberOfLines = 0
-            $0.textColor = .label
+            $0.textColor = ReadingColors.text
         }
         timeLabel.textColor = .secondaryLabel
         balanceLabel.textColor = .secondaryLabel
@@ -151,7 +151,7 @@ private final class StardustMemberView: UIControl {
         avatar.translatesAutoresizingMaskIntoConstraints = false
         nameLabel.font = UIFontMetrics(forTextStyle: .footnote).scaledFont(for: .systemFont(ofSize: 13))
         nameLabel.adjustsFontForContentSizeCategory = true
-        nameLabel.textColor = .label
+        nameLabel.textColor = ReadingColors.text
         nameLabel.numberOfLines = 0
         let content = UIStackView(arrangedSubviews: [avatar, nameLabel])
         content.alignment = .center

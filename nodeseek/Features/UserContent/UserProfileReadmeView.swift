@@ -84,7 +84,7 @@ final class UserProfileReadmeView: UIView, UITextViewDelegate {
             // 渲染不出内容时退回原文，至少不丢信息
             stack.addArrangedSubview(makeTextView(NSAttributedString(
                 string: markdown,
-                attributes: [.font: UIFont.systemFont(ofSize: 15), .foregroundColor: UIColor.label]
+                attributes: [.font: UIFont.systemFont(ofSize: 15), .foregroundColor: ReadingColors.text]
             )))
         } else {
             views.forEach(stack.addArrangedSubview)
@@ -185,7 +185,7 @@ final class UserProfileReadmeView: UIView, UITextViewDelegate {
         let label = UILabel()
         label.text = text
         label.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
-        label.textColor = .label
+        label.textColor = ReadingColors.text
         label.numberOfLines = 0
 
         let container = UIView()

@@ -58,13 +58,13 @@ final class UserCollectionsViewController: UIViewController {
     }
 
     private func setupUI() {
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = UIColor.systemBackground
         tableNode.dataSource = self
         tableNode.delegate = self
         tableNode.leadingScreensForBatching = 2
         tableNode.view.separatorStyle = .singleLine
         tableNode.view.tableFooterView = footerView
-        tableNode.view.backgroundColor = .systemBackground
+        tableNode.view.backgroundColor = UIColor.systemBackground
         refreshControl.addTarget(self, action: #selector(refreshTriggered), for: .valueChanged)
         tableNode.view.refreshControl = refreshControl
         tableNode.view.translatesAutoresizingMaskIntoConstraints = false

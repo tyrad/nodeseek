@@ -19,7 +19,7 @@ final class PostRepliesDividerCellNode: ASCellNode {
         super.init()
         automaticallyManagesSubnodes = true
         selectionStyle = .none
-        backgroundColor = .systemBackground
+        backgroundColor = UIColor.systemBackground
         dividerNode.backgroundColor = .secondarySystemBackground
     }
 

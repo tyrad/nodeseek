@@ -71,7 +71,7 @@ final class UserProfileViewController: UIViewController {
     // MARK: - 布局
 
     private func setupUI() {
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = UIColor.systemGroupedBackground
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.alwaysBounceVertical = true
@@ -259,7 +259,7 @@ final class UserProfileViewController: UIViewController {
         let nameLabel = UILabel()
         nameLabel.text = profile.name
         nameLabel.font = .systemFont(ofSize: 24, weight: .bold)
-        nameLabel.textColor = .label
+        nameLabel.textColor = ReadingColors.text
         nameLabel.lineBreakMode = .byTruncatingTail
         nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
@@ -637,7 +637,7 @@ private final class UserProfileBadgeLabel: UILabel {
         super.init(frame: .zero)
         self.text = text
         font = .systemFont(ofSize: 11.5, weight: .semibold)
-        textColor = .label
+        textColor = ReadingColors.text
         textAlignment = .center
         layer.cornerRadius = 5
         layer.borderWidth = 1
@@ -685,7 +685,7 @@ private final class UserProfileStatView: UIControl {
 
         valueLabel.text = value
         valueLabel.font = .monospacedDigitSystemFont(ofSize: 20, weight: .bold)
-        valueLabel.textColor = .label
+        valueLabel.textColor = ReadingColors.text
         valueLabel.textAlignment = .center
         valueLabel.adjustsFontSizeToFitWidth = true
         valueLabel.minimumScaleFactor = 0.7
@@ -782,7 +782,7 @@ private final class UserProfileRowView: UIControl {
         let titleLabel = UILabel()
         titleLabel.text = title
         titleLabel.font = .systemFont(ofSize: 16)
-        titleLabel.textColor = .label
+        titleLabel.textColor = ReadingColors.text
 
         let countLabel = UILabel()
         countLabel.text = count.map { "\($0)" }
@@ -861,7 +861,7 @@ final class UserProfileProgressCardView: UIView {
         layer.cornerCurve = .continuous
 
         levelTitleLabel.font = .systemFont(ofSize: 15, weight: .bold)
-        levelTitleLabel.textColor = .label
+        levelTitleLabel.textColor = ReadingColors.text
         levelValueLabel.font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular)
         levelValueLabel.textColor = .secondaryLabel
         levelValueLabel.setContentHuggingPriority(.required, for: .horizontal)
@@ -937,7 +937,7 @@ private final class UserProfileProgressRow: UIStackView {
         let titleLabel = UILabel()
         titleLabel.text = title
         titleLabel.font = .systemFont(ofSize: 15)
-        titleLabel.textColor = .label
+        titleLabel.textColor = ReadingColors.text
 
         valueLabel.font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular)
         valueLabel.textColor = .secondaryLabel
