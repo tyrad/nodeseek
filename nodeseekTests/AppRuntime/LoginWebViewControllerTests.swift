@@ -21,7 +21,7 @@ struct LoginWebViewControllerTests {
         viewController.view.layoutIfNeeded()
 
         let hintContainer = try #require(viewController.view.firstView(accessibilityIdentifier: "login-hint-container"))
-        let hintLabel = try #require(viewController.view.firstLabel(text: "登录成功后关闭当前页面即可"))
+        let hintLabel = try #require(viewController.view.firstLabel(text: "登录成功后将自动关闭"))
         #expect(hintContainer.layer.cornerRadius == 12)
         #expect(hintContainer.frame.minX > 0)
         #expect(hintLabel.numberOfLines == 0)
@@ -31,6 +31,43 @@ struct LoginWebViewControllerTests {
         #expect(closeButton.title == nil)
         #expect(closeButton.image != nil)
         #expect(closeButton.tintColor == .label)
+    }
+
+    @Test func successfulLoginClosesOnlyOnce() async throws {
+        let cookieSession = SpyLoginCookieSession()
+        var closeCount = 0
+        let controller = LoginWebViewController(
+            cookieSession: cookieSession, automaticallyLoadsPage: false, readsAccountOnClose: false
+        ) { closeCount += 1 }
+        controller.loadViewIfNeeded()
+        let html = """
+        <div id="nsk-right-panel-container"><div class="user-card">
+        <a href="/space/31037" class="Username">缭雾</a>
+        </div></div>
+        """
+        await controller.closeIfLoggedIn(html: html)
+        await controller.closeIfLoggedIn(html: html)
+        let button = try #require(controller.navigationItem.rightBarButtonItem)
+        _ = (button.target as AnyObject).perform(try #require(button.action))
+        try await Task.sleep(nanoseconds: 120_000_000)
+        #expect(closeCount == 1)
+        #expect(cookieSession.captureWebViewSessionCount == 1)
+        #expect(button.isEnabled == false)
+    }
+
+    @Test func loggedOutOrChallengePageStaysOpen() async {
+        let cookieSession = SpyLoginCookieSession()
+        var closeCount = 0
+        let controller = LoginWebViewController(
+            cookieSession: cookieSession, automaticallyLoadsPage: false
+        ) { closeCount += 1 }
+        controller.loadViewIfNeeded()
+        for html in ["", "<form>登录失败</form>", "<html>Just a moment...</html>"] {
+            await controller.closeIfLoggedIn(html: html)
+        }
+        #expect(closeCount == 0)
+        #expect(cookieSession.captureWebViewSessionCount == 0)
+        #expect(controller.navigationItem.rightBarButtonItem?.isEnabled == true)
     }
 
     @Test func closeSyncsCookiesAndCallsCompletion() async throws {

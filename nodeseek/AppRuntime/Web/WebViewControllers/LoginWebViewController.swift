@@ -8,6 +8,8 @@ import WebKit
 
 final class LoginWebViewController: BaseWebViewController {
     private let onClose: @MainActor () -> Void
+    private var isClosing = false
+    private var loginDetectionTask: Task<Void, Never>?
     private let readsAccountOnClose: Bool
 
     private let hintContainerView: UIView = {
@@ -33,7 +35,7 @@ final class LoginWebViewController: BaseWebViewController {
 
     private let hintLabel: UILabel = {
         let label = UILabel()
-        label.text = "登录成功后关闭当前页面即可"
+        label.text = "登录成功后将自动关闭"
         label.font = .preferredFont(forTextStyle: .footnote)
         label.textColor = .label
         label.numberOfLines = 0
@@ -109,7 +111,54 @@ final class LoginWebViewController: BaseWebViewController {
         ])
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard !isClosing else { return }
+        loginDetectionTask?.cancel()
+        // 登录后账号区域可能异步出现，因此页面可见期间持续检查。
+        loginDetectionTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                await self?.checkLoginStatus()
+                do {
+                    try await Task.sleep(nanoseconds: 1_000_000_000)
+                } catch { return }
+            }
+        }
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        loginDetectionTask?.cancel()
+        loginDetectionTask = nil
+    }
+
+    private func checkLoginStatus() async {
+        guard !isClosing, !webView.isLoading,
+              let url = webView.url,
+              url.scheme == "https", url.host == NodeSeekSite.baseURL.host,
+              let html = await readCurrentPageHTML() else { return }
+        await closeIfLoggedIn(html: html)
+    }
+
+    func closeIfLoggedIn(html: String) async {
+        guard !isClosing, !Task.isCancelled else { return }
+        let account = await Task.detached(priority: .userInitiated) {
+            try? KannaNodeSeekParser(baseURL: NodeSeekSite.baseURL).parseAccount(html: html)
+        }.value
+        guard !Task.isCancelled, let account, account.isLoggedIn,
+              account.profileURL != nil else { return }
+        close(account: account)
+    }
+
     @objc private func closeTapped() {
+        close(account: nil)
+    }
+
+    private func close(account: AccountResponse?) {
+        guard !isClosing else { return }
+        isClosing = true
+        loginDetectionTask?.cancel()
+        loginDetectionTask = nil
         navigationItem.rightBarButtonItem?.isEnabled = false
         cancelLoad()
         webView.stopLoading()
@@ -119,7 +168,11 @@ final class LoginWebViewController: BaseWebViewController {
         Task { @MainActor [weak self] in
             guard let self else { return }
             await webViewContext.captureWebViewSession()
-            await saveAccountFromCurrentPage()
+            if let account {
+                await CurrentAccountStore.shared.save(account)
+            } else {
+                await saveAccountFromCurrentPage()
+            }
             NotificationCenter.default.post(name: .nodeSeekLoginSessionDidClose, object: nil)
             onClose()
             closeSelf()
