@@ -755,9 +755,9 @@ class PostListViewController: UIViewController {
 }
 
 extension PostListViewController: TabReselectHandling {
-    /// 已在首页时再点“首页”Tab：回到顶部并重新显示发帖按钮。
+    /// 已在首页时再点“首页”Tab：回到顶部、刷新当前分类，并重新显示发帖按钮。
     func handleTabReselect() {
-        pageContainerViewController.scrollToTop(for: selectedCategory, animated: true)
+        pageContainerViewController.refreshFromTabReselect(for: selectedCategory)
         setComposeButtonHidden(false, animated: true)
     }
 }

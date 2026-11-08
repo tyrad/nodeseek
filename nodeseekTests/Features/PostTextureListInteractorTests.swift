@@ -122,6 +122,8 @@ private final class SpyPostTextureListHostView: PostTextureListHostViewProtocol 
     func hideLoadingSkeleton() {}
     func showFirstPageError(message: String) {}
     func hideFirstPageError() {}
+    func showTabRefreshLoading() {}
+    func hideTabRefreshLoading(failureMessage: String?) {}
     func hideRefreshing() {}
     func showLoadingMore() {}
     func hideLoadingMore() {}

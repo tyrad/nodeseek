@@ -104,6 +104,10 @@ final class PostPageContainerViewController: UIPageViewController {
         hostViewControllers[category]?.scrollToTop(animated: animated)
     }
 
+    func refreshFromTabReselect(for category: PostListCategoryItem) {
+        hostViewControllers[category]?.refreshFromTabReselect()
+    }
+
     func refreshVisibleAppearanceForCurrentTraits() {
         hostViewControllers.values.forEach { $0.refreshVisibleAppearanceForCurrentTraits() }
     }

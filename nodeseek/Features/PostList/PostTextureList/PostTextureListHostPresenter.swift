@@ -20,6 +20,8 @@ final class PostTextureListHostPresenter: PostTextureListHostPresenterProtocol {
     private var hasLoadedFirstPage = false
     private var isLoadingFirstPage = false
     private var isRefreshing = false
+    /// 本次刷新由再次点按 Tab 发起，结束时需要收起加载提示。
+    private var isTabReselectRefreshing = false
     private var isLoadingMore = false
 
     init(
@@ -71,6 +73,19 @@ final class PostTextureListHostPresenter: PostTextureListHostPresenterProtocol {
         refreshFirstPage()
     }
 
+    func didRequestTabReselectRefresh() {
+        // 首屏没加载成功时（例如停在错误页）重新走首屏加载，进行中则忽略
+        guard hasLoadedFirstPage else {
+            loadFirstPageIfNeeded()
+            return
+        }
+        // 正在刷新或加载更多时不重复请求，也不震动
+        guard !isRefreshing, !isLoadingFirstPage, !isLoadingMore else { return }
+        isTabReselectRefreshing = true
+        view?.showTabRefreshLoading()
+        refreshFirstPage()
+    }
+
     func didRequestFirstPageRetry() {
         resetAndLoadFirstPage()
     }
@@ -101,6 +116,7 @@ extension PostTextureListHostPresenter: PostTextureListHostInteractorOutput {
         view?.hideLoadingSkeleton()
         view?.hideRefreshing()
         view?.hideLoadingMore()
+        finishTabReselectRefresh(failureMessage: nil)
         delegate?.postTextureListHostDidLoadFirstPage(category: category)
     }
 
@@ -144,6 +160,7 @@ extension PostTextureListHostPresenter: PostTextureListHostInteractorOutput {
         view?.hideLoadingSkeleton()
         view?.hideRefreshing()
         view?.hideLoadingMore()
+        finishTabReselectRefresh(failureMessage: error)
         if items.isEmpty {
             view?.showFirstPageError(message: error)
         }
@@ -159,7 +176,15 @@ extension PostTextureListHostPresenter: PostTextureListHostInteractorOutput {
 }
 
 private extension PostTextureListHostPresenter {
+    func finishTabReselectRefresh(failureMessage: String?) {
+        guard isTabReselectRefreshing else { return }
+        isTabReselectRefreshing = false
+        view?.hideTabRefreshLoading(failureMessage: failureMessage)
+    }
+
     func resetAndLoadFirstPage() {
+        // 切换排序等会丢弃进行中的刷新结果，加载提示要一起收起
+        finishTabReselectRefresh(failureMessage: nil)
         items = []
         loadedIDs = []
         nextPage = 2

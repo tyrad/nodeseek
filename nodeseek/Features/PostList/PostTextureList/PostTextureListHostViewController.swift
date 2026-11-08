@@ -10,6 +10,8 @@ final class PostTextureListHostViewController: UIViewController {
 
     private let presenter: PostTextureListHostPresenterProtocol
     private let listView = PostTextureListView()
+    /// 再次点按 Tab 刷新时弹出的加载提示，刷新结束时收起。
+    private weak var tabRefreshToast: UIView?
 
     var onListScroll: ((UIScrollView) -> Void)? {
         get { listView.onScroll }
@@ -61,6 +63,12 @@ final class PostTextureListHostViewController: UIViewController {
         listView.scrollToTop(animated: animated)
     }
 
+    /// 底部 Tab 再次点按：回到顶部，并在后台静默重新拉第一页。
+    func refreshFromTabReselect() {
+        scrollToTop(animated: true)
+        presenter.didRequestTabReselectRefresh()
+    }
+
     func refreshVisibleAppearanceForCurrentTraits() {
         guard isViewLoaded else { return }
         listView.refreshVisibleAppearanceForCurrentTraits()
@@ -104,6 +112,25 @@ extension PostTextureListHostViewController: PostTextureListHostViewProtocol {
 
     func hideFirstPageError() {
         listView.hideFirstPageError()
+    }
+
+    func showTabRefreshLoading() {
+        listView.playRefreshFeedback()
+        // 时长只是兜底，正常由刷新结束时收起
+        tabRefreshToast = BottomToast.show("正在刷新…", style: .progress, in: view, duration: 15)
+    }
+
+    func hideTabRefreshLoading(failureMessage: String?) {
+        if isViewLoaded {
+            listView.settleAtTopIfIdle()
+        }
+        if let tabRefreshToast {
+            BottomToast.dismiss(tabRefreshToast)
+        }
+        tabRefreshToast = nil
+        // 已切到别的 Tab 时不再弹失败提示，避免出现在不相关的页面上
+        guard let failureMessage, isViewLoaded, view.window != nil else { return }
+        BottomToast.show(failureMessage, style: .failure, in: view)
     }
 
     func hideRefreshing() {

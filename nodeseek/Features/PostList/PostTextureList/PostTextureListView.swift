@@ -39,6 +39,8 @@ final class PostTextureListView: UIView {
     private var layoutCache: [String: PostSummaryLayout] = [:]
     private let layoutQueue = DispatchQueue(label: "com.nodeseek.app.post-list-layout", qos: .userInitiated)
     private var layoutWidth: CGFloat = 0
+    /// 正在执行带动画的回顶，结束时需确认真的贴到了顶部。
+    private var isScrollingToTop = false
 
     private let loadMoreIndicator: UIActivityIndicatorView = {
         let indicator = UIActivityIndicatorView(style: .medium)
@@ -208,12 +210,44 @@ final class PostTextureListView: UIView {
         lastBatchFetchRequestedItemCount = nil
     }
 
+    /// 再次点按 Tab 静默刷新时的轻震。不用代码触发系统转圈：beginRefreshing 会突然改顶部留白，
+    /// 和回顶动画、整表刷新叠在一起会让列表抖动。
+    func playRefreshFeedback() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
     func hideRefreshing() {
         refreshControl.endRefreshing()
     }
 
     func scrollToTop(animated: Bool) {
-        tableView.setContentOffset(.zero, animated: animated)
+        let top = topContentOffset
+        guard animated else {
+            isScrollingToTop = false
+            tableView.setContentOffset(top, animated: false)
+            return
+        }
+        guard tableView.contentOffset.y != top.y else { return }
+        // 离顶部超过一屏时先瞬移到一屏内，动画只走最后一屏：
+        // 长距离动画途经的行会用真实行高替换估算值，UIKit 修正位置后动画会停在半路
+        let viewportHeight = tableView.bounds.height
+        if viewportHeight > 0, tableView.contentOffset.y - top.y > viewportHeight {
+            tableView.setContentOffset(CGPoint(x: 0, y: top.y + viewportHeight), animated: false)
+            tableView.layoutIfNeeded()
+        }
+        isScrollingToTop = true
+        tableView.setContentOffset(top, animated: true)
+    }
+
+    /// 回顶动画途中数据回来会整表刷新，动画可能被打断停在半路；用户没在拖动时再对齐一次顶部。
+    func settleAtTopIfIdle() {
+        guard !tableView.isTracking, !tableView.isDragging, !tableView.isDecelerating else { return }
+        guard tableView.contentOffset.y != topContentOffset.y else { return }
+        scrollToTop(animated: true)
+    }
+
+    private var topContentOffset: CGPoint {
+        CGPoint(x: 0, y: -tableView.adjustedContentInset.top)
     }
 
     func refreshVisibleAppearanceForCurrentTraits() {
@@ -443,6 +477,21 @@ extension PostTextureListView: UITableViewDelegate {
         guard displayMode == .content else { return }
         tableView.deselectRow(at: indexPath, animated: true)
         delegate?.postTextureListView(self, didSelectPostAt: indexPath.row)
+    }
+
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        // 用户自己接管滚动，不再强制贴顶
+        isScrollingToTop = false
+    }
+
+    func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+        guard isScrollingToTop else { return }
+        isScrollingToTop = false
+        // 兜底：行高修正仍可能让动画停在半路，直接贴顶；贴顶后顶部几行实测高度再修正一次，所以最多补两次
+        for _ in 0..<2 where scrollView.contentOffset.y != topContentOffset.y {
+            scrollView.setContentOffset(topContentOffset, animated: false)
+            tableView.layoutIfNeeded()
+        }
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {

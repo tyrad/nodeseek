@@ -28,7 +28,8 @@ enum BottomToast {
 
     static let accessibilityIdentifier = "bottom-toast"
 
-    static func show(_ message: String, style: Style = .success, in sourceView: UIView, duration: TimeInterval = 2) {
+    @discardableResult
+    static func show(_ message: String, style: Style = .success, in sourceView: UIView, duration: TimeInterval = 2) -> UIView {
         // 挂到窗口上，和自动签到提示一样，不会被页面里的列表、导航层级遮住
         let view: UIView = sourceView.window ?? sourceView
         // 连续操作时只保留最新一条
@@ -63,6 +64,19 @@ enum BottomToast {
             } completion: { _ in
                 toast.removeFromSuperview()
             }
+        }
+        return toast
+    }
+
+    /// 提前收起指定提示，用于加载类提示在任务结束时消失。
+    /// 只收自己弹出的那条：页面可能已切走，按窗口找会误收别的页面的提示。
+    static func dismiss(_ toast: UIView) {
+        guard toast.superview != nil else { return }
+        UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseIn, .allowUserInteraction]) {
+            toast.alpha = 0
+            toast.transform = CGAffineTransform(translationX: 0, y: 8)
+        } completion: { _ in
+            toast.removeFromSuperview()
         }
     }
 

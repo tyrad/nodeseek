@@ -12,6 +12,8 @@ protocol PostTextureListHostViewProtocol: AnyObject {
     func hideLoadingSkeleton()
     func showFirstPageError(message: String)
     func hideFirstPageError()
+    func showTabRefreshLoading()
+    func hideTabRefreshLoading(failureMessage: String?)
     func hideRefreshing()
     func showLoadingMore()
     func hideLoadingMore()
@@ -36,6 +38,7 @@ protocol PostTextureListHostPresenterProtocol: AnyObject {
     func reloadFirstPage()
     func didSelectPost(at index: Int)
     func didRequestRefresh()
+    func didRequestTabReselectRefresh()
     func didRequestFirstPageRetry()
     func didApproachBottom(at index: Int, totalCount: Int)
 }
