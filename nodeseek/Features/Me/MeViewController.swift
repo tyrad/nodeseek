@@ -329,8 +329,7 @@ final class MeViewController: UIViewController {
 
     /// 登录状态变化后刷新首页列表（未登录看不到部分分类内容）。
     private func reloadHomeList() {
-        let homeNavigation = tabBarController?.viewControllers?.first as? UINavigationController
-        (homeNavigation?.viewControllers.first as? PostListViewProtocol)?.reloadSelectedCategory()
+        (tabBarController?.viewControllers?.first as? PostListViewProtocol)?.reloadSelectedCategory()
     }
 
     // MARK: - Factory

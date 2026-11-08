@@ -31,12 +31,9 @@ final class AppRouter {
         }
     }
 
-    /// 当前可见的导航栈：多 Tab 模式取选中 Tab 的导航栈。
+    /// 两种布局的根界面都是同一个导航栈；多 Tab 模式下底部 Tab 是它的根页面。
     var navigationController: UINavigationController? {
-        if let tabBarController = rootViewController as? MainTabBarController {
-            return tabBarController.selectedNavigationController
-        }
-        return rootViewController as? UINavigationController
+        rootViewController as? UINavigationController
     }
 
     func makeRootViewController() -> UIViewController {
@@ -45,7 +42,7 @@ final class AppRouter {
         case .reading:
             root = UINavigationController(rootViewController: PostListRouter.createModule())
         case .tabs:
-            root = MainTabBarController()
+            root = UINavigationController(rootViewController: MainTabBarController())
         }
         rootViewController = root
         PushNotificationDeepLink.attach(self)

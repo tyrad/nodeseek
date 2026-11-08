@@ -149,14 +149,20 @@ struct AppNavigationLayoutTests {
         #expect(items[1].badgeValue == nil)
     }
 
-    @Test func tabNavigationHidesTabBarForPushedPages() {
-        let root = UIViewController()
-        let navigationController = TabRootNavigationController(rootViewController: root)
-        let detail = UIViewController()
-        navigationController.pushViewController(detail, animated: false)
+    @Test func tabRootsPushOntoOuterNavigationStack() throws {
+        let tabBarController = MainTabBarController(layoutSettings: makeSettings())
+        let navigationController = UINavigationController(rootViewController: tabBarController)
+        let meRoot = try #require(tabBarController.viewControllers?.last)
+        tabBarController.select(.me)
 
-        #expect(root.hidesBottomBarWhenPushed == false)
-        #expect(detail.hidesBottomBarWhenPushed)
+        // Tab 根页面不再各包一层导航栈，二级页面推到外层，底栏随 Tab 界面一起被推走
+        #expect(meRoot is UINavigationController == false)
+        #expect(meRoot.navigationController === navigationController)
+        meRoot.navigationController?.pushViewController(UIViewController(), animated: false)
+        #expect(navigationController.viewControllers.count == 2)
+        // 外层导航条显示选中 Tab 的标题和按钮
+        #expect(tabBarController.navigationItem.title == "我的")
+        #expect(tabBarController.navigationItem.rightBarButtonItems == meRoot.navigationItem.rightBarButtonItems)
     }
 
     @Test func tabItemsDefaultAndNormalizeStoredValues() throws {
@@ -186,8 +192,7 @@ struct AppNavigationLayoutTests {
     @Test func tabBarFollowsTabItemsAndKeepsExistingStacks() throws {
         let settings = makeSettings()
         let tabBarController = MainTabBarController(layoutSettings: settings)
-        let meNavigation = try #require(tabBarController.viewControllers?.last as? UINavigationController)
-        meNavigation.pushViewController(UIViewController(), animated: false)
+        let meRoot = try #require(tabBarController.viewControllers?.last)
         tabBarController.applyNotificationUnreadCount(NodeSeekNotificationUnreadCount(message: 0, atMe: 0, reply: 2, all: 2))
         tabBarController.select(.me)
 
@@ -195,9 +200,8 @@ struct AppNavigationLayoutTests {
         let titles = tabBarController.viewControllers?.compactMap { $0.tabBarItem.title }
         #expect(titles == ["首页", "最近浏览", "通知", "我的"])
         // “我的”里正在看的页面不被重建，选中项不变
-        #expect(tabBarController.viewControllers?.last === meNavigation)
-        #expect(meNavigation.viewControllers.count == 2)
-        #expect(tabBarController.selectedViewController === meNavigation)
+        #expect(tabBarController.viewControllers?.last === meRoot)
+        #expect(tabBarController.selectedViewController === meRoot)
         #expect(tabBarController.viewControllers?[2].tabBarItem.badgeValue == "2")
 
         settings.setTabItems([.home, .me])

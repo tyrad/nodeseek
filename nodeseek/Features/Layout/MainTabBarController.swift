@@ -11,14 +11,15 @@ protocol TabReselectHandling: AnyObject {
 }
 
 /// 多 Tab 模式的根界面：默认首页 / 通知 / 我的，用户可在设置里增减中间的入口。
+/// 本身放在外层导航栈里：进入二级页面时连同底栏一起被推走，不用 hidesBottomBarWhenPushed 单独收起底栏。
 final class MainTabBarController: UITabBarController, UITabBarControllerDelegate {
     private let layoutSettings: AppNavigationLayoutSettings
     private let visitedStore: VisitedPostStoreProtocol
     private var unreadCountObserver: NSObjectProtocol?
     private var tabItemsObserver: NSObjectProtocol?
     private var latestUnreadCount: NodeSeekNotificationUnreadCount?
-    /// 已建好的 Tab 导航栈，底部栏调整时复用，避免正在看的页面被重建。
-    private var navigationControllersByItem: [MainTabItem: UINavigationController] = [:]
+    /// 已建好的 Tab 根页面，底部栏调整时复用，避免正在看的页面被重建。
+    private var rootViewControllersByItem: [MainTabItem: UIViewController] = [:]
     private(set) var tabItems: [MainTabItem] = []
 
     init(
@@ -54,19 +55,21 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         observeNotificationUnreadCount()
     }
 
-    var selectedNavigationController: UINavigationController? {
-        selectedViewController as? UINavigationController
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        syncNavigationItemWithSelectedTab()
     }
 
     func select(_ item: MainTabItem) {
         guard let index = tabItems.firstIndex(of: item) else { return }
         selectedIndex = index
+        syncNavigationItemWithSelectedTab()
     }
 
     func applyNotificationUnreadCount(_ unreadCount: NodeSeekNotificationUnreadCount) {
         latestUnreadCount = unreadCount
         // 通知 Tab 被关掉时不显示角标
-        guard let item = navigationControllersByItem[.notification]?.tabBarItem else { return }
+        guard let item = rootViewControllersByItem[.notification]?.tabBarItem else { return }
         let count = unreadCount.all
         item.badgeValue = count > 0 ? (count > 99 ? "99+" : "\(count)") : nil
     }
@@ -78,17 +81,18 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         let selectedItem = tabItems.indices.contains(selectedIndex) ? tabItems[selectedIndex] : nil
         tabItems = items
 
-        var reused: [MainTabItem: UINavigationController] = [:]
-        let controllers = items.map { item -> UINavigationController in
-            let navigationController = navigationControllersByItem[item] ?? makeNavigationController(for: item)
-            reused[item] = navigationController
-            return navigationController
+        var reused: [MainTabItem: UIViewController] = [:]
+        let controllers = items.map { item -> UIViewController in
+            let viewController = rootViewControllersByItem[item] ?? makeTabRootViewController(for: item)
+            reused[item] = viewController
+            return viewController
         }
-        navigationControllersByItem = reused
+        rootViewControllersByItem = reused
         setViewControllers(controllers, animated: false)
         if let selectedItem, let index = items.firstIndex(of: selectedItem) {
             selectedIndex = index
         }
+        syncNavigationItemWithSelectedTab()
         if let latestUnreadCount {
             applyNotificationUnreadCount(latestUnreadCount)
         }
@@ -97,26 +101,44 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
     // MARK: - UITabBarControllerDelegate
 
     func tabBarController(_ tabBarController: UITabBarController, shouldSelect viewController: UIViewController) -> Bool {
-        if viewController === selectedViewController,
-           let navigationController = viewController as? UINavigationController,
-           navigationController.viewControllers.count == 1,
-           let root = navigationController.viewControllers.first as? TabReselectHandling {
+        // 底栏只在 Tab 界面位于栈顶时可见，所以不用再判断是否在二级页面
+        if viewController === selectedViewController, let root = viewController as? TabReselectHandling {
             root.handleTabReselect()
         }
         return true
     }
 
+    func tabBarController(_ tabBarController: UITabBarController, didSelect viewController: UIViewController) {
+        syncNavigationItemWithSelectedTab()
+    }
+
     // MARK: - Private
 
-    private func makeNavigationController(for item: MainTabItem) -> UINavigationController {
-        let navigationController = TabRootNavigationController(rootViewController: makeRootViewController(for: item))
-        navigationController.tabBarItem = UITabBarItem(
+    /// 外层导航条显示的是本控制器的 navigationItem；各 Tab 根页面仍按原样配置自己的 navigationItem，
+    /// 切 Tab 时搬过来，页面代码不用区分两种布局。
+    private func syncNavigationItemWithSelectedTab() {
+        guard let selected = selectedViewController else { return }
+        selected.loadViewIfNeeded()
+        let source = selected.navigationItem
+        navigationItem.title = source.title ?? selected.title
+        navigationItem.titleView = source.titleView
+        navigationItem.leftBarButtonItems = source.leftBarButtonItems
+        navigationItem.rightBarButtonItems = source.rightBarButtonItems
+        navigationItem.largeTitleDisplayMode = source.largeTitleDisplayMode
+        navigationItem.backButtonTitle = source.backButtonTitle
+        navigationItem.backBarButtonItem = source.backBarButtonItem
+        navigationItem.backButtonDisplayMode = source.backButtonDisplayMode
+    }
+
+    private func makeTabRootViewController(for item: MainTabItem) -> UIViewController {
+        let viewController = makeRootViewController(for: item)
+        viewController.tabBarItem = UITabBarItem(
             title: item.title,
             image: UIImage(systemName: item.symbolName),
             selectedImage: UIImage(systemName: "\(item.symbolName).fill") ?? UIImage(systemName: item.symbolName)
         )
-        navigationController.tabBarItem.accessibilityIdentifier = item.accessibilityIdentifier
-        return navigationController
+        viewController.tabBarItem.accessibilityIdentifier = item.accessibilityIdentifier
+        return viewController
     }
 
     /// 新加的 Tab 直接复用现有页面，点开帖子时在本 Tab 的导航栈里打开详情。
@@ -184,15 +206,5 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
             guard let unreadCount = NodeSeekNotificationUnreadCountEvent.unreadCount(from: notification) else { return }
             self?.applyNotificationUnreadCount(unreadCount)
         }
-    }
-}
-
-/// Tab 内的导航栈：进入二级页面时隐藏底栏。
-final class TabRootNavigationController: UINavigationController {
-    override func pushViewController(_ viewController: UIViewController, animated: Bool) {
-        if viewControllers.isEmpty == false {
-            viewController.hidesBottomBarWhenPushed = true
-        }
-        super.pushViewController(viewController, animated: animated)
     }
 }
