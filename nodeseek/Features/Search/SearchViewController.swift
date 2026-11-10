@@ -741,9 +741,9 @@ final class SearchViewController: UIViewController {
         loadTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let posts = try await self.loadPosts(page: page, request: request)
+                let searchPage = try await self.loadPosts(page: page, request: request)
                 await MainActor.run {
-                    self.handleLoadedPosts(posts, page: page, request: request, isLoadMore: isLoadMore, isRefresh: isRefresh)
+                    self.handleLoadedPosts(searchPage, page: page, request: request, isLoadMore: isLoadMore, isRefresh: isRefresh)
                 }
             } catch is CancellationError {
                 // 被新请求取消，状态由新请求负责更新。
@@ -756,16 +756,16 @@ final class SearchViewController: UIViewController {
         }
     }
 
-    private func loadPosts(page: Int, request: SearchRequest) async throws -> [PostSummary] {
+    private func loadPosts(page: Int, request: SearchRequest) async throws -> NodeSeekSearchPage {
         let result = try await service.loadSearchResults(
             query: request.query,
             page: page,
             category: request.category
         )
         switch result {
-        case .value(let posts):
+        case .value(let searchPage):
             await sessionStore.recordSuccess()
-            return posts
+            return searchPage
         case .challenge(let challenge):
             let message = await sessionStore.recordChallenge(challenge)
             throw SearchLoadError.challengeRequired(message)
@@ -773,13 +773,14 @@ final class SearchViewController: UIViewController {
     }
 
     private func handleLoadedPosts(
-        _ posts: [PostSummary],
+        _ searchPage: NodeSeekSearchPage,
         page: Int,
         request: SearchRequest,
         isLoadMore: Bool,
         isRefresh: Bool
     ) {
         guard request == activeRequest else { return }
+        let posts = searchPage.posts
         if isLoadMore {
             isLoadingMore = false
             appendPosts(posts, page: page)
@@ -798,6 +799,10 @@ final class SearchViewController: UIViewController {
         listView.hideLoadingSkeleton()
         if isRefresh {
             listView.hideRefreshing()
+        }
+        if posts.isEmpty {
+            // 站点对过短、含违规字符或无结果的搜索只返回一句提示，原样展示给用户
+            listView.showEmptyMessage(searchPage.notice ?? "未找到相关帖子，换个关键词试试")
         }
     }
 

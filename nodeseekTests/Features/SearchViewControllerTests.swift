@@ -175,6 +175,33 @@ struct SearchViewControllerTests {
         #expect(abs(try inputRowTop(in: viewController.view) - initialTop) < 0.5)
     }
 
+    @Test func emptySearchShowsSiteNoticeWithoutRetry() async throws {
+        let html = """
+        <html><body><div id="nsk-body-left"><div style="min-height:300px;"><div> 搜索词太短😭 </div></div><div id="nsk-body-left-block"></div></div></body></html>
+        """
+        let service = NodeSeekService(
+            htmlClient: StaticSearchHTMLClient(html: html),
+            parser: EmptyPostListParser()
+        )
+        let viewController = SearchViewController(
+            service: service,
+            searchHistoryStore: makeSearchHistoryStore(),
+            searchPreferenceStore: makeSearchPreferenceStore()
+        )
+        viewController.loadViewIfNeeded()
+        let keywordTextField = try #require(viewController.view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
+        let messageView = try #require(viewController.view.firstView(accessibilityIdentifier: "post-list-first-page-error"))
+
+        keywordTextField.text = "图"
+        _ = viewController.textFieldShouldReturn(keywordTextField)
+
+        try await waitUntil { !messageView.isHidden }
+        #expect(viewController.view.firstLabel(text: "搜索词太短😭") != nil)
+        #expect(viewController.view.firstButton(accessibilityIdentifier: "post-list-first-page-retry-button")?.isHidden == true)
+        #expect(viewController.view.firstLabel(text: "加载失败")?.isHidden == true)
+        #expect(viewController.presentedViewController == nil)
+    }
+
     @Test func scopeControlSwitchesBetweenPostUserAndGoogle() throws {
         let viewController = SearchViewController(searchHistoryStore: makeSearchHistoryStore())
         viewController.loadViewIfNeeded()
