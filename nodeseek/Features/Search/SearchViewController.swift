@@ -269,6 +269,8 @@ final class SearchViewController: UIViewController {
 
     /// 有结果时历史默认收成一行；每次新搜索都恢复收起。
     private var isHistoryExpanded = false
+    /// 接管侧滑手势前系统原本的代理，离开页面时还回去
+    private weak var originalPopGestureDelegate: UIGestureRecognizerDelegate?
     private var historyTopConstraint: NSLayoutConstraint?
     private var resultsBelowHistoryConstraints: [NSLayoutConstraint] = []
     private var resultsBelowFormConstraints: [NSLayoutConstraint] = []
@@ -356,9 +358,21 @@ final class SearchViewController: UIViewController {
         backButton.isHidden = !canGoBack
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // 导航条隐藏后系统默认不响应左边缘侧滑返回，页面显示期间由本页决定是否放行
+        if let popGesture = navigationController?.interactivePopGestureRecognizer, popGesture.delegate !== self {
+            originalPopGestureDelegate = popGesture.delegate
+            popGesture.delegate = self
+        }
+    }
+
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         navigationController?.setNavigationBarHidden(false, animated: animated)
+        if let popGesture = navigationController?.interactivePopGestureRecognizer, popGesture.delegate === self {
+            popGesture.delegate = originalPopGestureDelegate
+        }
     }
 
     /// 从首页推入或模态弹出时可返回；作为 Tab 根页面时没有上一页。
@@ -851,6 +865,18 @@ final class SearchViewController: UIViewController {
         let alert = UIAlertController(title: "错误", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "确定", style: .default))
         present(alert, animated: true)
+    }
+}
+
+extension SearchViewController: UIGestureRecognizerDelegate {
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard let navigationController, gestureRecognizer === navigationController.interactivePopGestureRecognizer else {
+            return true
+        }
+        // 有上一页且没有正在进行的转场时才允许侧滑，避免 Tab 根页面或转场中误触发
+        return navigationController.viewControllers.count > 1
+            && navigationController.topViewController === self
+            && navigationController.transitionCoordinator == nil
     }
 }
 

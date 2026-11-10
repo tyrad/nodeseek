@@ -345,6 +345,40 @@ struct SearchViewControllerTests {
         #expect(pushedBack.convert(pushedBack.bounds, to: pushedSearch.view).minX < scopeFrame.minX)
     }
 
+    @Test func pushedSearchKeepsSwipeBackWithHiddenNavigationBar() throws {
+        let home = UIViewController()
+        let navigation = UINavigationController(rootViewController: home)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = navigation
+        window.makeKeyAndVisible()
+        let search = SearchViewController(searchHistoryStore: makeSearchHistoryStore())
+        navigation.pushViewController(search, animated: false)
+        window.layoutIfNeeded()
+        search.viewDidAppear(false)
+
+        let popGesture = try #require(navigation.interactivePopGestureRecognizer)
+        let delegate = try #require(popGesture.delegate)
+        #expect(navigation.isNavigationBarHidden)
+        #expect(delegate === search)
+        #expect(delegate.gestureRecognizerShouldBegin?(popGesture) == true)
+
+        // 离开搜索页后交还系统原来的代理
+        search.viewWillDisappear(false)
+        #expect(popGesture.delegate !== search)
+    }
+
+    @Test func rootSearchDoesNotAllowSwipeBack() throws {
+        let search = SearchViewController(searchHistoryStore: makeSearchHistoryStore())
+        let navigation = UINavigationController(rootViewController: search)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = navigation
+        window.makeKeyAndVisible()
+        search.viewDidAppear(false)
+
+        let popGesture = try #require(navigation.interactivePopGestureRecognizer)
+        #expect(popGesture.delegate?.gestureRecognizerShouldBegin?(popGesture) == false)
+    }
+
     @Test func historyStaysVisibleAsCollapsibleRowWhenResultsShown() throws {
         let store = makeSearchHistoryStore()
         ["iOS 开发", "Swift 并发", "美西 CN2", "美国原生 IP", "Kanna 解析", "甲骨文"].forEach { query in
