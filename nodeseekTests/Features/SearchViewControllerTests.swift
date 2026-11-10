@@ -18,7 +18,7 @@ struct SearchViewControllerTests {
         #expect(String(describing: type(of: htmlClient)).contains("WebViewFallbackHTMLClient"))
     }
 
-    @Test func searchControlsUseSingleRowWithCategoryMenu() throws {
+    @Test func searchControlsEmbedCategoryMenuInSearchField() throws {
         let viewController = SearchViewController()
         viewController.loadViewIfNeeded()
         viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
@@ -27,27 +27,27 @@ struct SearchViewControllerTests {
         let categoryButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "search-category-selector-button"))
         let keywordTextField = try #require(viewController.view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
         let searchButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "search-submit-button"))
+        let categoryFrame = categoryButton.convert(categoryButton.bounds, to: viewController.view)
+        let keywordFrame = keywordTextField.convert(keywordTextField.bounds, to: viewController.view)
+        let searchFrame = searchButton.convert(searchButton.bounds, to: viewController.view)
 
         #expect(categoryButton.configuration?.title == "全部")
-        #expect(categoryButton.configuration?.image == nil)
+        #expect(categoryButton.configuration?.image != nil)
         #expect(categoryButton.menu != nil)
         #expect(categoryButton.showsMenuAsPrimaryAction == true)
         #expect(viewController.view.firstButton(title: "日常") == nil)
         let menuTitles = categoryButton.menu?.children.compactMap { ($0 as? UIAction)?.title } ?? []
         #expect(menuTitles.contains("DF") == false)
         #expect(menuTitles.contains("推荐阅读") == false)
-        #expect(abs(categoryButton.frame.midY - keywordTextField.frame.midY) < 1)
-        #expect(abs(searchButton.frame.midY - keywordTextField.frame.midY) < 1)
-        #expect(categoryButton.frame.maxX < keywordTextField.frame.minX)
-        #expect(keywordTextField.frame.maxX < searchButton.frame.minX)
+        #expect(abs(categoryFrame.midY - keywordFrame.midY) < 1)
+        #expect(abs(searchFrame.midY - keywordFrame.midY) < 1)
+        #expect(categoryFrame.maxX < keywordFrame.minX)
+        #expect(keywordFrame.maxX < searchFrame.minX)
         #expect(try inputRowTop(in: viewController.view) < 160)
-        #expect(abs(searchButton.bounds.width - 68) < 0.5)
+        #expect(abs(searchButton.bounds.width - 64) < 0.5)
         #expect(searchButton.configuration?.title == "搜索")
         #expect(searchButton.configuration?.image == nil)
-        #expect(searchButton.configuration?.titleLineBreakMode == .byTruncatingTail)
         #expect(keywordTextField.borderStyle == .none)
-        #expect(keywordTextField.layer.borderWidth >= 1.2)
-        #expect(keywordTextField.layer.borderColor != nil)
     }
 
     @Test func recentSearchesRenderStoredTopTenAndClearButton() throws {
@@ -181,7 +181,7 @@ struct SearchViewControllerTests {
         viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         viewController.view.layoutIfNeeded()
 
-        let scopeControl = try #require(viewController.view.firstView(accessibilityIdentifier: "search-scope-control") as? UISegmentedControl)
+        let scopeControl = try #require(viewController.view.firstView(accessibilityIdentifier: "search-scope-control") as? SearchScopeTabsView)
         let categoryButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "search-category-selector-button"))
         let keywordTextField = try #require(viewController.view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
 
@@ -213,7 +213,7 @@ struct SearchViewControllerTests {
         viewController.loadViewIfNeeded()
         viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         viewController.view.layoutIfNeeded()
-        let scopeControl = try #require(viewController.view.firstView(accessibilityIdentifier: "search-scope-control") as? UISegmentedControl)
+        let scopeControl = try #require(viewController.view.firstView(accessibilityIdentifier: "search-scope-control") as? SearchScopeTabsView)
         let keywordTextField = try #require(viewController.view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
         let searchButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "search-submit-button"))
         let resultsView = try #require(viewController.view.firstView(accessibilityIdentifier: "search-user-results") as? SearchUserResultsView)
@@ -249,7 +249,7 @@ struct SearchViewControllerTests {
             isLoggedIn: { true }
         )
         viewController.loadViewIfNeeded()
-        let scopeControl = try #require(viewController.view.firstView(accessibilityIdentifier: "search-scope-control") as? UISegmentedControl)
+        let scopeControl = try #require(viewController.view.firstView(accessibilityIdentifier: "search-scope-control") as? SearchScopeTabsView)
         let keywordTextField = try #require(viewController.view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
         let resultsView = try #require(viewController.view.firstView(accessibilityIdentifier: "search-user-results") as? SearchUserResultsView)
 
@@ -272,7 +272,7 @@ struct SearchViewControllerTests {
             isLoggedIn: { false }
         )
         viewController.loadViewIfNeeded()
-        let scopeControl = try #require(viewController.view.firstView(accessibilityIdentifier: "search-scope-control") as? UISegmentedControl)
+        let scopeControl = try #require(viewController.view.firstView(accessibilityIdentifier: "search-scope-control") as? SearchScopeTabsView)
         let keywordTextField = try #require(viewController.view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
         let resultsView = try #require(viewController.view.firstView(accessibilityIdentifier: "search-user-results") as? SearchUserResultsView)
 
@@ -283,6 +283,107 @@ struct SearchViewControllerTests {
 
         try await waitUntil { resultsView.state != .loading }
         #expect(resultsView.state == .failed("登录后才能搜索用户"))
+    }
+
+    @Test func searchPageHidesNavigationBarAndShowsBackOnlyWhenPushed() throws {
+        let rootSearch = SearchViewController(searchHistoryStore: makeSearchHistoryStore())
+        let tabNavigation = UINavigationController(rootViewController: rootSearch)
+        let tabWindow = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        tabWindow.rootViewController = tabNavigation
+        tabWindow.makeKeyAndVisible()
+        tabWindow.layoutIfNeeded()
+
+        #expect(tabNavigation.isNavigationBarHidden)
+        let rootBack = try #require(rootSearch.view.firstButton(accessibilityIdentifier: "search-back-button"))
+        #expect(rootBack.isHidden)
+
+        let home = UIViewController()
+        let navigation = UINavigationController(rootViewController: home)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = navigation
+        window.makeKeyAndVisible()
+        let pushedSearch = SearchViewController(searchHistoryStore: makeSearchHistoryStore())
+        navigation.pushViewController(pushedSearch, animated: false)
+        window.layoutIfNeeded()
+
+        #expect(navigation.isNavigationBarHidden)
+        let pushedBack = try #require(pushedSearch.view.firstButton(accessibilityIdentifier: "search-back-button"))
+        #expect(pushedBack.isHidden == false)
+        let scopeControl = try #require(pushedSearch.view.firstView(accessibilityIdentifier: "search-scope-control"))
+        // 类型选择在最上面一行，分类和输入框在第二行
+        let keywordTextField = try #require(pushedSearch.view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
+        let scopeFrame = scopeControl.convert(scopeControl.bounds, to: pushedSearch.view)
+        let keywordFrame = keywordTextField.convert(keywordTextField.bounds, to: pushedSearch.view)
+        #expect(scopeFrame.maxY <= keywordFrame.minY)
+        #expect(pushedBack.convert(pushedBack.bounds, to: pushedSearch.view).minX < scopeFrame.minX)
+    }
+
+    @Test func historyStaysVisibleAsCollapsibleRowWhenResultsShown() throws {
+        let store = makeSearchHistoryStore()
+        ["iOS 开发", "Swift 并发", "美西 CN2", "美国原生 IP", "Kanna 解析", "甲骨文"].forEach { query in
+            store.record(query: query, category: .all)
+        }
+        let service = NodeSeekService(
+            htmlClient: StaticSearchHTMLClient(html: "<html><body></body></html>"),
+            parser: EmptyPostListParser()
+        )
+        let viewController = SearchViewController(
+            service: service,
+            searchHistoryStore: store,
+            searchPreferenceStore: makeSearchPreferenceStore()
+        )
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.view.layoutIfNeeded()
+        let container = try #require(viewController.view.firstView(accessibilityIdentifier: "search-history-container"))
+        let expandButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "search-history-expand-button"))
+        let collapseButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "search-history-collapse-button"))
+        let keywordTextField = try #require(viewController.view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
+        let searchButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "search-submit-button"))
+
+        keywordTextField.text = "美西"
+        searchButton.sendActions(for: .touchUpInside)
+        viewController.view.layoutIfNeeded()
+
+        // 有结果时历史仍然展示，只占一行，放不下时出现展开
+        #expect(container.isHidden == false)
+        #expect(viewController.view.firstLabel(text: "最近搜索")?.superview?.isHidden == true)
+        let visibleChips = viewController.view.allButtons(accessibilityIdentifierPrefix: "search-history-record-button-")
+            .filter { !$0.isHidden }
+        #expect(visibleChips.count < 7)
+        #expect(Set(visibleChips.map { Int($0.frame.midY) }).count == 1)
+        #expect(expandButton.isHidden == false)
+        #expect(collapseButton.isHidden)
+        // 正在搜的「美西」不再出现在历史里，最近一条是「甲骨文」
+        let allChipTitles = viewController.view.allButtons(accessibilityIdentifierPrefix: "search-history-record-button-")
+            .map { $0.configuration?.title }
+        #expect(allChipTitles.contains("美西") == false)
+        #expect(visibleChips.first?.configuration?.title == "甲骨文")
+        #expect(visibleChips.first?.accessibilityLabel == "甲骨文")
+
+        expandButton.sendActions(for: .touchUpInside)
+        viewController.view.layoutIfNeeded()
+        let expandedChips = viewController.view.allButtons(accessibilityIdentifierPrefix: "search-history-record-button-")
+        #expect(expandedChips.allSatisfy { !$0.isHidden })
+        #expect(Set(expandedChips.map { Int($0.frame.midY) }).count > 1)
+        #expect(collapseButton.isHidden == false)
+        #expect(expandButton.isHidden)
+
+        // 新的搜索恢复为收起
+        keywordTextField.text = "甲骨文"
+        searchButton.sendActions(for: .touchUpInside)
+        viewController.view.layoutIfNeeded()
+        #expect(collapseButton.isHidden)
+
+        // 清空输入框后回到初始状态，刚搜过的词重新出现在完整历史里
+        keywordTextField.text = ""
+        keywordTextField.sendActions(for: .editingChanged)
+        viewController.view.layoutIfNeeded()
+        let resetChips = viewController.view.allButtons(accessibilityIdentifierPrefix: "search-history-record-button-")
+        #expect(resetChips.first?.configuration?.title == "甲骨文")
+        #expect(resetChips.allSatisfy { !$0.isHidden })
+        #expect(viewController.view.firstLabel(text: "最近搜索")?.superview?.isHidden == false)
+        #expect(expandButton.isHidden)
     }
 
     @Test func googleSearchURLLimitsToNodeSeekSite() throws {
@@ -463,8 +564,10 @@ private extension UIView {
 }
 
 private func inputRowTop(in view: UIView) throws -> CGFloat {
-    let categoryButton = try #require(view.firstButton(accessibilityIdentifier: "search-category-selector-button"))
     let keywordTextField = try #require(view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
     let searchButton = try #require(view.firstButton(accessibilityIdentifier: "search-submit-button"))
-    return min(categoryButton.frame.minY, keywordTextField.frame.minY, searchButton.frame.minY)
+    return min(
+        keywordTextField.convert(keywordTextField.bounds, to: view).minY,
+        searchButton.convert(searchButton.bounds, to: view).minY
+    )
 }
