@@ -100,6 +100,10 @@ class PostListRouter: PostListRouterProtocol {
         show(SearchViewController())
     }
 
+    func navigateToProbeMonitor() {
+        show(ProbeMonitorViewController())
+    }
+
     func navigateToPostCategoryPreferences() {
         show(PostCategoryPreferencesViewController())
     }

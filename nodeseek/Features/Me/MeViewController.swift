@@ -5,7 +5,7 @@
 
 import UIKit
 
-/// 多 Tab 模式的“我的”页：资料卡（账号 + 五格数字 + 升级进度）、我的内容、签到与最近浏览，设置在右上角。
+/// 多 Tab 模式的“我的”页：资料卡（账号 + 五格数字 + 升级进度）、我的内容、签到与最近浏览、探针，设置在右上角。
 final class MeViewController: UIViewController {
     private enum Layout {
         static let horizontalInset: CGFloat = 16
@@ -35,6 +35,7 @@ final class MeViewController: UIViewController {
     private let collectionsRow = MeListRowView(symbolName: "bookmark", title: "我的收藏")
     private let checkInRow = MeListRowView(symbolName: "checkmark.seal", title: "每日签到")
     private let recentRow = MeListRowView(symbolName: "clock.arrow.circlepath", title: "最近浏览")
+    private let probeRow = MeListRowView(symbolName: "server.rack", title: "探针")
 
     init(
         accountController: PostListSideMenuAccountController? = nil,
@@ -90,7 +91,7 @@ final class MeViewController: UIViewController {
 
     @objc private func appTextSizeDidChange() {
         profileCard.updateTextSize()
-        [discussionsRow, commentsRow, collectionsRow, recentRow].forEach { $0.updateTextSize() }
+        [discussionsRow, commentsRow, collectionsRow, recentRow, probeRow].forEach { $0.updateTextSize() }
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -138,6 +139,10 @@ final class MeViewController: UIViewController {
         contentStack.setCustomSpacing(7, after: contentHeader)
         contentStack.addArrangedSubview(Self.makeGroup([discussionsRow, commentsRow, collectionsRow]))
         contentStack.addArrangedSubview(Self.makeGroup([checkInRow, recentRow]))
+        let probeHeader = Self.makeSectionHeader("探针")
+        contentStack.addArrangedSubview(probeHeader)
+        contentStack.setCustomSpacing(7, after: probeHeader)
+        contentStack.addArrangedSubview(Self.makeGroup([probeRow]))
 
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -160,11 +165,13 @@ final class MeViewController: UIViewController {
         collectionsRow.addTarget(self, action: #selector(collectionsTapped), for: .touchUpInside)
         checkInRow.addTarget(self, action: #selector(checkInTapped), for: .touchUpInside)
         recentRow.addTarget(self, action: #selector(recentTapped), for: .touchUpInside)
+        probeRow.addTarget(self, action: #selector(probeTapped), for: .touchUpInside)
         discussionsRow.accessibilityIdentifier = "me-discussions-row"
         commentsRow.accessibilityIdentifier = "me-comments-row"
         collectionsRow.accessibilityIdentifier = "me-collections-row"
         checkInRow.accessibilityIdentifier = "me-check-in-row"
         recentRow.accessibilityIdentifier = "me-recent-row"
+        probeRow.accessibilityIdentifier = "me-probe-row"
     }
 
     // MARK: - Data
@@ -287,6 +294,10 @@ final class MeViewController: UIViewController {
 
     @objc private func recentTapped() {
         router.navigateToRecentVisitedPosts(visitedStore: visitedStore)
+    }
+
+    @objc private func probeTapped() {
+        router.navigateToProbeMonitor()
     }
 
     /// 未登录时转去登录，返回是否可继续。

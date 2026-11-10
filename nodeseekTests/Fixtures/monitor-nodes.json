@@ -1,0 +1,66 @@
+{
+  "nodes": [
+    {
+      "id": 7,
+      "name": "SG-01",
+      "sort": 1,
+      "public": true,
+      "online": true,
+      "country": "SG",
+      "group": "亚太",
+      "last_seen": 1794291129,
+      "os": "debian",
+      "cpu_cores": 4,
+      "mem_total": 4115853312,
+      "disk_total": 32061511680,
+      "metrics": {
+        "uptime": 3600,
+        "cpu": 12.5,
+        "load": [0.4, 0.2, 0.1],
+        "mem_total": 4115853312,
+        "mem_used": 437231616,
+        "swap_total": 0,
+        "swap_used": 0,
+        "disk_total": 32061511680,
+        "disk_used": 10000000000,
+        "net_rx": 58369,
+        "net_tx": 64639,
+        "total_rx": 1000,
+        "total_tx": 2000,
+        "tcp": 10,
+        "udp": 2,
+        "procs": 132
+      }
+    },
+    {
+      "id": 8,
+      "name": "HK-01",
+      "sort": 2,
+      "public": true,
+      "online": false,
+      "country": "",
+      "group": "",
+      "last_seen": 1794290000,
+      "os": "ubuntu",
+      "cpu_cores": 2,
+      "mem_total": 1024,
+      "disk_total": 2048,
+      "metrics": null
+    },
+    {
+      "id": 9,
+      "name": "刚连上",
+      "sort": 0,
+      "public": true,
+      "online": true,
+      "country": "JP",
+      "group": "亚太",
+      "last_seen": 1794291120,
+      "os": "linux",
+      "cpu_cores": 1,
+      "mem_total": 512,
+      "disk_total": 1024,
+      "metrics": null
+    }
+  ]
+}

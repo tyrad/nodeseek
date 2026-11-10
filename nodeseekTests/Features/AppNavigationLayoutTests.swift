@@ -115,11 +115,22 @@ struct AppNavigationLayoutTests {
 
         let loginButton = try #require(view.layoutTestButton(identifier: "me-login-button"))
         #expect(loginButton.isHidden == false)
-        for identifier in ["me-discussions-row", "me-comments-row", "me-collections-row", "me-check-in-row", "me-recent-row"] {
+        for identifier in ["me-discussions-row", "me-comments-row", "me-collections-row", "me-check-in-row", "me-recent-row", "me-probe-row"] {
             #expect(view.layoutTestView(identifier: identifier) != nil)
         }
+        #expect(view.layoutTestView(identifier: "me-probe-row")?.accessibilityLabel == "探针")
         // 未签到 / 未登录时签到行显示“签到”胶囊
         #expect(view.layoutTestView(identifier: "me-check-in-row")?.accessibilityLabel == "每日签到，签到")
+    }
+
+    @Test func meProbeRowOpensProbeList() throws {
+        let me = MeViewController()
+        let navigation = UINavigationController(rootViewController: me)
+        me.loadViewIfNeeded()
+        let row = try #require(me.view.layoutTestView(identifier: "me-probe-row") as? UIControl)
+        row.sendActions(for: .touchUpInside)
+        #expect(navigation.viewControllers.last is ProbeMonitorViewController)
+        #expect(navigation.viewControllers.last?.title == "探针")
     }
 
     @Test func meProfileCardHandlesTapsAnywhereExceptLoginButton() throws {

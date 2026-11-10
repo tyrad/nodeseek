@@ -1,0 +1,30 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "client": "11111111-1111-4111-8111-111111111111",
+    "time": "2026-11-10T06:12:09.212439514Z",
+    "cpu": 0.7512521,
+    "gpu": 0,
+    "ram": 437231616,
+    "ram_total": 4115853312,
+    "swap": 0,
+    "swap_total": 0,
+    "load": 0.02,
+    "load5": 0.02,
+    "load15": 0,
+    "temp": 0,
+    "disk": 9018852864,
+    "disk_total": 32061511680,
+    "net_in": 58369,
+    "net_out": 64639,
+    "net_total_up": 354386652918,
+    "net_total_down": 374923527957,
+    "process": 132,
+    "connections": 369,
+    "connections_udp": 4,
+    "online": true,
+    "uptime": 5680265,
+    "ping": {}
+  }
+}

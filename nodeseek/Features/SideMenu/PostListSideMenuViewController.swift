@@ -21,6 +21,7 @@ final class PostListSideMenuViewController: UIViewController {
     var onUserCommentsTapped: (() -> Void)?
     var onUserCollectionsTapped: (() -> Void)?
     var onSearchTapped: (() -> Void)?
+    var onProbeTapped: (() -> Void)?
     var onSettingsTapped: (() -> Void)?
     private let accountController: PostListSideMenuAccountController
     private let notificationClient: NodeSeekNotificationClientProtocol
@@ -138,6 +139,12 @@ final class PostListSideMenuViewController: UIViewController {
     private let settingsButton: UIButton = {
         let button = PostListSideMenuViewController.makeMenuButton(title: "设置", systemImageName: "gearshape")
         button.accessibilityIdentifier = "post-list-side-menu-settings-button"
+        return button
+    }()
+
+    private let probeButton: UIButton = {
+        let button = PostListSideMenuViewController.makeMenuButton(title: "探针", systemImageName: "server.rack")
+        button.accessibilityIdentifier = "post-list-side-menu-probe-button"
         return button
     }()
 
@@ -342,6 +349,7 @@ final class PostListSideMenuViewController: UIViewController {
         checkInButton.addTarget(self, action: #selector(checkInButtonTapped), for: .touchUpInside)
         notificationButton.addTarget(self, action: #selector(notificationButtonTapped), for: .touchUpInside)
         recentVisitedButton.addTarget(self, action: #selector(recentVisitedButtonTapped), for: .touchUpInside)
+        probeButton.addTarget(self, action: #selector(probeButtonTapped), for: .touchUpInside)
         searchButton.addTarget(self, action: #selector(searchButtonTapped), for: .touchUpInside)
         postsEntryButton.addTarget(self, action: #selector(postsEntryButtonTapped), for: .touchUpInside)
         commentsEntryButton.addTarget(self, action: #selector(commentsEntryButtonTapped), for: .touchUpInside)
@@ -362,6 +370,7 @@ final class PostListSideMenuViewController: UIViewController {
         sideMenuView.addSubview(notificationButton)
         sideMenuView.addSubview(searchButton)
         sideMenuView.addSubview(recentVisitedButton)
+        sideMenuView.addSubview(probeButton)
         sideMenuView.addSubview(settingsButton)
 
         let sideMenuLeadingConstraint = sideMenuView.leadingAnchor.constraint(
@@ -412,9 +421,14 @@ final class PostListSideMenuViewController: UIViewController {
             settingsButton.bottomAnchor.constraint(equalTo: sideMenuView.safeAreaLayoutGuide.bottomAnchor, constant: -18),
             settingsButton.heightAnchor.constraint(equalToConstant: 48),
 
+            probeButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
+            probeButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
+            probeButton.bottomAnchor.constraint(equalTo: settingsButton.topAnchor, constant: -8),
+            probeButton.heightAnchor.constraint(equalToConstant: 48),
+
             recentVisitedButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
             recentVisitedButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
-            recentVisitedButton.bottomAnchor.constraint(equalTo: settingsButton.topAnchor, constant: -8),
+            recentVisitedButton.bottomAnchor.constraint(equalTo: probeButton.topAnchor, constant: -8),
             recentVisitedButton.heightAnchor.constraint(equalToConstant: 48),
 
             searchButton.leadingAnchor.constraint(equalTo: sideMenuView.leadingAnchor, constant: SideMenuLayout.horizontalInset),
@@ -504,6 +518,11 @@ final class PostListSideMenuViewController: UIViewController {
     @objc private func recentVisitedButtonTapped() {
         hide(animated: true)
         onRecentVisitedTapped?()
+    }
+
+    @objc private func probeButtonTapped() {
+        hide(animated: true)
+        onProbeTapped?()
     }
 
     @objc private func searchButtonTapped() {

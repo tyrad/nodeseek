@@ -1,0 +1,67 @@
+{
+  "id": "komari",
+  "name": "Komari",
+  "specVersion": 1,
+  "summary": "读取面板的公开数据，不需要账号密码。",
+  "auth": { "type": "none" },
+  "requests": {
+    "version": { "method": "GET", "path": "/api/version" },
+    "public":  { "method": "GET", "path": "/api/public" },
+    "nodes":   { "method": "GET", "path": "/api/nodes" },
+    "latest":  {
+      "method": "POST", "path": "/api/rpc2",
+      "body": { "jsonrpc": "2.0", "method": "common:getNodesLatestStatus", "id": 1 }
+    },
+    "history": {
+      "method": "GET", "path": "/api/records/load",
+      "query": { "uuid": "{nodeID}", "hours": "{hours}" }
+    }
+  },
+  "version": { "request": "version", "path": "$.data.version" },
+  "preflight": [
+    { "request": "public", "path": "$.data.private_site", "equals": true, "error": "privateSite" }
+  ],
+  "nodes": {
+    "request": "nodes",
+    "items": "$.data[*]",
+    "fields": {
+      "id": "$.uuid", "name": "$.name", "region": "$.region", "group": "$.group",
+      "os": "$.os", "cpuCores": "$.cpu_cores", "memTotal": "$.mem_total",
+      "diskTotal": "$.disk_total", "weight": "$.weight"
+    }
+  },
+  "status": {
+    "request": "latest",
+    "items": "$.result.*",
+    "online": { "type": "bool", "path": "$.online" },
+    "fields": {
+      "id": "$.client",
+      "sampledAt": { "path": "$.time", "format": "iso8601" },
+      "cpu": "$.cpu",
+      "memUsed": "$.ram", "memTotal": "$.ram_total",
+      "diskUsed": "$.disk", "diskTotal": "$.disk_total",
+      "swapUsed": "$.swap", "swapTotal": "$.swap_total",
+      "netIn": "$.net_in", "netOut": "$.net_out",
+      "netTotalIn": "$.net_total_down", "netTotalOut": "$.net_total_up",
+      "load1": "$.load", "load5": "$.load5", "load15": "$.load15",
+      "uptime": "$.uptime", "processCount": "$.process", "connectionCount": "$.connections"
+    }
+  },
+  "history": {
+    "request": "history",
+    "items": "$.data.records[*]",
+    "fields": {
+      "time": { "path": "$.time", "format": "iso8601" },
+      "cpu": "$.cpu",
+      "memUsed": "$.ram",
+      "diskUsed": "$.disk", "diskTotal": "$.disk_total",
+      "netIn": "$.net_in", "netOut": "$.net_out"
+    }
+  },
+  "errors": [
+    { "status": 401, "bodyContains": "Private site", "error": "privateSite" },
+    { "path": "$.error.code", "equals": -32602, "error": "nodeNotFound" },
+    { "path": "$.error.code", "equals": -32601, "error": "unsupported" },
+    { "path": "$.error.code", "equals": -32041, "error": "unauthorized" }
+  ]
+}

@@ -467,6 +467,7 @@ struct PostListViewControllerTests {
         let notificationButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-notification-button"))
         let searchButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-search-button"))
         let recentVisitedButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-recent-visited-button"))
+        let probeButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-probe-button"))
         let settingsButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-settings-button"))
         let sideMenuHost = viewController.children.first {
             $0.view.firstView(accessibilityIdentifier: "post-list-side-menu") != nil
@@ -497,6 +498,8 @@ struct PostListViewControllerTests {
         #expect(searchButton.configuration?.image != nil)
         #expect(recentVisitedButton.configuration?.title == "最近浏览")
         #expect(recentVisitedButton.configuration?.image != nil)
+        #expect(probeButton.configuration?.title == "探针")
+        #expect(probeButton.configuration?.image != nil)
         #expect(settingsButton.configuration?.title == "设置")
         #expect(settingsButton.configuration?.image != nil)
 
@@ -510,7 +513,8 @@ struct PostListViewControllerTests {
         #expect(backdrop.isHidden == false)
         #expect(backdrop.alpha == 1)
         #expect(accountHeaderButton.frame.contains(avatar.frame))
-        #expect(recentVisitedButton.frame.maxY < settingsButton.frame.minY)
+        #expect(recentVisitedButton.frame.maxY < probeButton.frame.minY)
+        #expect(probeButton.frame.maxY < settingsButton.frame.minY)
         #expect(searchButton.frame.maxY < recentVisitedButton.frame.minY)
         #expect(notificationButton.frame.maxY < searchButton.frame.minY)
         #expect(checkInButton.frame.maxY < notificationButton.frame.minY)
@@ -569,6 +573,16 @@ struct PostListViewControllerTests {
         #expect(presenter.didTapSettingsCount == 1)
         #expect(sideMenu.frame.maxX <= 0.5)
         #expect(backdrop.isHidden == true)
+
+        UIView.setAnimationsEnabled(false)
+        menuButton.sendActions(for: .touchUpInside)
+        viewController.view.layoutIfNeeded()
+        probeButton.sendActions(for: .touchUpInside)
+        viewController.view.layoutIfNeeded()
+        UIView.setAnimationsEnabled(animationsWereEnabled)
+
+        #expect(presenter.didTapProbeCount == 1)
+        #expect(sideMenu.frame.maxX <= 0.5)
 
         UIView.setAnimationsEnabled(false)
         menuButton.sendActions(for: .touchUpInside)
@@ -996,6 +1010,7 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
     private(set) var didTapUserCollectionsCount = 0
     private(set) var notificationURLs: [URL] = []
     private(set) var didTapSettingsCount = 0
+    private(set) var didTapProbeCount = 0
     private(set) var didTapCategoryPreferencesCount = 0
     private(set) var accountProfileURLs: [URL] = []
     private(set) var didTapLogFileCount = 0
@@ -1046,6 +1061,10 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
 
     func didTapSettings() {
         didTapSettingsCount += 1
+    }
+
+    func didTapProbe() {
+        didTapProbeCount += 1
     }
 
     func didTapCategoryPreferences() {
