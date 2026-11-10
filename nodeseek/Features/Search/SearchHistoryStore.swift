@@ -49,15 +49,6 @@ struct SearchHistoryRecord: Codable, Equatable, Sendable {
         guard scope == .post else { return scope.title }
         return category == .all ? nil : category.title
     }
-
-    var displayTitle: String {
-        switch scope {
-        case .post:
-            return category == .all ? query : "\(category.title) · \(query)"
-        case .user, .google:
-            return "\(scope.title) · \(query)"
-        }
-    }
 }
 
 final class SearchHistoryStore {

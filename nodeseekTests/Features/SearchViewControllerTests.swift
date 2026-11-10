@@ -405,7 +405,8 @@ struct SearchViewControllerTests {
         store.record(query: "酒神", category: .tech, scope: .user)
         store.record(query: "ns", category: .all, scope: .google)
         store.record(query: "酒神", category: .all, scope: .post)
-        #expect(store.records().map(\.displayTitle) == ["酒神", "谷歌 · ns", "用户 · 酒神", "技术 · 美西"])
+        #expect(store.records().map(\.query) == ["酒神", "ns", "酒神", "美西"])
+        #expect(store.records().map(\.tagTitle) == [nil, "谷歌", "用户", "技术"])
     }
 }
 
