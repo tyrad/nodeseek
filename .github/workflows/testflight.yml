@@ -14,6 +14,11 @@ on:
         description: "Optional TestFlight What to Test text. Falls back to the app-store environment variable."
         required: false
         type: string
+      force_profile_refresh:
+        description: "Regenerate App Store provisioning profiles, e.g. after adding a capability such as App Groups."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -122,6 +127,7 @@ jobs:
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           MATCH_GIT_PRIVATE_KEY: ${{ secrets.MATCH_GIT_PRIVATE_KEY }}
+          FORCE_PROFILE_REFRESH: ${{ inputs.force_profile_refresh && 'true' || 'false' }}
           TESTFLIGHT_GROUPS: ${{ vars.TESTFLIGHT_GROUPS || '' }}
           TESTFLIGHT_CHANGELOG: ${{ inputs.changelog || vars.TESTFLIGHT_CHANGELOG || 'Please test browsing discussion lists, opening post details, signing in with a NodeSeek account, replying to posts, loading images, viewing user information, and general navigation stability.' }}
           TESTFLIGHT_DISTRIBUTE_EXTERNAL: ${{ vars.TESTFLIGHT_DISTRIBUTE_EXTERNAL || 'false' }}
