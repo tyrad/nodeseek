@@ -227,6 +227,13 @@ final class ProbeMonitorViewModel {
     }
 
     func entry(id: String) -> ProbeListEntry? {
+    /// 删掉本机的探针配置和缓存。存储变更会通知列表页切到剩下的第一张。
+    func deleteInstance(id: UUID) async {
+        guard store.instance(id: id) != nil else { return }
+        store.remove(id: id)
+        await service.forget(instanceID: id)
+    }
+
         entries.first { $0.id == id }
     }
 

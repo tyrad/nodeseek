@@ -23,7 +23,8 @@ final class ProbeMonitorViewModelTests: XCTestCase {
         }
 
         func history(for instance: ProbeInstance, nodeID: String, hours: Int) async throws -> [ProbeHistoryPoint] { [] }
-        func forget(instanceID: UUID) async {}
+        var forgottenIDs: [UUID] = []
+        func forget(instanceID: UUID) async { forgottenIDs.append(instanceID) }
     }
 
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -275,6 +276,63 @@ final class ProbeMonitorViewModelTests: XCTestCase {
         XCTAssertEqual(title?.textColor, .label)
     }
 
+    func testDeleteInstanceRemovesConfigAndSnapshot() async {
+        let store = makeStore()
+        let home = ProbeInstance(name: "家里", baseURL: URL(string: "https://home.example")!, adapterID: "komari")
+        store.upsert(home)
+        store.saveSnapshot(snapshot(at: now), for: home.id)
+        let service = StubService(result: .success(snapshot(at: now)))
+        let viewModel = ProbeMonitorViewModel(store: store, service: service, now: { self.now })
+
+        await viewModel.deleteInstance(id: home.id)
+
+        XCTAssertNil(store.instance(id: home.id))
+        XCTAssertNil(store.snapshot(for: home.id))
+        XCTAssertEqual(service.forgottenIDs, [home.id])
+        viewModel.reloadInstances()
+        XCTAssertNil(viewModel.selectedInstanceID)
+        XCTAssertTrue(viewModel.cards.isEmpty)
+    }
+
+    func testManageMenusOfferEditAndDelete() throws {
+        let store = makeStore()
+        let home = ProbeInstance(name: "家里", baseURL: URL(string: "https://home.example")!, adapterID: "komari")
+        let room = ProbeInstance(name: "机房", baseURL: URL(string: "https://room.example")!, adapterID: "monitor")
+        store.upsert(home)
+        store.upsert(room)
+        store.saveSnapshot(snapshot(at: now), for: home.id)
+        let viewModel = ProbeMonitorViewModel(store: store, service: StubService(result: .success(snapshot(at: now))), now: { self.now })
+        let controller = ProbeMonitorViewController(viewModel: viewModel)
+        controller.loadViewIfNeeded()
+
+        XCTAssertNil(controller.navigationItem.rightBarButtonItems?.first { $0.accessibilityIdentifier == "probe-add" })
+        let more = try XCTUnwrap(controller.navigationItem.rightBarButtonItems?.first { $0.accessibilityIdentifier == "probe-more-menu" })
+        XCTAssertEqual(more.accessibilityLabel, "更多")
+        let actions = menuActions(more.menu)
+        XCTAssertEqual(actions.prefix(3).map(\.title), ["添加探针", "编辑当前探针", "删除当前探针"])
+        XCTAssertTrue(actions.first { $0.title == "删除当前探针" }?.attributes.contains(.destructive) ?? false)
+
+        let table = try XCTUnwrap(controller.view.view(matchingIdentifier: "probe-monitor-table") as? UITableView)
+        let header = try XCTUnwrap(controller.tableView(table, viewForHeaderInSection: 0) as? ProbeSectionHeaderView)
+        let headerActions = menuActions(header.menuButton.menu)
+        XCTAssertEqual(headerActions.map(\.title), ["编辑探针", "删除探针"])
+        XCTAssertTrue(headerActions.last?.attributes.contains(.destructive) ?? false)
+
+        let carousel = try XCTUnwrap(controller.view.view(matchingIdentifier: "probe-hero-carousel")?.superview as? ProbeHeroCarouselView)
+        XCTAssertEqual(carousel.contextMenu(at: 0)?.children.compactMap { $0 as? UIAction }.map(\.title), ["编辑当前探针", "删除当前探针"])
+        // 旁边那张还没选中，长按不出菜单。
+        XCTAssertNil(carousel.contextMenu(at: 1))
+    }
+
+    private func menuActions(_ menu: UIMenu?) -> [UIAction] {
+        guard let menu else { return [] }
+        return menu.children.flatMap { element -> [UIAction] in
+            if let action = element as? UIAction { return [action] }
+            if let nested = element as? UIMenu { return menuActions(nested) }
+            return []
+        }
+    }
+
     func testFilterRowCarriesSortMenu() {
         let chips = ProbeFilterChipsView(frame: CGRect(x: 0, y: 0, width: 370, height: 32))
         var picked: ProbeListSort?
@@ -324,46 +382,6 @@ final class ProbeMonitorViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.usesCompactList)
     }
 
-    private func makeStore() -> ProbeInstanceStore {
-        let suite = "probe-tests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
-        addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
-        return ProbeInstanceStore(defaults: defaults)
-    }
-
-    private func sampleEntry(instance: UUID, name: String, online: Bool, cpu: Double?, net: Int64) -> ProbeListEntry {
-        let node = ProbeNode(id: name, name: name, region: nil, group: nil, os: nil, cpuCores: 2, memTotal: 100, diskTotal: 100, weight: 0)
-        let metrics = ProbeMetrics(cpuPercent: cpu, memUsed: 10, memTotal: 100, netInRate: net, netOutRate: net)
-        let status = ProbeStatus(nodeID: name, online: online, sampledAt: nil, metrics: metrics)
-        return ProbeListEntry(instanceID: instance, instanceName: "probe", server: ProbeServer(node: node, status: status),
-                              displayName: name, isStale: false, panelIndex: 0)
-    }
-
-    private func snapshot(at date: Date, ids: [String] = ["a", "b", "c"], online: Bool = true, netIn: Int64? = nil, netOut: Int64? = nil) -> ProbeSnapshot {
-        let nodes = ids.enumerated().map { index, id in
-            ProbeNode(id: id, name: id, region: nil, group: nil, os: nil, cpuCores: 2, memTotal: 100, diskTotal: 100, weight: index)
-        }
-        let statuses = Dictionary(uniqueKeysWithValues: nodes.map { node in
-            (node.id, ProbeStatus(nodeID: node.id, online: online, sampledAt: date,
-                                  metrics: ProbeMetrics(cpuPercent: 95, memUsed: 10, memTotal: 100, netInRate: netIn, netOutRate: netOut)))
-        })
-        return ProbeSnapshot(nodes: nodes, statuses: statuses, fetchedAt: date)
-    }
-}
-
-private extension UIView {
-    func view(matchingIdentifier identifier: String) -> UIView? {
-        if accessibilityIdentifier == identifier { return self }
-        for subview in subviews {
-            if let match = subview.view(matchingIdentifier: identifier) { return match }
-        }
-        return nil
-    }
-}
-
-private extension UIView {
-    var allSubviews: [UIView] { subviews + subviews.flatMap(\.allSubviews) }
-}
     private final class FakeLocator: ProbeLocating {
         var authorization: ProbeLocationAuthorization
         var lastCoordinate: CLLocationCoordinate2D?
@@ -436,3 +454,43 @@ private extension UIView {
         XCTAssertEqual(alert.actions.map(\.title), ["取消", "去设置"])
     }
 
+    private func makeStore() -> ProbeInstanceStore {
+        let suite = "probe-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
+        return ProbeInstanceStore(defaults: defaults)
+    }
+
+    private func sampleEntry(instance: UUID, name: String, online: Bool, cpu: Double?, net: Int64) -> ProbeListEntry {
+        let node = ProbeNode(id: name, name: name, region: nil, group: nil, os: nil, cpuCores: 2, memTotal: 100, diskTotal: 100, weight: 0)
+        let metrics = ProbeMetrics(cpuPercent: cpu, memUsed: 10, memTotal: 100, netInRate: net, netOutRate: net)
+        let status = ProbeStatus(nodeID: name, online: online, sampledAt: nil, metrics: metrics)
+        return ProbeListEntry(instanceID: instance, instanceName: "probe", server: ProbeServer(node: node, status: status),
+                              displayName: name, isStale: false, panelIndex: 0)
+    }
+
+    private func snapshot(at date: Date, ids: [String] = ["a", "b", "c"], online: Bool = true, netIn: Int64? = nil, netOut: Int64? = nil) -> ProbeSnapshot {
+        let nodes = ids.enumerated().map { index, id in
+            ProbeNode(id: id, name: id, region: nil, group: nil, os: nil, cpuCores: 2, memTotal: 100, diskTotal: 100, weight: index)
+        }
+        let statuses = Dictionary(uniqueKeysWithValues: nodes.map { node in
+            (node.id, ProbeStatus(nodeID: node.id, online: online, sampledAt: date,
+                                  metrics: ProbeMetrics(cpuPercent: 95, memUsed: 10, memTotal: 100, netInRate: netIn, netOutRate: netOut)))
+        })
+        return ProbeSnapshot(nodes: nodes, statuses: statuses, fetchedAt: date)
+    }
+}
+
+private extension UIView {
+    func view(matchingIdentifier identifier: String) -> UIView? {
+        if accessibilityIdentifier == identifier { return self }
+        for subview in subviews {
+            if let match = subview.view(matchingIdentifier: identifier) { return match }
+        }
+        return nil
+    }
+}
+
+private extension UIView {
+    var allSubviews: [UIView] { subviews + subviews.flatMap(\.allSubviews) }
+}

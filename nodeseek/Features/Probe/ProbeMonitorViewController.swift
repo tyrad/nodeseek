@@ -103,6 +103,11 @@ final class ProbeMonitorViewController: UIViewController {
             guard let self, let entry = viewModel.entry(id: id) else { return }
             showDetail(entry)
         }
+        heroCarousel.manageMenu = { [weak self] id in
+            guard let self else { return nil }
+            let actions = self.manageActions(for: id, current: true)
+            return actions.isEmpty ? nil : UIMenu(children: actions)
+        }
         chipsView.onSelect = { [weak self] filter in
             guard let self else { return }
             viewModel.filter = viewModel.filter == filter ? .all : filter
@@ -188,8 +193,6 @@ final class ProbeMonitorViewController: UIViewController {
             navigationItem.rightBarButtonItems = []
             return
         }
-        let add = UIBarButtonItem(systemItem: .add, primaryAction: UIAction { [weak self] _ in self?.presentEditor(for: nil) })
-        add.accessibilityIdentifier = "probe-add"
         let compact = viewModel.usesCompactList
         let density = UIMenu(options: .displayInline, children: [
             UIAction(title: "卡片", image: UIImage(systemName: "rectangle.grid.1x2"), state: compact ? .off : .on) { [weak self] _ in self?.viewModel.setCompact(false) },
@@ -202,10 +205,22 @@ final class ProbeMonitorViewController: UIViewController {
             }
         }
         let refresh = UIMenu(title: "刷新频率", subtitle: "\(Int(current)) 秒", image: UIImage(systemName: "arrow.clockwise"), children: intervals)
-        // 排序在筛选胶囊右侧，这里只放显示方式和刷新频率。
-        let menu = UIMenu(children: [density, UIMenu(options: .displayInline, children: [refresh])])
+        // 排序在筛选胶囊右侧。添加、编辑、删除放在最上面，连接失败、没有服务器时也能用。
+        let addProbe = UIAction(title: "添加探针", image: UIImage(systemName: "plus")) { [weak self] _ in
+            self?.presentEditor(for: nil)
+        }
+        var probeActions = [addProbe]
+        if let id = viewModel.selectedInstance?.id {
+            probeActions.append(contentsOf: manageActions(for: id, current: true))
+        }
+        let sections: [UIMenuElement] = [
+            UIMenu(options: .displayInline, children: probeActions),
+            density,
+            UIMenu(options: .displayInline, children: [refresh]),
+        ]
+        let menu = UIMenu(children: sections)
         let more = UIBarButtonItem(image: UIImage(systemName: "ellipsis.circle"), menu: menu)
-        more.accessibilityLabel = "显示方式和刷新频率"
+        more.accessibilityLabel = "更多"
         more.accessibilityIdentifier = "probe-more-menu"
         let globe = UIBarButtonItem(image: UIImage(systemName: "globe.asia.australia"), primaryAction: UIAction { [weak self] _ in
             guard let self else { return }
@@ -213,7 +228,8 @@ final class ProbeMonitorViewController: UIViewController {
         })
         globe.accessibilityLabel = "地球"
         globe.accessibilityIdentifier = "probe-globe-button"
-        navigationItem.rightBarButtonItems = [add, more, globe]
+        // 从右往左依次是：更多、地球。添加探针在「⋯」里。
+        navigationItem.rightBarButtonItems = [more, globe]
     }
 
     private func reloadVisibleRow(entryID: String) {
@@ -239,6 +255,34 @@ final class ProbeMonitorViewController: UIViewController {
     private func presentEditor(for instanceID: UUID?) {
         let editor = ProbeInstanceEditorViewController(instance: instanceID.flatMap(viewModel.instance(id:)), store: viewModel.store)
         present(UINavigationController(rootViewController: editor), animated: true)
+    }
+
+    /// 当前卡片用「当前探针」，分组标题用短标题。两组都是编辑和删除。
+    private func manageActions(for id: UUID, current: Bool) -> [UIAction] {
+        guard viewModel.instance(id: id) != nil else { return [] }
+        let edit = UIAction(title: current ? "编辑当前探针" : "编辑探针", image: UIImage(systemName: "slider.horizontal.3")) { [weak self] _ in
+            self?.presentEditor(for: id)
+        }
+        let delete = UIAction(title: current ? "删除当前探针" : "删除探针", image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in
+            self?.confirmDelete(id: id)
+        }
+        return [edit, delete]
+    }
+
+    private func confirmDelete(id: UUID) {
+        guard let instance = viewModel.instance(id: id) else { return }
+        let alert = UIAlertController(title: "删除“\(instance.name)”？", message: "只删除本机的配置和缓存，不影响面板。", preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "删除探针", style: .destructive) { [weak self] _ in
+            guard let self else { return }
+            Task { await self.viewModel.deleteInstance(id: id) }
+        })
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
+            popover.permittedArrowDirections = []
+        }
+        present(alert, animated: true)
     }
 
     private func showDetail(_ entry: ProbeListEntry) {
@@ -339,9 +383,8 @@ extension ProbeMonitorViewController: UITableViewDataSource, UITableViewDelegate
         let collapsible = viewModel.sections.count > 1
         var menu: UIMenu?
         if let instanceID = viewModel.instanceID(forSection: model), viewModel.filter == .all, viewModel.query.isEmpty {
-            menu = UIMenu(children: [
-                UIAction(title: "编辑探针", image: UIImage(systemName: "slider.horizontal.3")) { [weak self] _ in self?.presentEditor(for: instanceID) },
-            ])
+            let actions = manageActions(for: instanceID, current: false)
+            if !actions.isEmpty { menu = UIMenu(children: actions) }
         }
         header.configure(section: model, collapsed: isCollapsed(model), collapsible: collapsible, menu: menu)
         header.onToggle = { [weak self] in

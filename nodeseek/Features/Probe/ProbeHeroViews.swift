@@ -422,6 +422,8 @@ private final class ProbeHeroCell: UICollectionViewCell {
 final class ProbeHeroCarouselView: UIView, UICollectionViewDataSource, UICollectionViewDelegate {
     var onSelect: ((UUID) -> Void)?
     var onOpenEntry: ((String) -> Void)?
+    /// 长按当前卡片时的菜单。两侧露出的卡片不提供，避免滑的时候误删。
+    var manageMenu: ((UUID) -> UIMenu?)?
     /// 与页面内容对齐的左右边距，由列表页传入。
     private var horizontalMargin: CGFloat = 16
     /// 列表页在算表头高度前先告诉轮播整行宽度，否则第一次算高时自身还没有宽度。
@@ -569,6 +571,17 @@ final class ProbeHeroCarouselView: UIView, UICollectionViewDataSource, UICollect
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ProbeHeroCell.reuseIdentifier, for: indexPath) as! ProbeHeroCell
         configure(cell, at: indexPath.item)
         return cell
+    }
+
+    /// 只有当前这张卡能长按出菜单。
+    func contextMenu(at index: Int) -> UIMenu? {
+        guard cards.indices.contains(index), cards[index].isSelected else { return nil }
+        return manageMenu?(cards[index].id)
+    }
+
+    func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
+        guard let menu = contextMenu(at: indexPath.item) else { return nil }
+        return UIContextMenuConfiguration(actionProvider: { _ in menu })
     }
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
