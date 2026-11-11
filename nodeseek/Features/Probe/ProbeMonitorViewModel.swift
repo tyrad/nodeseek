@@ -3,8 +3,9 @@ import UIKit
 extension ProbeFetchError {
     var message: String {
         switch self {
-        case .privateSite: return "面板开启了私有站点，游客无法读取。请在面板后台关闭“私有站点”。"
+        case .privateSite: return "面板未对游客公开，无法读取。请在面板后台开启公开访问（Komari 为关闭“私有站点”）。"
         case .unauthorized: return "面板拒绝访问，可能未对游客公开。"
+        case .humanVerification: return "面板开启了人机验证，App 无法读取。请在面板后台关闭人机验证。"
         case .nodeNotFound: return "节点不存在或对游客隐藏。"
         case .unsupported: return "面板版本过旧或类型不匹配，暂不支持。"
         case .unreachable: return "无法连接面板，请检查地址和网络。"
@@ -226,7 +227,6 @@ final class ProbeMonitorViewModel {
         notify()
     }
 
-    func entry(id: String) -> ProbeListEntry? {
     /// 删掉本机的探针配置和缓存。存储变更会通知列表页切到剩下的第一张。
     func deleteInstance(id: UUID) async {
         guard store.instance(id: id) != nil else { return }
@@ -234,6 +234,7 @@ final class ProbeMonitorViewModel {
         await service.forget(instanceID: id)
     }
 
+    func entry(id: String) -> ProbeListEntry? {
         entries.first { $0.id == id }
     }
 

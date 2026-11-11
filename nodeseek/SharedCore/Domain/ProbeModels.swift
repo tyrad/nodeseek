@@ -132,6 +132,8 @@ nonisolated enum ProbeFetchError: String, Codable, Error, Equatable, Sendable {
     case privateSite
     /// 401/403 或权限不足。
     case unauthorized
+    /// 面板开启了 Cloudflare Turnstile 人机验证，App 无法完成验证。
+    case humanVerification
     /// 指定节点不存在或对游客隐藏。
     case nodeNotFound
     /// 面板版本不支持该接口（例如没有 rpc2）。

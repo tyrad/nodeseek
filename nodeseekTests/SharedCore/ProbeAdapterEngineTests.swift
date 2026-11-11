@@ -309,6 +309,162 @@ final class ProbeAdapterEngineTests: XCTestCase {
         XCTAssertEqual(history.httpMethod, "GET")
     }
 
+    // MARK: - CF-Server-Monitor
+
+    /// fixture 的结构参照 CF-Server-Monitor 2.8.7 的接口，数值全部是编造的。
+    func testBuiltinCFSMSpecLoads() throws {
+        let engine = try cfsm()
+        XCTAssertEqual(engine.spec.id, "cfsm")
+        XCTAssertEqual(engine.spec.name, "CF-Server-Monitor")
+        XCTAssertEqual(engine.spec.auth, .none)
+        XCTAssertEqual(engine.version(from: try json(engine, "cfsm-config")), "2.8.7 Beta6")
+    }
+
+    func testCFSMDecodesServersAndConvertsMegabytes() throws {
+        let engine = try cfsm()
+        let nodes = try engine.nodes(from: json(engine, "cfsm-servers"))
+        XCTAssertEqual(nodes.map(\.name), ["HK-01", "US-01", "刚添加"])
+        let hk = try XCTUnwrap(nodes.first)
+        XCTAssertEqual(hk.region, "HK")
+        XCTAssertEqual(hk.group, "香港")
+        XCTAssertEqual(hk.cpuCores, 1)
+        XCTAssertEqual(hk.memTotal, 1_024 * 1_048_576, "面板给的是 MB")
+        XCTAssertEqual(hk.diskTotal, 40_960 * 1_048_576)
+        XCTAssertEqual(hk.weight, 1)
+        XCTAssertNil(nodes.last?.region, "还没上报的机器地区为空")
+    }
+
+    func testCFSMStatusUsesLastUpdatedWithinFiveMinutes() throws {
+        let engine = try cfsm()
+        let now = Date(timeIntervalSince1970: 1_800_000_040)
+        let statuses = try engine.statuses(from: json(engine, "cfsm-servers"), now: now)
+
+        let hk = try XCTUnwrap(statuses["11111111-1111-4111-8111-111111111111"])
+        XCTAssertTrue(hk.online, "40 秒前上报")
+        XCTAssertEqual(try XCTUnwrap(hk.sampledAt).timeIntervalSince1970, 1_800_000_000, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(hk.metrics.cpuPercent), 1.25, accuracy: 0.001)
+        XCTAssertEqual(hk.metrics.memUsed, 300 * 1_048_576)
+        XCTAssertEqual(hk.metrics.memTotal, 1_024 * 1_048_576)
+        XCTAssertEqual(hk.metrics.diskUsed, 8_192 * 1_048_576)
+        XCTAssertEqual(hk.metrics.swapUsed, 16 * 1_048_576)
+        XCTAssertEqual(hk.metrics.netInRate, 4_000, "网速已是 B/s")
+        XCTAssertEqual(hk.metrics.netOutRate, 3_000)
+        XCTAssertEqual(hk.metrics.netTotalIn, 10_000_000_000)
+        XCTAssertEqual(hk.metrics.processCount, 100)
+        XCTAssertEqual(hk.metrics.connectionCount, 7, "tcp 与 udp 相加")
+        XCTAssertNil(hk.metrics.load1, "load_avg 是整段文字，暂不解析")
+
+        let us = try XCTUnwrap(statuses["22222222-2222-4222-8222-222222222222"])
+        XCTAssertFalse(us.online, "15 分钟没上报算离线")
+        XCTAssertEqual(Double(try XCTUnwrap(us.metrics.memUsed)), 288.5 * 1_048_576, accuracy: 1_048_576 * 0.001, "内存可能带小数")
+
+        let fresh = try XCTUnwrap(statuses["33333333-3333-4333-8333-333333333333"])
+        XCTAssertFalse(fresh.online, "从未上报")
+        XCTAssertNil(fresh.sampledAt)
+        XCTAssertNil(fresh.metrics.cpuPercent)
+    }
+
+    func testCFSMHistoryIsTopLevelArrayInMilliseconds() throws {
+        let engine = try cfsm()
+        let points = try engine.history(from: json(engine, "cfsm-history"))
+        XCTAssertEqual(points.count, 3)
+        XCTAssertEqual(try XCTUnwrap(points.first).date.timeIntervalSince1970, 1_799_996_400, accuracy: 0.001)
+        XCTAssertEqual(points.first?.metrics.memUsed, 300 * 1_048_576)
+        XCTAssertEqual(points.first?.metrics.netInRate, 3_900)
+        XCTAssertEqual(try engine.history(from: [Any]()).count, 0)
+
+        let request = try engine.request("history", baseURL: base, nodeID: "abc", hours: 6)
+        let components = try XCTUnwrap(request.url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) })
+        XCTAssertEqual(components.path, "/api/history/all")
+        XCTAssertEqual(Set(components.queryItems ?? []), [URLQueryItem(name: "id", value: "abc"), URLQueryItem(name: "hours", value: "6")])
+    }
+
+    func testPlanFieldsFromAllThreeProbes() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_040)
+        let gb: Int64 = 1_073_741_824
+
+        // CF-Server-Monitor：价格是文字，流量上限按 GB 填，用开机时间算运行时长。
+        let cfsm = try cfsm()
+        let object = try json(cfsm, "cfsm-servers")
+        let hk = try XCTUnwrap(cfsm.nodes(from: object).first)
+        let plan = try XCTUnwrap(hk.plan)
+        XCTAssertEqual(plan.price, 99)
+        XCTAssertEqual(plan.currency, "¥")
+        XCTAssertEqual(plan.cycle, .months(12))
+        XCTAssertEqual(plan.trafficLimit, 500 * gb)
+        XCTAssertEqual(plan.trafficMode, .sum)
+        XCTAssertEqual(plan.trafficResetDay, 1)
+        let expiry = try XCTUnwrap(plan.expiresAt)
+        XCTAssertEqual(Calendar.current.dateComponents([.year, .month, .day], from: expiry), DateComponents(year: 2030, month: 1, day: 1))
+        XCTAssertEqual(hk.tags, ["vps", "中转"])
+        XCTAssertEqual(hk.arch, "amd64")
+        XCTAssertNil(try cfsm.nodes(from: object)[1].plan, "价格、到期、上限都没填")
+        let status = try XCTUnwrap(cfsm.statuses(from: object, now: now)[hk.id])
+        XCTAssertEqual(status.metrics.trafficIn, 30_000_000_000)
+        XCTAssertEqual(status.metrics.trafficOut, 20_000_000_000)
+        XCTAssertEqual(status.metrics.uptime, Int64(now.timeIntervalSince1970 - 1_799_000_000))
+
+        // Komari：周期是天数，上限是字节，已用流量取累计值。
+        let komari = try komari()
+        let komariNode: [String: Any] = [
+            "uuid": "k1", "name": "k", "virtualization": "kvm", "arch": "amd64", "tags": "中转;香港",
+            "public_remark": "公开备注\n", "price": 5, "currency": "$", "billing_cycle": 30,
+            "expired_at": "2026-12-01T00:00:00Z", "traffic_limit": 4 * 1_099_511_627_776, "traffic_limit_type": "max",
+        ]
+        let node = try XCTUnwrap(komari.nodes(from: ["data": [komariNode]]).first)
+        XCTAssertEqual(node.virtualization, "kvm")
+        XCTAssertEqual(node.tags, ["中转", "香港"])
+        XCTAssertEqual(node.remark, "公开备注")
+        XCTAssertEqual(node.plan?.cycle, .months(1))
+        XCTAssertEqual(node.plan?.trafficMode, .max)
+        XCTAssertNotNil(node.plan?.expiresAt)
+        let unset = try XCTUnwrap(komari.nodes(from: json(komari, "komari-nodes")).first)
+        XCTAssertNil(unset.plan, "Komari 默认价格 0、周期 0、上限 0，都算未填")
+        let komariStatus = try komari.statuses(from: ["result": ["k1": ["client": "k1", "online": true, "net_total_down": 10, "net_total_up": 20]]])
+        XCTAssertEqual(komariStatus["k1"]?.metrics.trafficIn, 10)
+        XCTAssertEqual(komariStatus["k1"]?.metrics.trafficOut, 20)
+
+        // 极简探针：到期只有日期，币种是三字母，本月流量在节点顶层。
+        let monitor = try monitor()
+        let monitorNode: [String: Any] = [
+            "id": 7, "name": "m", "virt": "kvm", "arch": "x86_64", "public_remark": "", "price": 10, "currency": "USD",
+            "billing_cycle": "yearly", "expires_at": "2027-07-21", "traffic_limit": 1_099_511_627_776, "traffic_mode": "up",
+            "traffic_reset_day": 5, "online": true, "month_rx": 100, "month_tx": 200, "metrics": ["uptime": 60],
+        ]
+        let mNode = try XCTUnwrap(monitor.nodes(from: ["nodes": [monitorNode]]).first)
+        XCTAssertEqual(mNode.virtualization, "kvm")
+        XCTAssertNil(mNode.remark, "空备注不显示")
+        XCTAssertEqual(mNode.plan?.cycle, .months(12))
+        XCTAssertEqual(mNode.plan?.trafficMode, .up)
+        XCTAssertEqual(mNode.plan?.trafficResetDay, 5)
+        XCTAssertEqual(ProbePlanSummary(plan: mNode.plan, metrics: nil)?.price, "$10/年")
+        let mStatus = try XCTUnwrap(monitor.statuses(from: ["nodes": [monitorNode]])["7"])
+        XCTAssertEqual(mStatus.metrics.trafficOut, 200)
+        XCTAssertEqual(mStatus.metrics.uptime, 60)
+    }
+
+    func testCFSMPreflightAndErrors() throws {
+        let engine = try cfsm()
+        XCTAssertNoThrow(try engine.runChecks(for: "version", object: json(engine, "cfsm-config")))
+        XCTAssertThrowsError(try engine.runChecks(for: "version", object: ["is_public": false, "turnstile_enabled": false])) {
+            XCTAssertEqual($0 as? ProbeFetchError, .privateSite)
+        }
+        XCTAssertThrowsError(try engine.runChecks(for: "version", object: ["is_public": true, "turnstile_enabled": true])) {
+            XCTAssertEqual($0 as? ProbeFetchError, .humanVerification)
+        }
+        let cases: [(String, Int, ProbeFetchError)] = [
+            (#"{"error":"Unauthorized","code":401}"#, 401, .privateSite),
+            (#"{"error":"Turnstile verification failed","code":403}"#, 403, .humanVerification),
+            (#"{"error":"Server not found","code":404}"#, 404, .nodeNotFound),
+            (#"{"message":"databaseUpgradeRequired"}"#, 409, .unsupported),
+        ]
+        for (body, status, expected) in cases {
+            XCTAssertThrowsError(try engine.json(from: Data(body.utf8), httpStatus: status)) {
+                XCTAssertEqual($0 as? ProbeFetchError, expected, body)
+            }
+        }
+    }
+
     func testJSONPathSupportsArraysDictionariesAndIndexes() {
         let root: [String: Any] = ["a": ["b": [["c": 1], ["c": 2]]], "m": ["y": ["v": 2], "x": ["v": 1]]]
         XCTAssertEqual(ProbeJSONPath.values("$.a.b[*].c", in: root).compactMap { ProbeJSONPath.number($0) }, [1, 2])
@@ -326,6 +482,10 @@ final class ProbeAdapterEngineTests: XCTestCase {
 
     private func monitor() throws -> ProbeAdapterEngine {
         try ProbeAdapterEngine(data: BuiltinAdapterLoader.data(named: "probe-adapter-monitor"))
+    }
+
+    private func cfsm() throws -> ProbeAdapterEngine {
+        try ProbeAdapterEngine(data: BuiltinAdapterLoader.data(named: "probe-adapter-cfsm"))
     }
 
     private func json(_ engine: ProbeAdapterEngine, _ name: String) throws -> Any {

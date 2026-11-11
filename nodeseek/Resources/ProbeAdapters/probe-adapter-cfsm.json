@@ -1,0 +1,77 @@
+{
+  "id": "cfsm",
+  "name": "CF-Server-Monitor",
+  "specVersion": 1,
+  "summary": "读取部署在 Cloudflare 上的公开面板，不需要账号。私有面板或开启人机验证时无法连接。",
+  "auth": { "type": "none" },
+  "requests": {
+    "version": { "method": "GET", "path": "/api/config" },
+    "servers": { "method": "GET", "path": "/api/servers" },
+    "history": {
+      "method": "GET", "path": "/api/history/all",
+      "query": { "id": "{nodeID}", "hours": "{hours}" }
+    }
+  },
+  "version": { "request": "version", "path": "$.version" },
+  "preflight": [
+    { "request": "version", "path": "$.is_public", "equals": false, "error": "privateSite" },
+    { "request": "version", "path": "$.turnstile_enabled", "equals": true, "error": "humanVerification" }
+  ],
+  "nodes": {
+    "request": "servers",
+    "items": "$.servers[*]",
+    "fields": {
+      "id": "$.id", "name": "$.name", "region": "$.region", "group": "$.server_group",
+      "os": "$.os", "cpuCores": "$.cpu_cores",
+      "memTotal": { "path": "$.ram_total", "scale": 1048576 },
+      "diskTotal": { "path": "$.disk_total", "scale": 1048576 },
+      "weight": "$.sort_order",
+      "arch": "$.arch", "tags": "$.tags",
+      "expiresAt": "$.expire_date",
+      "price": "$.price", "currency": "$.currency", "billingCycle": "$.billing_cycle",
+      "trafficLimit": { "path": "$.traffic_limit", "scale": 1073741824 },
+      "trafficMode": "$.traffic_calc_type", "trafficResetDay": "$.reset_day"
+    }
+  },
+  "status": {
+    "request": "servers",
+    "items": "$.servers[*]",
+    "online": { "type": "freshness", "path": "$.last_updated", "format": "unixMillis", "seconds": 300 },
+    "fields": {
+      "id": "$.id",
+      "sampledAt": { "path": "$.last_updated", "format": "unixMillis" },
+      "cpu": "$.cpu",
+      "memUsed": { "path": "$.ram_used", "scale": 1048576 },
+      "memTotal": { "path": "$.ram_total", "scale": 1048576 },
+      "diskUsed": { "path": "$.disk_used", "scale": 1048576 },
+      "diskTotal": { "path": "$.disk_total", "scale": 1048576 },
+      "swapUsed": { "path": "$.swap_used", "scale": 1048576 },
+      "swapTotal": { "path": "$.swap_total", "scale": 1048576 },
+      "netIn": "$.net_in_speed", "netOut": "$.net_out_speed",
+      "netTotalIn": "$.net_rx", "netTotalOut": "$.net_tx",
+      "processCount": "$.processes",
+      "connectionCount": { "sum": ["$.tcp_conn", "$.udp_conn"] },
+      "uptime": { "path": "$.boot_time", "format": "unixMillis" },
+      "trafficIn": "$.net_rx_monthly", "trafficOut": "$.net_tx_monthly"
+    }
+  },
+  "history": {
+    "request": "history",
+    "items": "$[*]",
+    "fields": {
+      "time": { "path": "$.timestamp", "format": "unixMillis" },
+      "cpu": "$.cpu",
+      "memUsed": { "path": "$.ram_used", "scale": 1048576 },
+      "memTotal": { "path": "$.ram_total", "scale": 1048576 },
+      "diskUsed": { "path": "$.disk_used", "scale": 1048576 },
+      "diskTotal": { "path": "$.disk_total", "scale": 1048576 },
+      "netIn": "$.net_in_speed", "netOut": "$.net_out_speed"
+    }
+  },
+  "errors": [
+    { "status": 403, "bodyContains": "Turnstile", "error": "humanVerification" },
+    { "status": 401, "error": "privateSite" },
+    { "status": 404, "bodyContains": "Server not found", "error": "nodeNotFound" },
+    { "status": 409, "bodyContains": "databaseUpgradeRequired", "error": "unsupported" }
+  ]
+}

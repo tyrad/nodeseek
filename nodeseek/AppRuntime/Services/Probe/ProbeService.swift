@@ -5,7 +5,7 @@ final class ProbeAdapterRegistry: Sendable {
     static let shared = ProbeAdapterRegistry()
 
     /// 内置配置的资源名，按显示顺序排列。
-    private static let builtinResources = ["probe-adapter-komari", "probe-adapter-monitor"]
+    private static let builtinResources = ["probe-adapter-komari", "probe-adapter-cfsm", "probe-adapter-monitor"]
 
     let engines: [ProbeAdapterEngine]
 
