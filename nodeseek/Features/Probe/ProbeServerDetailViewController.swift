@@ -36,6 +36,9 @@ final class ProbeServerDetailViewController: UIViewController, UIGestureRecogniz
     private let networkTile = ProbeDetailTile(title: "网络", metric: .network)
     private let loadTile = ProbeDetailTile(title: "负载", metric: .cpu)
     private let factsStack = UIStackView()
+    /// 套餐：到期、价格、流量配额、虚拟化、标签、公开备注。面板都没填时整张卡隐藏。
+    private let planStack = UIStackView()
+    private lazy var planCard = Self.card(planStack)
     private let footerLabel = ProbeStyle.label(ProbeStyle.mono(10.5), .tertiaryLabel, lines: 0)
 
     init(entryID: String, viewModel: ProbeMonitorViewModel) {
@@ -113,7 +116,9 @@ final class ProbeServerDetailViewController: UIViewController, UIGestureRecogniz
             $0.distribution = .fillEqually
         }
         factsStack.distribution = .fillEqually
-        let column = UIStackView(arrangedSubviews: [header, chartCard, topTiles, bottomTiles, Self.card(factsStack), footerLabel])
+        planStack.axis = .vertical
+        planStack.spacing = 12
+        let column = UIStackView(arrangedSubviews: [header, chartCard, topTiles, bottomTiles, Self.card(factsStack), planCard, footerLabel])
         column.axis = .vertical
         column.spacing = 10
         column.setCustomSpacing(18, after: header)
@@ -209,6 +214,7 @@ final class ProbeServerDetailViewController: UIViewController, UIGestureRecogniz
          ("连接", metrics?.connectionCount.map(String.init) ?? "—"), ("交换", swap)].forEach {
             factsStack.addArrangedSubview(Self.fact($0.0, $0.1))
         }
+        renderPlan(entry, metrics: metrics)
         footerLabel.text = "数据来自 \(entry.instanceName) · 更新于 \(ProbeFormat.relative(viewModel.fetchedAt(for: entry.instanceID)))"
         configureMenu(entry)
     }
@@ -230,6 +236,81 @@ final class ProbeServerDetailViewController: UIViewController, UIGestureRecogniz
         } else {
             navigationItem.rightBarButtonItem?.menu = menu
         }
+    }
+
+    private func renderPlan(_ entry: ProbeListEntry, metrics: ProbeMetrics?) {
+        planStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        let node = entry.server.node
+        let summary = ProbePlanSummary(plan: node.plan, metrics: metrics)
+        if let expiry = summary?.expiry {
+            let value = [summary?.expiryDate, expiry].compactMap { $0 }.joined(separator: " · ")
+            planStack.addArrangedSubview(Self.planRow("到期", value, color: summary?.expiryLevel == .normal ? .label : ProbePlanStyle.color(summary?.expiryLevel ?? .normal)))
+        }
+        if let price = summary?.price {
+            planStack.addArrangedSubview(Self.planRow("价格", price))
+        }
+        if let summary, let traffic = summary.traffic {
+            planStack.addArrangedSubview(Self.trafficView(traffic, summary: summary))
+        }
+        switch (node.virtualization?.uppercased(), node.arch) {
+        case let (virt?, arch?): planStack.addArrangedSubview(Self.planRow("虚拟化 · 架构", "\(virt) · \(arch)"))
+        case let (virt?, nil): planStack.addArrangedSubview(Self.planRow("虚拟化", virt))
+        case let (nil, arch?): planStack.addArrangedSubview(Self.planRow("架构", arch))
+        case (nil, nil): break
+        }
+        if let tags = node.tags, !tags.isEmpty { planStack.addArrangedSubview(Self.planRow("标签", tags.joined(separator: " · "))) }
+        if let remark = node.remark {
+            let label = ProbeStyle.label(.systemFont(ofSize: 13), .secondaryLabel, lines: 0)
+            label.text = remark
+            planStack.addArrangedSubview(Self.planSection("公开备注", label))
+        }
+        planCard.isHidden = planStack.arrangedSubviews.isEmpty
+    }
+
+    private static func planRow(_ title: String, _ value: String, color: UIColor = .label) -> UIView {
+        let titleLabel = ProbeStyle.label(ProbeStyle.mono(11, .medium), .secondaryLabel)
+        titleLabel.text = title
+        titleLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let valueLabel = ProbeStyle.label(.systemFont(ofSize: 14, weight: .semibold), color, lines: 2)
+        valueLabel.text = value
+        valueLabel.textAlignment = .right
+        let row = UIStackView(arrangedSubviews: [titleLabel, valueLabel])
+        row.spacing = 12
+        row.alignment = .firstBaseline
+        row.isAccessibilityElement = true
+        row.accessibilityLabel = "\(title) \(value)"
+        return row
+    }
+
+    private static func planSection(_ title: String, _ content: UIView) -> UIView {
+        let titleLabel = ProbeStyle.label(ProbeStyle.mono(11, .medium), .secondaryLabel)
+        titleLabel.text = title
+        let stack = UIStackView(arrangedSubviews: [titleLabel, content])
+        stack.axis = .vertical
+        stack.spacing = 6
+        return stack
+    }
+
+    private static func trafficView(_ traffic: ProbePlanSummary.Traffic, summary: ProbePlanSummary) -> UIView {
+        let title = traffic.resetDay == nil ? "已用流量" : "本月流量"
+        let level = summary.trafficLevel
+        let header = planRow(title, "\(ProbeFormat.bytes(traffic.used)) / \(ProbeFormat.bytes(traffic.limit))",
+                             color: level == .normal ? .label : ProbePlanStyle.color(level))
+        let meter = ProbeSegmentMeterView()
+        meter.metric = .network
+        meter.normalColor = .label
+        meter.percent = min(traffic.percent, 100)
+        meter.translatesAutoresizingMaskIntoConstraints = false
+        meter.heightAnchor.constraint(equalToConstant: 9).isActive = true
+        let remaining = traffic.isOver
+            ? "超出 \(ProbeFormat.bytes(traffic.used - traffic.limit))"
+            : "剩余 \(ProbeFormat.bytes(traffic.limit - traffic.used))"
+        let detail = ProbeStyle.label(.systemFont(ofSize: 12), .secondaryLabel, lines: 0)
+        detail.text = [remaining, traffic.mode.title, traffic.resetDay.map { "每月 \($0) 日重置" }].compactMap { $0 }.joined(separator: " · ")
+        let stack = UIStackView(arrangedSubviews: [header, meter, detail])
+        stack.axis = .vertical
+        stack.spacing = 6
+        return stack
     }
 
     private static func fact(_ title: String, _ value: String) -> UIView {

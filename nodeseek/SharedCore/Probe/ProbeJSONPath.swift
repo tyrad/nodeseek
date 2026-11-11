@@ -95,6 +95,16 @@ nonisolated enum ProbeJSONPath {
         }
     }
 
+    /// 只有日期的写法（到期日 2030-01-01）按本地时区的当天零点算，剩余天数才和用户的日历一致。
+    private static func day(_ text: String) -> Date? {
+        guard text.count == 10 else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: text)
+    }
+
     /// 解析时间。ISO 8601 小数部分超过 3 位（Komari 为纳秒）时先截到毫秒。
     static func date(_ value: Any?, format: ProbeAdapterSpec.FieldMapping.Format) -> Date? {
         switch format {
@@ -115,8 +125,8 @@ nonisolated enum ProbeJSONPath {
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             if let date = formatter.date(from: text) { return date }
             formatter.formatOptions = [.withInternetDateTime]
-            guard let date = formatter.date(from: text), date.timeIntervalSince1970 > 0 else { return nil }
-            return date
+            if let date = formatter.date(from: text) { return date.timeIntervalSince1970 > 0 ? date : nil }
+            return day(text)
         }
     }
 }

@@ -53,11 +53,12 @@ nonisolated enum ProbeListFilter: String, CaseIterable, Sendable {
 }
 
 nonisolated enum ProbeListSort: String, CaseIterable, Sendable {
-    case problemsFirst, cpu, memory, network, name
+    case problemsFirst, expiry, cpu, memory, network, name
 
     var title: String {
         switch self {
         case .problemsFirst: return "异常优先"
+        case .expiry: return "到期时间从近到远"
         case .cpu: return "CPU 从高到低"
         case .memory: return "内存从高到低"
         case .network: return "网速从高到低"
@@ -179,6 +180,10 @@ nonisolated enum ProbeServerList {
             }
             // 告警组内用量高的在前。
             return [rank, rank == 1 ? -(entry.alertPercent ?? 0) : 0]
+        case .expiry:
+            // 已过期的日期最早，自然排最前；长期有效的日期很远，排在后面；没填到期日的排最后。
+            guard let expiresAt = entry.server.node.plan?.expiresAt else { return [1, 0] }
+            return [0, expiresAt.timeIntervalSince1970]
         case .cpu: return [-(metrics?.cpuPercent ?? -1)]
         case .memory: return [-(metrics?.memPercent ?? -1)]
         case .network: return [-Double((metrics?.netInRate ?? -1) + (metrics?.netOutRate ?? 0))]

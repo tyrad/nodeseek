@@ -27,7 +27,12 @@
     "fields": {
       "id": "$.uuid", "name": "$.name", "region": "$.region", "group": "$.group",
       "os": "$.os", "cpuCores": "$.cpu_cores", "memTotal": "$.mem_total",
-      "diskTotal": "$.disk_total", "weight": "$.weight"
+      "diskTotal": "$.disk_total", "weight": "$.weight",
+      "virtualization": "$.virtualization", "arch": "$.arch",
+      "tags": "$.tags", "remark": "$.public_remark",
+      "expiresAt": { "path": "$.expired_at", "format": "iso8601" },
+      "price": "$.price", "currency": "$.currency", "billingCycle": "$.billing_cycle",
+      "trafficLimit": "$.traffic_limit", "trafficMode": "$.traffic_limit_type"
     }
   },
   "status": {
@@ -44,7 +49,8 @@
       "netIn": "$.net_in", "netOut": "$.net_out",
       "netTotalIn": "$.net_total_down", "netTotalOut": "$.net_total_up",
       "load1": "$.load", "load5": "$.load5", "load15": "$.load15",
-      "uptime": "$.uptime", "processCount": "$.process", "connectionCount": "$.connections"
+      "uptime": "$.uptime", "processCount": "$.process", "connectionCount": "$.connections",
+      "trafficIn": "$.net_total_down", "trafficOut": "$.net_total_up"
     }
   },
   "history": {

@@ -25,6 +25,37 @@ struct ProbeRowContent {
         }
     }
 
+    var plan: ProbePlanSummary? {
+        ProbePlanSummary(plan: entry.server.node.plan, metrics: metrics)
+    }
+
+    /// 列表卡片底部的套餐行。只有快到期、过期、流量超额时才着色。
+    var planLine: NSAttributedString? {
+        let summary = plan
+        let tags = entry.server.node.tags ?? []
+        guard summary != nil || !tags.isEmpty else { return nil }
+        let text = NSMutableAttributedString()
+        func add(_ string: String, _ color: UIColor = .secondaryLabel, bold: Bool = false) {
+            if text.length > 0 {
+                text.append(NSAttributedString(string: " · ", attributes: [.font: UIFont.systemFont(ofSize: 12), .foregroundColor: UIColor.tertiaryLabel]))
+            }
+            text.append(NSAttributedString(string: string, attributes: [
+                .font: UIFont.systemFont(ofSize: 12, weight: bold ? .semibold : .regular), .foregroundColor: color,
+            ]))
+        }
+        if let expiry = summary?.expiry {
+            add(expiry, ProbePlanStyle.color(summary?.expiryLevel ?? .normal), bold: summary?.expiryLevel != .normal)
+        }
+        if let price = summary?.price { add(price) }
+        if let traffic = summary?.traffic {
+            let line = traffic.isOver ? "流量超出 \(ProbeFormat.bytes(traffic.used - traffic.limit))" : "流量 \(ProbeFormat.percent(traffic.percent, decimals: 0))%"
+            let level = summary?.trafficLevel ?? .normal
+            add(line, ProbePlanStyle.color(level), bold: level != .normal)
+        }
+        tags.prefix(3).forEach { add($0, .label) }
+        return text
+    }
+
     var accessibilityText: String {
         var parts = [entry.displayName]
         switch availability {
@@ -37,6 +68,7 @@ struct ProbeRowContent {
             parts.append("内存 \(ProbeFormat.percent(metrics.memPercent))%")
             parts.append("硬盘 \(ProbeFormat.percent(metrics.diskPercent))%")
         }
+        if let plan { parts += plan.compact }
         return parts.joined(separator: "，")
     }
 }
@@ -151,9 +183,12 @@ final class ProbeServerCardCell: ProbeCardContainerCell {
     private let memoryRow = ProbeMeterRow(title: "内存", metric: .memory)
     private let diskRow = ProbeMeterRow(title: "硬盘", metric: .disk)
     private let networkLabel = UILabel()
+    /// 到期 · 价格 · 流量 · 标签；面板没填时隐藏。
+    private let planLabel = UILabel()
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
+        planLabel.lineBreakMode = .byTruncatingTail
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         metaLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -169,7 +204,7 @@ final class ProbeServerCardCell: ProbeCardContainerCell {
         let cpuRow = UIStackView(arrangedSubviews: [cpuColumn, sparkline])
         cpuRow.spacing = 14
         cpuRow.alignment = .bottom
-        let column = UIStackView(arrangedSubviews: [header, cpuRow, memoryRow, diskRow, networkLabel])
+        let column = UIStackView(arrangedSubviews: [header, cpuRow, memoryRow, diskRow, networkLabel, planLabel])
         column.axis = .vertical
         column.spacing = 8
         column.setCustomSpacing(10, after: header)
@@ -214,6 +249,8 @@ final class ProbeServerCardCell: ProbeCardContainerCell {
         memoryRow.configure(percent: metrics?.memPercent, used: metrics?.memUsed, total: metrics?.memTotal, dimmed: dimmed)
         diskRow.configure(percent: metrics?.diskPercent, used: metrics?.diskUsed, total: metrics?.diskTotal, dimmed: dimmed)
         networkLabel.attributedText = Self.network(metrics, dimmed: dimmed)
+        planLabel.attributedText = content.planLine
+        planLabel.isHidden = planLabel.attributedText == nil
         accessibilityLabel = content.accessibilityText
     }
 
@@ -344,7 +381,7 @@ final class ProbeServerCompactCell: UITableViewCell {
     }
 }
 
-/// 分组头：标题、在线数、折叠箭头；单探针的分组带“编辑探针”菜单。
+/// 分组头：标题、在线数、折叠箭头；分组只属于一个探针时带编辑和删除。
 final class ProbeSectionHeaderView: UITableViewHeaderFooterView {
     static let reuseIdentifier = "ProbeSectionHeaderView"
 

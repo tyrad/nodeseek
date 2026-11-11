@@ -62,6 +62,21 @@ final class ProbeServerListTests: XCTestCase {
         XCTAssertEqual(names(.memory), ["b-10", "a-10", "a-2"])
     }
 
+    func testSortsByExpirySoonestFirst() {
+        let now = Date()
+        func days(_ value: Double) -> Date { now.addingTimeInterval(value * 86_400) }
+        let entries = [
+            entry("没填", index: 0),
+            entry("长期", expires: days(365 * 80), index: 1),
+            entry("下月", expires: days(30), index: 2),
+            entry("已过期", expires: days(-3), index: 3),
+            entry("三天后", expires: days(3), index: 4),
+            entry("也没填", index: 5),
+        ]
+        let names = ProbeServerList.arrange(entries, filter: .all, sort: .expiry, query: "").flatMap(\.entries).map(\.displayName)
+        XCTAssertEqual(names, ["已过期", "三天后", "下月", "长期", "没填", "也没填"])
+    }
+
     func testStaleDataNeverCountsAsAlertOrLiveTraffic() {
         let stale = entry("old", cpu: 95, net: 1000, stale: true, index: 0)
         XCTAssertFalse(stale.isAlerting)
@@ -96,21 +111,6 @@ final class ProbeServerListTests: XCTestCase {
         XCTAssertEqual(ProbeFormat.relative(now.addingTimeInterval(-7200), now: now), "2 小时前")
     }
 
-    private func entry(
-        _ name: String, online: Bool = true, status: Bool = true, cpu: Double = 1, mem: Double = 10,
-        net: Int64 = 0, group: String? = nil, region: String? = nil, stale: Bool = false,
-        instance: UUID? = nil, instanceName: String = "NS Probe", index: Int
-    ) -> ProbeListEntry {
-        let node = ProbeNode(id: name, name: name, region: region, group: group, os: nil, cpuCores: nil,
-                             memTotal: 100, diskTotal: 100, weight: 0)
-        let metrics = ProbeMetrics(cpuPercent: cpu, memUsed: Int64(mem), memTotal: 100, diskUsed: 10, diskTotal: 100,
-                                   netInRate: net, netOutRate: 0)
-        let probeStatus = status ? ProbeStatus(nodeID: name, online: online, sampledAt: nil, metrics: metrics) : nil
-        return ProbeListEntry(instanceID: instance ?? prod, instanceName: instanceName,
-                              server: ProbeServer(node: node, status: probeStatus), displayName: name,
-                              isStale: stale, panelIndex: index)
-    }
-}
     func testRegionNormalizesFlagsAndCountryCodes() {
         XCTAssertEqual(ProbeGeo.countryCode(from: "🇭🇰"), "HK")
         XCTAssertEqual(ProbeGeo.countryCode(from: " jp "), "JP")
@@ -192,3 +192,18 @@ final class ProbeServerListTests: XCTestCase {
         XCTAssertEqual(ProbeDatacenterDirectory.tokens(in: "US-LAX2洛杉矶"), ["US", "LAX", "2", "洛杉矶"])
     }
 
+    private func entry(
+        _ name: String, online: Bool = true, status: Bool = true, cpu: Double = 1, mem: Double = 10,
+        net: Int64 = 0, group: String? = nil, region: String? = nil, stale: Bool = false,
+        instance: UUID? = nil, instanceName: String = "NS Probe", expires: Date? = nil, index: Int
+    ) -> ProbeListEntry {
+        let node = ProbeNode(id: name, name: name, region: region, group: group, os: nil, cpuCores: nil,
+                             memTotal: 100, diskTotal: 100, weight: 0, plan: expires.map { ProbePlan(expiresAt: $0) })
+        let metrics = ProbeMetrics(cpuPercent: cpu, memUsed: Int64(mem), memTotal: 100, diskUsed: 10, diskTotal: 100,
+                                   netInRate: net, netOutRate: 0)
+        let probeStatus = status ? ProbeStatus(nodeID: name, online: online, sampledAt: nil, metrics: metrics) : nil
+        return ProbeListEntry(instanceID: instance ?? prod, instanceName: instanceName,
+                              server: ProbeServer(node: node, status: probeStatus), displayName: name,
+                              isStale: stale, panelIndex: index)
+    }
+}

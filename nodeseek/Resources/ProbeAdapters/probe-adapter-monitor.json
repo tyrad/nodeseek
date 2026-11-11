@@ -18,7 +18,11 @@
     "fields": {
       "id": "$.id", "name": "$.name", "region": "$.country", "group": "$.group",
       "os": "$.os", "cpuCores": "$.cpu_cores", "memTotal": "$.mem_total",
-      "diskTotal": "$.disk_total", "weight": "$.sort"
+      "diskTotal": "$.disk_total", "weight": "$.sort",
+      "virtualization": "$.virt", "arch": "$.arch", "remark": "$.public_remark",
+      "expiresAt": "$.expires_at",
+      "price": "$.price", "currency": "$.currency", "billingCycle": "$.billing_cycle",
+      "trafficLimit": "$.traffic_limit", "trafficMode": "$.traffic_mode", "trafficResetDay": "$.traffic_reset_day"
     }
   },
   "status": {
@@ -36,7 +40,8 @@
       "netTotalIn": "$.metrics.total_rx", "netTotalOut": "$.metrics.total_tx",
       "load1": "$.metrics.load[0]", "load5": "$.metrics.load[1]", "load15": "$.metrics.load[2]",
       "uptime": "$.metrics.uptime", "processCount": "$.metrics.procs",
-      "connectionCount": { "sum": ["$.metrics.tcp", "$.metrics.udp"] }
+      "connectionCount": { "sum": ["$.metrics.tcp", "$.metrics.udp"] },
+      "trafficIn": "$.month_rx", "trafficOut": "$.month_tx"
     }
   },
   "history": {

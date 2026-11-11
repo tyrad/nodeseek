@@ -210,6 +210,8 @@ final class ProbeSegmentMeterView: UIView {
     var segments = 24 { didSet { setNeedsDisplay() } }
     var percent: Double? { didSet { setNeedsDisplay() } }
     var metric: ProbeStyle.Metric = .memory { didSet { setNeedsDisplay() } }
+    /// 正常用量时改用的颜色，例如流量配额用主文字色，避免和指标色混淆；到阈值仍变橙、变红。
+    var normalColor: UIColor? { didSet { setNeedsDisplay() } }
     /// 过期数据显示为灰色。
     var isDimmed = false { didSet { setNeedsDisplay() } }
 
@@ -226,7 +228,8 @@ final class ProbeSegmentMeterView: UIView {
         let gap: CGFloat = segments > 12 ? 2.5 : 1.5
         let width = (bounds.width - gap * CGFloat(segments - 1)) / CGFloat(segments)
         let filled = percent.map { Int((min(max($0, 0), 100) / 100 * Double(segments)).rounded()) } ?? 0
-        let on = isDimmed ? UIColor.tertiaryLabel : ProbeStyle.color(for: metric, percent: percent)
+        var on = isDimmed ? UIColor.tertiaryLabel : ProbeStyle.color(for: metric, percent: percent)
+        if !isDimmed, let normalColor, ProbeUsageLevel(percent: percent) == .normal { on = normalColor }
         for index in 0..<segments {
             let cell = CGRect(x: CGFloat(index) * (width + gap), y: 0, width: width, height: bounds.height)
             (index < filled ? on : UIColor.tertiarySystemFill).setFill()
@@ -393,5 +396,16 @@ final class ProbeFilterChipsView: UIView {
             config.image = UIImage(systemName: "arrow.up.arrow.down")
         }
         return config
+    }
+}
+
+/// 套餐信息的提示色：正常不着色，快到期 / 流量将满为橙，过期 / 超额为红。
+enum ProbePlanStyle {
+    static func color(_ level: ProbePlanSummary.Level) -> UIColor {
+        switch level {
+        case .normal: return .secondaryLabel
+        case .warning: return .systemOrange
+        case .critical: return .systemRed
+        }
     }
 }

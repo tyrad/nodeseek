@@ -13,6 +13,13 @@ nonisolated struct ProbeNode: Codable, Equatable, Sendable {
     var diskTotal: Int64?
     /// 节点排序权重，越小越靠前。
     var weight: Int
+    // 以下为面板可选填写的信息，旧缓存里没有，因此都是可选。
+    var virtualization: String? = nil
+    var arch: String? = nil
+    var tags: [String]? = nil
+    /// 面板写给访客看的公开备注。
+    var remark: String? = nil
+    var plan: ProbePlan? = nil
 }
 
 /// 某个时刻的运行指标。指标全部可选：拿不到时界面显示“—”，不能当作 0。
@@ -37,6 +44,9 @@ nonisolated struct ProbeMetrics: Codable, Equatable, Sendable {
     var uptime: Int64?
     var processCount: Int?
     var connectionCount: Int?
+    /// 流量配额统计用的下行 / 上行字节数（本月或自上次重置以来）。
+    var trafficIn: Int64? = nil
+    var trafficOut: Int64? = nil
 
     var memPercent: Double? { Self.percent(memUsed, memTotal) }
     var diskPercent: Double? { Self.percent(diskUsed, diskTotal) }

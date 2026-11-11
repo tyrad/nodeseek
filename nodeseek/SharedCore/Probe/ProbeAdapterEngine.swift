@@ -136,7 +136,12 @@ nonisolated struct ProbeAdapterEngine: Sendable {
                 cpuCores: number("cpuCores", fields, item).map { Int($0) },
                 memTotal: positiveInt("memTotal", fields, item),
                 diskTotal: positiveInt("diskTotal", fields, item),
-                weight: number("weight", fields, item).map { Int($0) } ?? 0
+                weight: number("weight", fields, item).map { Int($0) } ?? 0,
+                virtualization: string("virtualization", fields, item),
+                arch: string("arch", fields, item),
+                tags: ProbePlan.tags(from: string("tags", fields, item)),
+                remark: string("remark", fields, item),
+                plan: plan(fields, item)
             )
         }
     }
@@ -158,7 +163,7 @@ nonisolated struct ProbeAdapterEngine: Sendable {
                 let last = ProbeJSONPath.date(ProbeJSONPath.first(path, in: item), format: format)
                 online = last.map { now.timeIntervalSince($0) <= seconds } ?? false
             }
-            result[id] = ProbeStatus(nodeID: id, online: online, sampledAt: sampledAt, metrics: metrics(fields, item))
+            result[id] = ProbeStatus(nodeID: id, online: online, sampledAt: sampledAt, metrics: metrics(fields, item, now: now))
         }
         return result
     }
@@ -256,7 +261,33 @@ nonisolated struct ProbeAdapterEngine: Sendable {
         }
     }
 
-    private func metrics(_ fields: [String: ProbeAdapterSpec.FieldMapping], _ item: Any) -> ProbeMetrics {
+    private func plan(_ fields: [String: ProbeAdapterSpec.FieldMapping], _ item: Any) -> ProbePlan? {
+        let plan = ProbePlan(
+            expiresAt: date("expiresAt", fields, item),
+            price: number("price", fields, item),
+            currency: string("currency", fields, item),
+            cycle: ProbeBillingCycle(raw: string("billingCycle", fields, item)),
+            trafficLimit: positiveInt("trafficLimit", fields, item),
+            trafficMode: ProbeTrafficMode(raw: string("trafficMode", fields, item)),
+            trafficResetDay: int("trafficResetDay", fields, item).flatMap { (1...31).contains($0) ? Int($0) : nil }
+        )
+        return plan.isEmpty ? nil : plan
+    }
+
+    /// 运行时间：直接给秒数，或者配置成时间格式时按“开机时间”换算（CF-Server-Monitor 只给 boot_time）。
+    private func uptime(_ fields: [String: ProbeAdapterSpec.FieldMapping], _ item: Any, now: Date) -> Int64? {
+        guard let mapping = fields["uptime"] else { return nil }
+        switch mapping.format {
+        case .unixSeconds, .unixMillis, .iso8601:
+            guard let boot = date("uptime", fields, item) else { return nil }
+            let seconds = Int64(now.timeIntervalSince(boot))
+            return seconds > 0 ? seconds : nil
+        case .number, .string:
+            return int("uptime", fields, item)
+        }
+    }
+
+    private func metrics(_ fields: [String: ProbeAdapterSpec.FieldMapping], _ item: Any, now: Date = Date()) -> ProbeMetrics {
         ProbeMetrics(
             cpuPercent: number("cpu", fields, item),
             memUsed: int("memUsed", fields, item),
@@ -272,9 +303,11 @@ nonisolated struct ProbeAdapterEngine: Sendable {
             load1: number("load1", fields, item),
             load5: number("load5", fields, item),
             load15: number("load15", fields, item),
-            uptime: int("uptime", fields, item),
+            uptime: uptime(fields, item, now: now),
             processCount: int("processCount", fields, item).map { Int($0) },
-            connectionCount: int("connectionCount", fields, item).map { Int($0) }
+            connectionCount: int("connectionCount", fields, item).map { Int($0) },
+            trafficIn: int("trafficIn", fields, item),
+            trafficOut: int("trafficOut", fields, item)
         )
     }
 
