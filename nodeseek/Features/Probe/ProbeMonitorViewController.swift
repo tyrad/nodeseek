@@ -207,7 +207,13 @@ final class ProbeMonitorViewController: UIViewController {
         let more = UIBarButtonItem(image: UIImage(systemName: "ellipsis.circle"), menu: menu)
         more.accessibilityLabel = "显示方式和刷新频率"
         more.accessibilityIdentifier = "probe-more-menu"
-        navigationItem.rightBarButtonItems = [add, more]
+        let globe = UIBarButtonItem(image: UIImage(systemName: "globe.asia.australia"), primaryAction: UIAction { [weak self] _ in
+            guard let self else { return }
+            navigationController?.pushViewController(ProbeGlobeViewController(viewModel: viewModel), animated: true)
+        })
+        globe.accessibilityLabel = "地球"
+        globe.accessibilityIdentifier = "probe-globe-button"
+        navigationItem.rightBarButtonItems = [add, more, globe]
     }
 
     private func reloadVisibleRow(entryID: String) {

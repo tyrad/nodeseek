@@ -1,3 +1,4 @@
+import CoreLocation
 import XCTest
 @testable import nodeseek
 
@@ -363,3 +364,75 @@ private extension UIView {
 private extension UIView {
     var allSubviews: [UIView] { subviews + subviews.flatMap(\.allSubviews) }
 }
+    private final class FakeLocator: ProbeLocating {
+        var authorization: ProbeLocationAuthorization
+        var lastCoordinate: CLLocationCoordinate2D?
+        var onAuthorizationChange: (() -> Void)?
+        var authorizationRequests = 0
+        var pending: [(Result<CLLocationCoordinate2D, Error>) -> Void] = []
+
+        init(_ authorization: ProbeLocationAuthorization) { self.authorization = authorization }
+        func requestAuthorization() { authorizationRequests += 1 }
+        func requestLocation(completion: @escaping (Result<CLLocationCoordinate2D, Error>) -> Void) { pending.append(completion) }
+
+        func complete(_ result: Result<CLLocationCoordinate2D, Error>) {
+            if case .success(let coordinate) = result { lastCoordinate = coordinate }
+            pending.forEach { $0(result) }
+            pending = []
+        }
+    }
+
+    private func makeGlobePage(_ locator: FakeLocator) throws -> (ProbeGlobeViewController, UIWindow) {
+        let viewModel = ProbeMonitorViewModel(store: makeStore(), service: StubService(result: .success(snapshot(at: now))), now: { self.now })
+        let page = ProbeGlobeViewController(viewModel: viewModel, locator: locator)
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = page
+        window.makeKeyAndVisible()
+        addTeardownBlock { window.isHidden = true }
+        page.viewDidAppear(false)
+        return (page, window)
+    }
+
+    func testGlobeAsksForLocationOnceThenLocatesFromButton() throws {
+        let locator = FakeLocator(.notDetermined)
+        let (page, _) = try makeGlobePage(locator)
+        // 第一次进页面自动弹授权框；没拿到位置前按钮是“未定位”。
+        XCTAssertEqual(locator.authorizationRequests, 1)
+        XCTAssertEqual(page.locateButton.accessibilityValue, "未定位")
+
+        // 用户允许后立刻定位，成功后变成“已定位”。
+        locator.authorization = .authorized
+        locator.onAuthorizationChange?()
+        XCTAssertEqual(page.locateButton.accessibilityValue, "定位中")
+        locator.complete(.success(CLLocationCoordinate2D(latitude: 31.2, longitude: 121.5)))
+        XCTAssertEqual(page.locateButton.accessibilityValue, "已定位")
+
+        // 点按钮重新定位；失败时保留之前的位置。
+        page.locateTapped()
+        XCTAssertEqual(locator.pending.count, 1)
+        locator.complete(.failure(ProbeLocationProvider.TimeoutError()))
+        XCTAssertEqual(page.locateButton.accessibilityValue, "已定位")
+    }
+
+    func testGlobeLocatesAutomaticallyWhenAlreadyAuthorized() throws {
+        let locator = FakeLocator(.authorized)
+        let (page, _) = try makeGlobePage(locator)
+        XCTAssertEqual(locator.authorizationRequests, 0)
+        XCTAssertEqual(locator.pending.count, 1)
+        XCTAssertEqual(page.locateButton.accessibilityValue, "定位中")
+        locator.complete(.failure(ProbeLocationProvider.TimeoutError()))
+        XCTAssertEqual(page.locateButton.accessibilityValue, "未定位")
+    }
+
+    func testGlobeDeniedLocationOffersSettingsInsteadOfAsking() throws {
+        let locator = FakeLocator(.denied)
+        let (page, _) = try makeGlobePage(locator)
+        XCTAssertEqual(locator.authorizationRequests, 0)
+        XCTAssertTrue(locator.pending.isEmpty)
+        XCTAssertEqual(page.locateButton.accessibilityValue, "定位权限已关闭")
+        page.locateTapped()
+        let alert = try XCTUnwrap(page.presentedViewController as? UIAlertController)
+        XCTAssertEqual(alert.actions.map(\.title), ["取消", "去设置"])
+    }
+

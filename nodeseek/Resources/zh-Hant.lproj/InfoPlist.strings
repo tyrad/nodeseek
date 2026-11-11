@@ -2,3 +2,4 @@
 "CFBundleDisplayName" = "NS Connect";
 "NSCameraUsageDescription" = "拍照上傳到 NodeImage 並插入回覆";
 "NSPhotoLibraryAddUsageDescription" = "儲存圖片到系統相簿";
+"NSLocationWhenInUseUsageDescription" = "用於在探針地球頁畫出你到各伺服器的連線，位置只在本機使用，不會上傳";

@@ -111,3 +111,84 @@ final class ProbeServerListTests: XCTestCase {
                               isStale: stale, panelIndex: index)
     }
 }
+    func testRegionNormalizesFlagsAndCountryCodes() {
+        XCTAssertEqual(ProbeGeo.countryCode(from: "🇭🇰"), "HK")
+        XCTAssertEqual(ProbeGeo.countryCode(from: " jp "), "JP")
+        XCTAssertEqual(ProbeGeo.countryCode(from: "UK"), "GB")
+        XCTAssertEqual(ProbeGeo.countryCode(from: "🇺🇸 洛杉矶"), "US")
+        XCTAssertNil(ProbeGeo.countryCode(from: nil))
+        XCTAssertNil(ProbeGeo.countryCode(from: ""))
+        XCTAssertNil(ProbeGeo.countryCode(from: "Mars"))
+        XCTAssertNil(ProbeGeo.countryCode(from: "XX"))
+        XCTAssertEqual(ProbeGeo.flag(for: "SG"), "🇸🇬")
+        XCTAssertEqual(ProbeGeo.displayName(for: "HK"), "香港")
+        for code in ["HK", "JP", "SG", "US", "DE", "GB", "KR", "TW", "CN", "RU", "NL", "FR"] {
+            XCTAssertNotNil(ProbeGeo.coordinate(for: code), code)
+        }
+        let hongKong = ProbeGeo.coordinate(for: "HK")
+        XCTAssertEqual(hongKong?.latitude ?? 0, 22.3, accuracy: 0.5)
+        XCTAssertEqual(hongKong?.longitude ?? 0, 114.2, accuracy: 0.5)
+    }
+
+    func testCountryGroupsPutProblemsFirstAndUnknownLast() {
+        let entries = [
+            entry("HK-1", region: "🇭🇰", index: 0),
+            entry("HK-2", cpu: 95, region: "🇭🇰", index: 1),
+            entry("JP-1", region: "JP", index: 2),
+            entry("JP-2", region: "JP", index: 3),
+            entry("JP-3", region: "JP", index: 4),
+            entry("US-1", online: false, region: "🇺🇸", index: 5),
+            entry("none", index: 6),
+            entry("old", online: false, region: "🇩🇪", stale: true, index: 7),
+        ]
+        let groups = ProbeCountryGroup.groups(from: entries)
+        // 离线 → 告警 → 暂无数据（过期）→ 正常，“未知地区”最后。
+        XCTAssertEqual(groups.map(\.id), ["US", "HK", "DE", "JP", "unknown"])
+        XCTAssertEqual(groups.map(\.health), [.offline, .alert, .unknown, .online, .online])
+        XCTAssertEqual(groups[1].alertCount, 1)
+        XCTAssertEqual(groups[1].entries.map(\.displayName), ["HK-1", "HK-2"])
+        XCTAssertEqual(groups[3].entries.count, 3)
+        XCTAssertEqual(groups[0].offlineCount, 1)
+        // 过期数据不算离线。
+        XCTAssertEqual(groups[2].offlineCount, 0)
+    }
+
+    func testBuiltinDatacenterDictionaryIsWellFormed() throws {
+        let directory = try ProbeDatacenterDirectory(data: BuiltinAdapterLoader.data(named: ProbeDatacenterDirectory.resourceName))
+        XCTAssertGreaterThan(directory.cities.count, 100)
+        let codes = directory.cities.flatMap(\.codes)
+        XCTAssertEqual(codes.count, Set(codes).count, "机场代码不能重复")
+        for city in directory.cities {
+            XCTAssertTrue((-90...90).contains(city.lat) && (-180...180).contains(city.lon), city.city)
+            XCTAssertNotNil(ProbeGeo.coordinate(for: city.country), "\(city.city) 的国家 \(city.country) 不在国家表里")
+            XCTAssertEqual(city.names, city.names.map { $0.lowercased() }, "\(city.city) 的写法要用小写")
+        }
+    }
+
+    func testDatacenterMatchingFromNamesAndGroups() throws {
+        // SwiftPM 测试进程没有 App bundle，builtin 会是空字典，所以按源码路径读取同一个文件。
+        let directory = try ProbeDatacenterDirectory(data: BuiltinAdapterLoader.data(named: ProbeDatacenterDirectory.resourceName))
+        func locate(_ name: String, region: String? = nil, group: String? = nil) -> (String?, String?) {
+            let location = directory.locate(entry(name, group: group, region: region, index: 0))
+            return (location.country, location.city?.city)
+        }
+        XCTAssertTrue(locate("US-LAX", region: "🇺🇸") == ("US", "洛杉矶"))
+        XCTAssertTrue(locate("JP-TYO") == ("JP", "东京"))
+        XCTAssertTrue(locate("lax2") == ("US", "洛杉矶"))
+        XCTAssertTrue(locate("圣何塞 CN2") == ("US", "圣何塞"))
+        XCTAssertTrue(locate("Tokyo-2") == ("JP", "东京"))
+        XCTAssertTrue(locate("DE-FRA-01", region: "🇩🇪") == ("DE", "法兰克福"))
+        XCTAssertTrue(locate("node", group: "美西") == ("US", "洛杉矶"))
+        // 名字里的城市和国旗冲突时以国旗为准，退回国家。
+        XCTAssertTrue(locate("FRA-01", region: "🇫🇷") == ("FR", nil))
+        // 只写了国家代码时推断国家；小写或 CN2 线路名不算。
+        XCTAssertTrue(locate("HK-01") == ("HK", nil))
+        XCTAssertTrue(locate("hk-01") == (nil, nil))
+        XCTAssertTrue(locate("CN2-GIA") == (nil, nil))
+        // 不把普通单词的一部分当成代码。
+        XCTAssertTrue(locate("SEARCH-1") == (nil, nil))
+        XCTAssertTrue(locate("LAXITY") == (nil, nil))
+        XCTAssertTrue(locate("climate") == (nil, nil))
+        XCTAssertEqual(ProbeDatacenterDirectory.tokens(in: "US-LAX2洛杉矶"), ["US", "LAX", "2", "洛杉矶"])
+    }
+
