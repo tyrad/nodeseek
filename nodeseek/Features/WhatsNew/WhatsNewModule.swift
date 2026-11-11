@@ -28,7 +28,7 @@ enum WhatsNewModule {
                 systemName: "server.rack",
                 tint: .systemBlue,
                 title: "服务器探针",
-                subtitle: "小鸡跑得咋样，侧边栏点「探针」看看"
+                subtitle: "多 Tab 去「我的」，侧栏点探针"
             ),
             feature(
                 systemName: "apps.iphone",
