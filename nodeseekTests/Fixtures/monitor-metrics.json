@@ -1,0 +1,11 @@
+{
+  "metrics": [
+    { "ts": 1794291060, "cpu": 3.0, "mem_used": 110, "disk_used": 200, "net_rx": 30, "net_tx": 40 },
+    { "ts": 0, "cpu": 9.0, "mem_used": 1, "disk_used": 1, "net_rx": 1, "net_tx": 1 },
+    { "ts": 1794291000, "cpu": 1.5, "mem_used": 100, "disk_used": 180, "net_rx": 10, "net_tx": 20 }
+  ],
+  "ping": [],
+  "probes": {},
+  "loss": {},
+  "step": 60
+}

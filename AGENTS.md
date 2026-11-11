@@ -50,3 +50,4 @@
 ## 8. 自检要求
 - 完成前自查语法、依赖、导入、低级错误。
 - 涉及编译、测试、类型检查或接口变更时，应尽量做验证并汇报结果。
+- 模拟器测试用 `make xcode-test-class TEST="类名 ..."` 等 make 目标，不要手写 `xcodebuild test`/`test-without-building`，原因见 `docs/project-overview.md`「常用验证命令」。

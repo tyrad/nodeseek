@@ -1,0 +1,311 @@
+<!doctype html><html><head><meta charset="utf-8"><style>* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #e9ebee; font-family: -apple-system, "PingFang SC", "SF Pro Text", sans-serif; padding: 48px; color: #111; width: 1830px; -webkit-font-smoothing: antialiased; }
+body > h1 { font-size: 32px; font-weight: 700; letter-spacing: -.5px; }
+body > h1.sec { font-size: 26px; margin-top: 64px; }
+.sub { color: #6b6b70; font-size: 15px; margin: 6px 0 22px; max-width: 1500px; }
+.rules { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 40px; }
+.rule { background: #fff; border-radius: 16px; padding: 14px 16px; font-size: 13px; line-height: 1.55; color: #48484c; }
+.rule b { display: block; color: #111; font-size: 14px; margin-bottom: 4px; }
+.row { display: flex; gap: 48px; }
+.cell { width: 390px; }
+.cap { margin-top: 18px; font-size: 13.5px; line-height: 1.65; color: #3a3a3e; }
+.cap b { display: block; font-size: 16px; margin-bottom: 4px; color: #111; }
+svg { display: block; flex: none; }
+.mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+
+.phone, .wall {
+  --bg: #f2f2f7; --card: #fff; --label: #000; --label2: rgba(60,60,67,.6); --label3: rgba(60,60,67,.3);
+  --sep: rgba(60,60,67,.12); --fill: rgba(120,120,128,.14); --glass: rgba(255,255,255,.8); --glass-b: rgba(0,0,0,.05);
+  --green: #34C759; --red: #FF3B30; --orange: #FF9500; --blue: #007AFF; --indigo: #5856D6; --teal: #30B0C7; --pink: #FF2D55;
+}
+.phone.dark, .wall.dark {
+  --bg: #000; --card: #1c1c1e; --label: #fff; --label2: rgba(235,235,245,.6); --label3: rgba(235,235,245,.3);
+  --sep: rgba(84,84,88,.55); --fill: rgba(120,120,128,.3); --glass: rgba(44,44,46,.8); --glass-b: rgba(255,255,255,.06);
+  --green: #30D158; --red: #FF453A; --orange: #FF9F0A; --blue: #0A84FF; --indigo: #5E5CE6; --teal: #40C8E0; --pink: #FF375F;
+}
+.phone { position: relative; width: 390px; height: 844px; border-radius: 55px; background: var(--bg); color: var(--label); overflow: hidden; box-shadow: 0 0 0 10px #18181a, 0 30px 60px rgba(0,0,0,.25); }
+.status { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 8px 36px 0 48px; font-weight: 600; font-size: 17px; }
+.island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; border-radius: 20px; background: #000; }
+.bat { width: 25px; height: 12px; border: 1.5px solid currentColor; border-radius: 4px; position: relative; }
+.bat::after { content: ""; position: absolute; inset: 1.5px; width: 72%; background: currentColor; border-radius: 1.5px; }
+.home { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--label); z-index: 9; }
+.nav { height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+.gbtn { height: 40px; min-width: 40px; border-radius: 20px; background: var(--glass); border: .5px solid var(--glass-b); display: flex; align-items: center; justify-content: center; font-size: 14.5px; font-weight: 600; }
+.gbtn.pill { padding: 0 14px; }
+.gbtn.inv { background: var(--label); color: var(--bg); border: 0; }
+.ptitle { font-size: 34px; font-weight: 800; letter-spacing: -.8px; padding: 2px 20px 12px; }
+
+/* 趋势线 */
+.sp .ln { fill: none; stroke: var(--label); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.sp .ar { fill: var(--label); opacity: .07; }
+.sp .dash { stroke: var(--label3); stroke-width: 1.4; stroke-dasharray: 3 4; fill: none; }
+.sp .end { fill: var(--red); }
+.sp.crit .ln { stroke: var(--red); } .sp.crit .ar { fill: var(--red); opacity: .1; }
+
+/* 汇总反色卡 */
+.hero { margin: 0 16px; border-radius: 20px; background: var(--label); color: var(--bg); padding: 14px 16px 0; overflow: hidden; }
+.hmeta { display: flex; justify-content: space-between; font-family: "SF Mono", ui-monospace, monospace; font-size: 10.5px; letter-spacing: .6px; opacity: .55; }
+.hmain { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 4px; }
+.hbig { display: flex; align-items: baseline; gap: 2px; }
+.hbig b { font-size: 52px; font-weight: 800; letter-spacing: -2px; line-height: 1; }
+.hbig span { font-size: 22px; font-weight: 700; opacity: .5; }
+.hbig em { font-style: normal; font-size: 14px; font-weight: 600; margin-left: 8px; opacity: .8; }
+.hoff { font-size: 12px !important; opacity: 1 !important; color: var(--red); font-weight: 700 !important; margin-left: 8px; }
+.hnet { display: grid; gap: 2px; text-align: right; font-family: "SF Mono", ui-monospace, monospace; font-size: 13px; font-weight: 600; padding-bottom: 4px; }
+.hsp { margin: 8px -16px 0; width: calc(100% + 32px); }
+.hsp .ln { stroke: var(--bg); opacity: .8; }
+.hsp .ar { fill: var(--bg); opacity: .14; }
+
+/* 服务器卡 */
+.srv { margin: 10px 16px 0; background: var(--card); border-radius: 20px; padding: 14px 16px 12px; }
+.stop { display: flex; align-items: center; gap: 7px; }
+.flag { font-size: 16px; line-height: 1; }
+.stop h3 { font-size: 18px; font-weight: 800; letter-spacing: -.3px; flex: 1; }
+.live { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--label2); }
+.live i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.live.off { color: var(--red); } .live.off i { background: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent); }
+.meta { font-size: 10.5px; letter-spacing: .5px; color: var(--label2); margin-top: 3px; }
+.sbody { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 8px; }
+.sbig b { display: block; font-size: 38px; font-weight: 800; letter-spacing: -1.4px; line-height: 1; font-variant-numeric: tabular-nums; }
+.sbig b small { font-size: 17px; font-weight: 700; letter-spacing: 0; margin-left: 1px; }
+.sbig b.dim { color: var(--label3); }
+.sbig span { display: block; font-size: 9.5px; letter-spacing: .5px; color: var(--label2); margin-top: 5px; }
+.mtr { display: grid; grid-template-columns: 30px 1fr 50px; align-items: center; gap: 10px; margin-top: 9px; font-size: 12.5px; color: var(--label2); }
+.mtr b { text-align: right; color: var(--label); font-size: 12.5px; font-weight: 700; }
+.tk { display: flex; gap: 2.5px; height: 12px; }
+.tk i { flex: 1; border-radius: 1.5px; background: var(--fill); }
+.tk i.on { background: var(--label); } .tk i.on.warn { background: var(--orange); } .tk i.on.crit { background: var(--red); }
+.sfoot { display: flex; gap: 16px; margin-top: 11px; padding-top: 9px; border-top: .5px solid var(--sep); font-size: 11px; letter-spacing: .3px; color: var(--label2); }
+.sfoot span:last-child { margin-left: auto; }
+.offc .sp .ln { stroke: var(--label2); } .offc .sp .ar { opacity: .05; }
+.stalec { border: 1.2px dashed var(--label3); background: transparent; color: var(--label2); }
+.stalec h3, .stalec .sbig b, .stalec .mtr b { color: var(--label2); }
+.stalec .sp .ln { stroke: var(--label3); } .stalec .tk i.on { background: var(--label3); }
+.gt { display: flex; justify-content: space-between; margin: 20px 32px 0; font-size: 10.5px; letter-spacing: .5px; color: var(--label2); }
+.gt .stale { display: inline-flex; align-items: center; gap: 4px; }
+
+/* 详情 */
+.dhead { padding: 0 20px; }
+.dt { display: flex; align-items: center; gap: 9px; }
+.dt .flag { font-size: 26px; }
+.dt h2 { font-size: 34px; font-weight: 800; letter-spacing: -.8px; flex: 1; }
+.chart { margin: 14px 16px 0; background: var(--card); border-radius: 20px; padding: 16px 16px 12px; }
+.ctop { display: flex; justify-content: space-between; align-items: flex-start; }
+.ctop .sbig b { font-size: 48px; letter-spacing: -2px; }
+.seg { display: flex; background: var(--fill); border-radius: 9px; padding: 2px; font-family: "SF Mono", ui-monospace, monospace; font-size: 11px; font-weight: 600; }
+.seg span { padding: 5px 9px; border-radius: 7px; color: var(--label2); }
+.seg span.on { background: var(--label); color: var(--bg); }
+.cplot { position: relative; margin-top: 12px; }
+.cplot .grid span { position: absolute; left: 0; right: 0; border-top: 1px dotted var(--sep); }
+.cy { position: absolute; right: 0; top: -6px; bottom: -4px; display: flex; flex-direction: column; justify-content: space-between; font-size: 9px; color: var(--label3); text-align: right; }
+.cx { display: flex; justify-content: space-between; margin-top: 6px; font-size: 9.5px; color: var(--label2); }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 16px 0; }
+.tile { background: var(--card); border-radius: 18px; padding: 12px 14px; height: 112px; display: flex; flex-direction: column; gap: 5px; }
+.tl { font-size: 12px; color: var(--label2); }
+.tile b { font-size: 26px; font-weight: 800; letter-spacing: -.8px; line-height: 1; font-variant-numeric: tabular-nums; }
+.tile b small { font-size: 13px; font-weight: 700; letter-spacing: 0; margin-left: 1px; }
+.tile .tk { height: 10px; margin-top: auto; }
+.ts { font-size: 9.5px; color: var(--label2); letter-spacing: .3px; }
+.tsp { margin-top: auto; }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); margin: 10px 16px 0; background: var(--card); border-radius: 18px; padding: 12px 0; }
+.facts div { text-align: center; position: relative; }
+.facts div + div::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: .5px; background: var(--sep); }
+.facts span { display: block; font-size: 9.5px; letter-spacing: .5px; color: var(--label2); }
+.facts b { display: block; font-size: 15px; font-weight: 700; margin-top: 3px; }
+
+/* 添加 */
+.plead { margin: 0 20px; font-size: 14px; line-height: 1.55; color: var(--label2); }
+.plead.small { font-size: 12.5px; margin-top: 10px; }
+.inp { margin: 12px 16px 0; background: var(--card); border-radius: 16px; padding: 10px 16px 12px; }
+.inp + .inp { margin-top: 8px; }
+.inp span { display: block; font-size: 10px; letter-spacing: .6px; color: var(--label2); }
+.inp b { display: block; font-size: 18px; font-weight: 600; margin-top: 3px; }
+.okline { display: flex; align-items: center; gap: 7px; margin: 12px 20px 0; font-size: 10.5px; letter-spacing: .4px; color: var(--label); }
+.okline i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.picks { margin: 8px 16px 0; background: var(--card); border-radius: 18px; overflow: hidden; }
+.pick { display: flex; align-items: center; gap: 12px; height: 60px; padding: 0 16px; position: relative; }
+.pick + .pick::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: .5px; background: var(--sep); }
+.chk { width: 22px; height: 22px; border-radius: 50%; background: var(--label); color: var(--bg); display: flex; align-items: center; justify-content: center; flex: none; }
+.pn { font-family: "SF Mono", ui-monospace, monospace; font-size: 20px; font-weight: 700; color: var(--label3); }
+.pick .t { flex: 1; font-size: 16px; font-weight: 700; }
+.pick .t small { display: block; font-size: 9.5px; letter-spacing: .5px; font-weight: 400; color: var(--label2); margin-top: 2px; }
+.psp .ln { stroke-width: 1.3; }
+
+/* 小组件 */
+.walls { display: flex; gap: 32px; }
+.wall { border-radius: 36px; padding: 28px 28px 40px; display: grid; grid-template-columns: 170px 170px; grid-auto-rows: 170px; gap: 30px 24px; background: linear-gradient(160deg, #c3c7cf, #e6e7eb); }
+.wall.dark { background: linear-gradient(160deg, #2a2b30, #0b0b0d); }
+.wcell { position: relative; }
+.wcell.wide { grid-column: span 2; }
+.wlab { position: absolute; left: 0; right: 0; bottom: -21px; text-align: center; font-size: 11.5px; color: rgba(0,0,0,.55); }
+.wall.dark .wlab { color: rgba(255,255,255,.55); }
+.w { position: relative; width: 100%; height: 100%; border-radius: 22px; background: var(--card); color: var(--label); overflow: hidden; font-variant-numeric: tabular-nums; }
+.w.inv { background: var(--label); color: var(--bg); }
+.w.inv .sp .ln { stroke: var(--bg); } .w.inv .sp .ar { fill: var(--bg); opacity: .16; }
+.w.inv .wmeta, .w.inv .wbig span { color: color-mix(in srgb, var(--bg) 60%, transparent); }
+.ws { padding: 14px 15px 0; }
+.wtop { display: flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 800; letter-spacing: -.2px; }
+.wtop .flag { font-size: 12px; }
+.wtop .n { flex: 1; }
+.wdot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex: none; }
+.wdot.off { background: var(--red); } .wdot.none { background: var(--label3); }
+.wclock { color: var(--label2); }
+.wbig { margin-top: 8px; }
+.wbig b { display: block; font-size: 38px; font-weight: 800; letter-spacing: -1.6px; line-height: 1; }
+.wbig b small { font-size: 16px; letter-spacing: 0; }
+.wbig b.red { color: var(--red); font-size: 32px; letter-spacing: -.5px; }
+.wbig span { display: block; font-size: 9px; letter-spacing: .6px; color: var(--label2); margin-top: 4px; }
+.wmeta { display: flex; gap: 8px; margin-top: 6px; font-size: 9.5px; letter-spacing: .3px; color: var(--label2); }
+.wmeta span:last-child { margin-left: auto; }
+.wsp { position: absolute; left: 0; bottom: 0; }
+.stalew .wtop .n, .stalew .wbig b { color: var(--label2); }
+.stalew .sp .ln { stroke: var(--label3); } .stalew .sp .ar { opacity: .04; }
+.woff .sp .ln { stroke: var(--label2); }
+.wm { padding: 12px 14px 12px; }
+.wh { display: flex; justify-content: space-between; font-size: 9.5px; letter-spacing: .5px; color: var(--label2); }
+.wh b { color: var(--label); } .wh em { font-style: normal; color: var(--red); font-weight: 700; }
+.cols { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 10px; }
+.wc { padding: 0 10px; position: relative; }
+.wc:first-child { padding-left: 0; } .wc:last-child { padding-right: 0; }
+.wc + .wc::before { content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: .5px; background: var(--sep); }
+.cn { display: flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; white-space: nowrap; overflow: hidden; }
+.cbig { font-size: 30px; font-weight: 800; letter-spacing: -1.2px; line-height: 1; margin-top: 10px; }
+.cbig small { font-size: 13px; letter-spacing: 0; }
+.cbig.red { color: var(--red); font-size: 24px; letter-spacing: -.3px; padding-top: 4px; }
+.cbig.crit { color: var(--red); }
+.cbig.dim { color: var(--label3); }
+.csp { margin-top: 8px; width: 100%; }
+.cm { font-size: 8.5px; letter-spacing: .3px; color: var(--label2); margin-top: 6px; white-space: nowrap; }
+
+/* 第三版：指标色 */
+.sp.cpu .ln { stroke: var(--blue); } .sp.cpu .ar { fill: var(--blue); opacity: .14; }
+.sp.net .ln { stroke: var(--pink); }
+.tk.mem i.on { background: var(--indigo); } .tk.dsk i.on { background: var(--teal); }
+.tk i.on.warn { background: var(--orange) !important; } .tk i.on.crit { background: var(--red) !important; }
+.lg { display: inline-block; width: 6px; height: 6px; border-radius: 2px; margin-right: 5px; vertical-align: 1px; }
+.lg.mem { background: var(--indigo); } .lg.dsk { background: var(--teal); } .lg.net { background: var(--pink); }
+.mtr { grid-template-columns: 40px 1fr 50px; }
+.sp.cpu.crit .ln { stroke: var(--red); } .sp.cpu.crit .ar { fill: var(--red); }
+.offc .sp .ln, .woff .sp .ln { stroke: var(--label2) !important; } .offc .sp .ar, .woff .sp .ar { fill: var(--label); opacity: .05; }
+.stalec .sp .ln, .stalew .sp .ln { stroke: var(--label3) !important; } .stalec .sp .ar, .stalew .sp .ar { fill: var(--label); opacity: .04; }
+.stalec .tk i.on { background: var(--label3) !important; } .stalec .lg { opacity: .4; }
+.w.inv .sp.cpu .ln { stroke: var(--blue); } .w.inv .sp.cpu .ar { fill: var(--blue); opacity: .3; }
+
+.ph{position:relative;width:390px;height:560px;border-radius:55px 55px 0 0;background:var(--bg);color:var(--label);overflow:hidden;box-shadow:0 0 0 10px #18181a;--bg:#f2f2f7;--card:#fff;--label:#000;--label2:rgba(60,60,67,.6);--label3:rgba(60,60,67,.3);--sep:rgba(60,60,67,.12);--fill:rgba(120,120,128,.16);--glass:rgba(255,255,255,.8);--glass-b:rgba(0,0,0,.05);--green:#34C759;--red:#FF3B30;--orange:#FF9500;--pink:#FF2D55;--blue:#007AFF;--indigo:#5856D6;--teal:#30B0C7}
+.ph.dark{--bg:#000;--card:#1c1c1e;--label:#fff;--label2:rgba(235,235,245,.6);--label3:rgba(235,235,245,.3);--sep:rgba(84,84,88,.55);--fill:rgba(120,120,128,.32);--glass:rgba(44,44,46,.8);--glass-b:rgba(255,255,255,.06);--green:#30D158;--red:#FF453A;--orange:#FF9F0A;--blue:#0A84FF;--indigo:#5E5CE6;--teal:#40C8E0}
+.strip{position:relative;height:180px;margin:0 0 8px}
+.slot{position:absolute;top:6px;width:318px;height:164px}
+.slot.c{left:36px}.slot.s{left:16px;width:358px}
+.slot.l{left:-290px;transform:scale(.88);transform-origin:right center;opacity:.45}
+.slot.r{left:362px;transform:scale(.88);transform-origin:left center;opacity:.45}
+.slot>div{width:100%;height:100%;background:var(--card);color:var(--label);border-radius:22px;padding:14px 16px 0;position:relative;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 22px rgba(0,0,0,.06)}
+.ph.dark .slot>div{box-shadow:none}
+.slot.inv>div{background:#2c2c2e;--label:#f2f2f7;--label2:rgba(242,242,247,.58);--label3:rgba(242,242,247,.28);--fill:rgba(255,255,255,.13);--sep:rgba(255,255,255,.1);color:#f2f2f7;box-shadow:0 10px 26px rgba(0,0,0,.16)}
+.ph.dark .slot.inv>div{background:#d5d5da;--label:#1c1c1e;--label2:rgba(28,28,30,.58);--label3:rgba(28,28,30,.3);--fill:rgba(0,0,0,.1);--sep:rgba(0,0,0,.1);color:#1c1c1e;--blue:#007AFF;--indigo:#5856D6;--teal:#2a9db3;--red:#E5352B;--orange:#E8890C;--green:#28A745}
+.t1{display:flex;align-items:center;gap:8px}.t1 b{font-size:17px;font-weight:700;letter-spacing:-.3px;flex:1;white-space:nowrap;overflow:hidden}
+.t2{font-size:11.5px;color:var(--label2);margin-top:1px;white-space:nowrap;overflow:hidden}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 9px 3px 7px;border-radius:10px;white-space:nowrap}
+.pill em{width:6px;height:6px;border-radius:3px}
+.pill.ok{background:color-mix(in srgb,var(--green) 16%,transparent);color:var(--green)}.pill.ok em{background:var(--green)}
+.pill.red{background:color-mix(in srgb,var(--red) 16%,transparent);color:var(--red)}.pill.red em{background:var(--red)}
+.pill.org{background:color-mix(in srgb,var(--orange) 16%,transparent);color:var(--orange)}.pill.org em{background:var(--orange)}
+.mid{display:flex;align-items:flex-end;justify-content:space-between;margin-top:10px}
+.big{display:flex;align-items:baseline;gap:3px}.big b{font-size:38px;font-weight:800;letter-spacing:-1.4px;line-height:1;font-variant-numeric:tabular-nums}.big span{font-size:16px;font-weight:700;color:var(--label2)}.big i{font-style:normal;font-size:12px;color:var(--label2);font-weight:600;margin-left:5px}
+.rings{display:flex;gap:10px}
+.rg{display:flex;flex-direction:column;align-items:center;gap:3px}.rg span{font-size:9.5px;color:var(--label2);font-weight:600}
+.rw{position:relative;width:42px;height:42px}.rw b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums}.rw b small{font-size:7.5px;margin-left:.5px}
+.ft{position:absolute;left:0;right:0;bottom:0;height:34px;border-top:.5px solid var(--sep);display:flex;align-items:center;gap:7px;padding:0 16px;font-size:12px}
+.ft .tg{font-weight:700;font-size:11px;padding:1px 6px;border-radius:5px}
+.ft.busy .tg{background:var(--fill);color:var(--label2)}
+.ft.off .tg{background:color-mix(in srgb,var(--red) 16%,transparent);color:var(--red)}
+.ft .hs{font-weight:600;flex:1;white-space:nowrap;overflow:hidden}.ft .vv{color:var(--label2);font-family:"SF Mono",monospace;font-size:11px}.ft.off .vv{color:var(--red)}
+.chev{color:var(--label3);font-size:15px}
+i{font-style:normal}
+.chips{display:flex;gap:6px;padding:2px 16px 10px}.chip{background:var(--card);border-radius:16px;padding:6px 12px;font-size:13px;font-weight:600}.chip i{color:var(--label2);font-size:11px}.chip.on{background:var(--label);color:var(--bg)}.chip.on i{color:var(--bg);opacity:.6}
+.lst{background:var(--card)}.lr{display:flex;align-items:center;gap:9px;padding:13px 16px;border-bottom:.5px solid var(--sep);font-size:15px}.lr b{font-weight:600;flex:1}.lr .m{font-size:11px;color:var(--label2);font-family:"SF Mono",monospace}
+.dot{width:7px;height:7px;border-radius:4px}
+.grid{display:grid;grid-template-columns:repeat(3,390px);gap:30px 56px;margin-top:20px}
+.lab{font-size:19px;font-weight:700}.lab small{display:block;font-size:13px;font-weight:400;color:#555;margin-top:4px;line-height:1.55}
+.zoom{display:flex;gap:40px;margin-top:50px;align-items:flex-start}
+.zc{width:358px;height:150px;position:relative}.zc>div{width:100%;height:100%;border-radius:22px;padding:14px 16px 0;position:relative;overflow:hidden}
+
+body{width:1400px}
+.row{display:flex;gap:28px;margin-top:18px;align-items:flex-start;flex-wrap:wrap}
+.bg{padding:22px;border-radius:26px;background:#f2f2f7} .bg.dk{background:#000}
+.cap{font-size:13px;color:#555;margin-top:10px;width:358px;line-height:1.5}
+.k{position:relative;width:358px;height:164px}
+.k>.cd{width:100%;height:100%;border-radius:22px;padding:14px 16px 0;position:relative;overflow:hidden;isolation:isolate}
+/* 基础：柔和反色 */
+.k>.cd{background:#2c2c2e;--label:#f2f2f7;--label2:rgba(242,242,247,.58);--label3:rgba(242,242,247,.28);--fill:rgba(255,255,255,.13);--sep:rgba(255,255,255,.1);color:#f2f2f7;--green:#34C759;--red:#FF453A;--orange:#FF9F0A;--blue:#0A84FF;--indigo:#5E5CE6;--teal:#40C8E0}
+.dk .k>.cd{background:#d5d5da;--label:#1c1c1e;--label2:rgba(28,28,30,.58);--label3:rgba(28,28,30,.3);--fill:rgba(0,0,0,.1);--sep:rgba(0,0,0,.1);color:#1c1c1e;--blue:#007AFF;--indigo:#5856D6;--teal:#2a9db3;--red:#E5352B;--orange:#E8890C;--green:#28A745}
+.k>.cd>*{position:relative;z-index:2} .k>.cd>.ft{position:absolute}
+.fx{position:absolute!important;inset:0;z-index:1!important;pointer-events:none;border-radius:inherit}
+/* A 静态质感 */
+.A>.cd{background:linear-gradient(145deg,#3a3a3d 0%,#2c2c2e 48%,#242426 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),inset 0 -1px 0 rgba(0,0,0,.35),0 1px 1px rgba(0,0,0,.08),0 12px 28px -8px rgba(0,0,0,.35)}
+.dk .A>.cd{background:linear-gradient(145deg,#e4e4e8 0%,#d5d5da 50%,#c9c9ce 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 0 -1px 0 rgba(0,0,0,.08),0 12px 30px -10px rgba(255,255,255,.08)}
+.A .grain{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 1.1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");opacity:.10;mix-blend-mode:overlay}
+.dk .A .grain{opacity:.16;mix-blend-mode:multiply}
+.A .rw svg circle:nth-child(2){filter:drop-shadow(0 0 3px currentColor)}
+.A .rw svg circle:nth-child(1){stroke:rgba(0,0,0,.28)}
+.dk .A .rw svg circle:nth-child(1){stroke:rgba(0,0,0,.09)}
+/* B 倾斜光泽：一条斜向高光带，位置随倾斜移动 */
+.sheen{background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.07) 40%,rgba(255,255,255,.2) 50%,rgba(255,255,255,.07) 60%,transparent 70%);background-size:260% 100%;mix-blend-mode:screen}
+.dk .sheen{background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.35) 44%,rgba(255,255,255,.6) 50%,rgba(255,255,255,.35) 56%,transparent 70%);background-size:260% 100%;mix-blend-mode:soft-light}
+.p0{background-position:95% 0} .p1{background-position:50% 0} .p2{background-position:5% 0}
+/* C 状态氛围光：右上角缓慢流动的一团柔光 */
+.glow{filter:blur(18px);opacity:.9}
+.glow.ok{background:radial-gradient(60% 80% at 92% 0%,rgba(255,255,255,.10),transparent 70%),radial-gradient(50% 70% at 10% 110%,rgba(255,255,255,.05),transparent 70%)}
+.glow.off{background:radial-gradient(55% 85% at 96% -5%,rgba(255,69,58,.42),transparent 70%),radial-gradient(40% 60% at 70% 10%,rgba(255,69,58,.12),transparent 70%)}
+.glow.warn{background:radial-gradient(55% 85% at 96% -5%,rgba(255,159,10,.38),transparent 70%),radial-gradient(40% 60% at 70% 10%,rgba(255,159,10,.10),transparent 70%)}
+.dk .glow.off{background:radial-gradient(55% 85% at 96% -5%,rgba(255,59,48,.30),transparent 70%)}
+.dk .glow.warn{background:radial-gradient(55% 85% at 96% -5%,rgba(255,149,0,.30),transparent 70%)}
+/* 拉丝金属示意 */
+.brush{background:repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 2px),repeating-linear-gradient(0deg,rgba(0,0,0,.05) 0 1px,transparent 1px 3px),linear-gradient(100deg,transparent 20%,rgba(255,255,255,.12) 45%,rgba(255,255,255,.2) 50%,rgba(255,255,255,.12) 55%,transparent 80%)}
+h2{font-size:22px;margin:46px 0 4px}
+</style></head><body>
+<h1>探针 · 顶部卡片质感 v8</h1>
+<p class="sub">在 v7 统一柔和反色卡片上加质感。A、B 不用 Metal，几乎不耗电；C 需要 Metal 实时渲染，只给居中卡片用。左浅色模式，右深色模式。</p>
+<h2>对比：现在 vs A 静态质感</h2>
+<p class="sub">A = 细颗粒噪点 + 上沿高光 / 下沿暗线 + 左上到右下 3% 的微渐变 + 圆环同色微光、底轨略内凹。</p>
+<div class="row"><div><div class="bg "><div class="k "><div class="cd"><div class="t1"><b>极简</b><span class="pill red"><em></em>1 台离线</span></div><div class="t2">极简探针 · probe.example.net · 刚刚</div>
+<div class="mid"><div class="big"><b>9</b><span>/10</span><i>在线</i></div>
+<div class="rings"><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--blue)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="4.8 117.8"/></svg><b style="color:var(--label)">4<small>%</small></b></div><span>CPU</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--indigo)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="28.0 117.8"/></svg><b style="color:var(--label)">24<small>%</small></b></div><span>内存</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--teal)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="20.0 117.8"/></svg><b style="color:var(--label)">17<small>%</small></b></div><span>硬盘</span></div></div></div>
+<div class="ft off"><span class="tg">离线</span><span class="hs">🇭🇰 HK-02</span><span class="vv">3 小时前</span><span class="chev">›</span></div></div></div></div><div class="cap">现在 · 浅色：纯色块</div></div><div><div class="bg "><div class="k A"><div class="cd"><div class="fx grain"></div><div class="t1"><b>极简</b><span class="pill red"><em></em>1 台离线</span></div><div class="t2">极简探针 · probe.example.net · 刚刚</div>
+<div class="mid"><div class="big"><b>9</b><span>/10</span><i>在线</i></div>
+<div class="rings"><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--blue)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="4.8 117.8"/></svg><b style="color:var(--label)">4<small>%</small></b></div><span>CPU</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--indigo)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="28.0 117.8"/></svg><b style="color:var(--label)">24<small>%</small></b></div><span>内存</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--teal)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="20.0 117.8"/></svg><b style="color:var(--label)">17<small>%</small></b></div><span>硬盘</span></div></div></div>
+<div class="ft off"><span class="tg">离线</span><span class="hs">🇭🇰 HK-02</span><span class="vv">3 小时前</span><span class="chev">›</span></div></div></div></div><div class="cap">A · 浅色：有厚度、有磨砂感</div></div><div><div class="bg dk"><div class="k A"><div class="cd"><div class="fx grain"></div><div class="t1"><b>极简</b><span class="pill red"><em></em>1 台离线</span></div><div class="t2">极简探针 · probe.example.net · 刚刚</div>
+<div class="mid"><div class="big"><b>9</b><span>/10</span><i>在线</i></div>
+<div class="rings"><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--blue)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="4.8 117.8"/></svg><b style="color:var(--label)">4<small>%</small></b></div><span>CPU</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--indigo)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="28.0 117.8"/></svg><b style="color:var(--label)">24<small>%</small></b></div><span>内存</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--teal)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="20.0 117.8"/></svg><b style="color:var(--label)">17<small>%</small></b></div><span>硬盘</span></div></div></div>
+<div class="ft off"><span class="tg">离线</span><span class="hs">🇭🇰 HK-02</span><span class="vv">3 小时前</span><span class="chev">›</span></div></div></div></div><div class="cap">A · 深色：浅灰卡同样处理</div></div></div>
+<h2>B 随手机倾斜的光泽（在 A 基础上）</h2>
+<p class="sub">一条很淡的斜向高光带，手机左右倾斜时在卡面上缓慢滑动，类似钛金卡转动时的反光。下面三张是同一张卡在三个倾斜角度下的样子。用陀螺仪驱动渐变层，不需要 Metal；开了「减弱动态效果」或低电量模式时关闭。</p>
+<div class="row"><div><div class="bg "><div class="k A"><div class="cd"><div class="fx grain"></div><div class="fx sheen p0"></div><div class="t1"><b>家里 HK</b><span class="pill ok"><em></em>全部在线</span></div><div class="t2">Komari · status.example.com · 刚刚</div>
+<div class="mid"><div class="big"><b>2</b><span>/2</span><i>在线</i></div>
+<div class="rings"><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--blue)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="1.9 117.8"/></svg><b style="color:var(--label)">2<small>%</small></b></div><span>CPU</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--indigo)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="8.8 117.8"/></svg><b style="color:var(--label)">8<small>%</small></b></div><span>内存</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--teal)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="38.9 117.8"/></svg><b style="color:var(--label)">33<small>%</small></b></div><span>硬盘</span></div></div></div>
+<div class="ft busy"><span class="tg">最忙</span><span class="hs">🇭🇰 HK-01</span><span class="vv">CPU 1.8%</span><span class="chev">›</span></div></div></div></div><div class="cap">向左倾斜</div></div><div><div class="bg "><div class="k A"><div class="cd"><div class="fx grain"></div><div class="fx sheen p1"></div><div class="t1"><b>家里 HK</b><span class="pill ok"><em></em>全部在线</span></div><div class="t2">Komari · status.example.com · 刚刚</div>
+<div class="mid"><div class="big"><b>2</b><span>/2</span><i>在线</i></div>
+<div class="rings"><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--blue)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="1.9 117.8"/></svg><b style="color:var(--label)">2<small>%</small></b></div><span>CPU</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--indigo)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="8.8 117.8"/></svg><b style="color:var(--label)">8<small>%</small></b></div><span>内存</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--teal)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="38.9 117.8"/></svg><b style="color:var(--label)">33<small>%</small></b></div><span>硬盘</span></div></div></div>
+<div class="ft busy"><span class="tg">最忙</span><span class="hs">🇭🇰 HK-01</span><span class="vv">CPU 1.8%</span><span class="chev">›</span></div></div></div></div><div class="cap">放平</div></div><div><div class="bg dk"><div class="k A"><div class="cd"><div class="fx grain"></div><div class="fx sheen p2"></div><div class="t1"><b>家里 HK</b><span class="pill ok"><em></em>全部在线</span></div><div class="t2">Komari · status.example.com · 刚刚</div>
+<div class="mid"><div class="big"><b>2</b><span>/2</span><i>在线</i></div>
+<div class="rings"><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--blue)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="1.9 117.8"/></svg><b style="color:var(--label)">2<small>%</small></b></div><span>CPU</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--indigo)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="8.8 117.8"/></svg><b style="color:var(--label)">8<small>%</small></b></div><span>内存</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--teal)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="38.9 117.8"/></svg><b style="color:var(--label)">33<small>%</small></b></div><span>硬盘</span></div></div></div>
+<div class="ft busy"><span class="tg">最忙</span><span class="hs">🇭🇰 HK-01</span><span class="vv">CPU 1.8%</span><span class="chev">›</span></div></div></div></div><div class="cap">向右倾斜 · 深色</div></div></div>
+<h2>C 状态氛围光（Metal，在 A 基础上）</h2>
+<p class="sub">卡片底层一团缓慢流动的柔光：正常时是中性的微亮；有离线时右上角渗出淡红，有告警时淡橙。不看文字也能感知探针状态。实际是 Metal 着色器实时渲染、缓慢漂动，这里是静态截帧。</p>
+<div class="row"><div><div class="bg "><div class="k A"><div class="cd"><div class="fx grain"></div><div class="fx glow ok"></div><div class="t1"><b>家里 HK</b><span class="pill ok"><em></em>全部在线</span></div><div class="t2">Komari · status.example.com · 刚刚</div>
+<div class="mid"><div class="big"><b>2</b><span>/2</span><i>在线</i></div>
+<div class="rings"><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--blue)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="1.9 117.8"/></svg><b style="color:var(--label)">2<small>%</small></b></div><span>CPU</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--indigo)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="8.8 117.8"/></svg><b style="color:var(--label)">8<small>%</small></b></div><span>内存</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--teal)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="38.9 117.8"/></svg><b style="color:var(--label)">33<small>%</small></b></div><span>硬盘</span></div></div></div>
+<div class="ft busy"><span class="tg">最忙</span><span class="hs">🇭🇰 HK-01</span><span class="vv">CPU 1.8%</span><span class="chev">›</span></div></div></div></div><div class="cap">全部在线 · 中性</div></div><div><div class="bg "><div class="k A"><div class="cd"><div class="fx grain"></div><div class="fx glow off"></div><div class="t1"><b>极简</b><span class="pill red"><em></em>1 台离线</span></div><div class="t2">极简探针 · probe.example.net · 刚刚</div>
+<div class="mid"><div class="big"><b>9</b><span>/10</span><i>在线</i></div>
+<div class="rings"><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--blue)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="4.8 117.8"/></svg><b style="color:var(--label)">4<small>%</small></b></div><span>CPU</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--indigo)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="28.0 117.8"/></svg><b style="color:var(--label)">24<small>%</small></b></div><span>内存</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--teal)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="20.0 117.8"/></svg><b style="color:var(--label)">17<small>%</small></b></div><span>硬盘</span></div></div></div>
+<div class="ft off"><span class="tg">离线</span><span class="hs">🇭🇰 HK-02</span><span class="vv">3 小时前</span><span class="chev">›</span></div></div></div></div><div class="cap">有离线 · 淡红</div></div><div><div class="bg dk"><div class="k A"><div class="cd"><div class="fx grain"></div><div class="fx glow off"></div><div class="t1"><b>生产集群</b><span class="pill red"><em></em>1 台离线</span></div><div class="t2">Komari · status.example.com · 12 秒前</div>
+<div class="mid"><div class="big"><b>27</b><span>/28</span><i>在线</i></div>
+<div class="rings"><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--blue)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="54.2 117.8"/></svg><b style="color:var(--label)">46<small>%</small></b></div><span>CPU</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--orange)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="87.2 117.8"/></svg><b style="color:var(--orange)">74<small>%</small></b></div><span>内存</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--red)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="107.2 117.8"/></svg><b style="color:var(--red)">91<small>%</small></b></div><span>硬盘</span></div></div></div>
+<div class="ft off"><span class="tg">离线</span><span class="hs">🇸🇬 SG-07</span><span class="vv">8 分钟前</span><span class="chev">›</span></div></div></div></div><div class="cap">有离线 · 深色</div></div></div>
+<div class="row"><div><div class="bg "><div class="k A"><div class="cd"><div class="fx grain"></div><div class="fx glow warn"></div><div class="t1"><b>生产集群</b><span class="pill org"><em></em>2 台告警</span></div><div class="t2">Komari · status.example.com · 12 秒前</div>
+<div class="mid"><div class="big"><b>27</b><span>/28</span><i>在线</i></div>
+<div class="rings"><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--blue)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="54.2 117.8"/></svg><b style="color:var(--label)">46<small>%</small></b></div><span>CPU</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--orange)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="87.2 117.8"/></svg><b style="color:var(--orange)">74<small>%</small></b></div><span>内存</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--red)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="107.2 117.8"/></svg><b style="color:var(--red)">91<small>%</small></b></div><span>硬盘</span></div></div></div>
+<div class="ft busy"><span class="tg">最忙</span><span class="hs">🇸🇬 SG-03</span><span class="vv">硬盘 91%</span><span class="chev">›</span></div></div></div></div><div class="cap">只有告警 · 淡橙</div></div><div><div class="bg "><div class="k A"><div class="cd"><div class="fx grain"></div><div class="fx brush"></div><div class="t1"><b>极简</b><span class="pill red"><em></em>1 台离线</span></div><div class="t2">极简探针 · probe.example.net · 刚刚</div>
+<div class="mid"><div class="big"><b>9</b><span>/10</span><i>在线</i></div>
+<div class="rings"><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--blue)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="4.8 117.8"/></svg><b style="color:var(--label)">4<small>%</small></b></div><span>CPU</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--indigo)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="28.0 117.8"/></svg><b style="color:var(--label)">24<small>%</small></b></div><span>内存</span></div><div class="rg"><div class="rw"><svg width="42" height="42" viewBox="0 0 42 42" style="transform:rotate(-90deg)"><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--fill)" stroke-width="4.5"/><circle cx="21.0" cy="21.0" r="18.75" fill="none" stroke="var(--teal)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="20.0 117.8"/></svg><b style="color:var(--label)">17<small>%</small></b></div><span>硬盘</span></div></div></div>
+<div class="ft off"><span class="tg">离线</span><span class="hs">🇭🇰 HK-02</span><span class="vv">3 小时前</span><span class="chev">›</span></div></div></div></div><div class="cap">拉丝金属（示意，不推荐：只有装饰，没有信息）</div></div></div>
+</body></html>

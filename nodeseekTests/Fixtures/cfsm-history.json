@@ -1,0 +1,38 @@
+[
+ {
+  "timestamp": 1799996400000,
+  "cpu": 1.1,
+  "ram_total": 1024,
+  "ram_used": 300,
+  "disk_total": 40960,
+  "disk_used": 8192,
+  "net_in_speed": 3900,
+  "net_out_speed": 1900,
+  "load_avg": "0.10 0.10 0.10",
+  "region": "HK"
+ },
+ {
+  "timestamp": 1799996460000,
+  "cpu": 1.0,
+  "ram_total": 1024,
+  "ram_used": 300,
+  "disk_total": 40960,
+  "disk_used": 8192,
+  "net_in_speed": 4200,
+  "net_out_speed": 3700,
+  "load_avg": "0.10 0.10 0.10",
+  "region": "HK"
+ },
+ {
+  "timestamp": 1799996520000,
+  "cpu": 1.2,
+  "ram_total": 1024,
+  "ram_used": 300,
+  "disk_total": 40960,
+  "disk_used": 8192,
+  "net_in_speed": 4300,
+  "net_out_speed": 4000,
+  "load_avg": "0.10 0.10 0.10",
+  "region": "HK"
+ }
+]

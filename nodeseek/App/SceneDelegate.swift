@@ -17,7 +17,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         let window = UIWindow(windowScene: windowScene)
         appRouter.window = window
-        let launchedFromPush = connectionOptions.notificationResponse != nil
+        let launchedFromPush = connectionOptions.notificationResponse != nil || !connectionOptions.urlContexts.isEmpty
         window.rootViewController = appRouter.makeRootViewController()
         window.makeKeyAndVisible()
         self.window = window
@@ -32,6 +32,17 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         if let response = connectionOptions.notificationResponse {
             PushNotificationDeepLink.handle(userInfo: response.notification.request.content.userInfo)
         }
+        handle(urlContexts: connectionOptions.urlContexts)
+    }
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        handle(urlContexts: URLContexts)
+    }
+
+    /// 目前只有小组件会用 nsconnect:// 打开 App。
+    private func handle(urlContexts: Set<UIOpenURLContext>) {
+        guard let link = urlContexts.lazy.compactMap({ ProbeWidgetLink(url: $0.url) }).first else { return }
+        PushNotificationDeepLink.handle(.probe(link))
     }
 
     private func presentOnboarding(from root: UIViewController, in window: UIWindow) {

@@ -135,6 +135,10 @@ class PostListPresenter: PostListPresenterProtocol {
         router.navigateToSearch()
     }
 
+    func didTapProbe() {
+        router.navigateToProbeMonitor()
+    }
+
     func didTapSettings() {
         #if DEBUG
         let detailTestAction: (@MainActor () -> Void)? = { [weak self] in

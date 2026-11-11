@@ -1,0 +1,299 @@
+<!doctype html><html><head><meta charset="utf-8"><style>* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #e9ebee; font-family: -apple-system, "PingFang SC", "SF Pro Text", sans-serif; padding: 48px; color: #111; width: 1830px; -webkit-font-smoothing: antialiased; }
+body > h1 { font-size: 32px; font-weight: 700; letter-spacing: -.5px; }
+body > h1.sec { font-size: 26px; margin-top: 64px; }
+.sub { color: #6b6b70; font-size: 15px; margin: 6px 0 22px; max-width: 1500px; }
+.rules { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 40px; }
+.rule { background: #fff; border-radius: 16px; padding: 14px 16px; font-size: 13px; line-height: 1.55; color: #48484c; }
+.rule b { display: block; color: #111; font-size: 14px; margin-bottom: 4px; }
+.row { display: flex; gap: 48px; }
+.cell { width: 390px; }
+.cap { margin-top: 18px; font-size: 13.5px; line-height: 1.65; color: #3a3a3e; }
+.cap b { display: block; font-size: 16px; margin-bottom: 4px; color: #111; }
+svg { display: block; flex: none; }
+.mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+
+.phone, .wall {
+  --bg: #f2f2f7; --card: #fff; --label: #000; --label2: rgba(60,60,67,.6); --label3: rgba(60,60,67,.3);
+  --sep: rgba(60,60,67,.12); --fill: rgba(120,120,128,.14); --glass: rgba(255,255,255,.8); --glass-b: rgba(0,0,0,.05);
+  --green: #34C759; --red: #FF3B30; --orange: #FF9500; --blue: #007AFF; --indigo: #5856D6; --teal: #30B0C7; --pink: #FF2D55;
+}
+.phone.dark, .wall.dark {
+  --bg: #000; --card: #1c1c1e; --label: #fff; --label2: rgba(235,235,245,.6); --label3: rgba(235,235,245,.3);
+  --sep: rgba(84,84,88,.55); --fill: rgba(120,120,128,.3); --glass: rgba(44,44,46,.8); --glass-b: rgba(255,255,255,.06);
+  --green: #30D158; --red: #FF453A; --orange: #FF9F0A; --blue: #0A84FF; --indigo: #5E5CE6; --teal: #40C8E0; --pink: #FF375F;
+}
+.phone { position: relative; width: 390px; height: 844px; border-radius: 55px; background: var(--bg); color: var(--label); overflow: hidden; box-shadow: 0 0 0 10px #18181a, 0 30px 60px rgba(0,0,0,.25); }
+.status { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 8px 36px 0 48px; font-weight: 600; font-size: 17px; }
+.island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; border-radius: 20px; background: #000; }
+.bat { width: 25px; height: 12px; border: 1.5px solid currentColor; border-radius: 4px; position: relative; }
+.bat::after { content: ""; position: absolute; inset: 1.5px; width: 72%; background: currentColor; border-radius: 1.5px; }
+.home { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--label); z-index: 9; }
+.nav { height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+.gbtn { height: 40px; min-width: 40px; border-radius: 20px; background: var(--glass); border: .5px solid var(--glass-b); display: flex; align-items: center; justify-content: center; font-size: 14.5px; font-weight: 600; }
+.gbtn.pill { padding: 0 14px; }
+.gbtn.inv { background: var(--label); color: var(--bg); border: 0; }
+.ptitle { font-size: 34px; font-weight: 800; letter-spacing: -.8px; padding: 2px 20px 12px; }
+
+/* 趋势线 */
+.sp .ln { fill: none; stroke: var(--label); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.sp .ar { fill: var(--label); opacity: .07; }
+.sp .dash { stroke: var(--label3); stroke-width: 1.4; stroke-dasharray: 3 4; fill: none; }
+.sp .end { fill: var(--red); }
+.sp.crit .ln { stroke: var(--red); } .sp.crit .ar { fill: var(--red); opacity: .1; }
+
+/* 汇总反色卡 */
+.hero { margin: 0 16px; border-radius: 20px; background: var(--label); color: var(--bg); padding: 14px 16px 0; overflow: hidden; }
+.hmeta { display: flex; justify-content: space-between; font-family: "SF Mono", ui-monospace, monospace; font-size: 10.5px; letter-spacing: .6px; opacity: .55; }
+.hmain { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 4px; }
+.hbig { display: flex; align-items: baseline; gap: 2px; }
+.hbig b { font-size: 52px; font-weight: 800; letter-spacing: -2px; line-height: 1; }
+.hbig span { font-size: 22px; font-weight: 700; opacity: .5; }
+.hbig em { font-style: normal; font-size: 14px; font-weight: 600; margin-left: 8px; opacity: .8; }
+.hoff { font-size: 12px !important; opacity: 1 !important; color: var(--red); font-weight: 700 !important; margin-left: 8px; }
+.hnet { display: grid; gap: 2px; text-align: right; font-family: "SF Mono", ui-monospace, monospace; font-size: 13px; font-weight: 600; padding-bottom: 4px; }
+.hsp { margin: 8px -16px 0; width: calc(100% + 32px); }
+.hsp .ln { stroke: var(--bg); opacity: .8; }
+.hsp .ar { fill: var(--bg); opacity: .14; }
+
+/* 服务器卡 */
+.srv { margin: 10px 16px 0; background: var(--card); border-radius: 20px; padding: 14px 16px 12px; }
+.stop { display: flex; align-items: center; gap: 7px; }
+.flag { font-size: 16px; line-height: 1; }
+.stop h3 { font-size: 18px; font-weight: 800; letter-spacing: -.3px; flex: 1; }
+.live { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--label2); }
+.live i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.live.off { color: var(--red); } .live.off i { background: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent); }
+.meta { font-size: 10.5px; letter-spacing: .5px; color: var(--label2); margin-top: 3px; }
+.sbody { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 8px; }
+.sbig b { display: block; font-size: 38px; font-weight: 800; letter-spacing: -1.4px; line-height: 1; font-variant-numeric: tabular-nums; }
+.sbig b small { font-size: 17px; font-weight: 700; letter-spacing: 0; margin-left: 1px; }
+.sbig b.dim { color: var(--label3); }
+.sbig span { display: block; font-size: 9.5px; letter-spacing: .5px; color: var(--label2); margin-top: 5px; }
+.mtr { display: grid; grid-template-columns: 30px 1fr 50px; align-items: center; gap: 10px; margin-top: 9px; font-size: 12.5px; color: var(--label2); }
+.mtr b { text-align: right; color: var(--label); font-size: 12.5px; font-weight: 700; }
+.tk { display: flex; gap: 2.5px; height: 12px; }
+.tk i { flex: 1; border-radius: 1.5px; background: var(--fill); }
+.tk i.on { background: var(--label); } .tk i.on.warn { background: var(--orange); } .tk i.on.crit { background: var(--red); }
+.sfoot { display: flex; gap: 16px; margin-top: 11px; padding-top: 9px; border-top: .5px solid var(--sep); font-size: 11px; letter-spacing: .3px; color: var(--label2); }
+.sfoot span:last-child { margin-left: auto; }
+.offc .sp .ln { stroke: var(--label2); } .offc .sp .ar { opacity: .05; }
+.stalec { border: 1.2px dashed var(--label3); background: transparent; color: var(--label2); }
+.stalec h3, .stalec .sbig b, .stalec .mtr b { color: var(--label2); }
+.stalec .sp .ln { stroke: var(--label3); } .stalec .tk i.on { background: var(--label3); }
+.gt { display: flex; justify-content: space-between; margin: 20px 32px 0; font-size: 10.5px; letter-spacing: .5px; color: var(--label2); }
+.gt .stale { display: inline-flex; align-items: center; gap: 4px; }
+
+/* 详情 */
+.dhead { padding: 0 20px; }
+.dt { display: flex; align-items: center; gap: 9px; }
+.dt .flag { font-size: 26px; }
+.dt h2 { font-size: 34px; font-weight: 800; letter-spacing: -.8px; flex: 1; }
+.chart { margin: 14px 16px 0; background: var(--card); border-radius: 20px; padding: 16px 16px 12px; }
+.ctop { display: flex; justify-content: space-between; align-items: flex-start; }
+.ctop .sbig b { font-size: 48px; letter-spacing: -2px; }
+.seg { display: flex; background: var(--fill); border-radius: 9px; padding: 2px; font-family: "SF Mono", ui-monospace, monospace; font-size: 11px; font-weight: 600; }
+.seg span { padding: 5px 9px; border-radius: 7px; color: var(--label2); }
+.seg span.on { background: var(--label); color: var(--bg); }
+.cplot { position: relative; margin-top: 12px; }
+.cplot .grid span { position: absolute; left: 0; right: 0; border-top: 1px dotted var(--sep); }
+.cy { position: absolute; right: 0; top: -6px; bottom: -4px; display: flex; flex-direction: column; justify-content: space-between; font-size: 9px; color: var(--label3); text-align: right; }
+.cx { display: flex; justify-content: space-between; margin-top: 6px; font-size: 9.5px; color: var(--label2); }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 16px 0; }
+.tile { background: var(--card); border-radius: 18px; padding: 12px 14px; height: 112px; display: flex; flex-direction: column; gap: 5px; }
+.tl { font-size: 12px; color: var(--label2); }
+.tile b { font-size: 26px; font-weight: 800; letter-spacing: -.8px; line-height: 1; font-variant-numeric: tabular-nums; }
+.tile b small { font-size: 13px; font-weight: 700; letter-spacing: 0; margin-left: 1px; }
+.tile .tk { height: 10px; margin-top: auto; }
+.ts { font-size: 9.5px; color: var(--label2); letter-spacing: .3px; }
+.tsp { margin-top: auto; }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); margin: 10px 16px 0; background: var(--card); border-radius: 18px; padding: 12px 0; }
+.facts div { text-align: center; position: relative; }
+.facts div + div::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: .5px; background: var(--sep); }
+.facts span { display: block; font-size: 9.5px; letter-spacing: .5px; color: var(--label2); }
+.facts b { display: block; font-size: 15px; font-weight: 700; margin-top: 3px; }
+
+/* 添加 */
+.plead { margin: 0 20px; font-size: 14px; line-height: 1.55; color: var(--label2); }
+.plead.small { font-size: 12.5px; margin-top: 10px; }
+.inp { margin: 12px 16px 0; background: var(--card); border-radius: 16px; padding: 10px 16px 12px; }
+.inp + .inp { margin-top: 8px; }
+.inp span { display: block; font-size: 10px; letter-spacing: .6px; color: var(--label2); }
+.inp b { display: block; font-size: 18px; font-weight: 600; margin-top: 3px; }
+.okline { display: flex; align-items: center; gap: 7px; margin: 12px 20px 0; font-size: 10.5px; letter-spacing: .4px; color: var(--label); }
+.okline i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.picks { margin: 8px 16px 0; background: var(--card); border-radius: 18px; overflow: hidden; }
+.pick { display: flex; align-items: center; gap: 12px; height: 60px; padding: 0 16px; position: relative; }
+.pick + .pick::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: .5px; background: var(--sep); }
+.chk { width: 22px; height: 22px; border-radius: 50%; background: var(--label); color: var(--bg); display: flex; align-items: center; justify-content: center; flex: none; }
+.pn { font-family: "SF Mono", ui-monospace, monospace; font-size: 20px; font-weight: 700; color: var(--label3); }
+.pick .t { flex: 1; font-size: 16px; font-weight: 700; }
+.pick .t small { display: block; font-size: 9.5px; letter-spacing: .5px; font-weight: 400; color: var(--label2); margin-top: 2px; }
+.psp .ln { stroke-width: 1.3; }
+
+/* 小组件 */
+.walls { display: flex; gap: 32px; }
+.wall { border-radius: 36px; padding: 28px 28px 40px; display: grid; grid-template-columns: 170px 170px; grid-auto-rows: 170px; gap: 30px 24px; background: linear-gradient(160deg, #c3c7cf, #e6e7eb); }
+.wall.dark { background: linear-gradient(160deg, #2a2b30, #0b0b0d); }
+.wcell { position: relative; }
+.wcell.wide { grid-column: span 2; }
+.wlab { position: absolute; left: 0; right: 0; bottom: -21px; text-align: center; font-size: 11.5px; color: rgba(0,0,0,.55); }
+.wall.dark .wlab { color: rgba(255,255,255,.55); }
+.w { position: relative; width: 100%; height: 100%; border-radius: 22px; background: var(--card); color: var(--label); overflow: hidden; font-variant-numeric: tabular-nums; }
+.w.inv { background: var(--label); color: var(--bg); }
+.w.inv .sp .ln { stroke: var(--bg); } .w.inv .sp .ar { fill: var(--bg); opacity: .16; }
+.w.inv .wmeta, .w.inv .wbig span { color: color-mix(in srgb, var(--bg) 60%, transparent); }
+.ws { padding: 14px 15px 0; }
+.wtop { display: flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 800; letter-spacing: -.2px; }
+.wtop .flag { font-size: 12px; }
+.wtop .n { flex: 1; }
+.wdot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex: none; }
+.wdot.off { background: var(--red); } .wdot.none { background: var(--label3); }
+.wclock { color: var(--label2); }
+.wbig { margin-top: 8px; }
+.wbig b { display: block; font-size: 38px; font-weight: 800; letter-spacing: -1.6px; line-height: 1; }
+.wbig b small { font-size: 16px; letter-spacing: 0; }
+.wbig b.red { color: var(--red); font-size: 32px; letter-spacing: -.5px; }
+.wbig span { display: block; font-size: 9px; letter-spacing: .6px; color: var(--label2); margin-top: 4px; }
+.wmeta { display: flex; gap: 8px; margin-top: 6px; font-size: 9.5px; letter-spacing: .3px; color: var(--label2); }
+.wmeta span:last-child { margin-left: auto; }
+.wsp { position: absolute; left: 0; bottom: 0; }
+.stalew .wtop .n, .stalew .wbig b { color: var(--label2); }
+.stalew .sp .ln { stroke: var(--label3); } .stalew .sp .ar { opacity: .04; }
+.woff .sp .ln { stroke: var(--label2); }
+.wm { padding: 12px 14px 12px; }
+.wh { display: flex; justify-content: space-between; font-size: 9.5px; letter-spacing: .5px; color: var(--label2); }
+.wh b { color: var(--label); } .wh em { font-style: normal; color: var(--red); font-weight: 700; }
+.cols { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 10px; }
+.wc { padding: 0 10px; position: relative; }
+.wc:first-child { padding-left: 0; } .wc:last-child { padding-right: 0; }
+.wc + .wc::before { content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: .5px; background: var(--sep); }
+.cn { display: flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; white-space: nowrap; overflow: hidden; }
+.cbig { font-size: 30px; font-weight: 800; letter-spacing: -1.2px; line-height: 1; margin-top: 10px; }
+.cbig small { font-size: 13px; letter-spacing: 0; }
+.cbig.red { color: var(--red); font-size: 24px; letter-spacing: -.3px; padding-top: 4px; }
+.cbig.crit { color: var(--red); }
+.cbig.dim { color: var(--label3); }
+.csp { margin-top: 8px; width: 100%; }
+.cm { font-size: 8.5px; letter-spacing: .3px; color: var(--label2); margin-top: 6px; white-space: nowrap; }
+
+/* 第三版：指标色 */
+.sp.cpu .ln { stroke: var(--blue); } .sp.cpu .ar { fill: var(--blue); opacity: .14; }
+.sp.net .ln { stroke: var(--pink); }
+.tk.mem i.on { background: var(--indigo); } .tk.dsk i.on { background: var(--teal); }
+.tk i.on.warn { background: var(--orange) !important; } .tk i.on.crit { background: var(--red) !important; }
+.lg { display: inline-block; width: 6px; height: 6px; border-radius: 2px; margin-right: 5px; vertical-align: 1px; }
+.lg.mem { background: var(--indigo); } .lg.dsk { background: var(--teal); } .lg.net { background: var(--pink); }
+.mtr { grid-template-columns: 40px 1fr 50px; }
+.sp.cpu.crit .ln { stroke: var(--red); } .sp.cpu.crit .ar { fill: var(--red); }
+.offc .sp .ln, .woff .sp .ln { stroke: var(--label2) !important; } .offc .sp .ar, .woff .sp .ar { fill: var(--label); opacity: .05; }
+.stalec .sp .ln, .stalew .sp .ln { stroke: var(--label3) !important; } .stalec .sp .ar, .stalew .sp .ar { fill: var(--label); opacity: .04; }
+.stalec .tk i.on { background: var(--label3) !important; } .stalec .lg { opacity: .4; }
+.w.inv .sp.cpu .ln { stroke: var(--blue); } .w.inv .sp.cpu .ar { fill: var(--blue); opacity: .3; }
+
+.ph{position:relative;width:390px;height:560px;border-radius:55px 55px 0 0;background:var(--bg);color:var(--label);overflow:hidden;box-shadow:0 0 0 10px #18181a;--bg:#f2f2f7;--card:#fff;--label:#000;--label2:rgba(60,60,67,.6);--label3:rgba(60,60,67,.3);--sep:rgba(60,60,67,.12);--fill:rgba(120,120,128,.14);--glass:rgba(255,255,255,.8);--glass-b:rgba(0,0,0,.05);--green:#34C759;--red:#FF3B30;--orange:#FF9500;--pink:#FF2D55;--blue:#007AFF}
+.ph.dark{--bg:#000;--card:#1c1c1e;--label:#fff;--label2:rgba(235,235,245,.6);--label3:rgba(235,235,245,.3);--sep:rgba(84,84,88,.55);--fill:rgba(120,120,128,.3);--glass:rgba(44,44,46,.8);--glass-b:rgba(255,255,255,.06);--green:#30D158;--red:#FF453A;--orange:#FF9F0A;--pink:#FF375F}
+.strip{position:relative;height:150px;margin:0 0 8px}
+.slot{position:absolute;top:6px;width:318px;height:132px}
+.slot.c{left:36px}
+.slot.l{left:-290px;transform:scale(.88);transform-origin:right center;opacity:.45}
+.slot.r{left:362px;transform:scale(.88);transform-origin:left center;opacity:.45}
+.slot>div{width:100%;height:100%;background:var(--card);border-radius:22px;padding:14px 16px;position:relative;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 22px rgba(0,0,0,.06)}
+.ph.dark .slot>div{box-shadow:none}
+.t1{display:flex;align-items:center;gap:8px}.t1 b{font-size:17px;font-weight:700;letter-spacing:-.3px;flex:1;white-space:nowrap;overflow:hidden}
+.t2{font-size:11.5px;color:var(--label2);margin-top:1px;white-space:nowrap;overflow:hidden}
+.lv{font-size:11.5px;color:var(--label2);display:flex;align-items:center;gap:5px}.lv em{width:6px;height:6px;border-radius:3px;background:var(--green)}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 9px 3px 7px;border-radius:10px;white-space:nowrap}
+.pill em{width:6px;height:6px;border-radius:3px}
+.pill.ok{background:color-mix(in srgb,var(--green) 14%,transparent);color:var(--green)}.pill.ok em{background:var(--green)}
+.pill.red{background:color-mix(in srgb,var(--red) 13%,transparent);color:var(--red)}.pill.red em{background:var(--red)}
+.pill.org{background:color-mix(in srgb,var(--orange) 15%,transparent);color:var(--orange)}.pill.org em{background:var(--orange)}
+i{font-style:normal}
+/* A 圆环 */
+.cA{display:flex;gap:16px;align-items:center}
+.ringw{position:relative;width:74px;height:74px;flex:none}
+.rc{position:absolute;inset:0;display:flex;align-items:baseline;justify-content:center;padding-top:22px}
+.rc b{font-size:24px;font-weight:800;letter-spacing:-.8px;font-variant-numeric:tabular-nums}.rc span{font-size:12px;color:var(--label2);font-weight:600}
+.ainfo{flex:1;min-width:0}.t3{margin-top:9px}
+.t4{display:flex;gap:14px;margin-top:9px;font-size:13px;font-weight:600}.t4 i,.net i,.cnet i{color:var(--pink);margin-right:3px;font-weight:700}.t4 small,.cnet small{font-size:9.5px;color:var(--label2)}
+/* B 数字 */
+.nums{display:flex;align-items:flex-end;gap:18px;margin-top:14px}
+.nums>div:not(.net){display:flex;flex-direction:column}
+.nums b{font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1;font-variant-numeric:tabular-nums}.nums b small{font-size:15px;color:var(--label2);font-weight:700;letter-spacing:0}
+.nums span{font-size:11px;color:var(--label2);margin-top:4px;font-weight:600}
+.nums .z b{color:var(--label3)}.nums .red b,.nums .red span{color:var(--red)}.nums .org b,.nums .org span{color:var(--orange)}
+.net{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;font-size:12.5px;font-weight:600;line-height:1.4}
+/* C 面积图 */
+.bgarea{position:absolute;left:0;bottom:0;width:100%;height:40px}
+.cC .t1,.cC .t2,.cbig,.cnet{position:relative}
+.cbig{margin-top:6px;display:flex;align-items:baseline;gap:4px}.cbig b{font-size:34px;font-weight:800;letter-spacing:-1.2px;line-height:1;font-variant-numeric:tabular-nums}.cbig span{font-size:13px;color:var(--label2);font-weight:600}
+.cnet{position:absolute;right:16px;bottom:46px;display:flex;flex-direction:column;align-items:flex-end;font-size:12.5px;font-weight:600}
+.chips{display:flex;gap:6px;padding:2px 16px 10px}.chip{background:var(--card);border-radius:16px;padding:6px 12px;font-size:13px;font-weight:600}.chip i{color:var(--label2);font-size:11px}.chip.on{background:var(--label);color:var(--bg)}.chip.on i{color:var(--bg);opacity:.6}
+.lst{background:var(--card)}.lr{display:flex;align-items:center;gap:9px;padding:13px 16px;border-bottom:.5px solid var(--sep);font-size:15px}.lr b{font-weight:600;flex:1}.lr .m{font-size:11px;color:var(--label2)}
+.dot{width:7px;height:7px;border-radius:4px}
+.grid{display:grid;grid-template-columns:repeat(3,390px);gap:60px 56px;margin-top:24px}
+.lab{font-size:20px;font-weight:700;margin-bottom:6px}.lab small{display:block;font-size:13px;font-weight:400;color:#555;margin-top:4px;line-height:1.55;max-width:390px}
+ body{width:1400px}</style></head><body>
+<h1>探针 · 顶部卡片 v5（普通卡片，不反色、不用线段）</h1>
+<p class="sub">三套卡片内容任选其一。共同点：白色（深色模式为深灰）卡片，不反色；去掉逐台线段状态条；保留放大缩小轮播——当前卡居中原尺寸，两侧邻居缩小到 88% 并变淡；高度 132pt。</p>
+<div class="grid"><div class="lab">方案 A · 圆环<small>左边一个在线圆环（绿色在线、红色离线），中间写 9/10；右边名称、地址、状态胶囊、实时网速。信息最集中，一眼看比例。</small></div><div class="lab">方案 B · 三个数字<small>在线 / 离线 / 告警三个大数字并排，有问题时对应数字变红、变橙，没问题是灰色；网速放右下。最直白，适合机器多。</small></div><div class="lab">方案 C · 网速面积图<small>卡片下半部是淡粉色网速面积图做背景，上面压大号在线数和网速；右上角状态胶囊。最有氛围感，但信息最少。</small></div><div class="ph "><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div><div class="strip"><div class="slot l"><div class="cA"><div class="ringw"><svg width="74" height="74" viewBox="0 0 74 74" style="transform:rotate(-90deg)"><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--fill)" stroke-width="8"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round" stroke-dasharray="207.3 207.34511513692635"/></svg><div class="rc"><b>2</b><span>/2</span></div></div>
+<div class="ainfo"><div class="t1"><b>家里 HK</b><span class="lv">刚刚</span></div><div class="t2">Komari · status.example.com</div>
+<div class="t3"><span class="pill ok"><em></em>全部在线</span></div>
+<div class="t4 mono"><span><i>↑</i>343K<small>/s</small></span><span><i>↓</i>346K<small>/s</small></span></div></div></div></div><div class="slot c"><div class="cA"><div class="ringw"><svg width="74" height="74" viewBox="0 0 74 74" style="transform:rotate(-90deg)"><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--fill)" stroke-width="8"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round" stroke-dasharray="181.6 207.34511513692635"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--red)" stroke-width="8" stroke-linecap="round" stroke-dasharray="18.2 207.34511513692635" stroke-dashoffset="-186.6"/></svg><div class="rc"><b>9</b><span>/10</span></div></div>
+<div class="ainfo"><div class="t1"><b>极简</b><span class="lv">刚刚</span></div><div class="t2">极简探针 · probe.example.net</div>
+<div class="t3"><span class="pill red"><em></em>1 台离线</span></div>
+<div class="t4 mono"><span><i>↑</i>10.3K<small>/s</small></span><span><i>↓</i>36.4K<small>/s</small></span></div></div></div></div><div class="slot r"><div class="cA"><div class="ringw"><svg width="74" height="74" viewBox="0 0 74 74" style="transform:rotate(-90deg)"><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--fill)" stroke-width="8"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round" stroke-dasharray="195.0 207.34511513692635"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--red)" stroke-width="8" stroke-linecap="round" stroke-dasharray="4.9 207.34511513692635" stroke-dashoffset="-199.9"/></svg><div class="rc"><b>27</b><span>/28</span></div></div>
+<div class="ainfo"><div class="t1"><b>生产集群</b><span class="lv">12 秒前</span></div><div class="t2">Komari · status.example.com</div>
+<div class="t3"><span class="pill red"><em></em>1 台离线</span></div>
+<div class="t4 mono"><span><i>↑</i>18.2M<small>/s</small></span><span><i>↓</i>9.41M<small>/s</small></span></div></div></div></div></div>
+<div class="chips"><span class="chip on">全部 <i>10</i></span><span class="chip">离线 <i>1</i></span><span class="chip">告警 <i>0</i></span></div><div class="lst"><div class="lr"><span class="dot" style="background:var(--red)"></span><b>🇭🇰 HK-02</b><span class="mono m">最后上报 3 小时前</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇺🇸 US-02</b><span class="mono m">1%  28%  12%</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇯🇵 JP-03</b><span class="mono m">0%  23%  10%</span></div></div></div><div class="ph "><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div><div class="strip"><div class="slot l"><div class="cB"><div class="t1"><b>家里 HK</b><span class="lv"><em></em>刚刚</span></div><div class="t2">Komari · status.example.com</div>
+<div class="nums"><div><b>2<small>/2</small></b><span>在线</span></div><div class="z"><b>0</b><span>离线</span></div><div class="z"><b>0</b><span>告警</span></div>
+<div class="net mono"><span><i>↑</i>343K</span><span><i>↓</i>346K</span></div></div></div></div><div class="slot c"><div class="cB"><div class="t1"><b>极简</b><span class="lv"><em></em>刚刚</span></div><div class="t2">极简探针 · probe.example.net</div>
+<div class="nums"><div><b>9<small>/10</small></b><span>在线</span></div><div class="red"><b>1</b><span>离线</span></div><div class="z"><b>0</b><span>告警</span></div>
+<div class="net mono"><span><i>↑</i>10.3K</span><span><i>↓</i>36.4K</span></div></div></div></div><div class="slot r"><div class="cB"><div class="t1"><b>生产集群</b><span class="lv"><em></em>12 秒前</span></div><div class="t2">Komari · status.example.com</div>
+<div class="nums"><div><b>27<small>/28</small></b><span>在线</span></div><div class="red"><b>1</b><span>离线</span></div><div class="org"><b>2</b><span>告警</span></div>
+<div class="net mono"><span><i>↑</i>18.2M</span><span><i>↓</i>9.41M</span></div></div></div></div></div>
+<div class="chips"><span class="chip on">全部 <i>10</i></span><span class="chip">离线 <i>1</i></span><span class="chip">告警 <i>0</i></span></div><div class="lst"><div class="lr"><span class="dot" style="background:var(--red)"></span><b>🇭🇰 HK-02</b><span class="mono m">最后上报 3 小时前</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇺🇸 US-02</b><span class="mono m">1%  28%  12%</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇯🇵 JP-03</b><span class="mono m">0%  23%  10%</span></div></div></div><div class="ph "><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div><div class="strip"><div class="slot l"><div class="cC"><svg class="bgarea" width="318" height="40" viewBox="0 0 318 40" preserveAspectRatio="none"><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--pink)" stop-opacity=".28"/><stop offset="1" stop-color="var(--pink)" stop-opacity="0"/></linearGradient></defs><polygon points="0,40 0.0,26.2 8.2,23.2 16.3,20.8 24.5,23.0 32.6,23.0 40.8,23.5 48.9,22.1 57.1,19.6 65.2,23.2 73.4,27.3 81.5,24.4 89.7,25.0 97.8,22.7 106.0,27.1 114.2,27.5 122.3,25.6 130.5,28.0 138.6,24.0 146.8,20.5 154.9,24.6 163.1,28.8 171.2,28.5 179.4,24.6 187.5,25.6 195.7,28.1 203.8,28.8 212.0,33.0 220.2,35.5 228.3,36.0 236.5,36.0 244.6,37.3 252.8,37.3 260.9,37.3 269.1,37.3 277.2,37.3 285.4,37.3 293.5,34.3 301.7,33.8 309.8,32.5 318.0,35.3 318,40" fill="url(#g1)"/><polyline points="0.0,26.2 8.2,23.2 16.3,20.8 24.5,23.0 32.6,23.0 40.8,23.5 48.9,22.1 57.1,19.6 65.2,23.2 73.4,27.3 81.5,24.4 89.7,25.0 97.8,22.7 106.0,27.1 114.2,27.5 122.3,25.6 130.5,28.0 138.6,24.0 146.8,20.5 154.9,24.6 163.1,28.8 171.2,28.5 179.4,24.6 187.5,25.6 195.7,28.1 203.8,28.8 212.0,33.0 220.2,35.5 228.3,36.0 236.5,36.0 244.6,37.3 252.8,37.3 260.9,37.3 269.1,37.3 277.2,37.3 285.4,37.3 293.5,34.3 301.7,33.8 309.8,32.5 318.0,35.3" fill="none" stroke="var(--pink)" stroke-width="1.6" stroke-linejoin="round"/></svg><div class="t1"><b>家里 HK</b><span class="pill ok"><em></em>全部在线</span></div><div class="t2">Komari · status.example.com · 刚刚</div>
+<div class="cbig"><b>2</b><span>/2 在线</span></div>
+<div class="cnet mono"><span><i>↑</i>343K<small>/s</small></span><span><i>↓</i>346K<small>/s</small></span></div></div></div><div class="slot c"><div class="cC"><svg class="bgarea" width="318" height="40" viewBox="0 0 318 40" preserveAspectRatio="none"><defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--pink)" stop-opacity=".28"/><stop offset="1" stop-color="var(--pink)" stop-opacity="0"/></linearGradient></defs><polygon points="0,40 0.0,19.0 8.2,15.0 16.3,18.9 24.5,22.6 32.6,19.6 40.8,17.5 48.9,16.0 57.1,17.7 65.2,16.8 73.4,15.9 81.5,15.1 89.7,18.2 97.8,18.8 106.0,19.7 114.2,17.7 122.3,13.4 130.5,9.4 138.6,9.0 146.8,9.5 154.9,11.5 163.1,15.6 171.2,19.8 179.4,20.1 187.5,21.7 195.7,22.8 203.8,19.3 212.0,19.1 220.2,18.6 228.3,20.9 236.5,25.1 244.6,26.7 252.8,29.9 260.9,29.8 269.1,25.4 277.2,23.8 285.4,26.6 293.5,23.2 301.7,20.5 309.8,18.5 318.0,14.9 318,40" fill="url(#g2)"/><polyline points="0.0,19.0 8.2,15.0 16.3,18.9 24.5,22.6 32.6,19.6 40.8,17.5 48.9,16.0 57.1,17.7 65.2,16.8 73.4,15.9 81.5,15.1 89.7,18.2 97.8,18.8 106.0,19.7 114.2,17.7 122.3,13.4 130.5,9.4 138.6,9.0 146.8,9.5 154.9,11.5 163.1,15.6 171.2,19.8 179.4,20.1 187.5,21.7 195.7,22.8 203.8,19.3 212.0,19.1 220.2,18.6 228.3,20.9 236.5,25.1 244.6,26.7 252.8,29.9 260.9,29.8 269.1,25.4 277.2,23.8 285.4,26.6 293.5,23.2 301.7,20.5 309.8,18.5 318.0,14.9" fill="none" stroke="var(--pink)" stroke-width="1.6" stroke-linejoin="round"/></svg><div class="t1"><b>极简</b><span class="pill red"><em></em>1 台离线</span></div><div class="t2">极简探针 · probe.example.net · 刚刚</div>
+<div class="cbig"><b>9</b><span>/10 在线</span></div>
+<div class="cnet mono"><span><i>↑</i>10.3K<small>/s</small></span><span><i>↓</i>36.4K<small>/s</small></span></div></div></div><div class="slot r"><div class="cC"><svg class="bgarea" width="318" height="40" viewBox="0 0 318 40" preserveAspectRatio="none"><defs><linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--pink)" stop-opacity=".28"/><stop offset="1" stop-color="var(--pink)" stop-opacity="0"/></linearGradient></defs><polygon points="0,40 0.0,25.3 8.2,24.9 16.3,26.1 24.5,25.2 32.6,24.0 40.8,27.9 48.9,32.2 57.1,29.2 65.2,31.3 73.4,33.7 81.5,29.3 89.7,29.6 97.8,26.6 106.0,26.8 114.2,25.6 122.3,28.7 130.5,27.5 138.6,24.2 146.8,24.0 154.9,21.9 163.1,20.4 171.2,24.2 179.4,21.9 187.5,21.1 195.7,22.9 203.8,27.0 212.0,23.8 220.2,24.0 228.3,22.1 236.5,18.8 244.6,16.9 252.8,13.1 260.9,14.1 269.1,11.4 277.2,11.9 285.4,8.0 293.5,7.7 301.7,11.3 309.8,14.5 318.0,17.0 318,40" fill="url(#g3)"/><polyline points="0.0,25.3 8.2,24.9 16.3,26.1 24.5,25.2 32.6,24.0 40.8,27.9 48.9,32.2 57.1,29.2 65.2,31.3 73.4,33.7 81.5,29.3 89.7,29.6 97.8,26.6 106.0,26.8 114.2,25.6 122.3,28.7 130.5,27.5 138.6,24.2 146.8,24.0 154.9,21.9 163.1,20.4 171.2,24.2 179.4,21.9 187.5,21.1 195.7,22.9 203.8,27.0 212.0,23.8 220.2,24.0 228.3,22.1 236.5,18.8 244.6,16.9 252.8,13.1 260.9,14.1 269.1,11.4 277.2,11.9 285.4,8.0 293.5,7.7 301.7,11.3 309.8,14.5 318.0,17.0" fill="none" stroke="var(--pink)" stroke-width="1.6" stroke-linejoin="round"/></svg><div class="t1"><b>生产集群</b><span class="pill red"><em></em>1 台离线</span></div><div class="t2">Komari · status.example.com · 12 秒前</div>
+<div class="cbig"><b>27</b><span>/28 在线</span></div>
+<div class="cnet mono"><span><i>↑</i>18.2M<small>/s</small></span><span><i>↓</i>9.41M<small>/s</small></span></div></div></div></div>
+<div class="chips"><span class="chip on">全部 <i>10</i></span><span class="chip">离线 <i>1</i></span><span class="chip">告警 <i>0</i></span></div><div class="lst"><div class="lr"><span class="dot" style="background:var(--red)"></span><b>🇭🇰 HK-02</b><span class="mono m">最后上报 3 小时前</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇺🇸 US-02</b><span class="mono m">1%  28%  12%</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇯🇵 JP-03</b><span class="mono m">0%  23%  10%</span></div></div></div><div class="ph dark"><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div><div class="strip"><div class="slot l"><div class="cA"><div class="ringw"><svg width="74" height="74" viewBox="0 0 74 74" style="transform:rotate(-90deg)"><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--fill)" stroke-width="8"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round" stroke-dasharray="207.3 207.34511513692635"/></svg><div class="rc"><b>2</b><span>/2</span></div></div>
+<div class="ainfo"><div class="t1"><b>家里 HK</b><span class="lv">刚刚</span></div><div class="t2">Komari · status.example.com</div>
+<div class="t3"><span class="pill ok"><em></em>全部在线</span></div>
+<div class="t4 mono"><span><i>↑</i>343K<small>/s</small></span><span><i>↓</i>346K<small>/s</small></span></div></div></div></div><div class="slot c"><div class="cA"><div class="ringw"><svg width="74" height="74" viewBox="0 0 74 74" style="transform:rotate(-90deg)"><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--fill)" stroke-width="8"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round" stroke-dasharray="181.6 207.34511513692635"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--red)" stroke-width="8" stroke-linecap="round" stroke-dasharray="18.2 207.34511513692635" stroke-dashoffset="-186.6"/></svg><div class="rc"><b>9</b><span>/10</span></div></div>
+<div class="ainfo"><div class="t1"><b>极简</b><span class="lv">刚刚</span></div><div class="t2">极简探针 · probe.example.net</div>
+<div class="t3"><span class="pill red"><em></em>1 台离线</span></div>
+<div class="t4 mono"><span><i>↑</i>10.3K<small>/s</small></span><span><i>↓</i>36.4K<small>/s</small></span></div></div></div></div><div class="slot r"><div class="cA"><div class="ringw"><svg width="74" height="74" viewBox="0 0 74 74" style="transform:rotate(-90deg)"><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--fill)" stroke-width="8"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round" stroke-dasharray="195.0 207.34511513692635"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--red)" stroke-width="8" stroke-linecap="round" stroke-dasharray="4.9 207.34511513692635" stroke-dashoffset="-199.9"/></svg><div class="rc"><b>27</b><span>/28</span></div></div>
+<div class="ainfo"><div class="t1"><b>生产集群</b><span class="lv">12 秒前</span></div><div class="t2">Komari · status.example.com</div>
+<div class="t3"><span class="pill red"><em></em>1 台离线</span></div>
+<div class="t4 mono"><span><i>↑</i>18.2M<small>/s</small></span><span><i>↓</i>9.41M<small>/s</small></span></div></div></div></div></div>
+<div class="chips"><span class="chip on">全部 <i>10</i></span><span class="chip">离线 <i>1</i></span><span class="chip">告警 <i>0</i></span></div><div class="lst"><div class="lr"><span class="dot" style="background:var(--red)"></span><b>🇭🇰 HK-02</b><span class="mono m">最后上报 3 小时前</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇺🇸 US-02</b><span class="mono m">1%  28%  12%</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇯🇵 JP-03</b><span class="mono m">0%  23%  10%</span></div></div></div><div class="ph dark"><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div><div class="strip"><div class="slot l"><div class="cB"><div class="t1"><b>家里 HK</b><span class="lv"><em></em>刚刚</span></div><div class="t2">Komari · status.example.com</div>
+<div class="nums"><div><b>2<small>/2</small></b><span>在线</span></div><div class="z"><b>0</b><span>离线</span></div><div class="z"><b>0</b><span>告警</span></div>
+<div class="net mono"><span><i>↑</i>343K</span><span><i>↓</i>346K</span></div></div></div></div><div class="slot c"><div class="cB"><div class="t1"><b>极简</b><span class="lv"><em></em>刚刚</span></div><div class="t2">极简探针 · probe.example.net</div>
+<div class="nums"><div><b>9<small>/10</small></b><span>在线</span></div><div class="red"><b>1</b><span>离线</span></div><div class="z"><b>0</b><span>告警</span></div>
+<div class="net mono"><span><i>↑</i>10.3K</span><span><i>↓</i>36.4K</span></div></div></div></div><div class="slot r"><div class="cB"><div class="t1"><b>生产集群</b><span class="lv"><em></em>12 秒前</span></div><div class="t2">Komari · status.example.com</div>
+<div class="nums"><div><b>27<small>/28</small></b><span>在线</span></div><div class="red"><b>1</b><span>离线</span></div><div class="org"><b>2</b><span>告警</span></div>
+<div class="net mono"><span><i>↑</i>18.2M</span><span><i>↓</i>9.41M</span></div></div></div></div></div>
+<div class="chips"><span class="chip on">全部 <i>10</i></span><span class="chip">离线 <i>1</i></span><span class="chip">告警 <i>0</i></span></div><div class="lst"><div class="lr"><span class="dot" style="background:var(--red)"></span><b>🇭🇰 HK-02</b><span class="mono m">最后上报 3 小时前</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇺🇸 US-02</b><span class="mono m">1%  28%  12%</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇯🇵 JP-03</b><span class="mono m">0%  23%  10%</span></div></div></div><div class="ph dark"><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div><div class="strip"><div class="slot l"><div class="cC"><svg class="bgarea" width="318" height="40" viewBox="0 0 318 40" preserveAspectRatio="none"><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--pink)" stop-opacity=".28"/><stop offset="1" stop-color="var(--pink)" stop-opacity="0"/></linearGradient></defs><polygon points="0,40 0.0,26.2 8.2,23.2 16.3,20.8 24.5,23.0 32.6,23.0 40.8,23.5 48.9,22.1 57.1,19.6 65.2,23.2 73.4,27.3 81.5,24.4 89.7,25.0 97.8,22.7 106.0,27.1 114.2,27.5 122.3,25.6 130.5,28.0 138.6,24.0 146.8,20.5 154.9,24.6 163.1,28.8 171.2,28.5 179.4,24.6 187.5,25.6 195.7,28.1 203.8,28.8 212.0,33.0 220.2,35.5 228.3,36.0 236.5,36.0 244.6,37.3 252.8,37.3 260.9,37.3 269.1,37.3 277.2,37.3 285.4,37.3 293.5,34.3 301.7,33.8 309.8,32.5 318.0,35.3 318,40" fill="url(#g1)"/><polyline points="0.0,26.2 8.2,23.2 16.3,20.8 24.5,23.0 32.6,23.0 40.8,23.5 48.9,22.1 57.1,19.6 65.2,23.2 73.4,27.3 81.5,24.4 89.7,25.0 97.8,22.7 106.0,27.1 114.2,27.5 122.3,25.6 130.5,28.0 138.6,24.0 146.8,20.5 154.9,24.6 163.1,28.8 171.2,28.5 179.4,24.6 187.5,25.6 195.7,28.1 203.8,28.8 212.0,33.0 220.2,35.5 228.3,36.0 236.5,36.0 244.6,37.3 252.8,37.3 260.9,37.3 269.1,37.3 277.2,37.3 285.4,37.3 293.5,34.3 301.7,33.8 309.8,32.5 318.0,35.3" fill="none" stroke="var(--pink)" stroke-width="1.6" stroke-linejoin="round"/></svg><div class="t1"><b>家里 HK</b><span class="pill ok"><em></em>全部在线</span></div><div class="t2">Komari · status.example.com · 刚刚</div>
+<div class="cbig"><b>2</b><span>/2 在线</span></div>
+<div class="cnet mono"><span><i>↑</i>343K<small>/s</small></span><span><i>↓</i>346K<small>/s</small></span></div></div></div><div class="slot c"><div class="cC"><svg class="bgarea" width="318" height="40" viewBox="0 0 318 40" preserveAspectRatio="none"><defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--pink)" stop-opacity=".28"/><stop offset="1" stop-color="var(--pink)" stop-opacity="0"/></linearGradient></defs><polygon points="0,40 0.0,19.0 8.2,15.0 16.3,18.9 24.5,22.6 32.6,19.6 40.8,17.5 48.9,16.0 57.1,17.7 65.2,16.8 73.4,15.9 81.5,15.1 89.7,18.2 97.8,18.8 106.0,19.7 114.2,17.7 122.3,13.4 130.5,9.4 138.6,9.0 146.8,9.5 154.9,11.5 163.1,15.6 171.2,19.8 179.4,20.1 187.5,21.7 195.7,22.8 203.8,19.3 212.0,19.1 220.2,18.6 228.3,20.9 236.5,25.1 244.6,26.7 252.8,29.9 260.9,29.8 269.1,25.4 277.2,23.8 285.4,26.6 293.5,23.2 301.7,20.5 309.8,18.5 318.0,14.9 318,40" fill="url(#g2)"/><polyline points="0.0,19.0 8.2,15.0 16.3,18.9 24.5,22.6 32.6,19.6 40.8,17.5 48.9,16.0 57.1,17.7 65.2,16.8 73.4,15.9 81.5,15.1 89.7,18.2 97.8,18.8 106.0,19.7 114.2,17.7 122.3,13.4 130.5,9.4 138.6,9.0 146.8,9.5 154.9,11.5 163.1,15.6 171.2,19.8 179.4,20.1 187.5,21.7 195.7,22.8 203.8,19.3 212.0,19.1 220.2,18.6 228.3,20.9 236.5,25.1 244.6,26.7 252.8,29.9 260.9,29.8 269.1,25.4 277.2,23.8 285.4,26.6 293.5,23.2 301.7,20.5 309.8,18.5 318.0,14.9" fill="none" stroke="var(--pink)" stroke-width="1.6" stroke-linejoin="round"/></svg><div class="t1"><b>极简</b><span class="pill red"><em></em>1 台离线</span></div><div class="t2">极简探针 · probe.example.net · 刚刚</div>
+<div class="cbig"><b>9</b><span>/10 在线</span></div>
+<div class="cnet mono"><span><i>↑</i>10.3K<small>/s</small></span><span><i>↓</i>36.4K<small>/s</small></span></div></div></div><div class="slot r"><div class="cC"><svg class="bgarea" width="318" height="40" viewBox="0 0 318 40" preserveAspectRatio="none"><defs><linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--pink)" stop-opacity=".28"/><stop offset="1" stop-color="var(--pink)" stop-opacity="0"/></linearGradient></defs><polygon points="0,40 0.0,25.3 8.2,24.9 16.3,26.1 24.5,25.2 32.6,24.0 40.8,27.9 48.9,32.2 57.1,29.2 65.2,31.3 73.4,33.7 81.5,29.3 89.7,29.6 97.8,26.6 106.0,26.8 114.2,25.6 122.3,28.7 130.5,27.5 138.6,24.2 146.8,24.0 154.9,21.9 163.1,20.4 171.2,24.2 179.4,21.9 187.5,21.1 195.7,22.9 203.8,27.0 212.0,23.8 220.2,24.0 228.3,22.1 236.5,18.8 244.6,16.9 252.8,13.1 260.9,14.1 269.1,11.4 277.2,11.9 285.4,8.0 293.5,7.7 301.7,11.3 309.8,14.5 318.0,17.0 318,40" fill="url(#g3)"/><polyline points="0.0,25.3 8.2,24.9 16.3,26.1 24.5,25.2 32.6,24.0 40.8,27.9 48.9,32.2 57.1,29.2 65.2,31.3 73.4,33.7 81.5,29.3 89.7,29.6 97.8,26.6 106.0,26.8 114.2,25.6 122.3,28.7 130.5,27.5 138.6,24.2 146.8,24.0 154.9,21.9 163.1,20.4 171.2,24.2 179.4,21.9 187.5,21.1 195.7,22.9 203.8,27.0 212.0,23.8 220.2,24.0 228.3,22.1 236.5,18.8 244.6,16.9 252.8,13.1 260.9,14.1 269.1,11.4 277.2,11.9 285.4,8.0 293.5,7.7 301.7,11.3 309.8,14.5 318.0,17.0" fill="none" stroke="var(--pink)" stroke-width="1.6" stroke-linejoin="round"/></svg><div class="t1"><b>生产集群</b><span class="pill red"><em></em>1 台离线</span></div><div class="t2">Komari · status.example.com · 12 秒前</div>
+<div class="cbig"><b>27</b><span>/28 在线</span></div>
+<div class="cnet mono"><span><i>↑</i>18.2M<small>/s</small></span><span><i>↓</i>9.41M<small>/s</small></span></div></div></div></div>
+<div class="chips"><span class="chip on">全部 <i>10</i></span><span class="chip">离线 <i>1</i></span><span class="chip">告警 <i>0</i></span></div><div class="lst"><div class="lr"><span class="dot" style="background:var(--red)"></span><b>🇭🇰 HK-02</b><span class="mono m">最后上报 3 小时前</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇺🇸 US-02</b><span class="mono m">1%  28%  12%</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇯🇵 JP-03</b><span class="mono m">0%  23%  10%</span></div></div></div></div></body></html>

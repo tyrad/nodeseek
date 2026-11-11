@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-Hans"><head><meta charset="utf-8"><title>Probe Plan Info</title>
+<style>
+:root{--bg:#F2F2F7;--card:#fff;--label:#000;--sec:#3C3C4399;--ter:#3C3C434D;--fill:#7878801F;--sep:#3C3C4329;--orange:#FF9500;--red:#FF3B30;--green:#34C759;--blue:#007AFF;--indigo:#5856D6;--teal:#30B0C7}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"SF Pro Text","PingFang SC",sans-serif;background:#E9E9EE;color:var(--label);padding:40px;width:1400px}
+h1{font-size:28px;font-weight:700;margin-bottom:6px}
+.sub{color:#555;font-size:14px;margin-bottom:28px;line-height:1.6}
+.row{display:flex;gap:36px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:12px}
+.cap{font-size:15px;font-weight:600;margin-top:10px}
+.capd{font-size:13px;color:#555;line-height:1.6;width:390px}
+.phone{width:390px;height:800px;border-radius:52px;background:var(--bg);border:10px solid #111;overflow:hidden;position:relative}
+.status{height:50px;display:flex;justify-content:space-between;align-items:center;padding:0 30px;font-weight:600;font-size:16px}
+.nav{padding:0 16px 8px;display:flex;justify-content:space-between;align-items:center}
+.circle{width:36px;height:36px;border-radius:18px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 1px 3px #0001}
+.title{font-size:30px;font-weight:700;padding:4px 16px 12px}
+.mono{font-family:"SF Mono",ui-monospace,Menlo,monospace}
+.card{background:var(--card);border-radius:14px;margin:0 16px 12px;padding:14px}
+.head{display:flex;justify-content:space-between;align-items:center}
+.name{font-size:17px;font-weight:600}
+.meta{font-size:11px;color:var(--sec);letter-spacing:.3px;margin-top:3px}
+.dot{display:inline-block;width:7px;height:7px;border-radius:4px;margin-right:4px}
+.on{font-size:12px;color:var(--sec)}
+.big{font-size:34px;font-weight:700;margin-top:8px}
+.big small{font-size:16px;font-weight:600}
+.bar{height:6px;border-radius:3px;background:var(--fill);overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:var(--label);border-radius:3px}
+.kv{display:flex;justify-content:space-between;font-size:12px;color:var(--sec);margin-top:8px}
+.plan{margin-top:10px;padding-top:9px;border-top:.5px solid var(--sep);display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--sec)}
+.pill{padding:2px 7px;border-radius:6px;background:var(--fill);color:var(--label);font-size:11.5px}
+.warn{color:var(--orange);font-weight:600}
+.bad{color:var(--red);font-weight:600}
+.new{outline:2px dashed var(--blue);outline-offset:3px;border-radius:8px}
+.tag{position:absolute;right:-8px;background:var(--blue);color:#fff;font-size:10px;padding:2px 6px;border-radius:5px}
+.sect{font-size:13px;color:var(--sec);padding:10px 32px 6px;text-transform:uppercase}
+.group{background:#fff;border-radius:12px;margin:0 16px 12px}
+.cell{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;font-size:16px;border-bottom:.5px solid var(--sep)}
+.cell:last-child{border-bottom:none}
+.cell .v{color:var(--sec);font-size:15px;text-align:right}
+.quota{padding:12px 16px;border-bottom:.5px solid var(--sep)}
+.quota .t{display:flex;justify-content:space-between;font-size:16px}
+.quota .bar{height:8px;margin-top:8px}
+.quota .d{font-size:12px;color:var(--sec);margin-top:6px}
+.remark{padding:12px 16px;font-size:14px;color:var(--sec);line-height:1.5}
+table{border-collapse:collapse;font-size:12.5px;background:#fff;border-radius:12px;overflow:hidden;width:520px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #eee;vertical-align:top}
+th{background:#f6f6f8;font-weight:600}
+td:first-child{font-weight:600;white-space:nowrap}
+.note{font-size:12.5px;color:#555;line-height:1.7;width:520px;margin-top:12px}
+</style></head><body>
+<h1>服务器套餐信息 · 示意</h1>
+<div class="sub">到期、价格、流量配额、在线时长等，三种探针都有，只是写法不同。App 统一成一套「套餐」字段：面板给了就显示，没给就整行隐藏。配色沿用黑白主题，只有快到期 / 超额才用橙、红提示。</div>
+<div class="row">
+
+<div class="col">
+<div class="phone">
+ <div class="status"><span>9:41</span><span>●●●</span></div>
+ <div class="nav"><span class="circle">‹</span><span style="display:flex;gap:8px"><span class="circle">🌏</span><span class="circle">⋯</span></span></div>
+ <div class="title">服务器</div>
+
+ <div class="card">
+  <div class="head"><div><div class="name">🇭🇰 HK-01</div><div class="meta mono">DEBIAN 12 · KVM · AMD64 · UP 10D</div></div><span class="on"><span class="dot" style="background:var(--green)"></span>在线</span></div>
+  <div class="big">1.2<small>%</small></div>
+  <div class="kv"><span>内存 31%</span><span>磁盘 15%</span><span class="mono">↑3.8K/s ↓4.2K/s</span></div>
+  <div class="plan new" style="position:relative"><span class="tag" style="top:-10px">新增</span>
+   <span>152 天后到期</span><span>·</span><span>¥99/年</span><span>·</span><span>流量 7%</span><span class="pill">vps</span>
+  </div>
+ </div>
+
+ <div class="card">
+  <div class="head"><div><div class="name">🇯🇵 JP-02</div><div class="meta mono">UBUNTU 22.04 · KVM · UP 119D</div></div><span class="on"><span class="dot" style="background:var(--green)"></span>在线</span></div>
+  <div class="big">4.1<small>%</small></div>
+  <div class="kv"><span>内存 19%</span><span>磁盘 27%</span><span class="mono">↑12K/s ↓9K/s</span></div>
+  <div class="plan new" style="position:relative">
+   <span class="warn">3 天后到期</span><span>·</span><span>$5/月</span><span>·</span><span class="bad">流量超出 1.7 TB</span>
+  </div>
+ </div>
+
+ <div class="card">
+  <div class="head"><div><div class="name">🇺🇸 US-01</div><div class="meta mono">DEBIAN 12 · UP 8D</div></div><span class="on"><span class="dot" style="background:var(--green)"></span>在线</span></div>
+  <div class="big">0.8<small>%</small></div>
+  <div class="kv"><span>内存 63%</span><span>磁盘 41%</span><span class="mono">↑1K/s ↓2K/s</span></div>
+  <div class="meta" style="margin-top:8px">面板没填套餐信息时不显示这一行</div>
+ </div>
+</div>
+<div class="cap">① 列表卡片</div>
+<div class="capd">底部加一行小字：到期 · 价格 · 本月流量占比 · 标签。7 天内到期变橙、已过期或流量超额变红。顶部那行补上虚拟化和在线时长。面板没给的项直接省略。</div>
+</div>
+
+<div class="col">
+<div class="phone">
+ <div class="status"><span>9:41</span><span>●●●</span></div>
+ <div class="nav"><span class="circle">‹</span><span class="circle">⋯</span></div>
+ <div class="title" style="font-size:26px">🇭🇰 HK-01</div>
+ <div class="sect">…… 原有的 CPU 趋势、内存、磁盘、网络 ……</div>
+ <div class="sect new" style="margin:6px 16px 0;padding:8px 16px;position:relative">套餐<span class="tag" style="top:6px;right:8px">新增分组</span></div>
+ <div class="group">
+  <div class="cell"><span>到期</span><span class="v">2030-01-01 · 还剩 152 天</span></div>
+  <div class="cell"><span>价格</span><span class="v">¥99 / 年 · 自动续费</span></div>
+  <div class="quota"><div class="t"><span>本月流量</span><span class="v mono" style="color:var(--sec)">56.0 GB / 500 GB</span></div>
+   <div class="bar"><i style="width:7%"></i></div>
+   <div class="d">剩余 444 GB · 双向合计 · 每月 1 日重置</div></div>
+  <div class="cell"><span>在线时长</span><span class="v">10 天 4 小时</span></div>
+  <div class="cell"><span>虚拟化 · 架构</span><span class="v">KVM · x86_64</span></div>
+  <div class="cell"><span>标签</span><span class="v"><span class="pill">vps</span> <span class="pill">中转</span></span></div>
+ </div>
+ <div class="sect">公开备注</div>
+ <div class="group"><div class="remark">CN2 GIA 回程，晚高峰稳定。</div></div>
+</div>
+<div class="cap">② 服务器详情</div>
+<div class="capd">在现有指标下面加「套餐」分组。流量用进度条：已用 / 上限、剩余、计费方式和重置日；超额时进度条变红并写「超出 X」。没有上限的只显示「累计 ↑ X ↓ Y · 未设配额」。</div>
+</div>
+
+<div class="col">
+<table>
+<tr><th>统一字段</th><th>Komari（已核实）</th><th>CF-Server-Monitor</th><th>极简探针</th></tr>
+<tr><td>到期</td><td>expired_at；为空或 100 年以后算长期</td><td>expire_date</td><td>expires_at / expires_in</td></tr>
+<tr><td>价格</td><td>price：0 未设，-1 免费<br>currency：符号（$、￥）</td><td>price 文字：0/-1 免费<br>currency：符号</td><td>price<br>currency：三字母</td></tr>
+<tr><td>周期</td><td>billing_cycle 天数：30 月、90 季、365 年…，-1 一次性</td><td>month / quarter / year …</td><td>命名周期或 12m</td></tr>
+<tr><td>流量上限</td><td>traffic_limit 字节，0 未设</td><td>traffic_limit 文字 "1TB"</td><td>traffic_limit</td></tr>
+<tr><td>计费方式</td><td>traffic_limit_type：sum / max / min / up / down</td><td>traffic_calc_type</td><td>traffic_mode</td></tr>
+<tr><td>已用流量</td><td>net_total_up / down（agent 开了按月重置才是本月）</td><td>net_rx_monthly / net_tx_monthly</td><td>month_used（已按方式算好）</td></tr>
+<tr><td>重置日</td><td>公开接口没有</td><td>reset_day</td><td>traffic_reset_day</td></tr>
+<tr><td>在线时长</td><td>uptime</td><td>由 boot_time 计算</td><td>metrics.uptime</td></tr>
+<tr><td>虚拟化·架构</td><td>virtualization / arch</td><td>arch</td><td>virt / arch</td></tr>
+<tr><td>标签·备注</td><td>tags（; 分隔）/ public_remark</td><td>tags（, 分隔）</td><td>public_remark</td></tr>
+</table>
+<div class="note">Komari 的核实依据：源码 <span class="mono">database/models/models.go</span>、<span class="mono">utils/renewal/renewal.go</span>、<span class="mono">utils/notifier/traffic.go</span>，官方主题 <span class="mono">PriceTags.tsx</span>，以及测试面板 /api/nodes 的实际返回（有 tags「中转」、public_remark、virtualization「kvm」）。<br>注意：Komari 的已用流量是 agent 统计的累计值，只有 agent 设置了 month_rotate 才按月清零，App 无法得知，所以 Komari 写成「已用」而不是「本月已用」。</div>
+</div>
+
+</div>
+</body></html>

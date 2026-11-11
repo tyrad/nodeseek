@@ -1,0 +1,514 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>服务器监控 UI</title><style>* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #e9ebee; font-family: -apple-system, "PingFang SC", "SF Pro Text", sans-serif; padding: 48px; color: #111; width: 1830px; -webkit-font-smoothing: antialiased; }
+body > h1 { font-size: 32px; font-weight: 700; letter-spacing: -.5px; }
+body > h1.sec { font-size: 26px; margin-top: 64px; }
+.sub { color: #6b6b70; font-size: 15px; margin: 6px 0 22px; max-width: 1500px; }
+.rules { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 40px; }
+.rule { background: #fff; border-radius: 16px; padding: 14px 16px; font-size: 13px; line-height: 1.55; color: #48484c; }
+.rule b { display: block; color: #111; font-size: 14px; margin-bottom: 4px; }
+.row { display: flex; gap: 48px; }
+.cell { width: 390px; }
+.cap { margin-top: 18px; font-size: 13.5px; line-height: 1.65; color: #3a3a3e; }
+.cap b { display: block; font-size: 16px; margin-bottom: 4px; color: #111; }
+svg { display: block; flex: none; }
+.mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+
+.phone, .wall {
+  --bg: #f2f2f7; --card: #fff; --label: #000; --label2: rgba(60,60,67,.6); --label3: rgba(60,60,67,.3);
+  --sep: rgba(60,60,67,.12); --fill: rgba(120,120,128,.14); --glass: rgba(255,255,255,.8); --glass-b: rgba(0,0,0,.05);
+  --green: #34C759; --red: #FF3B30; --orange: #FF9500; --blue: #007AFF; --indigo: #5856D6; --teal: #30B0C7; --pink: #FF2D55;
+}
+.phone.dark, .wall.dark {
+  --bg: #000; --card: #1c1c1e; --label: #fff; --label2: rgba(235,235,245,.6); --label3: rgba(235,235,245,.3);
+  --sep: rgba(84,84,88,.55); --fill: rgba(120,120,128,.3); --glass: rgba(44,44,46,.8); --glass-b: rgba(255,255,255,.06);
+  --green: #30D158; --red: #FF453A; --orange: #FF9F0A; --blue: #0A84FF; --indigo: #5E5CE6; --teal: #40C8E0; --pink: #FF375F;
+}
+.phone { position: relative; width: 390px; height: 844px; border-radius: 55px; background: var(--bg); color: var(--label); overflow: hidden; box-shadow: 0 0 0 10px #18181a, 0 30px 60px rgba(0,0,0,.25); }
+.status { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 8px 36px 0 48px; font-weight: 600; font-size: 17px; }
+.island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; border-radius: 20px; background: #000; }
+.bat { width: 25px; height: 12px; border: 1.5px solid currentColor; border-radius: 4px; position: relative; }
+.bat::after { content: ""; position: absolute; inset: 1.5px; width: 72%; background: currentColor; border-radius: 1.5px; }
+.home { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--label); z-index: 9; }
+.nav { height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+.gbtn { height: 40px; min-width: 40px; border-radius: 20px; background: var(--glass); border: .5px solid var(--glass-b); display: flex; align-items: center; justify-content: center; font-size: 14.5px; font-weight: 600; }
+.gbtn.pill { padding: 0 14px; }
+.gbtn.inv { background: var(--label); color: var(--bg); border: 0; }
+.ptitle { font-size: 34px; font-weight: 800; letter-spacing: -.8px; padding: 2px 20px 12px; }
+
+/* 趋势线 */
+.sp .ln { fill: none; stroke: var(--label); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.sp .ar { fill: var(--label); opacity: .07; }
+.sp .dash { stroke: var(--label3); stroke-width: 1.4; stroke-dasharray: 3 4; fill: none; }
+.sp .end { fill: var(--red); }
+.sp.crit .ln { stroke: var(--red); } .sp.crit .ar { fill: var(--red); opacity: .1; }
+
+/* 汇总反色卡 */
+.hero { margin: 0 16px; border-radius: 20px; background: var(--label); color: var(--bg); padding: 14px 16px 0; overflow: hidden; }
+.hmeta { display: flex; justify-content: space-between; font-family: "SF Mono", ui-monospace, monospace; font-size: 10.5px; letter-spacing: .6px; opacity: .55; }
+.hmain { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 4px; }
+.hbig { display: flex; align-items: baseline; gap: 2px; }
+.hbig b { font-size: 52px; font-weight: 800; letter-spacing: -2px; line-height: 1; }
+.hbig span { font-size: 22px; font-weight: 700; opacity: .5; }
+.hbig em { font-style: normal; font-size: 14px; font-weight: 600; margin-left: 8px; opacity: .8; }
+.hoff { font-size: 12px !important; opacity: 1 !important; color: var(--red); font-weight: 700 !important; margin-left: 8px; }
+.hnet { display: grid; gap: 2px; text-align: right; font-family: "SF Mono", ui-monospace, monospace; font-size: 13px; font-weight: 600; padding-bottom: 4px; }
+.hsp { margin: 8px -16px 0; width: calc(100% + 32px); }
+.hsp .ln { stroke: var(--bg); opacity: .8; }
+.hsp .ar { fill: var(--bg); opacity: .14; }
+
+/* 服务器卡 */
+.srv { margin: 10px 16px 0; background: var(--card); border-radius: 20px; padding: 14px 16px 12px; }
+.stop { display: flex; align-items: center; gap: 7px; }
+.flag { font-size: 16px; line-height: 1; }
+.stop h3 { font-size: 18px; font-weight: 800; letter-spacing: -.3px; flex: 1; }
+.live { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--label2); }
+.live i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.live.off { color: var(--red); } .live.off i { background: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent); }
+.meta { font-size: 10.5px; letter-spacing: .5px; color: var(--label2); margin-top: 3px; }
+.sbody { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 8px; }
+.sbig b { display: block; font-size: 38px; font-weight: 800; letter-spacing: -1.4px; line-height: 1; font-variant-numeric: tabular-nums; }
+.sbig b small { font-size: 17px; font-weight: 700; letter-spacing: 0; margin-left: 1px; }
+.sbig b.dim { color: var(--label3); }
+.sbig span { display: block; font-size: 9.5px; letter-spacing: .5px; color: var(--label2); margin-top: 5px; }
+.mtr { display: grid; grid-template-columns: 30px 1fr 50px; align-items: center; gap: 10px; margin-top: 9px; font-size: 12.5px; color: var(--label2); }
+.mtr b { text-align: right; color: var(--label); font-size: 12.5px; font-weight: 700; }
+.tk { display: flex; gap: 2.5px; height: 12px; }
+.tk i { flex: 1; border-radius: 1.5px; background: var(--fill); }
+.tk i.on { background: var(--label); } .tk i.on.warn { background: var(--orange); } .tk i.on.crit { background: var(--red); }
+.sfoot { display: flex; gap: 16px; margin-top: 11px; padding-top: 9px; border-top: .5px solid var(--sep); font-size: 11px; letter-spacing: .3px; color: var(--label2); }
+.sfoot span:last-child { margin-left: auto; }
+.offc .sp .ln { stroke: var(--label2); } .offc .sp .ar { opacity: .05; }
+.stalec { border: 1.2px dashed var(--label3); background: transparent; color: var(--label2); }
+.stalec h3, .stalec .sbig b, .stalec .mtr b { color: var(--label2); }
+.stalec .sp .ln { stroke: var(--label3); } .stalec .tk i.on { background: var(--label3); }
+.gt { display: flex; justify-content: space-between; margin: 20px 32px 0; font-size: 10.5px; letter-spacing: .5px; color: var(--label2); }
+.gt .stale { display: inline-flex; align-items: center; gap: 4px; }
+
+/* 详情 */
+.dhead { padding: 0 20px; }
+.dt { display: flex; align-items: center; gap: 9px; }
+.dt .flag { font-size: 26px; }
+.dt h2 { font-size: 34px; font-weight: 800; letter-spacing: -.8px; flex: 1; }
+.chart { margin: 14px 16px 0; background: var(--card); border-radius: 20px; padding: 16px 16px 12px; }
+.ctop { display: flex; justify-content: space-between; align-items: flex-start; }
+.ctop .sbig b { font-size: 48px; letter-spacing: -2px; }
+.seg { display: flex; background: var(--fill); border-radius: 9px; padding: 2px; font-family: "SF Mono", ui-monospace, monospace; font-size: 11px; font-weight: 600; }
+.seg span { padding: 5px 9px; border-radius: 7px; color: var(--label2); }
+.seg span.on { background: var(--label); color: var(--bg); }
+.cplot { position: relative; margin-top: 12px; }
+.cplot .grid span { position: absolute; left: 0; right: 0; border-top: 1px dotted var(--sep); }
+.cy { position: absolute; right: 0; top: -6px; bottom: -4px; display: flex; flex-direction: column; justify-content: space-between; font-size: 9px; color: var(--label3); text-align: right; }
+.cx { display: flex; justify-content: space-between; margin-top: 6px; font-size: 9.5px; color: var(--label2); }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 16px 0; }
+.tile { background: var(--card); border-radius: 18px; padding: 12px 14px; height: 112px; display: flex; flex-direction: column; gap: 5px; }
+.tl { font-size: 12px; color: var(--label2); }
+.tile b { font-size: 26px; font-weight: 800; letter-spacing: -.8px; line-height: 1; font-variant-numeric: tabular-nums; }
+.tile b small { font-size: 13px; font-weight: 700; letter-spacing: 0; margin-left: 1px; }
+.tile .tk { height: 10px; margin-top: auto; }
+.ts { font-size: 9.5px; color: var(--label2); letter-spacing: .3px; }
+.tsp { margin-top: auto; }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); margin: 10px 16px 0; background: var(--card); border-radius: 18px; padding: 12px 0; }
+.facts div { text-align: center; position: relative; }
+.facts div + div::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: .5px; background: var(--sep); }
+.facts span { display: block; font-size: 9.5px; letter-spacing: .5px; color: var(--label2); }
+.facts b { display: block; font-size: 15px; font-weight: 700; margin-top: 3px; }
+
+/* 添加 */
+.plead { margin: 0 20px; font-size: 14px; line-height: 1.55; color: var(--label2); }
+.plead.small { font-size: 12.5px; margin-top: 10px; }
+.inp { margin: 12px 16px 0; background: var(--card); border-radius: 16px; padding: 10px 16px 12px; }
+.inp + .inp { margin-top: 8px; }
+.inp span { display: block; font-size: 10px; letter-spacing: .6px; color: var(--label2); }
+.inp b { display: block; font-size: 18px; font-weight: 600; margin-top: 3px; }
+.okline { display: flex; align-items: center; gap: 7px; margin: 12px 20px 0; font-size: 10.5px; letter-spacing: .4px; color: var(--label); }
+.okline i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.picks { margin: 8px 16px 0; background: var(--card); border-radius: 18px; overflow: hidden; }
+.pick { display: flex; align-items: center; gap: 12px; height: 60px; padding: 0 16px; position: relative; }
+.pick + .pick::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: .5px; background: var(--sep); }
+.chk { width: 22px; height: 22px; border-radius: 50%; background: var(--label); color: var(--bg); display: flex; align-items: center; justify-content: center; flex: none; }
+.pn { font-family: "SF Mono", ui-monospace, monospace; font-size: 20px; font-weight: 700; color: var(--label3); }
+.pick .t { flex: 1; font-size: 16px; font-weight: 700; }
+.pick .t small { display: block; font-size: 9.5px; letter-spacing: .5px; font-weight: 400; color: var(--label2); margin-top: 2px; }
+.psp .ln { stroke-width: 1.3; }
+
+/* 小组件 */
+.walls { display: flex; gap: 32px; }
+.wall { border-radius: 36px; padding: 28px 28px 40px; display: grid; grid-template-columns: 170px 170px; grid-auto-rows: 170px; gap: 30px 24px; background: linear-gradient(160deg, #c3c7cf, #e6e7eb); }
+.wall.dark { background: linear-gradient(160deg, #2a2b30, #0b0b0d); }
+.wcell { position: relative; }
+.wcell.wide { grid-column: span 2; }
+.wlab { position: absolute; left: 0; right: 0; bottom: -21px; text-align: center; font-size: 11.5px; color: rgba(0,0,0,.55); }
+.wall.dark .wlab { color: rgba(255,255,255,.55); }
+.w { position: relative; width: 100%; height: 100%; border-radius: 22px; background: var(--card); color: var(--label); overflow: hidden; font-variant-numeric: tabular-nums; }
+.w.inv { background: var(--label); color: var(--bg); }
+.w.inv .sp .ln { stroke: var(--bg); } .w.inv .sp .ar { fill: var(--bg); opacity: .16; }
+.w.inv .wmeta, .w.inv .wbig span { color: color-mix(in srgb, var(--bg) 60%, transparent); }
+.ws { padding: 14px 15px 0; }
+.wtop { display: flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 800; letter-spacing: -.2px; }
+.wtop .flag { font-size: 12px; }
+.wtop .n { flex: 1; }
+.wdot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex: none; }
+.wdot.off { background: var(--red); } .wdot.none { background: var(--label3); }
+.wclock { color: var(--label2); }
+.wbig { margin-top: 8px; }
+.wbig b { display: block; font-size: 38px; font-weight: 800; letter-spacing: -1.6px; line-height: 1; }
+.wbig b small { font-size: 16px; letter-spacing: 0; }
+.wbig b.red { color: var(--red); font-size: 32px; letter-spacing: -.5px; }
+.wbig span { display: block; font-size: 9px; letter-spacing: .6px; color: var(--label2); margin-top: 4px; }
+.wmeta { display: flex; gap: 8px; margin-top: 6px; font-size: 9.5px; letter-spacing: .3px; color: var(--label2); }
+.wmeta span:last-child { margin-left: auto; }
+.wsp { position: absolute; left: 0; bottom: 0; }
+.stalew .wtop .n, .stalew .wbig b { color: var(--label2); }
+.stalew .sp .ln { stroke: var(--label3); } .stalew .sp .ar { opacity: .04; }
+.woff .sp .ln { stroke: var(--label2); }
+.wm { padding: 12px 14px 12px; }
+.wh { display: flex; justify-content: space-between; font-size: 9.5px; letter-spacing: .5px; color: var(--label2); }
+.wh b { color: var(--label); } .wh em { font-style: normal; color: var(--red); font-weight: 700; }
+.cols { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 10px; }
+.wc { padding: 0 10px; position: relative; }
+.wc:first-child { padding-left: 0; } .wc:last-child { padding-right: 0; }
+.wc + .wc::before { content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: .5px; background: var(--sep); }
+.cn { display: flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; white-space: nowrap; overflow: hidden; }
+.cbig { font-size: 30px; font-weight: 800; letter-spacing: -1.2px; line-height: 1; margin-top: 10px; }
+.cbig small { font-size: 13px; letter-spacing: 0; }
+.cbig.red { color: var(--red); font-size: 24px; letter-spacing: -.3px; padding-top: 4px; }
+.cbig.crit { color: var(--red); }
+.cbig.dim { color: var(--label3); }
+.csp { margin-top: 8px; width: 100%; }
+.cm { font-size: 8.5px; letter-spacing: .3px; color: var(--label2); margin-top: 6px; white-space: nowrap; }
+
+/* 第三版：指标色 */
+.sp.cpu .ln { stroke: var(--blue); } .sp.cpu .ar { fill: var(--blue); opacity: .14; }
+.sp.net .ln { stroke: var(--pink); }
+.tk.mem i.on { background: var(--indigo); } .tk.dsk i.on { background: var(--teal); }
+.tk i.on.warn { background: var(--orange) !important; } .tk i.on.crit { background: var(--red) !important; }
+.lg { display: inline-block; width: 6px; height: 6px; border-radius: 2px; margin-right: 5px; vertical-align: 1px; }
+.lg.mem { background: var(--indigo); } .lg.dsk { background: var(--teal); } .lg.net { background: var(--pink); }
+.mtr { grid-template-columns: 40px 1fr 50px; }
+.sp.cpu.crit .ln { stroke: var(--red); } .sp.cpu.crit .ar { fill: var(--red); }
+.offc .sp .ln, .woff .sp .ln { stroke: var(--label2) !important; } .offc .sp .ar, .woff .sp .ar { fill: var(--label); opacity: .05; }
+.stalec .sp .ln, .stalew .sp .ln { stroke: var(--label3) !important; } .stalec .sp .ar, .stalew .sp .ar { fill: var(--label); opacity: .04; }
+.stalec .tk i.on { background: var(--label3) !important; } .stalec .lg { opacity: .4; }
+.w.inv .sp.cpu .ln { stroke: var(--blue); } .w.inv .sp.cpu .ar { fill: var(--blue); opacity: .3; }
+
+/* 很多台 */
+.cell.wide2 { width: 864px; }
+.walls2 { display: flex; gap: 24px; }
+.wall.tall { grid-auto-rows: 170px; align-content: start; }
+.wcell.large { grid-row: span 2; height: 364px; }
+.navr { display: flex; gap: 8px; }
+.gbtn.on { background: var(--label); color: var(--bg); border: 0; }
+.mh { padding-top: 12px; }
+.mh .hbig b { font-size: 40px; }
+.hchips { display: flex; gap: 6px; margin-top: 6px; }
+.hc { font-family: "SF Mono", ui-monospace, monospace; font-size: 10.5px; font-weight: 700; padding: 3px 7px; border-radius: 6px; }
+.hc.red { background: color-mix(in srgb, var(--red) 22%, transparent); color: var(--red); }
+.hc.org { background: color-mix(in srgb, var(--orange) 22%, transparent); color: var(--orange); }
+.mh .hsp { margin-top: 4px; }
+.chips { display: flex; gap: 6px; margin: 10px 16px 0; }
+.chip { height: 30px; padding: 0 11px; border-radius: 15px; background: var(--card); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+.chip em { font-style: normal; font-size: 11px; color: var(--label2); }
+.chip.on { background: var(--label); color: var(--bg); } .chip.on em { color: color-mix(in srgb, var(--bg) 65%, transparent); }
+.chip.sort { margin-left: auto; color: var(--label2); background: none; padding: 0 2px; }
+.grp { margin: 10px 16px 0; background: var(--card); border-radius: 18px; overflow: hidden; }
+.grp.collapsed { margin-top: 8px; }
+.gh { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; font-size: 14px; }
+.gh b { font-weight: 800; }
+.gh span.mono { font-size: 10.5px; color: var(--label2); letter-spacing: .3px; }
+.gh em { font-style: normal; font-size: 10.5px; font-weight: 700; color: var(--orange); } .gh em.red { color: var(--red); }
+.gch { margin-left: auto; color: var(--label3); }
+.gh.flat { border-bottom: .5px solid var(--sep); }
+.cr { display: grid; grid-template-columns: 7px 1fr 74px 56px 50px; align-items: center; gap: 8px; height: 52px; padding: 0 14px; border-top: .5px solid var(--sep); }
+.gh.flat + .cr { border-top: 0; }
+.cd { width: 7px; height: 7px; border-radius: 50%; background: var(--green); } .cd.off { background: var(--red); }
+.cname b { display: block; font-size: 14.5px; font-weight: 700; white-space: nowrap; }
+.cname span { display: block; font-size: 9.5px; color: var(--label2); letter-spacing: .3px; margin-top: 2px; }
+.ccpu { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
+.ccpu b { font-size: 14px; font-weight: 700; width: 30px; text-align: right; }
+.ccpu b small { font-size: 9px; }
+.ccpu b.warn { color: var(--orange); } .ccpu b.crit { color: var(--red); }
+.cs.crit .ln { stroke: var(--red); } .cs.crit .ar { fill: var(--red); opacity: .15; }
+.cs.off .ln { stroke: var(--label3); }
+.cbars { display: grid; gap: 5px; }
+.mt { display: flex; gap: 1.5px; height: 5px; }
+.mt i { flex: 1; border-radius: 1px; background: var(--fill); }
+.mt.cpu i.on { background: var(--blue); } .mt.mem i.on { background: var(--indigo); } .mt.dsk i.on { background: var(--teal); }
+.mt i.on.warn { background: var(--orange) !important; } .mt i.on.crit { background: var(--red) !important; }
+.cnet { display: grid; text-align: right; font-size: 9.5px; color: var(--label2); line-height: 1.35; }
+.cr.off .cname b { color: var(--label2); }
+.coff { grid-column: 3 / 5; font-size: 10.5px; color: var(--label2); text-align: right; }
+.coff b { color: var(--red); }
+.search { display: flex; align-items: center; gap: 8px; margin: 2px 16px 0; height: 38px; padding: 0 12px; border-radius: 12px; background: var(--fill); color: var(--label2); font-size: 15px; }
+.search b { font-weight: 400; }
+.menu { position: absolute; right: 16px; top: 236px; width: 230px; background: var(--glass); backdrop-filter: blur(20px); border: .5px solid var(--glass-b); border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,.45); padding: 6px 0; z-index: 5; }
+.phone.dark .menu { background: rgba(44,44,46,.96); }
+.mh.mono { padding: 6px 16px 6px; font-size: 10px; letter-spacing: .5px; color: var(--label2); }
+.mi { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; font-size: 15px; border-top: .5px solid var(--sep); }
+.ck { width: 14px; display: inline-flex; }
+.ov { display: flex; flex-direction: column; padding-bottom: 12px; }
+.ovt { margin-left: auto; font-size: 9.5px; font-weight: 400; color: var(--label2); }
+.ov.inv .ovt, .ov.inv .ovl { color: color-mix(in srgb, var(--bg) 60%, transparent); }
+.ovbig { margin-top: 6px; display: flex; align-items: baseline; }
+.ovbig b { font-size: 46px; font-weight: 800; letter-spacing: -2px; line-height: 1; }
+.ovbig span { font-size: 18px; font-weight: 700; opacity: .45; }
+.ovl { font-size: 9.5px; letter-spacing: .5px; color: var(--label2); margin-top: 2px; }
+.ovs { display: flex; gap: 5px; margin-top: auto; }
+.ovn { display: flex; align-items: center; gap: 5px; font-size: 9.5px; color: var(--label2); margin-top: 6px; }
+.ovsp .ln { stroke: var(--bg) !important; opacity: .8; } .ovsp .ar { fill: var(--bg) !important; opacity: .15 !important; }
+.wl { padding: 13px 14px; display: flex; flex-direction: column; }
+.lhead, .lr { display: grid; grid-template-columns: 7px 1fr 66px 66px 66px; gap: 8px; align-items: center; }
+.lhead span:nth-child(n+3) { text-align: center; } .lhead { margin-top: 8px; font-size: 8.5px; letter-spacing: .5px; color: var(--label2); }
+.lr { height: 34px; border-top: .5px solid var(--sep); }
+.lhead + .lr { border-top: 0; }
+.lr b { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.lm { display: grid; grid-template-columns: 20px 1fr; align-items: center; gap: 4px; }
+.lm em { font-style: normal; font-size: 11px; font-weight: 700; text-align: right; }
+.lm em.warn { color: var(--orange); } .lm em.crit { color: var(--red); }
+.lof { grid-column: 3 / 6; font-size: 10px; color: var(--red); text-align: right; }
+.lmore { margin-top: auto; padding-top: 6px; border-top: .5px solid var(--sep); font-size: 9.5px; color: var(--label2); text-align: center; letter-spacing: .3px; }
+.csp.mem .ln { stroke: var(--indigo); } .csp.mem .ar { fill: var(--indigo); opacity: .14; }
+.csp.warn .ln { stroke: var(--orange); } .csp.warn .ar { fill: var(--orange); opacity: .14; }
+.cbig.warn { color: var(--orange); }
+</style></head><body>
+<h1>服务器监控 · 第三版</h1>
+<p class="sub">「仪表」方向：大号主数字 + 等宽小字，用真实的 1 小时趋势线代替静态进度条。在第二版基础上给指标加系统色：CPU 蓝、内存靛、磁盘青、网络粉；框架仍是黑白。趋势线是测试面板 /api/records/load 的真实数据。</p>
+<div class="rules">
+  <div class="rule"><b>三个视觉锚点</b>① 汇总区用反色卡片（浅色模式黑底，深色模式白底）；② CPU 用 36pt 粗数字配 1 小时趋势线；③ 内存和磁盘用 24 格刻度条，比连续进度条更有“仪表”感。</div>
+  <div class="rule"><b>两种字体</b>名称和主数字用 SF Pro；元信息、单位、时间用 SF Mono（大写，字距略放宽），营造技术感。不使用渐变和阴影。</div>
+  <div class="rule"><b>离线 ≠ 拿不到数据</b>离线时，趋势线在最后一次上报处打一个点，之后变成虚线，并显示红色「离线」。过期时显示时钟和「缓存 · X 前」，趋势线变灰，状态点隐藏。</div>
+  <div class="rule"><b>指标色 + 告警</b>每种指标固定一个系统色（CPU systemBlue、内存 systemIndigo、磁盘 systemTeal、网络 systemPink），App 和小组件保持一致。用量 ≥70% 时统一变为 systemOrange，≥90% 变为 systemRed。离线和缓存状态一律显示为灰色。</div>
+</div>
+<div class="row">
+  <div class="cell"><div class="phone"><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+  <div class="nav"><div class="gbtn"><svg width="11" height="18" viewBox="0 0 11 18"><path d="M9 2 2 9l7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="gbtn"><svg width="17" height="17" viewBox="0 0 17 17"><path d="M8.5 2v13M2 8.5h13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></div></div>
+  <h1 class="ptitle">服务器</h1>
+  <div class="hero">
+  <div class="hmeta"><span>NS PROBE · KOMARI</span><span>刚刚</span></div>
+  <div class="hmain"><div class="hbig"><b>2</b><span>/2</span><em>在线</em></div>
+    <div class="hnet"><span>↑ 596K/s</span><span>↓ 550K/s</span></div></div>
+  <svg class="sp hsp" width="326" height="34" viewBox="0 0 326 34" preserveAspectRatio="none"><path d="M0.0,24.2 L16.3,28.3 L32.6,28.5 L48.9,18.6 L65.2,27.8 L81.5,26.8 L97.8,23.9 L114.1,15.0 L130.4,18.5 L146.7,5.9 L163.0,12.0 L179.3,19.1 L195.6,18.0 L211.9,18.1 L228.2,11.0 L244.5,17.5 L260.8,12.8 L277.1,17.3 L293.4,17.9 L309.7,26.5 L326.0,20.1 L326.0,34 L0,34 Z" class="ar"/><path d="M0.0,24.2 L16.3,28.3 L32.6,28.5 L48.9,18.6 L65.2,27.8 L81.5,26.8 L97.8,23.9 L114.1,15.0 L130.4,18.5 L146.7,5.9 L163.0,12.0 L179.3,19.1 L195.6,18.0 L211.9,18.1 L228.2,11.0 L244.5,17.5 L260.8,12.8 L277.1,17.3 L293.4,17.9 L309.7,26.5 L326.0,20.1" class="ln"/></svg>
+</div>
+  <div class="srv">
+  <div class="stop"><span class="flag">🇭🇰</span><h3>HK-01</h3><span class="live"><i></i>在线</span></div>
+  <div class="mono meta">UBUNTU 22.04 · 4C · UP 65D</div>
+  <div class="sbody">
+    <div class="sbig"><b>0.9<small>%</small></b><span class="mono">CPU · 1H 峰值 6.0</span></div>
+    <svg class="sp cpu" width="196" height="52" viewBox="0 0 196 52" preserveAspectRatio="none"><path d="M0.0,45.8 L5.0,47.9 L10.1,47.9 L15.1,48.6 L20.1,48.6 L25.1,47.2 L30.2,48.6 L35.2,47.2 L40.2,47.9 L45.2,45.1 L50.3,43.7 L55.3,44.4 L60.3,45.8 L65.3,46.5 L70.4,44.4 L75.4,45.8 L80.4,47.9 L85.4,46.5 L90.5,45.1 L95.5,47.2 L100.5,47.2 L105.5,47.9 L110.6,47.2 L115.6,47.9 L120.6,8.3 L125.6,46.5 L130.7,45.1 L135.7,45.8 L140.7,45.1 L145.7,45.1 L150.8,45.1 L155.8,47.2 L160.8,46.5 L165.8,45.8 L170.9,45.8 L175.9,43.7 L180.9,45.1 L185.9,46.5 L191.0,47.2 L196.0,47.2 L196.0,52 L0,52 Z" class="ar"/><path d="M0.0,45.8 L5.0,47.9 L10.1,47.9 L15.1,48.6 L20.1,48.6 L25.1,47.2 L30.2,48.6 L35.2,47.2 L40.2,47.9 L45.2,45.1 L50.3,43.7 L55.3,44.4 L60.3,45.8 L65.3,46.5 L70.4,44.4 L75.4,45.8 L80.4,47.9 L85.4,46.5 L90.5,45.1 L95.5,47.2 L100.5,47.2 L105.5,47.9 L110.6,47.2 L115.6,47.9 L120.6,8.3 L125.6,46.5 L130.7,45.1 L135.7,45.8 L140.7,45.1 L145.7,45.1 L150.8,45.1 L155.8,47.2 L160.8,46.5 L165.8,45.8 L170.9,45.8 L175.9,43.7 L180.9,45.1 L185.9,46.5 L191.0,47.2 L196.0,47.2" class="ln"/></svg>
+  </div>
+  <div class="mtr"><span><i class="lg mem"></i>内存</span><span class="tk mem"><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span><b class="mono">10.5%</b></div>
+  <div class="mtr"><span><i class="lg dsk"></i>磁盘</span><span class="tk dsk"><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span><b class="mono">28.1%</b></div>
+  <div class="sfoot mono"><span>↑ 312K/s</span><span>↓ 265K/s</span><span>LOAD 0.00</span></div>
+</div>
+  <div class="srv">
+  <div class="stop"><span class="flag">🇸🇬</span><h3>SG-01</h3><span class="live"><i></i>在线</span></div>
+  <div class="mono meta">DEBIAN 12 · 1C · UP 8D</div>
+  <div class="sbody">
+    <div class="sbig"><b>1.7<small>%</small></b><span class="mono">CPU · 1H 峰值 5.9</span></div>
+    <svg class="sp cpu" width="196" height="52" viewBox="0 0 196 52" preserveAspectRatio="none"><path d="M0.0,28.8 L7.5,43.6 L15.1,42.2 L22.6,45.8 L30.2,45.0 L37.7,8.3 L45.2,43.6 L52.8,41.5 L60.3,44.3 L67.8,45.0 L75.4,45.8 L82.9,46.5 L90.5,44.3 L98.0,42.2 L105.5,38.7 L113.1,38.7 L120.6,38.7 L128.2,41.5 L135.7,42.9 L143.2,41.5 L150.8,40.8 L158.3,37.3 L165.8,35.9 L173.4,40.1 L180.9,42.9 L188.5,43.6 L196.0,42.9 L196.0,52 L0,52 Z" class="ar"/><path d="M0.0,28.8 L7.5,43.6 L15.1,42.2 L22.6,45.8 L30.2,45.0 L37.7,8.3 L45.2,43.6 L52.8,41.5 L60.3,44.3 L67.8,45.0 L75.4,45.8 L82.9,46.5 L90.5,44.3 L98.0,42.2 L105.5,38.7 L113.1,38.7 L120.6,38.7 L128.2,41.5 L135.7,42.9 L143.2,41.5 L150.8,40.8 L158.3,37.3 L165.8,35.9 L173.4,40.1 L180.9,42.9 L188.5,43.6 L196.0,42.9" class="ln"/></svg>
+  </div>
+  <div class="mtr"><span><i class="lg mem"></i>内存</span><span class="tk mem"><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span><b class="mono">7.5%</b></div>
+  <div class="mtr"><span><i class="lg dsk"></i>磁盘</span><span class="tk dsk"><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span><b class="mono">76.4%</b></div>
+  <div class="sfoot mono"><span>↑ 284K/s</span><span>↓ 285K/s</span><span>LOAD 0.00</span></div>
+</div>
+  <div class="home"></div></div><div class="cap"><b>① 服务器列表</b>汇总区是反色卡片，底部是两台机器的合计网速曲线。每台服务器显示大号 CPU 数字和 1 小时趋势线，下面是内存、磁盘刻度条和一行等宽元信息。SG-01 的磁盘用 76.4% 演示橙色阈值。</div></div>
+  <div class="cell"><div class="phone"><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+  <div class="nav"><div class="gbtn"><svg width="11" height="18" viewBox="0 0 11 18"><path d="M9 2 2 9l7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="gbtn pill">别名</div></div>
+  <div class="dhead"><div class="dt"><span class="flag">🇭🇰</span><h2>HK-01</h2><span class="live"><i></i>在线</span></div>
+    <div class="mono meta">NS PROBE · UBUNTU 22.04 · XEON GOLD 6230 · 4C</div></div>
+  <div class="chart">
+    <div class="ctop"><div class="sbig"><b>0.9<small>%</small></b><span class="mono">CPU · 采样于 3 秒前</span></div>
+      <div class="seg"><span class="on">1H</span><span>6H</span><span>24H</span></div></div>
+    <div class="cplot"><div class="grid"><span style="top:0px"></span><span style="top:40px"></span><span style="top:80px"></span></div><svg class="sp cpu" width="326" height="96" viewBox="0 0 326 96" preserveAspectRatio="none"><path d="M0.0,86.1 L8.4,90.1 L16.7,90.1 L25.1,91.4 L33.4,91.4 L41.8,88.7 L50.2,91.4 L58.5,88.7 L66.9,90.1 L75.2,84.8 L83.6,82.2 L91.9,83.5 L100.3,86.1 L108.7,87.4 L117.0,83.5 L125.4,86.1 L133.7,90.1 L142.1,87.4 L150.5,84.8 L158.8,88.7 L167.2,88.7 L175.5,90.1 L183.9,88.7 L192.3,90.1 L200.6,15.1 L209.0,87.4 L217.3,84.8 L225.7,86.1 L234.1,84.8 L242.4,84.8 L250.8,84.8 L259.1,88.7 L267.5,87.4 L275.8,86.1 L284.2,86.1 L292.6,82.2 L300.9,84.8 L309.3,87.4 L317.6,88.7 L326.0,88.7 L326.0,96 L0,96 Z" class="ar"/><path d="M0.0,86.1 L8.4,90.1 L16.7,90.1 L25.1,91.4 L33.4,91.4 L41.8,88.7 L50.2,91.4 L58.5,88.7 L66.9,90.1 L75.2,84.8 L83.6,82.2 L91.9,83.5 L100.3,86.1 L108.7,87.4 L117.0,83.5 L125.4,86.1 L133.7,90.1 L142.1,87.4 L150.5,84.8 L158.8,88.7 L167.2,88.7 L175.5,90.1 L183.9,88.7 L192.3,90.1 L200.6,15.1 L209.0,87.4 L217.3,84.8 L225.7,86.1 L234.1,84.8 L242.4,84.8 L250.8,84.8 L259.1,88.7 L267.5,87.4 L275.8,86.1 L284.2,86.1 L292.6,82.2 L300.9,84.8 L309.3,87.4 L317.6,88.7 L326.0,88.7" class="ln"/></svg>
+      <div class="cy mono"><span>6%</span><span>3%</span><span>0</span></div></div>
+    <div class="cx mono"><span>13:52</span><span>14:07</span><span>14:22</span><span>现在</span></div>
+  </div>
+  <div class="tiles">
+    <div class="tile"><span class="tl"><i class="lg mem"></i>内存</span><b>10.5<small>%</small></b><span class="tk mem"><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span><span class="mono ts">412M / 3.83G</span></div>
+    <div class="tile"><span class="tl"><i class="lg dsk"></i>磁盘</span><b>28.1<small>%</small></b><span class="tk dsk"><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span><span class="mono ts">8.40G / 29.9G</span></div>
+    <div class="tile"><span class="tl"><i class="lg net"></i>网络 ↑</span><b>312<small>K/s</small></b><svg class="sp tsp net" width="140" height="18" viewBox="0 0 140 18" preserveAspectRatio="none"><path d="M0.0,11.7 L4.8,14.4 L9.7,15.5 L14.5,15.2 L19.3,3.8 L24.1,14.8 L29.0,14.3 L33.8,15.3 L38.6,14.7 L43.4,15.2 L48.3,15.6 L53.1,15.6 L57.9,14.4 L62.8,15.5 L67.6,15.4 L72.4,15.0 L77.2,14.0 L82.1,14.3 L86.9,13.1 L91.7,14.0 L96.6,14.6 L101.4,14.6 L106.2,14.6 L111.0,13.6 L115.9,14.4 L120.7,13.9 L125.5,14.5 L130.3,14.5 L135.2,15.3 L140.0,14.7" class="ln"/></svg><span class="mono ts">↓ 265K/s · 累计 729G</span></div>
+    <div class="tile"><span class="tl">负载</span><b>0.00</b><span class="mono ts" style="margin-top:auto">5M 0.02 · 15M 0.00</span><span class="mono ts">4 核</span></div>
+  </div>
+  <div class="facts mono"><div><span>运行</span><b>65D 18H</b></div><div><span>进程</span><b>134</b></div><div><span>连接</span><b>437</b></div></div>
+  <div class="home"></div></div><div class="cap"><b>② 服务器详情</b>主图是 CPU 趋势，可切换 1H / 6H / 24H（面板保留 24 小时）。下面是四个格子：内存、磁盘、网络、负载。底部一行是等宽字体的运行时间、进程数和连接数。</div></div>
+  <div class="cell"><div class="phone dark"><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+  <div class="nav"><div class="gbtn"><svg width="11" height="18" viewBox="0 0 11 18"><path d="M9 2 2 9l7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="gbtn"><svg width="17" height="17" viewBox="0 0 17 17"><path d="M8.5 2v13M2 8.5h13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></div></div>
+  <h1 class="ptitle">服务器</h1>
+  <div class="hero">
+  <div class="hmeta"><span>NS PROBE · KOMARI</span><span>刚刚</span></div>
+  <div class="hmain"><div class="hbig"><b>1</b><span>/2</span><em>在线</em><span class="hoff">离线 1</span></div>
+    <div class="hnet"><span>↑ 312K/s</span><span>↓ 265K/s</span></div></div>
+  <svg class="sp hsp" width="326" height="34" viewBox="0 0 326 34" preserveAspectRatio="none"><path d="M0.0,24.2 L16.3,28.3 L32.6,28.5 L48.9,18.6 L65.2,27.8 L81.5,26.8 L97.8,23.9 L114.1,15.0 L130.4,18.5 L146.7,5.9 L163.0,12.0 L179.3,19.1 L195.6,18.0 L211.9,18.1 L228.2,11.0 L244.5,17.5 L260.8,12.8 L277.1,17.3 L293.4,17.9 L309.7,26.5 L326.0,20.1 L326.0,34 L0,34 Z" class="ar"/><path d="M0.0,24.2 L16.3,28.3 L32.6,28.5 L48.9,18.6 L65.2,27.8 L81.5,26.8 L97.8,23.9 L114.1,15.0 L130.4,18.5 L146.7,5.9 L163.0,12.0 L179.3,19.1 L195.6,18.0 L211.9,18.1 L228.2,11.0 L244.5,17.5 L260.8,12.8 L277.1,17.3 L293.4,17.9 L309.7,26.5 L326.0,20.1" class="ln"/></svg>
+</div>
+  <div class="srv offc">
+  <div class="stop"><span class="flag">🇸🇬</span><h3>SG-01</h3><span class="live off"><i></i>离线</span></div>
+  <div class="mono meta">最后上报 2 小时前 · 12:31</div>
+  <div class="sbody">
+    <div class="sbig"><b class="dim">—</b><span class="mono">CPU</span></div>
+    <svg class="sp" width="196" height="52" viewBox="0 0 196 52" preserveAspectRatio="none"><path d="M0.0,28.8 L3.2,43.6 L6.3,42.2 L9.5,45.8 L12.7,45.0 L15.8,8.3 L19.0,43.6 L22.2,41.5 L25.3,44.3 L28.5,45.0 L31.7,45.8 L34.8,46.5 L38.0,44.3 L41.2,42.2 L44.3,38.7 L47.5,38.7 L50.7,38.7 L53.8,41.5 L57.0,42.9 L60.2,41.5 L63.3,40.8 L66.5,37.3 L69.7,35.9 L72.8,40.1 L76.0,42.9 L79.2,43.6 L82.3,42.9 L82.3,52 L0,52 Z" class="ar"/><path d="M0.0,28.8 L3.2,43.6 L6.3,42.2 L9.5,45.8 L12.7,45.0 L15.8,8.3 L19.0,43.6 L22.2,41.5 L25.3,44.3 L28.5,45.0 L31.7,45.8 L34.8,46.5 L38.0,44.3 L41.2,42.2 L44.3,38.7 L47.5,38.7 L50.7,38.7 L53.8,41.5 L57.0,42.9 L60.2,41.5 L63.3,40.8 L66.5,37.3 L69.7,35.9 L72.8,40.1 L76.0,42.9 L79.2,43.6 L82.3,42.9" class="ln"/><circle cx="82.3" cy="42.9" r="2.6" class="end"/><path d="M82.3,50.0 L196,50.0" class="dash"/></svg>
+  </div>
+</div>
+  <div class="gt mono"><span>家里 NAS</span><span class="stale"><svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6 3.2V6l1.8 1.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>无法连接 · 缓存 32 分钟前</span></div>
+<div class="srv stalec">
+  <div class="stop"><span class="flag">🇨🇳</span><h3>NAS</h3></div>
+  <div class="sbody"><div class="sbig"><b>12.0<small>%</small></b><span class="mono">CPU · 缓存值</span></div><svg class="sp" width="196" height="52" viewBox="0 0 196 52" preserveAspectRatio="none"><path d="M0.0,22.2 L17.8,16.6 L35.6,19.4 L53.5,11.0 L71.3,13.8 L89.1,16.6 L106.9,8.3 L124.7,16.6 L142.5,19.4 L160.4,16.6 L178.2,13.8 L196.0,16.6 L196.0,52 L0,52 Z" class="ar"/><path d="M0.0,22.2 L17.8,16.6 L35.6,19.4 L53.5,11.0 L71.3,13.8 L89.1,16.6 L106.9,8.3 L124.7,16.6 L142.5,19.4 L160.4,16.6 L178.2,13.8 L196.0,16.6" class="ln"/></svg></div>
+  <div class="mtr"><span><i class="lg mem"></i>内存</span><span class="tk mem"><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span><b class="mono">41.2%</b></div>
+</div>
+  <div class="home"></div></div><div class="cap"><b>③ 异常状态 · 深色</b>深色模式下汇总区反成白底，仍然是页面焦点。SG-01 离线：趋势线断开后变成虚线，大数字显示「—」。家里 NAS 连接失败：分组标题显示缓存时间，卡片用虚线框且变灰（示意数据）。</div></div>
+  <div class="cell"><div class="phone"><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+  <div class="nav"><div class="gbtn pill">取消</div><div class="gbtn pill inv">保存</div></div>
+  <h1 class="ptitle">添加探针</h1>
+  <p class="plead">读取 Komari 面板的公开数据。不需要账号密码，所有数据只保存在这台设备上。</p>
+  <div class="inp"><span class="mono">面板地址</span><b>https://status.example.com</b></div>
+  <div class="inp"><span class="mono">名称</span><b>NS Probe</b></div>
+  <div class="okline mono"><i></i>KOMARI 1.6.1 · 2 个公开节点 · 已连接</div>
+  <div class="gt mono"><span>显示的服务器</span><span>拖动排序</span></div>
+  <div class="picks">
+    <div class="pick"><span class="chk"><svg width="11" height="9" viewBox="0 0 11 9"><path d="m1.5 4.5 2.8 2.8L9.5 1.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="pn">01</span><span class="t">🇭🇰 HK-01<small class="mono">UBUNTU 22.04 · 4C</small></span><svg class="sp psp cpu" width="54" height="20" viewBox="0 0 54 20" preserveAspectRatio="none"><path d="M0.0,17.1 L2.8,17.3 L5.7,17.1 L8.5,17.3 L11.4,4.1 L14.2,16.8 L17.1,16.4 L19.9,16.6 L22.7,16.4 L25.6,16.4 L28.4,16.4 L31.3,17.1 L34.1,16.8 L36.9,16.6 L39.8,16.6 L42.6,15.9 L45.5,16.4 L48.3,16.8 L51.2,17.1 L54.0,17.1" class="ln"/></svg></div>
+    <div class="pick"><span class="chk"><svg width="11" height="9" viewBox="0 0 11 9"><path d="m1.5 4.5 2.8 2.8L9.5 1.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="pn">02</span><span class="t">🇸🇬 SG-01<small class="mono">DEBIAN 12 · 1C</small></span><svg class="sp psp cpu" width="54" height="20" viewBox="0 0 54 20" preserveAspectRatio="none"><path d="M0.0,9.7 L2.8,12.4 L5.7,13.1 L8.5,13.8 L11.4,14.5 L14.2,12.4 L17.1,10.3 L19.9,6.9 L22.7,6.9 L25.6,6.9 L28.4,9.7 L31.3,11.0 L34.1,9.7 L36.9,9.0 L39.8,5.5 L42.6,4.1 L45.5,8.3 L48.3,11.0 L51.2,11.7 L54.0,11.0" class="ln"/></svg></div>
+  </div>
+  <p class="plead small">01 是小号小组件默认显示的服务器，中号按顺序显示前 3 台。</p>
+  <div class="home"></div></div><div class="cap"><b>④ 添加探针</b>大标题加两个输入框，自动测试连接，连接结果用一行等宽字体显示。节点按编号排序，每个节点附带一条迷你趋势线，方便辨认是哪台机器。</div></div>
+</div>
+<h1 class="sec">桌面小组件</h1>
+<p class="sub">小号：大号 CPU 数字配一条贴边的趋势线，铺满整个底部。中号：三栏并排，每栏都有数字和趋势线。小号额外提供「反色」样式，放在主屏上更显眼。时间用系统相对时间，超过 45 分钟没有更新就切换为过期样式。</p>
+<div class="walls"><div class="wall">
+  <div class="wcell"><div class="w ws ">
+  <div class="wtop"><span class="flag">🇭🇰</span><span class="n">HK-01</span><i class="wdot"></i></div>
+  <div class="wbig"><b>0.9<small>%</small></b><span class="mono">CPU</span></div>
+  <div class="wmeta mono"><span>MEM 11</span><span>DSK 28</span><span>刚刚</span></div>
+  <svg class="sp wsp cpu" width="170" height="46" viewBox="0 0 170 46" preserveAspectRatio="none"><path d="M0.0,41.2 L4.4,43.1 L8.7,43.1 L13.1,43.7 L17.4,43.7 L21.8,42.4 L26.2,43.7 L30.5,42.4 L34.9,43.1 L39.2,40.5 L43.6,39.3 L47.9,39.9 L52.3,41.2 L56.7,41.8 L61.0,39.9 L65.4,41.2 L69.7,43.1 L74.1,41.8 L78.5,40.5 L82.8,42.4 L87.2,42.4 L91.5,43.1 L95.9,42.4 L100.3,43.1 L104.6,6.7 L109.0,41.8 L113.3,40.5 L117.7,41.2 L122.1,40.5 L126.4,40.5 L130.8,40.5 L135.1,42.4 L139.5,41.8 L143.8,41.2 L148.2,41.2 L152.6,39.3 L156.9,40.5 L161.3,41.8 L165.6,42.4 L170.0,42.4 L170.0,46 L0,46 Z" class="ar"/><path d="M0.0,41.2 L4.4,43.1 L8.7,43.1 L13.1,43.7 L17.4,43.7 L21.8,42.4 L26.2,43.7 L30.5,42.4 L34.9,43.1 L39.2,40.5 L43.6,39.3 L47.9,39.9 L52.3,41.2 L56.7,41.8 L61.0,39.9 L65.4,41.2 L69.7,43.1 L74.1,41.8 L78.5,40.5 L82.8,42.4 L87.2,42.4 L91.5,43.1 L95.9,42.4 L100.3,43.1 L104.6,6.7 L109.0,41.8 L113.3,40.5 L117.7,41.2 L122.1,40.5 L126.4,40.5 L130.8,40.5 L135.1,42.4 L139.5,41.8 L143.8,41.2 L148.2,41.2 L152.6,39.3 L156.9,40.5 L161.3,41.8 L165.6,42.4 L170.0,42.4" class="ln"/></svg>
+</div><div class="wlab">小号 · 白</div></div>
+  <div class="wcell"><div class="w ws inv">
+  <div class="wtop"><span class="flag">🇸🇬</span><span class="n">SG-01</span><i class="wdot"></i></div>
+  <div class="wbig"><b>1.7<small>%</small></b><span class="mono">CPU</span></div>
+  <div class="wmeta mono"><span>MEM 8</span><span>DSK 27</span><span>刚刚</span></div>
+  <svg class="sp wsp cpu" width="170" height="46" viewBox="0 0 170 46" preserveAspectRatio="none"><path d="M0.0,25.5 L6.5,39.2 L13.1,37.9 L19.6,41.1 L26.2,40.5 L32.7,6.7 L39.2,39.2 L45.8,37.2 L52.3,39.8 L58.8,40.5 L65.4,41.1 L71.9,41.8 L78.5,39.8 L85.0,37.9 L91.5,34.6 L98.1,34.6 L104.6,34.6 L111.2,37.2 L117.7,38.5 L124.2,37.2 L130.8,36.6 L137.3,33.3 L143.8,32.0 L150.4,35.9 L156.9,38.5 L163.5,39.2 L170.0,38.5 L170.0,46 L0,46 Z" class="ar"/><path d="M0.0,25.5 L6.5,39.2 L13.1,37.9 L19.6,41.1 L26.2,40.5 L32.7,6.7 L39.2,39.2 L45.8,37.2 L52.3,39.8 L58.8,40.5 L65.4,41.1 L71.9,41.8 L78.5,39.8 L85.0,37.9 L91.5,34.6 L98.1,34.6 L104.6,34.6 L111.2,37.2 L117.7,38.5 L124.2,37.2 L130.8,36.6 L137.3,33.3 L143.8,32.0 L150.4,35.9 L156.9,38.5 L163.5,39.2 L170.0,38.5" class="ln"/></svg>
+</div><div class="wlab">小号 · 反色（可选样式）</div></div>
+  <div class="wcell wide"><div class="w wm">
+    <div class="wh mono"><span>NS PROBE</span><span><b>2/2</b> 在线 · 刚刚</span></div>
+    <div class="cols"><div class="wc"><div class="cn"><i class="wdot "></i>🇭🇰 HK-01</div><div class="cbig ">0.9<small>%</small></div><svg class="sp csp cpu " width="96" height="30" viewBox="0 0 96 30" preserveAspectRatio="none"><path d="M0.0,25.7 L2.5,26.9 L4.9,26.9 L7.4,27.2 L9.8,27.2 L12.3,26.5 L14.8,27.2 L17.2,26.5 L19.7,26.9 L22.2,25.4 L24.6,24.6 L27.1,25.0 L29.5,25.7 L32.0,26.1 L34.5,25.0 L36.9,25.7 L39.4,26.9 L41.8,26.1 L44.3,25.4 L46.8,26.5 L49.2,26.5 L51.7,26.9 L54.2,26.5 L56.6,26.9 L59.1,5.4 L61.5,26.1 L64.0,25.4 L66.5,25.7 L68.9,25.4 L71.4,25.4 L73.8,25.4 L76.3,26.5 L78.8,26.1 L81.2,25.7 L83.7,25.7 L86.2,24.6 L88.6,25.4 L91.1,26.1 L93.5,26.5 L96.0,26.5 L96.0,30 L0,30 Z" class="ar"/><path d="M0.0,25.7 L2.5,26.9 L4.9,26.9 L7.4,27.2 L9.8,27.2 L12.3,26.5 L14.8,27.2 L17.2,26.5 L19.7,26.9 L22.2,25.4 L24.6,24.6 L27.1,25.0 L29.5,25.7 L32.0,26.1 L34.5,25.0 L36.9,25.7 L39.4,26.9 L41.8,26.1 L44.3,25.4 L46.8,26.5 L49.2,26.5 L51.7,26.9 L54.2,26.5 L56.6,26.9 L59.1,5.4 L61.5,26.1 L64.0,25.4 L66.5,25.7 L68.9,25.4 L71.4,25.4 L73.8,25.4 L76.3,26.5 L78.8,26.1 L81.2,25.7 L83.7,25.7 L86.2,24.6 L88.6,25.4 L91.1,26.1 L93.5,26.5 L96.0,26.5" class="ln"/></svg><div class="cm mono">MEM 11 · DSK 28</div></div><div class="wc"><div class="cn"><i class="wdot "></i>🇸🇬 SG-01</div><div class="cbig ">1.7<small>%</small></div><svg class="sp csp cpu " width="96" height="30" viewBox="0 0 96 30" preserveAspectRatio="none"><path d="M0.0,16.5 L3.7,24.6 L7.4,23.8 L11.1,25.7 L14.8,25.3 L18.5,5.4 L22.2,24.6 L25.8,23.4 L29.5,24.9 L33.2,25.3 L36.9,25.7 L40.6,26.1 L44.3,24.9 L48.0,23.8 L51.7,21.9 L55.4,21.9 L59.1,21.9 L62.8,23.4 L66.5,24.2 L70.2,23.4 L73.8,23.0 L77.5,21.1 L81.2,20.3 L84.9,22.6 L88.6,24.2 L92.3,24.6 L96.0,24.2 L96.0,30 L0,30 Z" class="ar"/><path d="M0.0,16.5 L3.7,24.6 L7.4,23.8 L11.1,25.7 L14.8,25.3 L18.5,5.4 L22.2,24.6 L25.8,23.4 L29.5,24.9 L33.2,25.3 L36.9,25.7 L40.6,26.1 L44.3,24.9 L48.0,23.8 L51.7,21.9 L55.4,21.9 L59.1,21.9 L62.8,23.4 L66.5,24.2 L70.2,23.4 L73.8,23.0 L77.5,21.1 L81.2,20.3 L84.9,22.6 L88.6,24.2 L92.3,24.6 L96.0,24.2" class="ln"/></svg><div class="cm mono">MEM 8 · DSK 27</div></div><div class="wc"><div class="cn"><i class="wdot "></i>🇯🇵 TYO-02</div><div class="cbig crit">93<small>%</small></div><svg class="sp csp cpu crit" width="96" height="30" viewBox="0 0 96 30" preserveAspectRatio="none"><path d="M0.0,11.9 L4.8,9.8 L9.6,10.3 L14.4,8.5 L19.2,6.9 L24.0,8.0 L28.8,5.9 L33.6,5.1 L38.4,6.2 L43.2,4.6 L48.0,3.8 L52.8,4.3 L57.6,4.9 L62.4,3.6 L67.2,4.1 L72.0,3.3 L76.8,3.8 L81.6,4.6 L86.4,4.1 L91.2,3.6 L96.0,3.8 L96.0,30 L0,30 Z" class="ar"/><path d="M0.0,11.9 L4.8,9.8 L9.6,10.3 L14.4,8.5 L19.2,6.9 L24.0,8.0 L28.8,5.9 L33.6,5.1 L38.4,6.2 L43.2,4.6 L48.0,3.8 L52.8,4.3 L57.6,4.9 L62.4,3.6 L67.2,4.1 L72.0,3.3 L76.8,3.8 L81.6,4.6 L86.4,4.1 L91.2,3.6 L96.0,3.8" class="ln"/></svg><div class="cm mono">MEM 78 · DSK 41</div></div></div>
+  </div><div class="wlab">中号 · 多台（TYO-02 为示意，演示高负载）</div></div>
+</div><div class="wall dark">
+  <div class="wcell"><div class="w ws stalew">
+    <div class="wtop"><span class="flag">🇭🇰</span><span class="n">HK-01</span><span class="wclock"><svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6 3.2V6l1.8 1.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span></div>
+    <div class="wbig"><b>0.9<small>%</small></b><span class="mono">CPU · 缓存</span></div>
+    <div class="wmeta mono"><span>MEM 11</span><span>DSK 28</span><span>52 分钟前</span></div>
+    <svg class="sp wsp cpu" width="170" height="46" viewBox="0 0 170 46" preserveAspectRatio="none"><path d="M0.0,41.2 L4.4,43.1 L8.7,43.1 L13.1,43.7 L17.4,43.7 L21.8,42.4 L26.2,43.7 L30.5,42.4 L34.9,43.1 L39.2,40.5 L43.6,39.3 L47.9,39.9 L52.3,41.2 L56.7,41.8 L61.0,39.9 L65.4,41.2 L69.7,43.1 L74.1,41.8 L78.5,40.5 L82.8,42.4 L87.2,42.4 L91.5,43.1 L95.9,42.4 L100.3,43.1 L104.6,6.7 L109.0,41.8 L113.3,40.5 L117.7,41.2 L122.1,40.5 L126.4,40.5 L130.8,40.5 L135.1,42.4 L139.5,41.8 L143.8,41.2 L148.2,41.2 L152.6,39.3 L156.9,40.5 L161.3,41.8 L165.6,42.4 L170.0,42.4 L170.0,46 L0,46 Z" class="ar"/><path d="M0.0,41.2 L4.4,43.1 L8.7,43.1 L13.1,43.7 L17.4,43.7 L21.8,42.4 L26.2,43.7 L30.5,42.4 L34.9,43.1 L39.2,40.5 L43.6,39.3 L47.9,39.9 L52.3,41.2 L56.7,41.8 L61.0,39.9 L65.4,41.2 L69.7,43.1 L74.1,41.8 L78.5,40.5 L82.8,42.4 L87.2,42.4 L91.5,43.1 L95.9,42.4 L100.3,43.1 L104.6,6.7 L109.0,41.8 L113.3,40.5 L117.7,41.2 L122.1,40.5 L126.4,40.5 L130.8,40.5 L135.1,42.4 L139.5,41.8 L143.8,41.2 L148.2,41.2 L152.6,39.3 L156.9,40.5 L161.3,41.8 L165.6,42.4 L170.0,42.4" class="ln"/></svg>
+  </div><div class="wlab">小号 · 过期缓存</div></div>
+  <div class="wcell"><div class="w ws woff">
+    <div class="wtop"><span class="flag">🇸🇬</span><span class="n">SG-01</span><i class="wdot off"></i></div>
+    <div class="wbig"><b class="red">离线</b></div>
+    <div class="wmeta mono"><span>最后上报 2 小时前</span></div>
+    <svg class="sp wsp cpu" width="170" height="46" viewBox="0 0 170 46" preserveAspectRatio="none"><path d="M0.0,25.5 L2.6,39.2 L5.2,37.9 L7.8,41.1 L10.5,40.5 L13.1,6.7 L15.7,39.2 L18.3,37.2 L20.9,39.8 L23.5,40.5 L26.2,41.1 L28.8,41.8 L31.4,39.8 L34.0,37.9 L36.6,34.6 L39.2,34.6 L41.8,34.6 L44.5,37.2 L47.1,38.5 L49.7,37.2 L52.3,36.6 L54.9,33.3 L57.5,32.0 L60.2,35.9 L62.8,38.5 L65.4,39.2 L68.0,38.5 L68.0,46 L0,46 Z" class="ar"/><path d="M0.0,25.5 L2.6,39.2 L5.2,37.9 L7.8,41.1 L10.5,40.5 L13.1,6.7 L15.7,39.2 L18.3,37.2 L20.9,39.8 L23.5,40.5 L26.2,41.1 L28.8,41.8 L31.4,39.8 L34.0,37.9 L36.6,34.6 L39.2,34.6 L41.8,34.6 L44.5,37.2 L47.1,38.5 L49.7,37.2 L52.3,36.6 L54.9,33.3 L57.5,32.0 L60.2,35.9 L62.8,38.5 L65.4,39.2 L68.0,38.5" class="ln"/><circle cx="68.0" cy="38.5" r="2.6" class="end"/><path d="M68.0,45.0 L170,45.0" class="dash"/></svg>
+  </div><div class="wlab">小号 · 离线</div></div>
+  <div class="wcell wide"><div class="w wm">
+    <div class="wh mono"><span>NS PROBE</span><span><em>离线 1</em> · <b>1/3</b> 在线 · 3 分钟前</span></div>
+    <div class="cols"><div class="wc"><div class="cn"><i class="wdot off"></i>🇸🇬 SG-01</div><div class="cbig red">离线</div><svg class="sp csp" width="96" height="30" viewBox="0 0 96 30" preserveAspectRatio="none"><path d="M0.0,16.5 L1.7,24.6 L3.3,23.8 L5.0,25.7 L6.6,25.3 L8.3,5.4 L10.0,24.6 L11.6,23.4 L13.3,24.9 L15.0,25.3 L16.6,25.7 L18.3,26.1 L19.9,24.9 L21.6,23.8 L23.3,21.9 L24.9,21.9 L26.6,21.9 L28.2,23.4 L29.9,24.2 L31.6,23.4 L33.2,23.0 L34.9,21.1 L36.6,20.3 L38.2,22.6 L39.9,24.2 L41.5,24.6 L43.2,24.2" class="ln"/><circle cx="43.2" cy="24.2" r="2.6" class="end"/><path d="M43.2,28.0 L96,28.0" class="dash"/></svg><div class="cm mono">2 小时前</div></div><div class="wc"><div class="cn"><i class="wdot "></i>🇭🇰 HK-01</div><div class="cbig ">0.9<small>%</small></div><svg class="sp csp cpu " width="96" height="30" viewBox="0 0 96 30" preserveAspectRatio="none"><path d="M0.0,25.7 L2.5,26.9 L4.9,26.9 L7.4,27.2 L9.8,27.2 L12.3,26.5 L14.8,27.2 L17.2,26.5 L19.7,26.9 L22.2,25.4 L24.6,24.6 L27.1,25.0 L29.5,25.7 L32.0,26.1 L34.5,25.0 L36.9,25.7 L39.4,26.9 L41.8,26.1 L44.3,25.4 L46.8,26.5 L49.2,26.5 L51.7,26.9 L54.2,26.5 L56.6,26.9 L59.1,5.4 L61.5,26.1 L64.0,25.4 L66.5,25.7 L68.9,25.4 L71.4,25.4 L73.8,25.4 L76.3,26.5 L78.8,26.1 L81.2,25.7 L83.7,25.7 L86.2,24.6 L88.6,25.4 L91.1,26.1 L93.5,26.5 L96.0,26.5 L96.0,30 L0,30 Z" class="ar"/><path d="M0.0,25.7 L2.5,26.9 L4.9,26.9 L7.4,27.2 L9.8,27.2 L12.3,26.5 L14.8,27.2 L17.2,26.5 L19.7,26.9 L22.2,25.4 L24.6,24.6 L27.1,25.0 L29.5,25.7 L32.0,26.1 L34.5,25.0 L36.9,25.7 L39.4,26.9 L41.8,26.1 L44.3,25.4 L46.8,26.5 L49.2,26.5 L51.7,26.9 L54.2,26.5 L56.6,26.9 L59.1,5.4 L61.5,26.1 L64.0,25.4 L66.5,25.7 L68.9,25.4 L71.4,25.4 L73.8,25.4 L76.3,26.5 L78.8,26.1 L81.2,25.7 L83.7,25.7 L86.2,24.6 L88.6,25.4 L91.1,26.1 L93.5,26.5 L96.0,26.5" class="ln"/></svg><div class="cm mono">MEM 11 · DSK 28</div></div><div class="wc"><div class="cn"><i class="wdot none"></i>🇺🇸 LAX-NAS</div><div class="cbig dim">—</div><svg class="sp csp" width="96" height="30"><path d="M0,28 L96,28" class="dash"/></svg><div class="cm mono">暂无数据</div></div></div>
+  </div><div class="wlab">中号 · 离线排最前；面板重启后未上报的显示「暂无数据」</div></div>
+</div></div>
+
+<h1 class="sec">服务器很多时（示意：3 个探针、50 台）</h1>
+<p class="sub">超过 8 台时自动切换为紧凑列表（右上角可手动切换）；按探针或 Komari 分组折叠，异常的固定排在最前面。当前状态 1 个请求就能取回全部服务器；趋势线只为屏幕上能看到的行加载。</p>
+<div class="row">
+  <div class="cell"><div class="phone"><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+  <div class="nav"><div class="gbtn"><svg width="11" height="18" viewBox="0 0 11 18"><path d="M9 2 2 9l7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="navr"><div class="gbtn"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="m11 11 3.2 3.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></div><div class="gbtn on"><svg width="16" height="14" viewBox="0 0 16 14"><path d="M1 2h14M1 7h14M1 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></div><div class="gbtn"><svg width="16" height="16" viewBox="0 0 17 17"><path d="M8.5 2v13M2 8.5h13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></div></div></div>
+  <div class="hero mh">
+  <div class="hmeta"><span>3 个探针 · 50 台</span><span>刚刚</span></div>
+  <div class="hmain"><div class="hbig"><b>48</b><span>/50</span><em>在线</em></div>
+    <div class="hnet"><span>↑ 8.6M/s</span><span>↓ 7.9M/s</span></div></div>
+  <div class="hchips"><span class="hc red">离线 2</span><span class="hc org">告警 3</span></div>
+  <svg class="sp hsp" width="326" height="26" viewBox="0 0 326 26" preserveAspectRatio="none"><path d="M0.0,4.5 L11.2,21.3 L22.5,14.0 L33.7,24.5 L45.0,22.7 L56.2,24.5 L67.4,24.5 L78.7,24.1 L89.9,24.5 L101.2,24.5 L112.4,24.5 L123.7,24.5 L134.9,24.5 L146.1,8.8 L157.4,24.5 L168.6,24.5 L179.9,18.3 L191.1,4.5 L202.3,4.5 L213.6,9.5 L224.8,4.5 L236.1,24.5 L247.3,7.3 L258.6,17.4 L269.8,24.5 L281.0,24.5 L292.3,24.5 L303.5,9.3 L314.8,24.5 L326.0,20.5 L326.0,26 L0,26 Z" class="ar"/><path d="M0.0,4.5 L11.2,21.3 L22.5,14.0 L33.7,24.5 L45.0,22.7 L56.2,24.5 L67.4,24.5 L78.7,24.1 L89.9,24.5 L101.2,24.5 L112.4,24.5 L123.7,24.5 L134.9,24.5 L146.1,8.8 L157.4,24.5 L168.6,24.5 L179.9,18.3 L191.1,4.5 L202.3,4.5 L213.6,9.5 L224.8,4.5 L236.1,24.5 L247.3,7.3 L258.6,17.4 L269.8,24.5 L281.0,24.5 L292.3,24.5 L303.5,9.3 L314.8,24.5 L326.0,20.5" class="ln"/></svg>
+</div>
+  <div class="chips"><span class="chip on">全部 <em class="mono">50</em></span><span class="chip ">离线 <em class="mono">2</em></span><span class="chip ">告警 <em class="mono">3</em></span><span class="chip sort"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.5v9M1 8.5l2 2 2-2M9 10.5v-9M7 3.5l2-2 2 2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>异常优先</span></div>
+  <div class="grp"><div class="gh"><b>生产</b><span class="mono">在线 17/18</span><em class="mono ">告警 2</em><span class="gch"><svg width="11" height="7" viewBox="0 0 11 7"><path d="m1.5 1.5 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><div class="cr off"><i class="cd off"></i><div class="cname"><b>🇯🇵 TYO-07</b><span class="mono">生产 · 2C</span></div>
+  <div class="coff mono"><b>离线</b> · 18 分钟前</div><svg class="sp cs off" width="60" height="18" viewBox="0 0 60 18" preserveAspectRatio="none"><path d="M0.0,9.1 L1.3,8.7 L2.6,6.1 L3.9,6.3 L5.2,6.3 L6.5,5.7 L7.8,7.7 L9.1,7.6 L10.4,6.8 L11.7,5.0 L13.0,7.5 L14.3,8.7 L15.7,11.2 L17.0,9.3 L18.3,8.1 L19.6,11.0 L20.9,8.0 L22.2,5.1 L23.5,4.2 L24.8,3.5 L26.1,5.6 L27.4,8.6 L28.7,8.4 L30.0,11.1" class="ln"/><circle cx="30.0" cy="11.1" r="2.2" class="end"/><path d="M30.0,16.5 L60,16.5" class="dash"/></svg></div><div class="cr"><i class="cd"></i><div class="cname"><b>🇯🇵 TYO-03</b><span class="mono">UP 41D</span></div>
+  <div class="ccpu"><b class="mono crit">93<small>%</small></b><svg class="sp cs cpu crit" width="44" height="16" viewBox="0 0 44 16" preserveAspectRatio="none"><path d="M0.0,4.1 L1.9,3.3 L3.8,3.2 L5.7,5.1 L7.7,7.6 L9.6,8.3 L11.5,9.5 L13.4,7.9 L15.3,6.9 L17.2,6.3 L19.1,6.0 L21.0,5.2 L23.0,7.0 L24.9,7.4 L26.8,9.1 L28.7,7.0 L30.6,9.3 L32.5,7.6 L34.4,9.9 L36.3,8.9 L38.3,9.7 L40.2,10.2 L42.1,8.4 L44.0,11.0 L44.0,16 L0,16 Z" class="ar"/><path d="M0.0,4.1 L1.9,3.3 L3.8,3.2 L5.7,5.1 L7.7,7.6 L9.6,8.3 L11.5,9.5 L13.4,7.9 L15.3,6.9 L17.2,6.3 L19.1,6.0 L21.0,5.2 L23.0,7.0 L24.9,7.4 L26.8,9.1 L28.7,7.0 L30.6,9.3 L32.5,7.6 L34.4,9.9 L36.3,8.9 L38.3,9.7 L40.2,10.2 L42.1,8.4 L44.0,11.0" class="ln"/></svg></div>
+  <div class="cbars"><span class="mt mem"><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class=""></i><i class=""></i></span><span class="mt dsk"><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></div>
+  <div class="cnet mono"><span>↑4.1M</span><span>↓1.2M</span></div></div><div class="cr"><i class="cd"></i><div class="cname"><b>🇭🇰 HK-12</b><span class="mono">UP 12D</span></div>
+  <div class="ccpu"><b class="mono ">34<small>%</small></b><svg class="sp cs cpu " width="44" height="16" viewBox="0 0 44 16" preserveAspectRatio="none"><path d="M0.0,6.5 L1.9,5.6 L3.8,4.8 L5.7,3.2 L7.7,4.6 L9.6,5.9 L11.5,7.5 L13.4,8.7 L15.3,7.7 L17.2,9.3 L19.1,9.2 L21.0,10.5 L23.0,11.4 L24.9,11.8 L26.8,10.2 L28.7,9.7 L30.6,11.9 L32.5,13.0 L34.4,14.4 L36.3,12.8 L38.3,11.3 L40.2,9.9 L42.1,8.5 L44.0,7.3 L44.0,16 L0,16 Z" class="ar"/><path d="M0.0,6.5 L1.9,5.6 L3.8,4.8 L5.7,3.2 L7.7,4.6 L9.6,5.9 L11.5,7.5 L13.4,8.7 L15.3,7.7 L17.2,9.3 L19.1,9.2 L21.0,10.5 L23.0,11.4 L24.9,11.8 L26.8,10.2 L28.7,9.7 L30.6,11.9 L32.5,13.0 L34.4,14.4 L36.3,12.8 L38.3,11.3 L40.2,9.9 L42.1,8.5 L44.0,7.3" class="ln"/></svg></div>
+  <div class="cbars"><span class="mt mem"><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class=""></i></span><span class="mt dsk"><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></div>
+  <div class="cnet mono"><span>↑820K</span><span>↓760K</span></div></div><div class="cr"><i class="cd"></i><div class="cname"><b>🇭🇰 HK-01</b><span class="mono">UP 65D</span></div>
+  <div class="ccpu"><b class="mono ">1<small>%</small></b><svg class="sp cs cpu " width="44" height="16" viewBox="0 0 44 16" preserveAspectRatio="none"><path d="M0.0,9.9 L1.9,8.3 L3.8,7.2 L5.7,3.8 L7.7,5.6 L9.6,7.4 L11.5,5.6 L13.4,4.4 L15.3,5.9 L17.2,4.5 L19.1,5.3 L21.0,3.2 L23.0,6.1 L24.9,8.2 L26.8,5.2 L28.7,6.2 L30.6,8.1 L32.5,5.7 L34.4,4.7 L36.3,7.4 L38.3,7.0 L40.2,5.8 L42.1,8.3 L44.0,7.2 L44.0,16 L0,16 Z" class="ar"/><path d="M0.0,9.9 L1.9,8.3 L3.8,7.2 L5.7,3.8 L7.7,5.6 L9.6,7.4 L11.5,5.6 L13.4,4.4 L15.3,5.9 L17.2,4.5 L19.1,5.3 L21.0,3.2 L23.0,6.1 L24.9,8.2 L26.8,5.2 L28.7,6.2 L30.6,8.1 L32.5,5.7 L34.4,4.7 L36.3,7.4 L38.3,7.0 L40.2,5.8 L42.1,8.3 L44.0,7.2" class="ln"/></svg></div>
+  <div class="cbars"><span class="mt mem"><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span><span class="mt dsk"><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></div>
+  <div class="cnet mono"><span>↑312K</span><span>↓265K</span></div></div><div class="cr"><i class="cd"></i><div class="cname"><b>🇸🇬 SG-01</b><span class="mono">UP 8D</span></div>
+  <div class="ccpu"><b class="mono ">2<small>%</small></b><svg class="sp cs cpu " width="44" height="16" viewBox="0 0 44 16" preserveAspectRatio="none"><path d="M0.0,6.9 L1.9,8.6 L3.8,7.8 L5.7,9.0 L7.7,7.3 L9.6,9.0 L11.5,7.7 L13.4,7.1 L15.3,5.8 L17.2,4.1 L19.1,5.0 L21.0,5.5 L23.0,4.8 L24.9,5.6 L26.8,6.4 L28.7,7.3 L30.6,6.1 L32.5,4.8 L34.4,3.8 L36.3,4.7 L38.3,3.2 L40.2,3.2 L42.1,4.1 L44.0,4.3 L44.0,16 L0,16 Z" class="ar"/><path d="M0.0,6.9 L1.9,8.6 L3.8,7.8 L5.7,9.0 L7.7,7.3 L9.6,9.0 L11.5,7.7 L13.4,7.1 L15.3,5.8 L17.2,4.1 L19.1,5.0 L21.0,5.5 L23.0,4.8 L24.9,5.6 L26.8,6.4 L28.7,7.3 L30.6,6.1 L32.5,4.8 L34.4,3.8 L36.3,4.7 L38.3,3.2 L40.2,3.2 L42.1,4.1 L44.0,4.3" class="ln"/></svg></div>
+  <div class="cbars"><span class="mt mem"><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span><span class="mt dsk"><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></div>
+  <div class="cnet mono"><span>↑284K</span><span>↓285K</span></div></div><div class="cr"><i class="cd"></i><div class="cname"><b>🇸🇬 SG-04</b><span class="mono">UP 23D</span></div>
+  <div class="ccpu"><b class="mono ">12<small>%</small></b><svg class="sp cs cpu " width="44" height="16" viewBox="0 0 44 16" preserveAspectRatio="none"><path d="M0.0,3.3 L1.9,3.4 L3.8,3.9 L5.7,4.2 L7.7,4.8 L9.6,3.8 L11.5,5.3 L13.4,4.5 L15.3,7.4 L17.2,8.6 L19.1,9.6 L21.0,11.8 L23.0,10.3 L24.9,11.4 L26.8,9.7 L28.7,6.9 L30.6,8.4 L32.5,6.1 L34.4,4.2 L36.3,3.2 L38.3,6.0 L40.2,6.3 L42.1,5.5 L44.0,6.8 L44.0,16 L0,16 Z" class="ar"/><path d="M0.0,3.3 L1.9,3.4 L3.8,3.9 L5.7,4.2 L7.7,4.8 L9.6,3.8 L11.5,5.3 L13.4,4.5 L15.3,7.4 L17.2,8.6 L19.1,9.6 L21.0,11.8 L23.0,10.3 L24.9,11.4 L26.8,9.7 L28.7,6.9 L30.6,8.4 L32.5,6.1 L34.4,4.2 L36.3,3.2 L38.3,6.0 L40.2,6.3 L42.1,5.5 L44.0,6.8" class="ln"/></svg></div>
+  <div class="cbars"><span class="mt mem"><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span><span class="mt dsk"><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></div>
+  <div class="cnet mono"><span>↑1.3M</span><span>↓1.1M</span></div></div><div class="cr"><i class="cd"></i><div class="cname"><b>🇺🇸 LAX-02</b><span class="mono">UP 90D</span></div>
+  <div class="ccpu"><b class="mono ">6<small>%</small></b><svg class="sp cs cpu " width="44" height="16" viewBox="0 0 44 16" preserveAspectRatio="none"><path d="M0.0,8.0 L1.9,7.0 L3.8,5.5 L5.7,6.2 L7.7,5.3 L9.6,4.6 L11.5,4.1 L13.4,5.4 L15.3,6.9 L17.2,7.3 L19.1,6.5 L21.0,7.3 L23.0,7.3 L24.9,7.9 L26.8,6.7 L28.7,5.3 L30.6,5.6 L32.5,4.0 L34.4,5.4 L36.3,4.4 L38.3,3.2 L40.2,4.3 L42.1,3.7 L44.0,3.5 L44.0,16 L0,16 Z" class="ar"/><path d="M0.0,8.0 L1.9,7.0 L3.8,5.5 L5.7,6.2 L7.7,5.3 L9.6,4.6 L11.5,4.1 L13.4,5.4 L15.3,6.9 L17.2,7.3 L19.1,6.5 L21.0,7.3 L23.0,7.3 L24.9,7.9 L26.8,6.7 L28.7,5.3 L30.6,5.6 L32.5,4.0 L34.4,5.4 L36.3,4.4 L38.3,3.2 L40.2,4.3 L42.1,3.7 L44.0,3.5" class="ln"/></svg></div>
+  <div class="cbars"><span class="mt mem"><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span><span class="mt dsk"><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></div>
+  <div class="cnet mono"><span>↑96K</span><span>↓120K</span></div></div></div>
+  <div class="grp collapsed"><div class="gh"><b>测试</b><span class="mono">在线 12/12</span><span class="gch"><svg width="7" height="11" viewBox="0 0 7 11"><path d="m1.5 1.5 4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div></div>
+  <div class="grp collapsed"><div class="gh"><b>家里 NAS</b><span class="mono">在线 5/6</span><em class="mono red">离线 1</em><span class="gch"><svg width="7" height="11" viewBox="0 0 7 11"><path d="m1.5 1.5 4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div></div>
+  <div class="home"></div></div><div class="cap"><b>⑤ 紧凑列表 · 分组</b>每行 52pt：状态点、名称和分组、CPU 数字加迷你趋势线、内存和磁盘两条 10 格刻度、网速。汇总卡缩小，增加离线和告警数。下面一排筛选按钮。分组可以折叠，组头显示在线数和告警数。</div></div>
+  <div class="cell"><div class="phone dark"><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+  <div class="nav"><div class="gbtn"><svg width="11" height="18" viewBox="0 0 11 18"><path d="M9 2 2 9l7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="navr"><div class="gbtn"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="m11 11 3.2 3.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></div><div class="gbtn on"><svg width="16" height="14" viewBox="0 0 16 14"><path d="M1 2h14M1 7h14M1 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></div><div class="gbtn"><svg width="16" height="16" viewBox="0 0 17 17"><path d="M8.5 2v13M2 8.5h13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></div></div></div>
+  <div class="search"><span><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="m11 11 3.2 3.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span><b>搜索名称、地区、分组</b></div>
+  <div class="chips"><span class="chip ">全部 <em class="mono">50</em></span><span class="chip ">离线 <em class="mono">2</em></span><span class="chip on">告警 <em class="mono">3</em></span><span class="chip sort"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.5v9M1 8.5l2 2 2-2M9 10.5v-9M7 3.5l2-2 2 2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>异常优先</span></div>
+  <div class="grp"><div class="gh flat"><b>告警</b><span class="mono">3 台 · 用量 ≥ 70%</span></div><div class="cr"><i class="cd"></i><div class="cname"><b>🇯🇵 TYO-03</b><span class="mono">生产 · UP 41D</span></div>
+  <div class="ccpu"><b class="mono crit">93<small>%</small></b><svg class="sp cs cpu crit" width="44" height="16" viewBox="0 0 44 16" preserveAspectRatio="none"><path d="M0.0,4.1 L1.9,3.3 L3.8,3.2 L5.7,5.1 L7.7,7.6 L9.6,8.3 L11.5,9.5 L13.4,7.9 L15.3,6.9 L17.2,6.3 L19.1,6.0 L21.0,5.2 L23.0,7.0 L24.9,7.4 L26.8,9.1 L28.7,7.0 L30.6,9.3 L32.5,7.6 L34.4,9.9 L36.3,8.9 L38.3,9.7 L40.2,10.2 L42.1,8.4 L44.0,11.0 L44.0,16 L0,16 Z" class="ar"/><path d="M0.0,4.1 L1.9,3.3 L3.8,3.2 L5.7,5.1 L7.7,7.6 L9.6,8.3 L11.5,9.5 L13.4,7.9 L15.3,6.9 L17.2,6.3 L19.1,6.0 L21.0,5.2 L23.0,7.0 L24.9,7.4 L26.8,9.1 L28.7,7.0 L30.6,9.3 L32.5,7.6 L34.4,9.9 L36.3,8.9 L38.3,9.7 L40.2,10.2 L42.1,8.4 L44.0,11.0" class="ln"/></svg></div>
+  <div class="cbars"><span class="mt mem"><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class=""></i><i class=""></i></span><span class="mt dsk"><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></div>
+  <div class="cnet mono"><span>↑4.1M</span><span>↓1.2M</span></div></div><div class="cr"><i class="cd"></i><div class="cname"><b>🇭🇰 HK-12</b><span class="mono">生产 · UP 12D</span></div>
+  <div class="ccpu"><b class="mono ">34<small>%</small></b><svg class="sp cs cpu " width="44" height="16" viewBox="0 0 44 16" preserveAspectRatio="none"><path d="M0.0,6.5 L1.9,5.6 L3.8,4.8 L5.7,3.2 L7.7,4.6 L9.6,5.9 L11.5,7.5 L13.4,8.7 L15.3,7.7 L17.2,9.3 L19.1,9.2 L21.0,10.5 L23.0,11.4 L24.9,11.8 L26.8,10.2 L28.7,9.7 L30.6,11.9 L32.5,13.0 L34.4,14.4 L36.3,12.8 L38.3,11.3 L40.2,9.9 L42.1,8.5 L44.0,7.3 L44.0,16 L0,16 Z" class="ar"/><path d="M0.0,6.5 L1.9,5.6 L3.8,4.8 L5.7,3.2 L7.7,4.6 L9.6,5.9 L11.5,7.5 L13.4,8.7 L15.3,7.7 L17.2,9.3 L19.1,9.2 L21.0,10.5 L23.0,11.4 L24.9,11.8 L26.8,10.2 L28.7,9.7 L30.6,11.9 L32.5,13.0 L34.4,14.4 L36.3,12.8 L38.3,11.3 L40.2,9.9 L42.1,8.5 L44.0,7.3" class="ln"/></svg></div>
+  <div class="cbars"><span class="mt mem"><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class=""></i></span><span class="mt dsk"><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></div>
+  <div class="cnet mono"><span>↑820K</span><span>↓760K</span></div></div><div class="cr"><i class="cd"></i><div class="cname"><b>🇨🇳 NAS-02</b><span class="mono">家里 · UP 3D</span></div>
+  <div class="ccpu"><b class="mono ">8<small>%</small></b><svg class="sp cs cpu " width="44" height="16" viewBox="0 0 44 16" preserveAspectRatio="none"><path d="M0.0,6.8 L1.9,6.1 L3.8,6.8 L5.7,8.2 L7.7,8.3 L9.6,8.3 L11.5,8.4 L13.4,8.6 L15.3,9.7 L17.2,10.8 L19.1,9.9 L21.0,10.7 L23.0,9.9 L24.9,8.6 L26.8,6.9 L28.7,4.9 L30.6,6.1 L32.5,7.3 L34.4,6.2 L36.3,5.9 L38.3,7.2 L40.2,6.4 L42.1,4.7 L44.0,3.2 L44.0,16 L0,16 Z" class="ar"/><path d="M0.0,6.8 L1.9,6.1 L3.8,6.8 L5.7,8.2 L7.7,8.3 L9.6,8.3 L11.5,8.4 L13.4,8.6 L15.3,9.7 L17.2,10.8 L19.1,9.9 L21.0,10.7 L23.0,9.9 L24.9,8.6 L26.8,6.9 L28.7,4.9 L30.6,6.1 L32.5,7.3 L34.4,6.2 L36.3,5.9 L38.3,7.2 L40.2,6.4 L42.1,4.7 L44.0,3.2" class="ln"/></svg></div>
+  <div class="cbars"><span class="mt mem"><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span><span class="mt dsk"><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class=""></i></span></div>
+  <div class="cnet mono"><span>↑12K</span><span>↓40K</span></div></div></div>
+  <div class="menu"><div class="mh mono">排序</div><div class="mi"><span class=ck><svg width="13" height="10" viewBox="0 0 11 9"><path d="m1.5 4.5 2.8 2.8L9.5 1.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>异常优先</div><div class="mi"><span class=ck></span>CPU 从高到低</div><div class="mi"><span class=ck></span>内存从高到低</div><div class="mi"><span class=ck></span>网速从高到低</div><div class="mi"><span class=ck></span>名称</div><div class="mi"><span class=ck></span>面板顺序</div></div>
+  <div class="home"></div></div><div class="cap"><b>⑥ 筛选、搜索、排序 · 深色</b>点「告警」只看用量 ≥70% 的服务器，不再分组。下拉或点放大镜出现搜索框。排序用系统菜单，默认「异常优先」：离线 → 告警 → 面板顺序。</div></div>
+  <div class="cell wide2">
+    <div class="walls2">
+      <div class="wall tall">
+        <div class="wcell"><div class="w ws ov">
+  <div class="wtop"><span class="n">3 个探针</span><span class="mono ovt">刚刚</span></div>
+  <div class="ovbig"><b>48</b><span>/50</span></div>
+  <div class="ovl mono">在线</div>
+  <div class="ovs"><span class="hc red">离线 2</span><span class="hc org">告警 3</span></div>
+  <div class="ovn mono"><i class="wdot off"></i>TYO-07 · 18 分钟前</div>
+</div><div class="wlab">小号 · 总览</div></div>
+        <div class="wcell"><div class="w ws ov inv">
+  <div class="wtop"><span class="n">3 个探针</span><span class="mono ovt">刚刚</span></div>
+  <div class="ovbig"><b>50</b><span>/50</span></div>
+  <div class="ovl mono">全部在线</div>
+  <svg class="sp wsp ovsp" width="170" height="40" viewBox="0 0 170 40" preserveAspectRatio="none"><path d="M0.0,6.3 L5.9,33.3 L11.7,21.6 L17.6,38.4 L23.4,35.7 L29.3,38.4 L35.2,38.4 L41.0,37.9 L46.9,38.4 L52.8,38.4 L58.6,38.4 L64.5,38.4 L70.3,38.4 L76.2,13.2 L82.1,38.4 L87.9,38.4 L93.8,28.6 L99.7,6.3 L105.5,6.3 L111.4,14.3 L117.2,6.3 L123.1,38.4 L129.0,10.8 L134.8,27.0 L140.7,38.4 L146.6,38.4 L152.4,38.4 L158.3,14.0 L164.1,38.4 L170.0,32.1 L170.0,40 L0,40 Z" class="ar"/><path d="M0.0,6.3 L5.9,33.3 L11.7,21.6 L17.6,38.4 L23.4,35.7 L29.3,38.4 L35.2,38.4 L41.0,37.9 L46.9,38.4 L52.8,38.4 L58.6,38.4 L64.5,38.4 L70.3,38.4 L76.2,13.2 L82.1,38.4 L87.9,38.4 L93.8,28.6 L99.7,6.3 L105.5,6.3 L111.4,14.3 L117.2,6.3 L123.1,38.4 L129.0,10.8 L134.8,27.0 L140.7,38.4 L146.6,38.4 L152.4,38.4 L158.3,14.0 L164.1,38.4 L170.0,32.1" class="ln"/></svg>
+</div><div class="wlab">小号 · 总览（全部正常 · 反色）</div></div>
+        <div class="wcell wide"><div class="w wm">
+  <div class="wh mono"><span>最需要关注 · 自动</span><span><b>48/50</b> 在线 · 刚刚</span></div>
+  <div class="cols"><div class="wc"><div class="cn"><i class="wdot off"></i>🇯🇵 TYO-07</div><div class="cbig red">离线</div><svg class="sp csp" width="96" height="26" viewBox="0 0 96 26" preserveAspectRatio="none"><path d="M0.0,13.1 L2.1,12.6 L4.2,8.6 L6.3,8.9 L8.3,8.8 L10.4,8.0 L12.5,11.0 L14.6,10.9 L16.7,9.6 L18.8,6.9 L20.9,10.7 L23.0,12.6 L25.0,16.4 L27.1,13.5 L29.2,11.7 L31.3,16.0 L33.4,11.4 L35.5,7.0 L37.6,5.6 L39.7,4.5 L41.7,7.7 L43.8,12.3 L45.9,12.1 L48.0,16.2" class="ln"/><circle cx="48.0" cy="16.2" r="2.2" class="end"/><path d="M48.0,24.5 L96,24.5" class="dash"/></svg><div class="cm mono">18 分钟前</div></div><div class="wc"><div class="cn"><i class="wdot"></i>🇯🇵 TYO-03</div><div class="cbig crit">93<small>%</small></div><svg class="sp csp cpu crit" width="96" height="26" viewBox="0 0 96 26" preserveAspectRatio="none"><path d="M0.0,3.2 L4.2,2.7 L8.3,2.1 L12.5,3.3 L16.7,5.0 L20.9,5.4 L25.0,6.2 L29.2,5.1 L33.4,4.5 L37.6,4.1 L41.7,3.9 L45.9,3.4 L50.1,4.6 L54.3,4.8 L58.4,5.9 L62.6,4.6 L66.8,6.1 L71.0,5.0 L75.1,6.4 L79.3,5.8 L83.5,6.4 L87.7,6.7 L91.8,5.5 L96.0,7.2 L96.0,26 L0,26 Z" class="ar"/><path d="M0.0,3.2 L4.2,2.7 L8.3,2.1 L12.5,3.3 L16.7,5.0 L20.9,5.4 L25.0,6.2 L29.2,5.1 L33.4,4.5 L37.6,4.1 L41.7,3.9 L45.9,3.4 L50.1,4.6 L54.3,4.8 L58.4,5.9 L62.6,4.6 L66.8,6.1 L71.0,5.0 L75.1,6.4 L79.3,5.8 L83.5,6.4 L87.7,6.7 L91.8,5.5 L96.0,7.2" class="ln"/></svg><div class="cm mono">CPU · MEM 78</div></div><div class="wc"><div class="cn"><i class="wdot"></i>🇭🇰 HK-12</div><div class="cbig warn">88<small>%</small></div><svg class="sp csp mem warn" width="96" height="26" viewBox="0 0 96 26" preserveAspectRatio="none"><path d="M0.0,5.0 L4.2,4.4 L8.3,3.8 L12.5,2.7 L16.7,3.7 L20.9,4.6 L25.0,5.7 L29.2,6.6 L33.4,5.9 L37.6,7.1 L41.7,7.0 L45.9,7.9 L50.1,8.6 L54.3,8.8 L58.4,7.7 L62.6,7.3 L66.8,8.9 L71.0,9.6 L75.1,10.8 L79.3,9.6 L83.5,8.6 L87.7,7.6 L91.8,6.5 L96.0,5.7 L96.0,26 L0,26 Z" class="ar"/><path d="M0.0,5.0 L4.2,4.4 L8.3,3.8 L12.5,2.7 L16.7,3.7 L20.9,4.6 L25.0,5.7 L29.2,6.6 L33.4,5.9 L37.6,7.1 L41.7,7.0 L45.9,7.9 L50.1,8.6 L54.3,8.8 L58.4,7.7 L62.6,7.3 L66.8,8.9 L71.0,9.6 L75.1,10.8 L79.3,9.6 L83.5,8.6 L87.7,7.6 L91.8,6.5 L96.0,5.7" class="ln"/></svg><div class="cm mono">内存 · CPU 34</div></div></div>
+</div><div class="wlab">中号 · 自动「最需要关注」</div></div>
+        <div class="wcell wide large"><div class="w wl">
+  <div class="wh mono"><span>NS PROBE 等 3 个 · 异常优先</span><span><b>48/50</b> · 刚刚</span></div>
+  <div class="lhead mono"><span></span><span></span><span>CPU</span><span>内存</span><span>磁盘</span></div>
+  <div class="lr"><i class="wdot off"></i><b>🇯🇵 TYO-07</b><span class="lof mono">离线 · 18 分钟前</span></div><div class="lr"><i class="wdot"></i><b>🇯🇵 TYO-03</b><span class="lm"><em class="mono crit">93</em><span class="mt cpu"><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class=""></i></span></span><span class="lm"><em class="mono warn">78</em><span class="mt mem"><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">41</em><span class="mt dsk"><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span></div><div class="lr"><i class="wdot"></i><b>🇭🇰 HK-12</b><span class="lm"><em class="mono ">34</em><span class="mt cpu"><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono warn">88</em><span class="mt mem"><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class=""></i></span></span><span class="lm"><em class="mono ">52</em><span class="mt dsk"><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span></div><div class="lr"><i class="wdot"></i><b>🇨🇳 NAS-02</b><span class="lm"><em class="mono ">8</em><span class="mt cpu"><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">22</em><span class="mt mem"><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono crit">94</em><span class="mt dsk"><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i></span></span></div><div class="lr"><i class="wdot"></i><b>🇭🇰 HK-01</b><span class="lm"><em class="mono ">1</em><span class="mt cpu"><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">10</em><span class="mt mem"><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">28</em><span class="mt dsk"><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span></div><div class="lr"><i class="wdot"></i><b>🇸🇬 SG-01</b><span class="lm"><em class="mono ">2</em><span class="mt cpu"><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">8</em><span class="mt mem"><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">27</em><span class="mt dsk"><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span></div><div class="lr"><i class="wdot"></i><b>🇸🇬 SG-04</b><span class="lm"><em class="mono ">12</em><span class="mt cpu"><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">46</em><span class="mt mem"><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">61</em><span class="mt dsk"><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i></span></span></div><div class="lr"><i class="wdot"></i><b>🇺🇸 LAX-02</b><span class="lm"><em class="mono ">6</em><span class="mt cpu"><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">33</em><span class="mt mem"><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">18</em><span class="mt dsk"><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span></div>
+  <div class="lmore mono">还有 42 台 · 全部在线</div>
+</div><div class="wlab">大号 · 8 行列表，异常优先</div></div>
+      </div>
+      <div class="wall dark tall">
+        <div class="wcell wide large"><div class="w wl">
+  <div class="wh mono"><span>NS PROBE 等 3 个 · 异常优先</span><span><b>48/50</b> · 刚刚</span></div>
+  <div class="lhead mono"><span></span><span></span><span>CPU</span><span>内存</span><span>磁盘</span></div>
+  <div class="lr"><i class="wdot off"></i><b>🇯🇵 TYO-07</b><span class="lof mono">离线 · 18 分钟前</span></div><div class="lr"><i class="wdot"></i><b>🇯🇵 TYO-03</b><span class="lm"><em class="mono crit">93</em><span class="mt cpu"><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class=""></i></span></span><span class="lm"><em class="mono warn">78</em><span class="mt mem"><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">41</em><span class="mt dsk"><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span></div><div class="lr"><i class="wdot"></i><b>🇭🇰 HK-12</b><span class="lm"><em class="mono ">34</em><span class="mt cpu"><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono warn">88</em><span class="mt mem"><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class="on warn"></i><i class=""></i></span></span><span class="lm"><em class="mono ">52</em><span class="mt dsk"><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span></div><div class="lr"><i class="wdot"></i><b>🇨🇳 NAS-02</b><span class="lm"><em class="mono ">8</em><span class="mt cpu"><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">22</em><span class="mt mem"><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono crit">94</em><span class="mt dsk"><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i><i class="on crit"></i></span></span></div><div class="lr"><i class="wdot"></i><b>🇭🇰 HK-01</b><span class="lm"><em class="mono ">1</em><span class="mt cpu"><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">10</em><span class="mt mem"><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">28</em><span class="mt dsk"><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span></div><div class="lr"><i class="wdot"></i><b>🇸🇬 SG-01</b><span class="lm"><em class="mono ">2</em><span class="mt cpu"><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">8</em><span class="mt mem"><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">27</em><span class="mt dsk"><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span></div><div class="lr"><i class="wdot"></i><b>🇸🇬 SG-04</b><span class="lm"><em class="mono ">12</em><span class="mt cpu"><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">46</em><span class="mt mem"><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">61</em><span class="mt dsk"><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i></span></span></div><div class="lr"><i class="wdot"></i><b>🇺🇸 LAX-02</b><span class="lm"><em class="mono ">6</em><span class="mt cpu"><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">33</em><span class="mt mem"><i class="on "></i><i class="on "></i><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span><span class="lm"><em class="mono ">18</em><span class="mt dsk"><i class="on "></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i><i class=""></i></span></span></div>
+  <div class="lmore mono">还有 42 台 · 全部在线</div>
+</div><div class="wlab">大号 · 深色</div></div>
+        <div class="wcell"><div class="w ws ov">
+  <div class="wtop"><span class="n">3 个探针</span><span class="mono ovt">刚刚</span></div>
+  <div class="ovbig"><b>48</b><span>/50</span></div>
+  <div class="ovl mono">在线</div>
+  <div class="ovs"><span class="hc red">离线 2</span><span class="hc org">告警 3</span></div>
+  <div class="ovn mono"><i class="wdot off"></i>TYO-07 · 18 分钟前</div>
+</div><div class="wlab">小号 · 总览</div></div>
+        <div class="wcell"><div class="w ws ov inv">
+  <div class="wtop"><span class="n">3 个探针</span><span class="mono ovt">刚刚</span></div>
+  <div class="ovbig"><b>50</b><span>/50</span></div>
+  <div class="ovl mono">全部在线</div>
+  <svg class="sp wsp ovsp" width="170" height="40" viewBox="0 0 170 40" preserveAspectRatio="none"><path d="M0.0,6.3 L5.9,33.3 L11.7,21.6 L17.6,38.4 L23.4,35.7 L29.3,38.4 L35.2,38.4 L41.0,37.9 L46.9,38.4 L52.8,38.4 L58.6,38.4 L64.5,38.4 L70.3,38.4 L76.2,13.2 L82.1,38.4 L87.9,38.4 L93.8,28.6 L99.7,6.3 L105.5,6.3 L111.4,14.3 L117.2,6.3 L123.1,38.4 L129.0,10.8 L134.8,27.0 L140.7,38.4 L146.6,38.4 L152.4,38.4 L158.3,14.0 L164.1,38.4 L170.0,32.1 L170.0,40 L0,40 Z" class="ar"/><path d="M0.0,6.3 L5.9,33.3 L11.7,21.6 L17.6,38.4 L23.4,35.7 L29.3,38.4 L35.2,38.4 L41.0,37.9 L46.9,38.4 L52.8,38.4 L58.6,38.4 L64.5,38.4 L70.3,38.4 L76.2,13.2 L82.1,38.4 L87.9,38.4 L93.8,28.6 L99.7,6.3 L105.5,6.3 L111.4,14.3 L117.2,6.3 L123.1,38.4 L129.0,10.8 L134.8,27.0 L140.7,38.4 L146.6,38.4 L152.4,38.4 L158.3,14.0 L164.1,38.4 L170.0,32.1" class="ln"/></svg>
+</div><div class="wlab">小号 · 总览（反色）</div></div>
+      </div>
+    </div>
+    <div class="cap"><b>⑦ 小组件</b>小组件放不下全部服务器，所以分两种取法：「固定」由你指定，「自动」挑最需要关注的（离线优先，再按用量从高到低）。总览只显示在线数、告警数和第一台离线的服务器。大号是 8 行紧凑列表，最后一行显示「还有 N 台」。每次刷新请求数固定：1 次批量状态，加上最多 3 次趋势数据。</div>
+  </div>
+</div>
+</body></html>

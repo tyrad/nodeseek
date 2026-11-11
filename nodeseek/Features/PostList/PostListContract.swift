@@ -38,6 +38,7 @@ protocol PostListPresenterProtocol: AnyObject {
     func didTapUserComments()
     func didTapUserCollections()
     func didTapSearch()
+    func didTapProbe()
     func didTapSettings()
     func didTapCategoryPreferences()
     func didTapLogFile()
@@ -68,6 +69,7 @@ protocol PostListRouterProtocol: AnyObject {
     func navigateToUserComments()
     func navigateToUserCollections()
     func navigateToSearch()
+    func navigateToProbeMonitor()
     func navigateToPostCategoryPreferences()
     func navigateToSettings(
         onLogout: @escaping @MainActor () -> Void,

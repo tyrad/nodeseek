@@ -10,6 +10,9 @@ ROOT = File.expand_path("..", __dir__)
 PROJECT = File.join(ROOT, "nodeseek.xcodeproj")
 SCHEME = "nodeseek"
 APP_IDENTIFIER = ENV["APP_IDENTIFIER"] || "com.mistj.nodeseek"
+# 桌面小组件扩展，和主 App 一起签名、一起上传。
+WIDGET_IDENTIFIER = "#{APP_IDENTIFIER}.ProbeWidget"
+SIGNED_IDENTIFIERS = [APP_IDENTIFIER, WIDGET_IDENTIFIER].freeze
 APP_STORE_CONNECT_APP_ID = ENV["APP_STORE_CONNECT_APP_ID"]
 INFO_PLIST = File.join(ROOT, "nodeseek/Resources/Info.plist")
 BUILD_DIR = File.join(ROOT, "build")
@@ -249,8 +252,12 @@ def write_build_provenance
   File.write(PROVENANCE_PATH, JSON.pretty_generate(provenance))
 end
 
-def app_store_profile_name
-  "match AppStore #{APP_IDENTIFIER}"
+def app_store_profile_name(identifier = APP_IDENTIFIER)
+  "match AppStore #{identifier}"
+end
+
+def app_store_export_profiles
+  SIGNED_IDENTIFIERS.to_h { |identifier| [identifier, app_store_profile_name(identifier)] }
 end
 
 def fetch_appstore_signing
@@ -263,12 +270,18 @@ def fetch_appstore_signing
   api_key = app_store_api_key_from_env
   UI.user_error!("Missing App Store Connect API key to fetch the provisioning profile") unless api_key
 
-  get_provisioning_profile(
-    api_key: api_key,
-    app_identifier: APP_IDENTIFIER,
-    provisioning_name: app_store_profile_name,
-    ignore_profiles_with_different_name: true
-  )
+  # App ID 新增能力（如 App Group）后旧描述文件会失效，平时会自动新建；
+  # 万一仍拿到旧的，设置 FORCE_PROFILE_REFRESH=1 跑一次强制重新生成。
+  force = env_bool("FORCE_PROFILE_REFRESH", default: false)
+  SIGNED_IDENTIFIERS.each do |identifier|
+    get_provisioning_profile(
+      api_key: api_key,
+      app_identifier: identifier,
+      provisioning_name: app_store_profile_name(identifier),
+      ignore_profiles_with_different_name: true,
+      force: force
+    )
+  end
 end
 
 platform :ios do
@@ -296,9 +309,7 @@ platform :ios do
       output_name: "nodeseek.ipa",
       include_symbols: true,
       export_options: {
-        provisioningProfiles: {
-          APP_IDENTIFIER => app_store_profile_name
-        }
+        provisioningProfiles: app_store_export_profiles
       }
     )
     write_build_provenance
@@ -319,9 +330,7 @@ platform :ios do
       output_name: "nodeseek.ipa",
       include_symbols: true,
       export_options: {
-        provisioningProfiles: {
-          APP_IDENTIFIER => app_store_profile_name
-        }
+        provisioningProfiles: app_store_export_profiles
       }
     )
     write_build_provenance

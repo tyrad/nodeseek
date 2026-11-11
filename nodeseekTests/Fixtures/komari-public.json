@@ -1,0 +1,28 @@
+{
+  "data": {
+    "cors_origin_check_enabled": true,
+    "custom_body": "",
+    "custom_head": "",
+    "description": "NS Connect 小组件测试探针",
+    "disable_password_login": false,
+    "oauth_enable": false,
+    "oauth_provider": "github",
+    "ping_record_preserve_time": 24,
+    "private_site": false,
+    "record_enabled": true,
+    "record_preserve_time": 24,
+    "sitename": "NS Probe",
+    "theme": "default",
+    "theme_settings": {
+      "_komari_onboarding_v1": {
+        "seen": [
+          "workbench",
+          "notifications"
+        ],
+        "workbenchOpened": true
+      }
+    }
+  },
+  "message": "",
+  "status": "success"
+}

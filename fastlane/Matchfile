@@ -3,7 +3,7 @@ git_branch("main")
 storage_mode("git")
 
 type("appstore")
-app_identifier([ENV["APP_IDENTIFIER"] || "com.mistj.nodeseek"])
+app_identifier([ENV["APP_IDENTIFIER"] || "com.mistj.nodeseek"].flat_map { |id| [id, "#{id}.ProbeWidget"] })
 team_id(ENV["APPLE_TEAM_ID"]) if ENV["APPLE_TEAM_ID"] && !ENV["APPLE_TEAM_ID"].empty?
 readonly(true)
 

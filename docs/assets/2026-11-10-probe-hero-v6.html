@@ -1,0 +1,299 @@
+<!doctype html><html><head><meta charset="utf-8"><style>* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #e9ebee; font-family: -apple-system, "PingFang SC", "SF Pro Text", sans-serif; padding: 48px; color: #111; width: 1830px; -webkit-font-smoothing: antialiased; }
+body > h1 { font-size: 32px; font-weight: 700; letter-spacing: -.5px; }
+body > h1.sec { font-size: 26px; margin-top: 64px; }
+.sub { color: #6b6b70; font-size: 15px; margin: 6px 0 22px; max-width: 1500px; }
+.rules { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 40px; }
+.rule { background: #fff; border-radius: 16px; padding: 14px 16px; font-size: 13px; line-height: 1.55; color: #48484c; }
+.rule b { display: block; color: #111; font-size: 14px; margin-bottom: 4px; }
+.row { display: flex; gap: 48px; }
+.cell { width: 390px; }
+.cap { margin-top: 18px; font-size: 13.5px; line-height: 1.65; color: #3a3a3e; }
+.cap b { display: block; font-size: 16px; margin-bottom: 4px; color: #111; }
+svg { display: block; flex: none; }
+.mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+
+.phone, .wall {
+  --bg: #f2f2f7; --card: #fff; --label: #000; --label2: rgba(60,60,67,.6); --label3: rgba(60,60,67,.3);
+  --sep: rgba(60,60,67,.12); --fill: rgba(120,120,128,.14); --glass: rgba(255,255,255,.8); --glass-b: rgba(0,0,0,.05);
+  --green: #34C759; --red: #FF3B30; --orange: #FF9500; --blue: #007AFF; --indigo: #5856D6; --teal: #30B0C7; --pink: #FF2D55;
+}
+.phone.dark, .wall.dark {
+  --bg: #000; --card: #1c1c1e; --label: #fff; --label2: rgba(235,235,245,.6); --label3: rgba(235,235,245,.3);
+  --sep: rgba(84,84,88,.55); --fill: rgba(120,120,128,.3); --glass: rgba(44,44,46,.8); --glass-b: rgba(255,255,255,.06);
+  --green: #30D158; --red: #FF453A; --orange: #FF9F0A; --blue: #0A84FF; --indigo: #5E5CE6; --teal: #40C8E0; --pink: #FF375F;
+}
+.phone { position: relative; width: 390px; height: 844px; border-radius: 55px; background: var(--bg); color: var(--label); overflow: hidden; box-shadow: 0 0 0 10px #18181a, 0 30px 60px rgba(0,0,0,.25); }
+.status { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 8px 36px 0 48px; font-weight: 600; font-size: 17px; }
+.island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; border-radius: 20px; background: #000; }
+.bat { width: 25px; height: 12px; border: 1.5px solid currentColor; border-radius: 4px; position: relative; }
+.bat::after { content: ""; position: absolute; inset: 1.5px; width: 72%; background: currentColor; border-radius: 1.5px; }
+.home { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--label); z-index: 9; }
+.nav { height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+.gbtn { height: 40px; min-width: 40px; border-radius: 20px; background: var(--glass); border: .5px solid var(--glass-b); display: flex; align-items: center; justify-content: center; font-size: 14.5px; font-weight: 600; }
+.gbtn.pill { padding: 0 14px; }
+.gbtn.inv { background: var(--label); color: var(--bg); border: 0; }
+.ptitle { font-size: 34px; font-weight: 800; letter-spacing: -.8px; padding: 2px 20px 12px; }
+
+/* 趋势线 */
+.sp .ln { fill: none; stroke: var(--label); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.sp .ar { fill: var(--label); opacity: .07; }
+.sp .dash { stroke: var(--label3); stroke-width: 1.4; stroke-dasharray: 3 4; fill: none; }
+.sp .end { fill: var(--red); }
+.sp.crit .ln { stroke: var(--red); } .sp.crit .ar { fill: var(--red); opacity: .1; }
+
+/* 汇总反色卡 */
+.hero { margin: 0 16px; border-radius: 20px; background: var(--label); color: var(--bg); padding: 14px 16px 0; overflow: hidden; }
+.hmeta { display: flex; justify-content: space-between; font-family: "SF Mono", ui-monospace, monospace; font-size: 10.5px; letter-spacing: .6px; opacity: .55; }
+.hmain { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 4px; }
+.hbig { display: flex; align-items: baseline; gap: 2px; }
+.hbig b { font-size: 52px; font-weight: 800; letter-spacing: -2px; line-height: 1; }
+.hbig span { font-size: 22px; font-weight: 700; opacity: .5; }
+.hbig em { font-style: normal; font-size: 14px; font-weight: 600; margin-left: 8px; opacity: .8; }
+.hoff { font-size: 12px !important; opacity: 1 !important; color: var(--red); font-weight: 700 !important; margin-left: 8px; }
+.hnet { display: grid; gap: 2px; text-align: right; font-family: "SF Mono", ui-monospace, monospace; font-size: 13px; font-weight: 600; padding-bottom: 4px; }
+.hsp { margin: 8px -16px 0; width: calc(100% + 32px); }
+.hsp .ln { stroke: var(--bg); opacity: .8; }
+.hsp .ar { fill: var(--bg); opacity: .14; }
+
+/* 服务器卡 */
+.srv { margin: 10px 16px 0; background: var(--card); border-radius: 20px; padding: 14px 16px 12px; }
+.stop { display: flex; align-items: center; gap: 7px; }
+.flag { font-size: 16px; line-height: 1; }
+.stop h3 { font-size: 18px; font-weight: 800; letter-spacing: -.3px; flex: 1; }
+.live { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--label2); }
+.live i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.live.off { color: var(--red); } .live.off i { background: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent); }
+.meta { font-size: 10.5px; letter-spacing: .5px; color: var(--label2); margin-top: 3px; }
+.sbody { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 8px; }
+.sbig b { display: block; font-size: 38px; font-weight: 800; letter-spacing: -1.4px; line-height: 1; font-variant-numeric: tabular-nums; }
+.sbig b small { font-size: 17px; font-weight: 700; letter-spacing: 0; margin-left: 1px; }
+.sbig b.dim { color: var(--label3); }
+.sbig span { display: block; font-size: 9.5px; letter-spacing: .5px; color: var(--label2); margin-top: 5px; }
+.mtr { display: grid; grid-template-columns: 30px 1fr 50px; align-items: center; gap: 10px; margin-top: 9px; font-size: 12.5px; color: var(--label2); }
+.mtr b { text-align: right; color: var(--label); font-size: 12.5px; font-weight: 700; }
+.tk { display: flex; gap: 2.5px; height: 12px; }
+.tk i { flex: 1; border-radius: 1.5px; background: var(--fill); }
+.tk i.on { background: var(--label); } .tk i.on.warn { background: var(--orange); } .tk i.on.crit { background: var(--red); }
+.sfoot { display: flex; gap: 16px; margin-top: 11px; padding-top: 9px; border-top: .5px solid var(--sep); font-size: 11px; letter-spacing: .3px; color: var(--label2); }
+.sfoot span:last-child { margin-left: auto; }
+.offc .sp .ln { stroke: var(--label2); } .offc .sp .ar { opacity: .05; }
+.stalec { border: 1.2px dashed var(--label3); background: transparent; color: var(--label2); }
+.stalec h3, .stalec .sbig b, .stalec .mtr b { color: var(--label2); }
+.stalec .sp .ln { stroke: var(--label3); } .stalec .tk i.on { background: var(--label3); }
+.gt { display: flex; justify-content: space-between; margin: 20px 32px 0; font-size: 10.5px; letter-spacing: .5px; color: var(--label2); }
+.gt .stale { display: inline-flex; align-items: center; gap: 4px; }
+
+/* 详情 */
+.dhead { padding: 0 20px; }
+.dt { display: flex; align-items: center; gap: 9px; }
+.dt .flag { font-size: 26px; }
+.dt h2 { font-size: 34px; font-weight: 800; letter-spacing: -.8px; flex: 1; }
+.chart { margin: 14px 16px 0; background: var(--card); border-radius: 20px; padding: 16px 16px 12px; }
+.ctop { display: flex; justify-content: space-between; align-items: flex-start; }
+.ctop .sbig b { font-size: 48px; letter-spacing: -2px; }
+.seg { display: flex; background: var(--fill); border-radius: 9px; padding: 2px; font-family: "SF Mono", ui-monospace, monospace; font-size: 11px; font-weight: 600; }
+.seg span { padding: 5px 9px; border-radius: 7px; color: var(--label2); }
+.seg span.on { background: var(--label); color: var(--bg); }
+.cplot { position: relative; margin-top: 12px; }
+.cplot .grid span { position: absolute; left: 0; right: 0; border-top: 1px dotted var(--sep); }
+.cy { position: absolute; right: 0; top: -6px; bottom: -4px; display: flex; flex-direction: column; justify-content: space-between; font-size: 9px; color: var(--label3); text-align: right; }
+.cx { display: flex; justify-content: space-between; margin-top: 6px; font-size: 9.5px; color: var(--label2); }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 16px 0; }
+.tile { background: var(--card); border-radius: 18px; padding: 12px 14px; height: 112px; display: flex; flex-direction: column; gap: 5px; }
+.tl { font-size: 12px; color: var(--label2); }
+.tile b { font-size: 26px; font-weight: 800; letter-spacing: -.8px; line-height: 1; font-variant-numeric: tabular-nums; }
+.tile b small { font-size: 13px; font-weight: 700; letter-spacing: 0; margin-left: 1px; }
+.tile .tk { height: 10px; margin-top: auto; }
+.ts { font-size: 9.5px; color: var(--label2); letter-spacing: .3px; }
+.tsp { margin-top: auto; }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); margin: 10px 16px 0; background: var(--card); border-radius: 18px; padding: 12px 0; }
+.facts div { text-align: center; position: relative; }
+.facts div + div::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: .5px; background: var(--sep); }
+.facts span { display: block; font-size: 9.5px; letter-spacing: .5px; color: var(--label2); }
+.facts b { display: block; font-size: 15px; font-weight: 700; margin-top: 3px; }
+
+/* 添加 */
+.plead { margin: 0 20px; font-size: 14px; line-height: 1.55; color: var(--label2); }
+.plead.small { font-size: 12.5px; margin-top: 10px; }
+.inp { margin: 12px 16px 0; background: var(--card); border-radius: 16px; padding: 10px 16px 12px; }
+.inp + .inp { margin-top: 8px; }
+.inp span { display: block; font-size: 10px; letter-spacing: .6px; color: var(--label2); }
+.inp b { display: block; font-size: 18px; font-weight: 600; margin-top: 3px; }
+.okline { display: flex; align-items: center; gap: 7px; margin: 12px 20px 0; font-size: 10.5px; letter-spacing: .4px; color: var(--label); }
+.okline i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.picks { margin: 8px 16px 0; background: var(--card); border-radius: 18px; overflow: hidden; }
+.pick { display: flex; align-items: center; gap: 12px; height: 60px; padding: 0 16px; position: relative; }
+.pick + .pick::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: .5px; background: var(--sep); }
+.chk { width: 22px; height: 22px; border-radius: 50%; background: var(--label); color: var(--bg); display: flex; align-items: center; justify-content: center; flex: none; }
+.pn { font-family: "SF Mono", ui-monospace, monospace; font-size: 20px; font-weight: 700; color: var(--label3); }
+.pick .t { flex: 1; font-size: 16px; font-weight: 700; }
+.pick .t small { display: block; font-size: 9.5px; letter-spacing: .5px; font-weight: 400; color: var(--label2); margin-top: 2px; }
+.psp .ln { stroke-width: 1.3; }
+
+/* 小组件 */
+.walls { display: flex; gap: 32px; }
+.wall { border-radius: 36px; padding: 28px 28px 40px; display: grid; grid-template-columns: 170px 170px; grid-auto-rows: 170px; gap: 30px 24px; background: linear-gradient(160deg, #c3c7cf, #e6e7eb); }
+.wall.dark { background: linear-gradient(160deg, #2a2b30, #0b0b0d); }
+.wcell { position: relative; }
+.wcell.wide { grid-column: span 2; }
+.wlab { position: absolute; left: 0; right: 0; bottom: -21px; text-align: center; font-size: 11.5px; color: rgba(0,0,0,.55); }
+.wall.dark .wlab { color: rgba(255,255,255,.55); }
+.w { position: relative; width: 100%; height: 100%; border-radius: 22px; background: var(--card); color: var(--label); overflow: hidden; font-variant-numeric: tabular-nums; }
+.w.inv { background: var(--label); color: var(--bg); }
+.w.inv .sp .ln { stroke: var(--bg); } .w.inv .sp .ar { fill: var(--bg); opacity: .16; }
+.w.inv .wmeta, .w.inv .wbig span { color: color-mix(in srgb, var(--bg) 60%, transparent); }
+.ws { padding: 14px 15px 0; }
+.wtop { display: flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 800; letter-spacing: -.2px; }
+.wtop .flag { font-size: 12px; }
+.wtop .n { flex: 1; }
+.wdot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex: none; }
+.wdot.off { background: var(--red); } .wdot.none { background: var(--label3); }
+.wclock { color: var(--label2); }
+.wbig { margin-top: 8px; }
+.wbig b { display: block; font-size: 38px; font-weight: 800; letter-spacing: -1.6px; line-height: 1; }
+.wbig b small { font-size: 16px; letter-spacing: 0; }
+.wbig b.red { color: var(--red); font-size: 32px; letter-spacing: -.5px; }
+.wbig span { display: block; font-size: 9px; letter-spacing: .6px; color: var(--label2); margin-top: 4px; }
+.wmeta { display: flex; gap: 8px; margin-top: 6px; font-size: 9.5px; letter-spacing: .3px; color: var(--label2); }
+.wmeta span:last-child { margin-left: auto; }
+.wsp { position: absolute; left: 0; bottom: 0; }
+.stalew .wtop .n, .stalew .wbig b { color: var(--label2); }
+.stalew .sp .ln { stroke: var(--label3); } .stalew .sp .ar { opacity: .04; }
+.woff .sp .ln { stroke: var(--label2); }
+.wm { padding: 12px 14px 12px; }
+.wh { display: flex; justify-content: space-between; font-size: 9.5px; letter-spacing: .5px; color: var(--label2); }
+.wh b { color: var(--label); } .wh em { font-style: normal; color: var(--red); font-weight: 700; }
+.cols { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 10px; }
+.wc { padding: 0 10px; position: relative; }
+.wc:first-child { padding-left: 0; } .wc:last-child { padding-right: 0; }
+.wc + .wc::before { content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: .5px; background: var(--sep); }
+.cn { display: flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; white-space: nowrap; overflow: hidden; }
+.cbig { font-size: 30px; font-weight: 800; letter-spacing: -1.2px; line-height: 1; margin-top: 10px; }
+.cbig small { font-size: 13px; letter-spacing: 0; }
+.cbig.red { color: var(--red); font-size: 24px; letter-spacing: -.3px; padding-top: 4px; }
+.cbig.crit { color: var(--red); }
+.cbig.dim { color: var(--label3); }
+.csp { margin-top: 8px; width: 100%; }
+.cm { font-size: 8.5px; letter-spacing: .3px; color: var(--label2); margin-top: 6px; white-space: nowrap; }
+
+/* 第三版：指标色 */
+.sp.cpu .ln { stroke: var(--blue); } .sp.cpu .ar { fill: var(--blue); opacity: .14; }
+.sp.net .ln { stroke: var(--pink); }
+.tk.mem i.on { background: var(--indigo); } .tk.dsk i.on { background: var(--teal); }
+.tk i.on.warn { background: var(--orange) !important; } .tk i.on.crit { background: var(--red) !important; }
+.lg { display: inline-block; width: 6px; height: 6px; border-radius: 2px; margin-right: 5px; vertical-align: 1px; }
+.lg.mem { background: var(--indigo); } .lg.dsk { background: var(--teal); } .lg.net { background: var(--pink); }
+.mtr { grid-template-columns: 40px 1fr 50px; }
+.sp.cpu.crit .ln { stroke: var(--red); } .sp.cpu.crit .ar { fill: var(--red); }
+.offc .sp .ln, .woff .sp .ln { stroke: var(--label2) !important; } .offc .sp .ar, .woff .sp .ar { fill: var(--label); opacity: .05; }
+.stalec .sp .ln, .stalew .sp .ln { stroke: var(--label3) !important; } .stalec .sp .ar, .stalew .sp .ar { fill: var(--label); opacity: .04; }
+.stalec .tk i.on { background: var(--label3) !important; } .stalec .lg { opacity: .4; }
+.w.inv .sp.cpu .ln { stroke: var(--blue); } .w.inv .sp.cpu .ar { fill: var(--blue); opacity: .3; }
+
+.ph{position:relative;width:390px;height:560px;border-radius:55px 55px 0 0;background:var(--bg);color:var(--label);overflow:hidden;box-shadow:0 0 0 10px #18181a;--bg:#f2f2f7;--card:#fff;--label:#000;--label2:rgba(60,60,67,.6);--label3:rgba(60,60,67,.3);--sep:rgba(60,60,67,.12);--fill:rgba(120,120,128,.14);--glass:rgba(255,255,255,.8);--glass-b:rgba(0,0,0,.05);--green:#34C759;--red:#FF3B30;--orange:#FF9500;--pink:#FF2D55;--blue:#007AFF}
+.ph.dark{--bg:#000;--card:#1c1c1e;--label:#fff;--label2:rgba(235,235,245,.6);--label3:rgba(235,235,245,.3);--sep:rgba(84,84,88,.55);--fill:rgba(120,120,128,.3);--glass:rgba(44,44,46,.8);--glass-b:rgba(255,255,255,.06);--green:#30D158;--red:#FF453A;--orange:#FF9F0A;--pink:#FF375F}
+.strip{position:relative;height:150px;margin:0 0 8px}
+.slot{position:absolute;top:6px;width:318px;height:132px}
+.slot.c{left:36px}
+.slot.l{left:-290px;transform:scale(.88);transform-origin:right center;opacity:.45}
+.slot.r{left:362px;transform:scale(.88);transform-origin:left center;opacity:.45}
+.slot>div{width:100%;height:100%;background:var(--card);border-radius:22px;padding:14px 16px;position:relative;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 22px rgba(0,0,0,.06)}
+.ph.dark .slot>div{box-shadow:none}
+.t1{display:flex;align-items:center;gap:8px}.t1 b{font-size:17px;font-weight:700;letter-spacing:-.3px;flex:1;white-space:nowrap;overflow:hidden}
+.t2{font-size:11.5px;color:var(--label2);margin-top:1px;white-space:nowrap;overflow:hidden}
+.lv{font-size:11.5px;color:var(--label2);display:flex;align-items:center;gap:5px}.lv em{width:6px;height:6px;border-radius:3px;background:var(--green)}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 9px 3px 7px;border-radius:10px;white-space:nowrap}
+.pill em{width:6px;height:6px;border-radius:3px}
+.pill.ok{background:color-mix(in srgb,var(--green) 14%,transparent);color:var(--green)}.pill.ok em{background:var(--green)}
+.pill.red{background:color-mix(in srgb,var(--red) 13%,transparent);color:var(--red)}.pill.red em{background:var(--red)}
+.pill.org{background:color-mix(in srgb,var(--orange) 15%,transparent);color:var(--orange)}.pill.org em{background:var(--orange)}
+i{font-style:normal}
+/* A 圆环 */
+.cA{display:flex;gap:16px;align-items:center}
+.ringw{position:relative;width:74px;height:74px;flex:none}
+.rc{position:absolute;inset:0;display:flex;align-items:baseline;justify-content:center;padding-top:22px}
+.rc b{font-size:24px;font-weight:800;letter-spacing:-.8px;font-variant-numeric:tabular-nums}.rc span{font-size:12px;color:var(--label2);font-weight:600}
+.ainfo{flex:1;min-width:0}.t3{margin-top:9px}
+.t4{display:flex;gap:14px;margin-top:9px;font-size:13px;font-weight:600}.t4 i,.net i,.cnet i{color:var(--pink);margin-right:3px;font-weight:700}.t4 small,.cnet small{font-size:9.5px;color:var(--label2)}
+/* B 数字 */
+.nums{display:flex;align-items:flex-end;gap:18px;margin-top:14px}
+.nums>div:not(.net){display:flex;flex-direction:column}
+.nums b{font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1;font-variant-numeric:tabular-nums}.nums b small{font-size:15px;color:var(--label2);font-weight:700;letter-spacing:0}
+.nums span{font-size:11px;color:var(--label2);margin-top:4px;font-weight:600}
+.nums .z b{color:var(--label3)}.nums .red b,.nums .red span{color:var(--red)}.nums .org b,.nums .org span{color:var(--orange)}
+.net{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;font-size:12.5px;font-weight:600;line-height:1.4}
+/* C 面积图 */
+.bgarea{position:absolute;left:0;bottom:0;width:100%;height:40px}
+.cC .t1,.cC .t2,.cbig,.cnet{position:relative}
+.cbig{margin-top:6px;display:flex;align-items:baseline;gap:4px}.cbig b{font-size:34px;font-weight:800;letter-spacing:-1.2px;line-height:1;font-variant-numeric:tabular-nums}.cbig span{font-size:13px;color:var(--label2);font-weight:600}
+.cnet{position:absolute;right:16px;bottom:46px;display:flex;flex-direction:column;align-items:flex-end;font-size:12.5px;font-weight:600}
+.chips{display:flex;gap:6px;padding:2px 16px 10px}.chip{background:var(--card);border-radius:16px;padding:6px 12px;font-size:13px;font-weight:600}.chip i{color:var(--label2);font-size:11px}.chip.on{background:var(--label);color:var(--bg)}.chip.on i{color:var(--bg);opacity:.6}
+.lst{background:var(--card)}.lr{display:flex;align-items:center;gap:9px;padding:13px 16px;border-bottom:.5px solid var(--sep);font-size:15px}.lr b{font-weight:600;flex:1}.lr .m{font-size:11px;color:var(--label2)}
+.dot{width:7px;height:7px;border-radius:4px}
+.grid{display:grid;grid-template-columns:repeat(3,390px);gap:60px 56px;margin-top:24px}
+
+.slot.s{left:16px;width:358px}
+/* 柔和反色：浅色模式石墨灰而不是纯黑，深色模式浅灰而不是纯白，文字对比度降一档 */
+.slot.inv>div{background:#2c2c2e;--label:#f2f2f7;--label2:rgba(242,242,247,.58);--label3:rgba(242,242,247,.28);--fill:rgba(255,255,255,.12);color:#f2f2f7;box-shadow:0 10px 26px rgba(0,0,0,.16)}
+.ph.dark .slot.inv>div{background:#d5d5da;--label:#1c1c1e;--label2:rgba(28,28,30,.58);--label3:rgba(28,28,30,.28);--fill:rgba(0,0,0,.1);color:#1c1c1e}
+.slot.inv .pill.red{background:rgba(255,69,58,.2)}
+
+.lab{font-size:20px;font-weight:700;margin-bottom:6px}.lab small{display:block;font-size:13px;font-weight:400;color:#555;margin-top:4px;line-height:1.55;max-width:390px}
+ body{width:1400px} .rowlab{grid-column:1/-1;font-size:22px;font-weight:700;margin-top:10px}</style></head><body>
+<h1>探针 · 顶部卡片 v6（柔和反色）</h1>
+<p class="sub">多个探针：当前卡片柔和反色——浅色模式用石墨灰 #2C2C2E（不是纯黑），深色模式用浅灰 #D5D5DA（不是纯白），文字对比降一档；两侧邻居是普通卡片，缩小到 88% 并变淡。只有一个探针：整行宽的普通卡片，不反色、不滑动。下面两套内容（A 圆环 / B 三个数字）选一个。</p>
+<div class="grid"><div class="lab">多个探针 · 浅色</div><div class="lab">多个探针 · 深色</div><div class="lab">只有一个探针</div><div class="rowlab">方案 A · 圆环</div><div class="ph "><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div><div class="strip"><div class="slot l"><div class="cA"><div class="ringw"><svg width="74" height="74" viewBox="0 0 74 74" style="transform:rotate(-90deg)"><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--fill)" stroke-width="8"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round" stroke-dasharray="207.3 207.34511513692635"/></svg><div class="rc"><b>2</b><span>/2</span></div></div>
+<div class="ainfo"><div class="t1"><b>家里 HK</b><span class="lv">刚刚</span></div><div class="t2">Komari · status.example.com</div>
+<div class="t3"><span class="pill ok"><em></em>全部在线</span></div>
+<div class="t4 mono"><span><i>↑</i>343K<small>/s</small></span><span><i>↓</i>346K<small>/s</small></span></div></div></div></div><div class="slot c inv"><div class="cA"><div class="ringw"><svg width="74" height="74" viewBox="0 0 74 74" style="transform:rotate(-90deg)"><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--fill)" stroke-width="8"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round" stroke-dasharray="181.6 207.34511513692635"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--red)" stroke-width="8" stroke-linecap="round" stroke-dasharray="18.2 207.34511513692635" stroke-dashoffset="-186.6"/></svg><div class="rc"><b>9</b><span>/10</span></div></div>
+<div class="ainfo"><div class="t1"><b>极简</b><span class="lv">刚刚</span></div><div class="t2">极简探针 · probe.example.net</div>
+<div class="t3"><span class="pill red"><em></em>1 台离线</span></div>
+<div class="t4 mono"><span><i>↑</i>10.3K<small>/s</small></span><span><i>↓</i>36.4K<small>/s</small></span></div></div></div></div><div class="slot r"><div class="cA"><div class="ringw"><svg width="74" height="74" viewBox="0 0 74 74" style="transform:rotate(-90deg)"><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--fill)" stroke-width="8"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round" stroke-dasharray="195.0 207.34511513692635"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--red)" stroke-width="8" stroke-linecap="round" stroke-dasharray="4.9 207.34511513692635" stroke-dashoffset="-199.9"/></svg><div class="rc"><b>27</b><span>/28</span></div></div>
+<div class="ainfo"><div class="t1"><b>生产集群</b><span class="lv">12 秒前</span></div><div class="t2">Komari · status.example.com</div>
+<div class="t3"><span class="pill red"><em></em>1 台离线</span></div>
+<div class="t4 mono"><span><i>↑</i>18.2M<small>/s</small></span><span><i>↓</i>9.41M<small>/s</small></span></div></div></div></div></div>
+<div class="chips"><span class="chip on">全部 <i>10</i></span><span class="chip">离线 <i>1</i></span><span class="chip">告警 <i>0</i></span></div><div class="lst"><div class="lr"><span class="dot" style="background:var(--red)"></span><b>🇭🇰 HK-02</b><span class="mono m">最后上报 3 小时前</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇺🇸 US-02</b><span class="mono m">1%  28%  12%</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇯🇵 JP-03</b><span class="mono m">0%  23%  10%</span></div></div></div><div class="ph dark"><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div><div class="strip"><div class="slot l"><div class="cA"><div class="ringw"><svg width="74" height="74" viewBox="0 0 74 74" style="transform:rotate(-90deg)"><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--fill)" stroke-width="8"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round" stroke-dasharray="207.3 207.34511513692635"/></svg><div class="rc"><b>2</b><span>/2</span></div></div>
+<div class="ainfo"><div class="t1"><b>家里 HK</b><span class="lv">刚刚</span></div><div class="t2">Komari · status.example.com</div>
+<div class="t3"><span class="pill ok"><em></em>全部在线</span></div>
+<div class="t4 mono"><span><i>↑</i>343K<small>/s</small></span><span><i>↓</i>346K<small>/s</small></span></div></div></div></div><div class="slot c inv"><div class="cA"><div class="ringw"><svg width="74" height="74" viewBox="0 0 74 74" style="transform:rotate(-90deg)"><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--fill)" stroke-width="8"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round" stroke-dasharray="181.6 207.34511513692635"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--red)" stroke-width="8" stroke-linecap="round" stroke-dasharray="18.2 207.34511513692635" stroke-dashoffset="-186.6"/></svg><div class="rc"><b>9</b><span>/10</span></div></div>
+<div class="ainfo"><div class="t1"><b>极简</b><span class="lv">刚刚</span></div><div class="t2">极简探针 · probe.example.net</div>
+<div class="t3"><span class="pill red"><em></em>1 台离线</span></div>
+<div class="t4 mono"><span><i>↑</i>10.3K<small>/s</small></span><span><i>↓</i>36.4K<small>/s</small></span></div></div></div></div><div class="slot r"><div class="cA"><div class="ringw"><svg width="74" height="74" viewBox="0 0 74 74" style="transform:rotate(-90deg)"><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--fill)" stroke-width="8"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round" stroke-dasharray="195.0 207.34511513692635"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--red)" stroke-width="8" stroke-linecap="round" stroke-dasharray="4.9 207.34511513692635" stroke-dashoffset="-199.9"/></svg><div class="rc"><b>27</b><span>/28</span></div></div>
+<div class="ainfo"><div class="t1"><b>生产集群</b><span class="lv">12 秒前</span></div><div class="t2">Komari · status.example.com</div>
+<div class="t3"><span class="pill red"><em></em>1 台离线</span></div>
+<div class="t4 mono"><span><i>↑</i>18.2M<small>/s</small></span><span><i>↓</i>9.41M<small>/s</small></span></div></div></div></div></div>
+<div class="chips"><span class="chip on">全部 <i>10</i></span><span class="chip">离线 <i>1</i></span><span class="chip">告警 <i>0</i></span></div><div class="lst"><div class="lr"><span class="dot" style="background:var(--red)"></span><b>🇭🇰 HK-02</b><span class="mono m">最后上报 3 小时前</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇺🇸 US-02</b><span class="mono m">1%  28%  12%</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇯🇵 JP-03</b><span class="mono m">0%  23%  10%</span></div></div></div><div class="ph "><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div><div class="strip"><div class="slot s"><div class="cA"><div class="ringw"><svg width="74" height="74" viewBox="0 0 74 74" style="transform:rotate(-90deg)"><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--fill)" stroke-width="8"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round" stroke-dasharray="181.6 207.34511513692635"/><circle cx="37.0" cy="37.0" r="33.0" fill="none" stroke="var(--red)" stroke-width="8" stroke-linecap="round" stroke-dasharray="18.2 207.34511513692635" stroke-dashoffset="-186.6"/></svg><div class="rc"><b>9</b><span>/10</span></div></div>
+<div class="ainfo"><div class="t1"><b>极简</b><span class="lv">刚刚</span></div><div class="t2">极简探针 · probe.example.net</div>
+<div class="t3"><span class="pill red"><em></em>1 台离线</span></div>
+<div class="t4 mono"><span><i>↑</i>10.3K<small>/s</small></span><span><i>↓</i>36.4K<small>/s</small></span></div></div></div></div></div>
+<div class="chips"><span class="chip on">全部 <i>10</i></span><span class="chip">离线 <i>1</i></span><span class="chip">告警 <i>0</i></span></div><div class="lst"><div class="lr"><span class="dot" style="background:var(--red)"></span><b>🇭🇰 HK-02</b><span class="mono m">最后上报 3 小时前</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇺🇸 US-02</b><span class="mono m">1%  28%  12%</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇯🇵 JP-03</b><span class="mono m">0%  23%  10%</span></div></div></div><div class="rowlab">方案 B · 三个数字</div><div class="ph "><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div><div class="strip"><div class="slot l"><div class="cB"><div class="t1"><b>家里 HK</b><span class="lv"><em></em>刚刚</span></div><div class="t2">Komari · status.example.com</div>
+<div class="nums"><div><b>2<small>/2</small></b><span>在线</span></div><div class="z"><b>0</b><span>离线</span></div><div class="z"><b>0</b><span>告警</span></div>
+<div class="net mono"><span><i>↑</i>343K</span><span><i>↓</i>346K</span></div></div></div></div><div class="slot c inv"><div class="cB"><div class="t1"><b>极简</b><span class="lv"><em></em>刚刚</span></div><div class="t2">极简探针 · probe.example.net</div>
+<div class="nums"><div><b>9<small>/10</small></b><span>在线</span></div><div class="red"><b>1</b><span>离线</span></div><div class="z"><b>0</b><span>告警</span></div>
+<div class="net mono"><span><i>↑</i>10.3K</span><span><i>↓</i>36.4K</span></div></div></div></div><div class="slot r"><div class="cB"><div class="t1"><b>生产集群</b><span class="lv"><em></em>12 秒前</span></div><div class="t2">Komari · status.example.com</div>
+<div class="nums"><div><b>27<small>/28</small></b><span>在线</span></div><div class="red"><b>1</b><span>离线</span></div><div class="org"><b>2</b><span>告警</span></div>
+<div class="net mono"><span><i>↑</i>18.2M</span><span><i>↓</i>9.41M</span></div></div></div></div></div>
+<div class="chips"><span class="chip on">全部 <i>10</i></span><span class="chip">离线 <i>1</i></span><span class="chip">告警 <i>0</i></span></div><div class="lst"><div class="lr"><span class="dot" style="background:var(--red)"></span><b>🇭🇰 HK-02</b><span class="mono m">最后上报 3 小时前</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇺🇸 US-02</b><span class="mono m">1%  28%  12%</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇯🇵 JP-03</b><span class="mono m">0%  23%  10%</span></div></div></div><div class="ph dark"><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div><div class="strip"><div class="slot l"><div class="cB"><div class="t1"><b>家里 HK</b><span class="lv"><em></em>刚刚</span></div><div class="t2">Komari · status.example.com</div>
+<div class="nums"><div><b>2<small>/2</small></b><span>在线</span></div><div class="z"><b>0</b><span>离线</span></div><div class="z"><b>0</b><span>告警</span></div>
+<div class="net mono"><span><i>↑</i>343K</span><span><i>↓</i>346K</span></div></div></div></div><div class="slot c inv"><div class="cB"><div class="t1"><b>极简</b><span class="lv"><em></em>刚刚</span></div><div class="t2">极简探针 · probe.example.net</div>
+<div class="nums"><div><b>9<small>/10</small></b><span>在线</span></div><div class="red"><b>1</b><span>离线</span></div><div class="z"><b>0</b><span>告警</span></div>
+<div class="net mono"><span><i>↑</i>10.3K</span><span><i>↓</i>36.4K</span></div></div></div></div><div class="slot r"><div class="cB"><div class="t1"><b>生产集群</b><span class="lv"><em></em>12 秒前</span></div><div class="t2">Komari · status.example.com</div>
+<div class="nums"><div><b>27<small>/28</small></b><span>在线</span></div><div class="red"><b>1</b><span>离线</span></div><div class="org"><b>2</b><span>告警</span></div>
+<div class="net mono"><span><i>↑</i>18.2M</span><span><i>↓</i>9.41M</span></div></div></div></div></div>
+<div class="chips"><span class="chip on">全部 <i>10</i></span><span class="chip">离线 <i>1</i></span><span class="chip">告警 <i>0</i></span></div><div class="lst"><div class="lr"><span class="dot" style="background:var(--red)"></span><b>🇭🇰 HK-02</b><span class="mono m">最后上报 3 小时前</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇺🇸 US-02</b><span class="mono m">1%  28%  12%</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇯🇵 JP-03</b><span class="mono m">0%  23%  10%</span></div></div></div><div class="ph "><div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div><div class="strip"><div class="slot s"><div class="cB"><div class="t1"><b>极简</b><span class="lv"><em></em>刚刚</span></div><div class="t2">极简探针 · probe.example.net</div>
+<div class="nums"><div><b>9<small>/10</small></b><span>在线</span></div><div class="red"><b>1</b><span>离线</span></div><div class="z"><b>0</b><span>告警</span></div>
+<div class="net mono"><span><i>↑</i>10.3K</span><span><i>↓</i>36.4K</span></div></div></div></div></div>
+<div class="chips"><span class="chip on">全部 <i>10</i></span><span class="chip">离线 <i>1</i></span><span class="chip">告警 <i>0</i></span></div><div class="lst"><div class="lr"><span class="dot" style="background:var(--red)"></span><b>🇭🇰 HK-02</b><span class="mono m">最后上报 3 小时前</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇺🇸 US-02</b><span class="mono m">1%  28%  12%</span></div><div class="lr"><span class="dot" style="background:var(--green)"></span><b>🇯🇵 JP-03</b><span class="mono m">0%  23%  10%</span></div></div></div></div></body></html>

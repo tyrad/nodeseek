@@ -44,9 +44,11 @@ XCODE_BUILD_COMMON = \
 	$(XCODE_BASE) \
 	-destination "$(BUILD_DESTINATION)"
 
+# 测试结束后 xcodebuild 默认会跑 simctl diagnose 收集模拟器诊断，常卡到 600 秒超时才退出。
 XCODE_TEST_COMMON = \
 	$(XCODE_BASE) \
-	-destination "$(TEST_DESTINATION)"
+	-destination "$(TEST_DESTINATION)" \
+	-collect-test-diagnostics never
 
 .PHONY: help lint lint-fix quality spm-test xcode-build-tests xcode-test-runtime-core xcode-test-core xcode-test-class xcode-test-full
 
@@ -62,6 +64,7 @@ help:
 		'  make xcode-test-runtime-core' \
 		'  make xcode-test-core  # alias' \
 		'  make xcode-test-class TEST=NodeSeekServiceTests' \
+		'  make xcode-test-class TEST="NodeSeekServiceTests CookieBridgeTests"' \
 		'  make xcode-test-class TEST=NodeSeekServiceTests SIMULATOR_NAME="iPhone 16" SIMULATOR_OS=18.0' \
 		'  make xcode-test-full' \
 		'' \
@@ -100,17 +103,18 @@ xcode-test-core: xcode-test-runtime-core
 
 xcode-test-class:
 	@if [[ -z "$${TEST:-}" ]]; then \
-		echo "Usage: make xcode-test-class TEST=NodeSeekServiceTests" >&2; \
+		echo "Usage: make xcode-test-class TEST=\"NodeSeekServiceTests [OtherTests ...]\"" >&2; \
 		exit 2; \
 	fi
-	@if [[ ! "$${TEST}" =~ ^[A-Za-z_][A-Za-z0-9_]*$$ ]]; then \
-		echo "Invalid TEST: $${TEST}" >&2; \
-		echo "TEST must be a simple XCTest class identifier: letters, numbers, underscore." >&2; \
-		echo "Usage: make xcode-test-class TEST=NodeSeekServiceTests" >&2; \
-		exit 2; \
-	fi
+	@for name in $${TEST}; do \
+		if [[ ! "$${name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$$ ]]; then \
+			echo "Invalid TEST: $${name}" >&2; \
+			echo "TEST must be space-separated XCTest class identifiers: letters, numbers, underscore." >&2; \
+			exit 2; \
+		fi; \
+	done
 	$(MAKE) xcode-build-tests
-	xcodebuild -quiet test-without-building $(XCODE_TEST_COMMON) -only-testing:nodeseekTests/$$TEST
+	xcodebuild -quiet test-without-building $(XCODE_TEST_COMMON) $(addprefix -only-testing:nodeseekTests/,$(TEST))
 
 xcode-test-full:
 	xcodebuild -quiet test $(XCODE_TEST_COMMON)

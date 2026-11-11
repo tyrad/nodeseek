@@ -1,0 +1,453 @@
+<!doctype html><html><head><meta charset="utf-8"><style>* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #e9ebee; font-family: -apple-system, "PingFang SC", "SF Pro Text", sans-serif; padding: 48px; color: #111; width: 1830px; -webkit-font-smoothing: antialiased; }
+body > h1 { font-size: 32px; font-weight: 700; letter-spacing: -.5px; }
+body > h1.sec { font-size: 26px; margin-top: 64px; }
+.sub { color: #6b6b70; font-size: 15px; margin: 6px 0 22px; max-width: 1500px; }
+.rules { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 40px; }
+.rule { background: #fff; border-radius: 16px; padding: 14px 16px; font-size: 13px; line-height: 1.55; color: #48484c; }
+.rule b { display: block; color: #111; font-size: 14px; margin-bottom: 4px; }
+.row { display: flex; gap: 48px; }
+.cell { width: 390px; }
+.cap { margin-top: 18px; font-size: 13.5px; line-height: 1.65; color: #3a3a3e; }
+.cap b { display: block; font-size: 16px; margin-bottom: 4px; color: #111; }
+svg { display: block; flex: none; }
+.mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+
+.phone, .wall {
+  --bg: #f2f2f7; --card: #fff; --label: #000; --label2: rgba(60,60,67,.6); --label3: rgba(60,60,67,.3);
+  --sep: rgba(60,60,67,.12); --fill: rgba(120,120,128,.14); --glass: rgba(255,255,255,.8); --glass-b: rgba(0,0,0,.05);
+  --green: #34C759; --red: #FF3B30; --orange: #FF9500; --blue: #007AFF; --indigo: #5856D6; --teal: #30B0C7; --pink: #FF2D55;
+}
+.phone.dark, .wall.dark {
+  --bg: #000; --card: #1c1c1e; --label: #fff; --label2: rgba(235,235,245,.6); --label3: rgba(235,235,245,.3);
+  --sep: rgba(84,84,88,.55); --fill: rgba(120,120,128,.3); --glass: rgba(44,44,46,.8); --glass-b: rgba(255,255,255,.06);
+  --green: #30D158; --red: #FF453A; --orange: #FF9F0A; --blue: #0A84FF; --indigo: #5E5CE6; --teal: #40C8E0; --pink: #FF375F;
+}
+.phone { position: relative; width: 390px; height: 844px; border-radius: 55px; background: var(--bg); color: var(--label); overflow: hidden; box-shadow: 0 0 0 10px #18181a, 0 30px 60px rgba(0,0,0,.25); }
+.status { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 8px 36px 0 48px; font-weight: 600; font-size: 17px; }
+.island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; border-radius: 20px; background: #000; }
+.bat { width: 25px; height: 12px; border: 1.5px solid currentColor; border-radius: 4px; position: relative; }
+.bat::after { content: ""; position: absolute; inset: 1.5px; width: 72%; background: currentColor; border-radius: 1.5px; }
+.home { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--label); z-index: 9; }
+.nav { height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+.gbtn { height: 40px; min-width: 40px; border-radius: 20px; background: var(--glass); border: .5px solid var(--glass-b); display: flex; align-items: center; justify-content: center; font-size: 14.5px; font-weight: 600; }
+.gbtn.pill { padding: 0 14px; }
+.gbtn.inv { background: var(--label); color: var(--bg); border: 0; }
+.ptitle { font-size: 34px; font-weight: 800; letter-spacing: -.8px; padding: 2px 20px 12px; }
+
+/* 趋势线 */
+.sp .ln { fill: none; stroke: var(--label); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.sp .ar { fill: var(--label); opacity: .07; }
+.sp .dash { stroke: var(--label3); stroke-width: 1.4; stroke-dasharray: 3 4; fill: none; }
+.sp .end { fill: var(--red); }
+.sp.crit .ln { stroke: var(--red); } .sp.crit .ar { fill: var(--red); opacity: .1; }
+
+/* 汇总反色卡 */
+.hero { margin: 0 16px; border-radius: 20px; background: var(--label); color: var(--bg); padding: 14px 16px 0; overflow: hidden; }
+.hmeta { display: flex; justify-content: space-between; font-family: "SF Mono", ui-monospace, monospace; font-size: 10.5px; letter-spacing: .6px; opacity: .55; }
+.hmain { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 4px; }
+.hbig { display: flex; align-items: baseline; gap: 2px; }
+.hbig b { font-size: 52px; font-weight: 800; letter-spacing: -2px; line-height: 1; }
+.hbig span { font-size: 22px; font-weight: 700; opacity: .5; }
+.hbig em { font-style: normal; font-size: 14px; font-weight: 600; margin-left: 8px; opacity: .8; }
+.hoff { font-size: 12px !important; opacity: 1 !important; color: var(--red); font-weight: 700 !important; margin-left: 8px; }
+.hnet { display: grid; gap: 2px; text-align: right; font-family: "SF Mono", ui-monospace, monospace; font-size: 13px; font-weight: 600; padding-bottom: 4px; }
+.hsp { margin: 8px -16px 0; width: calc(100% + 32px); }
+.hsp .ln { stroke: var(--bg); opacity: .8; }
+.hsp .ar { fill: var(--bg); opacity: .14; }
+
+/* 服务器卡 */
+.srv { margin: 10px 16px 0; background: var(--card); border-radius: 20px; padding: 14px 16px 12px; }
+.stop { display: flex; align-items: center; gap: 7px; }
+.flag { font-size: 16px; line-height: 1; }
+.stop h3 { font-size: 18px; font-weight: 800; letter-spacing: -.3px; flex: 1; }
+.live { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--label2); }
+.live i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.live.off { color: var(--red); } .live.off i { background: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent); }
+.meta { font-size: 10.5px; letter-spacing: .5px; color: var(--label2); margin-top: 3px; }
+.sbody { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 8px; }
+.sbig b { display: block; font-size: 38px; font-weight: 800; letter-spacing: -1.4px; line-height: 1; font-variant-numeric: tabular-nums; }
+.sbig b small { font-size: 17px; font-weight: 700; letter-spacing: 0; margin-left: 1px; }
+.sbig b.dim { color: var(--label3); }
+.sbig span { display: block; font-size: 9.5px; letter-spacing: .5px; color: var(--label2); margin-top: 5px; }
+.mtr { display: grid; grid-template-columns: 30px 1fr 50px; align-items: center; gap: 10px; margin-top: 9px; font-size: 12.5px; color: var(--label2); }
+.mtr b { text-align: right; color: var(--label); font-size: 12.5px; font-weight: 700; }
+.tk { display: flex; gap: 2.5px; height: 12px; }
+.tk i { flex: 1; border-radius: 1.5px; background: var(--fill); }
+.tk i.on { background: var(--label); } .tk i.on.warn { background: var(--orange); } .tk i.on.crit { background: var(--red); }
+.sfoot { display: flex; gap: 16px; margin-top: 11px; padding-top: 9px; border-top: .5px solid var(--sep); font-size: 11px; letter-spacing: .3px; color: var(--label2); }
+.sfoot span:last-child { margin-left: auto; }
+.offc .sp .ln { stroke: var(--label2); } .offc .sp .ar { opacity: .05; }
+.stalec { border: 1.2px dashed var(--label3); background: transparent; color: var(--label2); }
+.stalec h3, .stalec .sbig b, .stalec .mtr b { color: var(--label2); }
+.stalec .sp .ln { stroke: var(--label3); } .stalec .tk i.on { background: var(--label3); }
+.gt { display: flex; justify-content: space-between; margin: 20px 32px 0; font-size: 10.5px; letter-spacing: .5px; color: var(--label2); }
+.gt .stale { display: inline-flex; align-items: center; gap: 4px; }
+
+/* 详情 */
+.dhead { padding: 0 20px; }
+.dt { display: flex; align-items: center; gap: 9px; }
+.dt .flag { font-size: 26px; }
+.dt h2 { font-size: 34px; font-weight: 800; letter-spacing: -.8px; flex: 1; }
+.chart { margin: 14px 16px 0; background: var(--card); border-radius: 20px; padding: 16px 16px 12px; }
+.ctop { display: flex; justify-content: space-between; align-items: flex-start; }
+.ctop .sbig b { font-size: 48px; letter-spacing: -2px; }
+.seg { display: flex; background: var(--fill); border-radius: 9px; padding: 2px; font-family: "SF Mono", ui-monospace, monospace; font-size: 11px; font-weight: 600; }
+.seg span { padding: 5px 9px; border-radius: 7px; color: var(--label2); }
+.seg span.on { background: var(--label); color: var(--bg); }
+.cplot { position: relative; margin-top: 12px; }
+.cplot .grid span { position: absolute; left: 0; right: 0; border-top: 1px dotted var(--sep); }
+.cy { position: absolute; right: 0; top: -6px; bottom: -4px; display: flex; flex-direction: column; justify-content: space-between; font-size: 9px; color: var(--label3); text-align: right; }
+.cx { display: flex; justify-content: space-between; margin-top: 6px; font-size: 9.5px; color: var(--label2); }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 16px 0; }
+.tile { background: var(--card); border-radius: 18px; padding: 12px 14px; height: 112px; display: flex; flex-direction: column; gap: 5px; }
+.tl { font-size: 12px; color: var(--label2); }
+.tile b { font-size: 26px; font-weight: 800; letter-spacing: -.8px; line-height: 1; font-variant-numeric: tabular-nums; }
+.tile b small { font-size: 13px; font-weight: 700; letter-spacing: 0; margin-left: 1px; }
+.tile .tk { height: 10px; margin-top: auto; }
+.ts { font-size: 9.5px; color: var(--label2); letter-spacing: .3px; }
+.tsp { margin-top: auto; }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); margin: 10px 16px 0; background: var(--card); border-radius: 18px; padding: 12px 0; }
+.facts div { text-align: center; position: relative; }
+.facts div + div::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: .5px; background: var(--sep); }
+.facts span { display: block; font-size: 9.5px; letter-spacing: .5px; color: var(--label2); }
+.facts b { display: block; font-size: 15px; font-weight: 700; margin-top: 3px; }
+
+/* 添加 */
+.plead { margin: 0 20px; font-size: 14px; line-height: 1.55; color: var(--label2); }
+.plead.small { font-size: 12.5px; margin-top: 10px; }
+.inp { margin: 12px 16px 0; background: var(--card); border-radius: 16px; padding: 10px 16px 12px; }
+.inp + .inp { margin-top: 8px; }
+.inp span { display: block; font-size: 10px; letter-spacing: .6px; color: var(--label2); }
+.inp b { display: block; font-size: 18px; font-weight: 600; margin-top: 3px; }
+.okline { display: flex; align-items: center; gap: 7px; margin: 12px 20px 0; font-size: 10.5px; letter-spacing: .4px; color: var(--label); }
+.okline i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.picks { margin: 8px 16px 0; background: var(--card); border-radius: 18px; overflow: hidden; }
+.pick { display: flex; align-items: center; gap: 12px; height: 60px; padding: 0 16px; position: relative; }
+.pick + .pick::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: .5px; background: var(--sep); }
+.chk { width: 22px; height: 22px; border-radius: 50%; background: var(--label); color: var(--bg); display: flex; align-items: center; justify-content: center; flex: none; }
+.pn { font-family: "SF Mono", ui-monospace, monospace; font-size: 20px; font-weight: 700; color: var(--label3); }
+.pick .t { flex: 1; font-size: 16px; font-weight: 700; }
+.pick .t small { display: block; font-size: 9.5px; letter-spacing: .5px; font-weight: 400; color: var(--label2); margin-top: 2px; }
+.psp .ln { stroke-width: 1.3; }
+
+/* 小组件 */
+.walls { display: flex; gap: 32px; }
+.wall { border-radius: 36px; padding: 28px 28px 40px; display: grid; grid-template-columns: 170px 170px; grid-auto-rows: 170px; gap: 30px 24px; background: linear-gradient(160deg, #c3c7cf, #e6e7eb); }
+.wall.dark { background: linear-gradient(160deg, #2a2b30, #0b0b0d); }
+.wcell { position: relative; }
+.wcell.wide { grid-column: span 2; }
+.wlab { position: absolute; left: 0; right: 0; bottom: -21px; text-align: center; font-size: 11.5px; color: rgba(0,0,0,.55); }
+.wall.dark .wlab { color: rgba(255,255,255,.55); }
+.w { position: relative; width: 100%; height: 100%; border-radius: 22px; background: var(--card); color: var(--label); overflow: hidden; font-variant-numeric: tabular-nums; }
+.w.inv { background: var(--label); color: var(--bg); }
+.w.inv .sp .ln { stroke: var(--bg); } .w.inv .sp .ar { fill: var(--bg); opacity: .16; }
+.w.inv .wmeta, .w.inv .wbig span { color: color-mix(in srgb, var(--bg) 60%, transparent); }
+.ws { padding: 14px 15px 0; }
+.wtop { display: flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 800; letter-spacing: -.2px; }
+.wtop .flag { font-size: 12px; }
+.wtop .n { flex: 1; }
+.wdot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex: none; }
+.wdot.off { background: var(--red); } .wdot.none { background: var(--label3); }
+.wclock { color: var(--label2); }
+.wbig { margin-top: 8px; }
+.wbig b { display: block; font-size: 38px; font-weight: 800; letter-spacing: -1.6px; line-height: 1; }
+.wbig b small { font-size: 16px; letter-spacing: 0; }
+.wbig b.red { color: var(--red); font-size: 32px; letter-spacing: -.5px; }
+.wbig span { display: block; font-size: 9px; letter-spacing: .6px; color: var(--label2); margin-top: 4px; }
+.wmeta { display: flex; gap: 8px; margin-top: 6px; font-size: 9.5px; letter-spacing: .3px; color: var(--label2); }
+.wmeta span:last-child { margin-left: auto; }
+.wsp { position: absolute; left: 0; bottom: 0; }
+.stalew .wtop .n, .stalew .wbig b { color: var(--label2); }
+.stalew .sp .ln { stroke: var(--label3); } .stalew .sp .ar { opacity: .04; }
+.woff .sp .ln { stroke: var(--label2); }
+.wm { padding: 12px 14px 12px; }
+.wh { display: flex; justify-content: space-between; font-size: 9.5px; letter-spacing: .5px; color: var(--label2); }
+.wh b { color: var(--label); } .wh em { font-style: normal; color: var(--red); font-weight: 700; }
+.cols { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 10px; }
+.wc { padding: 0 10px; position: relative; }
+.wc:first-child { padding-left: 0; } .wc:last-child { padding-right: 0; }
+.wc + .wc::before { content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: .5px; background: var(--sep); }
+.cn { display: flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; white-space: nowrap; overflow: hidden; }
+.cbig { font-size: 30px; font-weight: 800; letter-spacing: -1.2px; line-height: 1; margin-top: 10px; }
+.cbig small { font-size: 13px; letter-spacing: 0; }
+.cbig.red { color: var(--red); font-size: 24px; letter-spacing: -.3px; padding-top: 4px; }
+.cbig.crit { color: var(--red); }
+.cbig.dim { color: var(--label3); }
+.csp { margin-top: 8px; width: 100%; }
+.cm { font-size: 8.5px; letter-spacing: .3px; color: var(--label2); margin-top: 6px; white-space: nowrap; }
+
+/* 第三版：指标色 */
+.sp.cpu .ln { stroke: var(--blue); } .sp.cpu .ar { fill: var(--blue); opacity: .14; }
+.sp.net .ln { stroke: var(--pink); }
+.tk.mem i.on { background: var(--indigo); } .tk.dsk i.on { background: var(--teal); }
+.tk i.on.warn { background: var(--orange) !important; } .tk i.on.crit { background: var(--red) !important; }
+.lg { display: inline-block; width: 6px; height: 6px; border-radius: 2px; margin-right: 5px; vertical-align: 1px; }
+.lg.mem { background: var(--indigo); } .lg.dsk { background: var(--teal); } .lg.net { background: var(--pink); }
+.mtr { grid-template-columns: 40px 1fr 50px; }
+.sp.cpu.crit .ln { stroke: var(--red); } .sp.cpu.crit .ar { fill: var(--red); }
+.offc .sp .ln, .woff .sp .ln { stroke: var(--label2) !important; } .offc .sp .ar, .woff .sp .ar { fill: var(--label); opacity: .05; }
+.stalec .sp .ln, .stalew .sp .ln { stroke: var(--label3) !important; } .stalec .sp .ar, .stalew .sp .ar { fill: var(--label); opacity: .04; }
+.stalec .tk i.on { background: var(--label3) !important; } .stalec .lg { opacity: .4; }
+.w.inv .sp.cpu .ln { stroke: var(--blue); } .w.inv .sp.cpu .ar { fill: var(--blue); opacity: .3; }
+
+.phone{--fg:var(--label);--fg2:var(--label2);--fg3:var(--label3)}
+.strip{position:relative;height:150px;margin:2px 0 6px;}
+.pc{position:absolute;top:8px;width:318px;height:132px;border-radius:24px;padding:14px 16px 0;background:var(--card);color:var(--label);--fg:var(--label);--fg2:var(--label2);--fg3:var(--label3);}
+.pc.sel{left:36px;background:var(--label);color:var(--bg);--fg:var(--bg);--fg2:color-mix(in srgb,var(--bg) 55%,transparent);--fg3:color-mix(in srgb,var(--bg) 22%,transparent);box-shadow:0 10px 24px rgba(0,0,0,.18);}
+.pc.side{transform:scale(.86);opacity:.6;}
+.pc.side.l{left:-276px;transform-origin:right center}
+.pc.side.r{left:366px;transform-origin:left center}
+.strip.single .pc.sel{left:16px;width:358px}
+.strip.swipe .pc.a{left:-70px;transform:scale(.93);transform-origin:right center;background:color-mix(in srgb,var(--label) 55%,var(--card));color:var(--bg);--fg:var(--bg);--fg2:color-mix(in srgb,var(--bg) 55%,transparent);}
+.strip.swipe .pc.b{left:262px;transform:scale(.95);transform-origin:left center;}
+.r1{display:flex;align-items:center;gap:8px;font-size:17px}
+.r1 b{font-weight:700;letter-spacing:-.3px;white-space:nowrap}
+.sp1{flex:1}
+.iss{font-size:10.5px;font-weight:700;color:var(--red);background:color-mix(in srgb,var(--red) 18%,transparent);padding:2px 6px;border-radius:6px;font-family:"SF Mono",monospace}
+.live{font-size:11.5px;color:var(--fg2);display:flex;align-items:center;gap:5px}
+.live em{width:6px;height:6px;border-radius:3px;background:var(--green)}
+.r2{font-size:10px;letter-spacing:.3px;color:var(--fg2);margin-top:2px}
+.r3{display:flex;align-items:flex-end;margin-top:8px;gap:10px}
+.big{flex:1;display:flex;align-items:baseline;gap:2px}
+.big .n{font-size:40px;font-weight:800;letter-spacing:-1.5px;line-height:1;font-variant-numeric:tabular-nums}
+.big .t{font-size:17px;font-weight:700;color:var(--fg2)}
+.big .c{font-size:12px;font-weight:600;color:var(--fg2);margin-left:6px}
+.net{font-size:12.5px;font-weight:600;line-height:1.35;text-align:right}
+.net .ar{color:var(--pink);font-weight:700;margin-right:3px}
+.net small{font-size:9.5px;color:var(--fg2)}
+.pc .sp{margin-bottom:3px}
+.fleet{display:flex;margin-top:12px;height:6px}
+.fleet i{flex:1;border-radius:2px}
+.chips{display:flex;gap:6px;padding:4px 16px 10px}
+.chip{background:var(--card);border-radius:16px;padding:6px 12px;font-size:13px;font-weight:600}
+.chip i{font-style:normal;color:var(--label2);font-size:11px;font-family:"SF Mono",monospace}
+.chip.on{background:var(--label);color:var(--bg)}.chip.on i{color:color-mix(in srgb,var(--bg) 65%,transparent)}
+.list{background:var(--card);}
+.row1{display:flex;align-items:center;gap:9px;padding:9px 16px;border-bottom:.5px solid var(--sep)}
+.dot{width:7px;height:7px;border-radius:4px;flex:none}
+.nm{flex:1;display:flex;flex-direction:column;min-width:0}.nm b{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden}
+.nm span{font-size:10px;color:var(--label2)}.nm span.red{color:var(--red)}
+.col{width:40px;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.mv{font-size:13px;font-weight:700}.mv.dim{color:var(--label2)}
+.mm{display:flex;gap:1.5px;width:40px;height:3px}.mm i{flex:1;border-radius:1px}
+.nt{width:50px;display:flex;flex-direction:column;align-items:flex-end;font-size:10.5px;font-weight:600}
+.sbar{position:absolute;left:0;right:0;bottom:22px;padding:0 16px;display:flex;gap:10px;align-items:center;z-index:5}
+.sfield{flex:1;height:48px;border-radius:24px;background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:.5px solid var(--glass-b);box-shadow:0 8px 24px rgba(0,0,0,.12);display:flex;align-items:center;gap:10px;padding:0 18px;color:var(--label2);font-size:16px}
+.sfield svg{color:var(--label)}
+.sfield.act{color:var(--label)}.typed{flex:1}.caret{display:inline-block;width:2px;height:19px;background:var(--blue);vertical-align:-3px;margin-left:1px}
+.clr{width:20px;height:20px;border-radius:10px;background:var(--label3);color:var(--bg);font-size:10px;display:flex;align-items:center;justify-content:center}
+.cancel{font-size:16px;font-weight:600}
+.sbar.on{bottom:300px}
+.kb{position:absolute;left:0;right:0;bottom:0;height:290px;background:#d1d4da;z-index:4;display:flex;align-items:center;justify-content:center;color:#8a8d93;font-size:15px}
+
+body{width:2400px}</style></head><body>
+<h1>探针 · 顶部卡片 v4（放大缩小轮播）+ 自绘底部搜索</h1>
+<p class="sub">一张卡只代表一个探针。选中卡片居中、反色、原尺寸；左右两张露出一截，缩小到 86% 并变淡，提示还能滑。卡片高度从约 270pt 降到 132pt，只保留：名称与状态、类型地址、在线数、实时网速与趋势、机群状态条。CPU/内存均值、累计流量移出顶部。没有分页圆点。</p>
+<div class="row">
+<div class="cell"><div class="phone "><div class="island"></div>
+<div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div>
+<div class="strip"><div class="pc side l">
+  <div class="r1"><b>家里 HK</b><span class="sp1"></span><span class="live"><em></em>刚刚</span></div>
+  <div class="r2 mono">KOMARI · STATUS.EXAMPLE.COM</div>
+  <div class="r3"><div class="big"><span class="n">2</span><span class="t">/2</span><span class="c">在线</span></div>
+    <div class="net mono"><div><span class="ar">↑</span>343K<small>/s</small></div><div><span class="ar">↓</span>346K<small>/s</small></div></div>
+    <svg class="sp" width="70" height="18" viewBox="0 0 70 18"><polyline points="0.0,10.9 3.0,12.8 6.1,7.4 9.1,13.6 12.2,8.6 15.2,10.5 18.3,13.8 21.3,8.9 24.3,14.0 27.4,9.7 30.4,13.6 33.5,13.4 36.5,9.8 39.6,5.5 42.6,13.1 45.7,12.0 48.7,7.6 51.7,4.2 54.8,8.2 57.8,10.1 60.9,3.9 63.9,13.9 67.0,5.1 70.0,11.3" fill="none" stroke="var(--pink)" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+  <div class="fleet" style="gap:2px"><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i></div>
+</div><div class="pc sel">
+  <div class="r1"><b>极简</b><span class="iss">离线 1</span><span class="sp1"></span><span class="live"><em></em>刚刚</span></div>
+  <div class="r2 mono">极简探针 · PROBE.EXAMPLE.NET</div>
+  <div class="r3"><div class="big"><span class="n">9</span><span class="t">/10</span><span class="c">在线</span></div>
+    <div class="net mono"><div><span class="ar">↑</span>10.3K<small>/s</small></div><div><span class="ar">↓</span>36.4K<small>/s</small></div></div>
+    <svg class="sp" width="70" height="18" viewBox="0 0 70 18"><polyline points="0.0,12.8 3.0,13.1 6.1,11.1 9.1,5.6 12.2,12.4 15.2,8.1 18.3,7.5 21.3,10.4 24.3,8.5 27.4,13.7 30.4,13.8 33.5,12.2 36.5,7.1 39.6,9.8 42.6,11.0 45.7,8.1 48.7,9.5 51.7,11.2 54.8,5.8 57.8,6.9 60.9,11.8 63.9,8.2 67.0,8.7 70.0,4.9" fill="none" stroke="var(--pink)" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+  <div class="fleet" style="gap:2px"><i style="background:var(--red)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i></div>
+</div><div class="pc side r">
+  <div class="r1"><b>生产集群</b><span class="iss">离线 1</span><span class="sp1"></span><span class="live"><em></em>12 秒前</span></div>
+  <div class="r2 mono">KOMARI · STATUS.EXAMPLE.COM</div>
+  <div class="r3"><div class="big"><span class="n">27</span><span class="t">/28</span><span class="c">在线</span></div>
+    <div class="net mono"><div><span class="ar">↑</span>18.2M<small>/s</small></div><div><span class="ar">↓</span>9.41M<small>/s</small></div></div>
+    <svg class="sp" width="70" height="18" viewBox="0 0 70 18"><polyline points="0.0,6.5 3.0,11.3 6.1,3.8 9.1,13.1 12.2,9.9 15.2,6.2 18.3,12.8 21.3,9.1 24.3,14.0 27.4,7.2 30.4,6.1 33.5,8.2 36.5,4.9 39.6,11.0 42.6,6.9 45.7,8.0 48.7,8.1 51.7,9.5 54.8,5.3 57.8,4.2 60.9,9.3 63.9,7.2 67.0,13.7 70.0,6.8" fill="none" stroke="var(--pink)" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+  <div class="fleet" style="gap:1px"><i style="background:var(--red)"></i><i style="background:var(--orange)"></i><i style="background:var(--orange)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i></div>
+</div></div>
+<div class="chips"><span class="chip on">全部 <i class="mono">10</i></span><span class="chip">离线 <i class="mono">1</i></span><span class="chip">告警 <i class="mono">0</i></span></div>
+<div class="list"><div class="row1"><span class="dot" style="background:var(--red)"></span>
+<div class="nm"><b>🇭🇰 HK-02</b><span class="mono red">最后上报 · 3 小时前</span></div>
+<div class="col"><span class="mv mono dim">—</span><span class="mm"></span></div><div class="col"><span class="mv mono dim">—</span><span class="mm"></span></div><div class="col"><span class="mv mono dim">—</span><span class="mm"></span></div>
+<div class="nt mono"><span>↑—</span><span>↓—</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇺🇸 US-02</b><span class="mono ">4D 16H</span></div>
+<div class="col"><span class="mv mono">1%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">28%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">12%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑523B</span><span>↓151B</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇯🇵 JP-03</b><span class="mono ">4D 16H</span></div>
+<div class="col"><span class="mv mono">0%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">23%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">10%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑547B</span><span>↓86B</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇩🇪 DE-01</b><span class="mono ">4D 16H</span></div>
+<div class="col"><span class="mv mono">0%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">4%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">20%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑4.59K</span><span>↓31.7K</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇺🇸 US-03</b><span class="mono ">2D 3H</span></div>
+<div class="col"><span class="mv mono">4%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">26%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">5%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑632B</span><span>↓1.2K</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇸🇬 SG-02</b><span class="mono ">9D 1H</span></div>
+<div class="col"><span class="mv mono">2%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">61%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">33%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--teal)"></i><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑12K</span><span>↓40K</span></div></div></div>
+<div class="sbar"><div class="sfield"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M11 11l3.6 3.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>搜索名称、地区、分组</span></div></div>
+<div class="home"></div></div><p class="cap"><b>① 默认（3 个探针）</b>中间是当前探针，两侧露出邻居卡（缩小、半透明）。点邻居卡或左右滑都能切换，落定后下面列表才换。有离线时名字旁边是红色「离线 1」标签。</p></div>
+<div class="cell"><div class="phone "><div class="island"></div>
+<div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div>
+<div class="strip swipe"><div class="pc mid a">
+  <div class="r1"><b>极简</b><span class="iss">离线 1</span><span class="sp1"></span><span class="live"><em></em>刚刚</span></div>
+  <div class="r2 mono">极简探针 · PROBE.EXAMPLE.NET</div>
+  <div class="r3"><div class="big"><span class="n">9</span><span class="t">/10</span><span class="c">在线</span></div>
+    <div class="net mono"><div><span class="ar">↑</span>10.3K<small>/s</small></div><div><span class="ar">↓</span>36.4K<small>/s</small></div></div>
+    <svg class="sp" width="70" height="18" viewBox="0 0 70 18"><polyline points="0.0,7.4 3.0,3.7 6.1,5.5 9.1,11.3 12.2,10.2 15.2,7.2 18.3,14.2 21.3,9.4 24.3,12.6 27.4,13.1 30.4,13.8 33.5,6.1 36.5,13.0 39.6,11.7 42.6,10.2 45.7,5.0 48.7,13.5 51.7,9.5 54.8,8.5 57.8,4.9 60.9,5.6 63.9,5.1 67.0,11.4 70.0,9.9" fill="none" stroke="var(--pink)" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+  <div class="fleet" style="gap:2px"><i style="background:var(--red)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i></div>
+</div><div class="pc mid b">
+  <div class="r1"><b>生产集群</b><span class="iss">离线 1</span><span class="sp1"></span><span class="live"><em></em>12 秒前</span></div>
+  <div class="r2 mono">KOMARI · STATUS.EXAMPLE.COM</div>
+  <div class="r3"><div class="big"><span class="n">27</span><span class="t">/28</span><span class="c">在线</span></div>
+    <div class="net mono"><div><span class="ar">↑</span>18.2M<small>/s</small></div><div><span class="ar">↓</span>9.41M<small>/s</small></div></div>
+    <svg class="sp" width="70" height="18" viewBox="0 0 70 18"><polyline points="0.0,10.5 3.0,4.9 6.1,4.1 9.1,12.8 12.2,12.5 15.2,11.9 18.3,11.9 21.3,9.2 24.3,8.0 27.4,11.6 30.4,14.4 33.5,9.9 36.5,10.4 39.6,8.3 42.6,4.1 45.7,6.9 48.7,8.8 51.7,7.7 54.8,7.1 57.8,13.8 60.9,4.7 63.9,6.0 67.0,5.0 70.0,5.8" fill="none" stroke="var(--pink)" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+  <div class="fleet" style="gap:1px"><i style="background:var(--red)"></i><i style="background:var(--orange)"></i><i style="background:var(--orange)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i></div>
+</div></div>
+<div class="chips"><span class="chip on">全部 <i class="mono">10</i></span><span class="chip">离线 <i class="mono">1</i></span><span class="chip">告警 <i class="mono">0</i></span></div>
+<div class="list"><div class="row1"><span class="dot" style="background:var(--red)"></span>
+<div class="nm"><b>🇭🇰 HK-02</b><span class="mono red">最后上报 · 3 小时前</span></div>
+<div class="col"><span class="mv mono dim">—</span><span class="mm"></span></div><div class="col"><span class="mv mono dim">—</span><span class="mm"></span></div><div class="col"><span class="mv mono dim">—</span><span class="mm"></span></div>
+<div class="nt mono"><span>↑—</span><span>↓—</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇺🇸 US-02</b><span class="mono ">4D 16H</span></div>
+<div class="col"><span class="mv mono">1%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">28%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">12%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑523B</span><span>↓151B</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇯🇵 JP-03</b><span class="mono ">4D 16H</span></div>
+<div class="col"><span class="mv mono">0%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">23%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">10%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑547B</span><span>↓86B</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇩🇪 DE-01</b><span class="mono ">4D 16H</span></div>
+<div class="col"><span class="mv mono">0%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">4%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">20%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑4.59K</span><span>↓31.7K</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇺🇸 US-03</b><span class="mono ">2D 3H</span></div>
+<div class="col"><span class="mv mono">4%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">26%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">5%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑632B</span><span>↓1.2K</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇸🇬 SG-02</b><span class="mono ">9D 1H</span></div>
+<div class="col"><span class="mv mono">2%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">61%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">33%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--teal)"></i><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑12K</span><span>↓40K</span></div></div></div>
+<div class="sbar"><div class="sfield"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M11 11l3.6 3.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>搜索名称、地区、分组</span></div></div>
+<div class="home"></div></div><p class="cap"><b>② 滑动中</b>两张卡随手指位置连续缩放：离中心越近越大越深，越远越小越淡，反色在两张之间渐变过渡。松手吸附到最近一张（UICollectionView 组合布局 groupPagingCentered + 可见项回调做缩放）。</p></div>
+<div class="cell"><div class="phone dark"><div class="island"></div>
+<div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div>
+<div class="strip"><div class="pc side l">
+  <div class="r1"><b>家里 HK</b><span class="sp1"></span><span class="live"><em></em>刚刚</span></div>
+  <div class="r2 mono">KOMARI · STATUS.EXAMPLE.COM</div>
+  <div class="r3"><div class="big"><span class="n">2</span><span class="t">/2</span><span class="c">在线</span></div>
+    <div class="net mono"><div><span class="ar">↑</span>343K<small>/s</small></div><div><span class="ar">↓</span>346K<small>/s</small></div></div>
+    <svg class="sp" width="70" height="18" viewBox="0 0 70 18"><polyline points="0.0,10.2 3.0,10.1 6.1,13.3 9.1,7.5 12.2,13.7 15.2,13.7 18.3,12.1 21.3,12.6 24.3,10.7 27.4,13.8 30.4,14.4 33.5,12.8 36.5,13.3 39.6,10.5 42.6,14.1 45.7,5.0 48.7,7.8 51.7,12.8 54.8,11.7 57.8,10.6 60.9,10.5 63.9,13.1 67.0,5.2 70.0,3.7" fill="none" stroke="var(--pink)" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+  <div class="fleet" style="gap:2px"><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i></div>
+</div><div class="pc sel">
+  <div class="r1"><b>极简</b><span class="iss">离线 1</span><span class="sp1"></span><span class="live"><em></em>刚刚</span></div>
+  <div class="r2 mono">极简探针 · PROBE.EXAMPLE.NET</div>
+  <div class="r3"><div class="big"><span class="n">9</span><span class="t">/10</span><span class="c">在线</span></div>
+    <div class="net mono"><div><span class="ar">↑</span>10.3K<small>/s</small></div><div><span class="ar">↓</span>36.4K<small>/s</small></div></div>
+    <svg class="sp" width="70" height="18" viewBox="0 0 70 18"><polyline points="0.0,9.4 3.0,9.2 6.1,13.5 9.1,13.3 12.2,10.7 15.2,11.5 18.3,5.4 21.3,12.7 24.3,14.2 27.4,4.1 30.4,8.7 33.5,12.8 36.5,8.5 39.6,14.1 42.6,8.7 45.7,3.8 48.7,5.1 51.7,6.9 54.8,11.6 57.8,10.4 60.9,12.6 63.9,6.1 67.0,8.6 70.0,6.0" fill="none" stroke="var(--pink)" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+  <div class="fleet" style="gap:2px"><i style="background:var(--red)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i></div>
+</div><div class="pc side r">
+  <div class="r1"><b>生产集群</b><span class="iss">离线 1</span><span class="sp1"></span><span class="live"><em></em>12 秒前</span></div>
+  <div class="r2 mono">KOMARI · STATUS.EXAMPLE.COM</div>
+  <div class="r3"><div class="big"><span class="n">27</span><span class="t">/28</span><span class="c">在线</span></div>
+    <div class="net mono"><div><span class="ar">↑</span>18.2M<small>/s</small></div><div><span class="ar">↓</span>9.41M<small>/s</small></div></div>
+    <svg class="sp" width="70" height="18" viewBox="0 0 70 18"><polyline points="0.0,10.8 3.0,12.0 6.1,5.6 9.1,3.8 12.2,5.2 15.2,5.7 18.3,5.6 21.3,6.4 24.3,12.0 27.4,8.8 30.4,10.6 33.5,14.1 36.5,14.1 39.6,11.4 42.6,11.6 45.7,6.9 48.7,4.1 51.7,9.6 54.8,4.3 57.8,3.7 60.9,4.1 63.9,10.5 67.0,12.0 70.0,12.0" fill="none" stroke="var(--pink)" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+  <div class="fleet" style="gap:1px"><i style="background:var(--red)"></i><i style="background:var(--orange)"></i><i style="background:var(--orange)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i></div>
+</div></div>
+<div class="chips"><span class="chip on">全部 <i class="mono">10</i></span><span class="chip">离线 <i class="mono">1</i></span><span class="chip">告警 <i class="mono">0</i></span></div>
+<div class="list"><div class="row1"><span class="dot" style="background:var(--red)"></span>
+<div class="nm"><b>🇭🇰 HK-02</b><span class="mono red">最后上报 · 3 小时前</span></div>
+<div class="col"><span class="mv mono dim">—</span><span class="mm"></span></div><div class="col"><span class="mv mono dim">—</span><span class="mm"></span></div><div class="col"><span class="mv mono dim">—</span><span class="mm"></span></div>
+<div class="nt mono"><span>↑—</span><span>↓—</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇺🇸 US-02</b><span class="mono ">4D 16H</span></div>
+<div class="col"><span class="mv mono">1%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">28%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">12%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑523B</span><span>↓151B</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇯🇵 JP-03</b><span class="mono ">4D 16H</span></div>
+<div class="col"><span class="mv mono">0%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">23%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">10%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑547B</span><span>↓86B</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇩🇪 DE-01</b><span class="mono ">4D 16H</span></div>
+<div class="col"><span class="mv mono">0%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">4%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">20%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑4.59K</span><span>↓31.7K</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇺🇸 US-03</b><span class="mono ">2D 3H</span></div>
+<div class="col"><span class="mv mono">4%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">26%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">5%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑632B</span><span>↓1.2K</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇸🇬 SG-02</b><span class="mono ">9D 1H</span></div>
+<div class="col"><span class="mv mono">2%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">61%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">33%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--teal)"></i><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑12K</span><span>↓40K</span></div></div></div>
+<div class="sbar"><div class="sfield"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M11 11l3.6 3.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>搜索名称、地区、分组</span></div></div>
+<div class="home"></div></div><p class="cap"><b>③ 深色</b>选中卡反色为白底黑字，邻居卡用深灰卡片色。机群状态条：一台一格，离线红、告警橙排在最前。</p></div>
+<div class="cell"><div class="phone "><div class="island"></div>
+<div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div>
+<div class="strip single"><div class="pc sel">
+  <div class="r1"><b>极简</b><span class="iss">离线 1</span><span class="sp1"></span><span class="live"><em></em>刚刚</span></div>
+  <div class="r2 mono">极简探针 · PROBE.EXAMPLE.NET</div>
+  <div class="r3"><div class="big"><span class="n">9</span><span class="t">/10</span><span class="c">在线</span></div>
+    <div class="net mono"><div><span class="ar">↑</span>10.3K<small>/s</small></div><div><span class="ar">↓</span>36.4K<small>/s</small></div></div>
+    <svg class="sp" width="70" height="18" viewBox="0 0 70 18"><polyline points="0.0,12.3 3.0,12.2 6.1,7.7 9.1,4.7 12.2,5.3 15.2,9.2 18.3,7.3 21.3,5.8 24.3,13.5 27.4,7.3 30.4,4.6 33.5,6.0 36.5,6.3 39.6,9.2 42.6,12.5 45.7,5.9 48.7,10.8 51.7,5.8 54.8,3.9 57.8,10.1 60.9,10.1 63.9,4.2 67.0,6.6 70.0,12.6" fill="none" stroke="var(--pink)" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+  <div class="fleet" style="gap:2px"><i style="background:var(--red)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i></div>
+</div></div>
+<div class="chips"><span class="chip on">全部 <i class="mono">10</i></span><span class="chip">离线 <i class="mono">1</i></span><span class="chip">告警 <i class="mono">0</i></span></div>
+<div class="list"><div class="row1"><span class="dot" style="background:var(--red)"></span>
+<div class="nm"><b>🇭🇰 HK-02</b><span class="mono red">最后上报 · 3 小时前</span></div>
+<div class="col"><span class="mv mono dim">—</span><span class="mm"></span></div><div class="col"><span class="mv mono dim">—</span><span class="mm"></span></div><div class="col"><span class="mv mono dim">—</span><span class="mm"></span></div>
+<div class="nt mono"><span>↑—</span><span>↓—</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇺🇸 US-02</b><span class="mono ">4D 16H</span></div>
+<div class="col"><span class="mv mono">1%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">28%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">12%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑523B</span><span>↓151B</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇯🇵 JP-03</b><span class="mono ">4D 16H</span></div>
+<div class="col"><span class="mv mono">0%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">23%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">10%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑547B</span><span>↓86B</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇩🇪 DE-01</b><span class="mono ">4D 16H</span></div>
+<div class="col"><span class="mv mono">0%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">4%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">20%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑4.59K</span><span>↓31.7K</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇺🇸 US-03</b><span class="mono ">2D 3H</span></div>
+<div class="col"><span class="mv mono">4%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">26%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">5%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑632B</span><span>↓1.2K</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇸🇬 SG-02</b><span class="mono ">9D 1H</span></div>
+<div class="col"><span class="mv mono">2%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">61%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">33%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--teal)"></i><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑12K</span><span>↓40K</span></div></div></div>
+<div class="sbar"><div class="sfield"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M11 11l3.6 3.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>搜索名称、地区、分组</span></div></div>
+<div class="home"></div></div><p class="cap"><b>④ 只有一个探针</b>卡片占满整行，不能滑，也没有邻居露出。</p></div>
+<div class="cell"><div class="phone "><div class="island"></div>
+<div class="status"><span>9:41</span><span class="bat"></span></div>
+<div class="nav"><div class="gbtn">‹</div><div style="display:flex;gap:8px"><div class="gbtn">≡</div><div class="gbtn">＋</div></div></div>
+<div class="ptitle">探针</div>
+<div class="strip single"><div class="pc sel">
+  <div class="r1"><b>极简</b><span class="iss">离线 1</span><span class="sp1"></span><span class="live"><em></em>刚刚</span></div>
+  <div class="r2 mono">极简探针 · PROBE.EXAMPLE.NET</div>
+  <div class="r3"><div class="big"><span class="n">9</span><span class="t">/10</span><span class="c">在线</span></div>
+    <div class="net mono"><div><span class="ar">↑</span>10.3K<small>/s</small></div><div><span class="ar">↓</span>36.4K<small>/s</small></div></div>
+    <svg class="sp" width="70" height="18" viewBox="0 0 70 18"><polyline points="0.0,13.0 3.0,12.8 6.1,4.6 9.1,5.7 12.2,12.8 15.2,5.5 18.3,3.8 21.3,7.3 24.3,10.6 27.4,8.5 30.4,13.0 33.5,14.2 36.5,3.9 39.6,7.4 42.6,8.7 45.7,4.3 48.7,9.7 51.7,5.0 54.8,5.5 57.8,12.1 60.9,11.7 63.9,11.2 67.0,11.8 70.0,8.1" fill="none" stroke="var(--pink)" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+  <div class="fleet" style="gap:2px"><i style="background:var(--red)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i><i style="background:var(--fg)"></i></div>
+</div></div>
+<div class="chips"><span class="chip on">全部 <i class="mono">10</i></span><span class="chip">离线 <i class="mono">1</i></span><span class="chip">告警 <i class="mono">0</i></span></div>
+<div class="list"><div class="row1"><span class="dot" style="background:var(--red)"></span>
+<div class="nm"><b>🇭🇰 HK-02</b><span class="mono red">最后上报 · 3 小时前</span></div>
+<div class="col"><span class="mv mono dim">—</span><span class="mm"></span></div><div class="col"><span class="mv mono dim">—</span><span class="mm"></span></div><div class="col"><span class="mv mono dim">—</span><span class="mm"></span></div>
+<div class="nt mono"><span>↑—</span><span>↓—</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇺🇸 US-02</b><span class="mono ">4D 16H</span></div>
+<div class="col"><span class="mv mono">1%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">28%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">12%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑523B</span><span>↓151B</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇯🇵 JP-03</b><span class="mono ">4D 16H</span></div>
+<div class="col"><span class="mv mono">0%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">23%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">10%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑547B</span><span>↓86B</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇩🇪 DE-01</b><span class="mono ">4D 16H</span></div>
+<div class="col"><span class="mv mono">0%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">4%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">20%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑4.59K</span><span>↓31.7K</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇺🇸 US-03</b><span class="mono ">2D 3H</span></div>
+<div class="col"><span class="mv mono">4%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">26%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">5%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑632B</span><span>↓1.2K</span></div></div><div class="row1"><span class="dot" style="background:var(--green)"></span>
+<div class="nm"><b>🇸🇬 SG-02</b><span class="mono ">9D 1H</span></div>
+<div class="col"><span class="mv mono">2%</span><span class="mm"><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">61%</span><span class="mm"><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--indigo)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div><div class="col"><span class="mv mono">33%</span><span class="mm"><i style="background:var(--teal)"></i><i style="background:var(--teal)"></i><i style="background:var(--teal)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i><i style="background:var(--fill)"></i></span></div>
+<div class="nt mono"><span>↑12K</span><span>↓40K</span></div></div></div>
+<div class="sbar on"><div class="sfield act"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M11 11l3.6 3.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span class="typed">HK<span class="caret"></span></span><span class="clr">✕</span></div><div class="cancel">取消</div></div><div class="kb">系统键盘</div>
+<div class="home"></div></div><p class="cap"><b>⑤ 自绘底部搜索</b>不用系统搜索。底部一条悬浮毛玻璃胶囊，随列表滚动不动；点击后变成输入框并跟随键盘上移，右侧出现「取消」，输入即时过滤（只在当前探针内搜）。不占用导航栈底部安全区，返回时底栏不会再被顶起。</p></div>
+</div></body></html>

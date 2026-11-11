@@ -1,0 +1,61 @@
+{
+  "id": "monitor",
+  "name": "极简探针",
+  "specVersion": 1,
+  "summary": "读取极简探针的公开状态页，不需要账号。公开页关闭后无法连接。",
+  "auth": { "type": "none" },
+  "requests": {
+    "nodes": { "method": "GET", "path": "/api/nodes" },
+    "history": {
+      "method": "GET",
+      "path": "/api/nodes/{nodeID}/metrics",
+      "query": { "hours": "{hours}", "series": "metrics" }
+    }
+  },
+  "nodes": {
+    "request": "nodes",
+    "items": "$.nodes[*]",
+    "fields": {
+      "id": "$.id", "name": "$.name", "region": "$.country", "group": "$.group",
+      "os": "$.os", "cpuCores": "$.cpu_cores", "memTotal": "$.mem_total",
+      "diskTotal": "$.disk_total", "weight": "$.sort",
+      "virtualization": "$.virt", "arch": "$.arch", "remark": "$.public_remark",
+      "expiresAt": "$.expires_at",
+      "price": "$.price", "currency": "$.currency", "billingCycle": "$.billing_cycle",
+      "trafficLimit": "$.traffic_limit", "trafficMode": "$.traffic_mode", "trafficResetDay": "$.traffic_reset_day"
+    }
+  },
+  "status": {
+    "request": "nodes",
+    "items": "$.nodes[*]",
+    "online": { "type": "bool", "path": "$.online" },
+    "fields": {
+      "id": "$.id",
+      "sampledAt": { "path": "$.last_seen", "format": "unixSeconds" },
+      "cpu": "$.metrics.cpu",
+      "memUsed": "$.metrics.mem_used", "memTotal": "$.metrics.mem_total",
+      "diskUsed": "$.metrics.disk_used", "diskTotal": "$.metrics.disk_total",
+      "swapUsed": "$.metrics.swap_used", "swapTotal": "$.metrics.swap_total",
+      "netIn": "$.metrics.net_rx", "netOut": "$.metrics.net_tx",
+      "netTotalIn": "$.metrics.total_rx", "netTotalOut": "$.metrics.total_tx",
+      "load1": "$.metrics.load[0]", "load5": "$.metrics.load[1]", "load15": "$.metrics.load[2]",
+      "uptime": "$.metrics.uptime", "processCount": "$.metrics.procs",
+      "connectionCount": { "sum": ["$.metrics.tcp", "$.metrics.udp"] },
+      "trafficIn": "$.month_rx", "trafficOut": "$.month_tx"
+    }
+  },
+  "history": {
+    "request": "history",
+    "items": "$.metrics[*]",
+    "fields": {
+      "time": { "path": "$.ts", "format": "unixSeconds" },
+      "cpu": "$.cpu",
+      "memUsed": "$.mem_used",
+      "diskUsed": "$.disk_used",
+      "netIn": "$.net_rx", "netOut": "$.net_tx"
+    }
+  },
+  "errors": [
+    { "status": 401, "bodyContains": "需要登录后查看", "error": "unauthorized" }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+ "version": "2.8.7 Beta6",
+ "is_public": true,
+ "authorization": false,
+ "turnstile_enabled": false,
+ "turnstile_login_enabled": false,
+ "turnstile_site_key": "",
+ "site_title": "Cloudflare Server Monitor",
+ "verified": false,
+ "turnstile_verified": null
+}

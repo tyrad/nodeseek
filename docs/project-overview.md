@@ -84,11 +84,14 @@
 make spm-test
 ```
 
-App-hosted 单测先复用构建产物：
+App-hosted 单测先复用构建产物，多个测试类用空格分隔：
 
 ```bash
 make xcode-test-class TEST=NodeSeekServiceTests
+make xcode-test-class TEST="NodeSeekServiceTests CookieBridgeTests"
 ```
+
+不要手写 `xcodebuild test` / `test-without-building`。make 目标带了 `-collect-test-diagnostics never`；手写命令缺这个参数时，测试跑完后 xcodebuild 会一直等模拟器诊断收集，常卡到 600 秒超时才退出。
 
 需要刷新 Xcode 测试构建产物：
 
