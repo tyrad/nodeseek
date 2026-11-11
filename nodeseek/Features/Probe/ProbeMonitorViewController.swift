@@ -2,7 +2,7 @@ import UIKit
 
 /// 探针列表：一个探针一张汇总卡，下面只显示当前卡片的服务器。
 final class ProbeMonitorViewController: UIViewController {
-    private let viewModel: ProbeMonitorViewModel
+    let viewModel: ProbeMonitorViewModel
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let heroCarousel = ProbeHeroCarouselView()
     private let chipsView = ProbeFilterChipsView()
@@ -255,6 +255,27 @@ final class ProbeMonitorViewController: UIViewController {
     private func presentEditor(for instanceID: UUID?) {
         let editor = ProbeInstanceEditorViewController(instance: instanceID.flatMap(viewModel.instance(id:)), store: viewModel.store)
         present(UINavigationController(rootViewController: editor), animated: true)
+    }
+
+    /// 小组件点按：进探针列表，带服务器时再进它的详情。已经停在探针页时复用它，避免每点一次就多压一层。
+    static func show(
+        _ link: ProbeWidgetLink,
+        in navigationController: UINavigationController,
+        animated: Bool = true,
+        makeMonitor: () -> ProbeMonitorViewController = { ProbeMonitorViewController() }
+    ) {
+        let monitor: ProbeMonitorViewController
+        if let existing = navigationController.viewControllers.last(where: { $0 is ProbeMonitorViewController }) as? ProbeMonitorViewController {
+            navigationController.popToViewController(existing, animated: false)
+            monitor = existing
+        } else {
+            monitor = makeMonitor()
+            navigationController.pushViewController(monitor, animated: animated && link.nodeID == nil)
+        }
+        if let instanceID = link.instanceID, let nodeID = link.nodeID {
+            let detail = ProbeServerDetailViewController(entryID: "\(instanceID.uuidString)/\(nodeID)", viewModel: monitor.viewModel)
+            navigationController.pushViewController(detail, animated: animated)
+        }
     }
 
     /// 当前卡片用「当前探针」，分组标题用短标题。两组都是编辑和删除。

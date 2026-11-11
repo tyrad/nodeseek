@@ -441,32 +441,12 @@ final class ProbeMonitorViewModel {
         entries = instances.flatMap { instance -> [ProbeListEntry] in
             guard let state = states[instance.id], let snapshot = state.snapshot else { return [] }
             let isStale = state.lastError != nil || date.timeIntervalSince(snapshot.fetchedAt) > staleInterval
-            return Self.orderedServers(snapshot: snapshot, instance: instance).enumerated().map { index, server in
-                ProbeListEntry(
-                    instanceID: instance.id,
-                    instanceName: instance.name,
-                    server: server,
-                    displayName: instance.aliases[server.node.id] ?? server.node.name,
-                    isStale: isStale,
-                    panelIndex: index
-                )
-            }
+            return ProbeListEntry.entries(instance: instance, snapshot: snapshot, isStale: isStale)
         }
         rearrange()
     }
 
     private func rearrange() {
         sections = ProbeServerList.arrange(visibleEntries, filter: filter, sort: sort, query: query)
-    }
-
-    /// 先按用户拖动的顺序，没排过的节点按面板顺序接在后面；隐藏的节点不显示。
-    static func orderedServers(snapshot: ProbeSnapshot, instance: ProbeInstance) -> [ProbeServer] {
-        let servers = ProbeServer.merge(nodes: snapshot.nodes, statuses: snapshot.statuses)
-            .filter { !instance.hiddenNodeIDs.contains($0.node.id) }
-        let position = Dictionary(instance.nodeOrder.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
-        return servers.enumerated().sorted { lhs, rhs in
-            let left = position[lhs.element.node.id] ?? Int.max, right = position[rhs.element.node.id] ?? Int.max
-            return left != right ? left < right : lhs.offset < rhs.offset
-        }.map(\.element)
     }
 }

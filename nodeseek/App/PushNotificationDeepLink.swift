@@ -61,8 +61,15 @@ extension AppRouter: PushNotificationNavigating {
             push(NotificationViewController(initialTab: .atMe))
         case .replyList:
             push(NotificationViewController(initialTab: .reply))
+        case let .probe(link):
+            openProbe(link)
         case .bannerOnly:
             break
         }
+    }
+
+    private func openProbe(_ link: ProbeWidgetLink) {
+        guard let navigationController else { return }
+        ProbeMonitorViewController.show(link, in: navigationController)
     }
 }

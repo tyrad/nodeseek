@@ -46,7 +46,7 @@ final class ProbeInstanceEditorViewController: UITableViewController {
         super.init(style: .insetGrouped)
         title = instance == nil ? "添加探针" : "编辑探针"
         if let instance, let snapshot = store.snapshot(for: instance.id) {
-            nodes = ProbeMonitorViewModel.orderedServers(
+            nodes = ProbeServer.ordered(
                 snapshot: snapshot, instance: ProbeInstance(id: instance.id, name: instance.name, baseURL: instance.baseURL,
                                                             adapterID: instance.adapterID, nodeOrder: instance.nodeOrder)
             ).map(\.node)

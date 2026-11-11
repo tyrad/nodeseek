@@ -1,10 +1,13 @@
 import Foundation
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 /// 探针配置和最后一次成功快照的本地存储。只保存面板地址、显示偏好和监控数据，不保存任何凭证。
-/// 以后接入小组件时，把 `defaults` 换成 App Group 的 UserDefaults 即可共享。
+/// App 和小组件通过 App Group 共用同一份数据，见 `ProbeSharedStorage`。
 @MainActor
 final class ProbeInstanceStore {
-    static let shared = ProbeInstanceStore()
+    static let shared = ProbeInstanceStore(defaults: ProbeSharedStorage.currentProcessDefaults())
     static let didChangeNotification = Notification.Name("ProbeInstanceStore.didChange")
 
     private enum Key {
@@ -85,5 +88,9 @@ final class ProbeInstanceStore {
             defaults.set(data, forKey: Key.instances)
         }
         NotificationCenter.default.post(name: Self.didChangeNotification, object: self)
+        // 增删改探针后小组件立即跟着变，不用等下一次定时刷新。
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
     }
 }

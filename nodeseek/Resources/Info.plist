@@ -12,6 +12,17 @@
 		<string>zh-Hans</string>
 		<string>zh-Hant</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.mistj.nodeseek.widget</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>nsconnect</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleName</key>
 	<string>NS Connect</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
