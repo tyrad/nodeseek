@@ -23,6 +23,20 @@ enum WhatsNewModule {
     /// ])
     /// ```
     static let catalog: [WhatsNew] = [
+        release("1.3.0", features: [
+            feature(
+                systemName: "server.rack",
+                tint: .systemBlue,
+                title: "服务器探针",
+                subtitle: "小鸡跑得咋样，侧边栏点「探针」看看"
+            ),
+            feature(
+                systemName: "apps.iphone",
+                tint: .systemPink,
+                title: "桌面小组件",
+                subtitle: "桌面瞄一眼，就知道哪台小鸡掉线了"
+            )
+        ]),
         release("1.2.0", features: [
             feature(
                 systemName: "square.grid.2x2.fill",
