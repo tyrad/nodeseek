@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-Hans"><head><meta charset="utf-8"><title>Probe Widgets</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"SF Pro Text","PingFang SC",sans-serif;background:#E9E9EE;color:#111;padding:40px;width:1560px}
+h1{font-size:28px;margin-bottom:6px}
+.sub{font-size:14px;color:#555;line-height:1.7;margin-bottom:26px;max-width:1450px}
+.mono{font-family:"SF Mono",ui-monospace,Menlo,monospace}
+.board{border-radius:28px;padding:26px;display:grid;grid-template-columns:170px 170px 364px;grid-auto-rows:170px;gap:24px;margin-bottom:12px;width:fit-content}
+.light{background:linear-gradient(135deg,#dfe6f1,#f4efe6)}
+.dark{background:linear-gradient(135deg,#1b1d24,#2a2630)}
+.tint{background:linear-gradient(135deg,#3a4a63,#6b5a78)}
+.title{font-size:16px;font-weight:700;margin:22px 0 10px}
+.cap{font-size:12.5px;color:#555;margin-bottom:6px}
+.w{border-radius:22px;padding:14px;position:relative;overflow:hidden;display:flex;flex-direction:column}
+.light .w{background:#fff;color:#000}
+.dark .w{background:#1c1c1e;color:#fff}
+.tint .w{background:rgba(255,255,255,.14);backdrop-filter:blur(20px);color:#fff;border:1px solid rgba(255,255,255,.18)}
+.m{grid-column:auto}
+.sec{opacity:.55}
+.ter{opacity:.35}
+.k{font-size:10.5px;letter-spacing:.4px;font-weight:600}
+.big{font-weight:800;letter-spacing:-1.5px;line-height:1}
+.row{display:flex;align-items:center;justify-content:space-between}
+.pill{font-size:11px;font-weight:700;padding:2px 7px;border-radius:7px;display:inline-flex;gap:3px;align-items:center}
+.red{color:#FF3B30}.orange{color:#FF9500}.green{color:#34C759}
+.light .bred{background:#FF3B3018}.light .bor{background:#FF950018}
+.dark .bred{background:#FF453A26}.dark .bor{background:#FF9F0A26}
+.dark .red{color:#FF453A}.dark .orange{color:#FF9F0A}
+.tint .red,.tint .orange,.tint .green{color:#fff}
+.tint .bred,.tint .bor{background:rgba(255,255,255,.18)}
+.bar{height:5px;border-radius:3px;background:currentColor;opacity:1;position:relative}
+.track{height:5px;border-radius:3px;position:relative;overflow:hidden}
+.light .track{background:#7878801f}.dark .track{background:#7878803d}.tint .track{background:rgba(255,255,255,.2)}
+.track i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:currentColor}
+.mrow{display:grid;grid-template-columns:30px 1fr 34px;align-items:center;gap:6px;font-size:10.5px;margin-top:5px}
+.list .it{display:grid;grid-template-columns:16px 1fr auto;gap:8px;align-items:center;font-size:13px;padding:5px 0}
+.list .it + .it{border-top:.5px solid rgba(127,127,127,.25)}
+.ic{font-size:12px;text-align:center;font-weight:800}
+.lock{border-radius:28px;padding:26px;display:flex;gap:26px;align-items:center;background:linear-gradient(135deg,#25324a,#4b3b55);color:#fff;width:fit-content;margin-bottom:12px}
+.lk{background:rgba(255,255,255,.14);border-radius:14px;padding:8px 10px}
+.circle{width:64px;height:64px;border-radius:32px;border:5px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;position:relative;font-weight:800;font-size:15px}
+.circle:after{content:"";position:absolute;inset:-5px;border-radius:32px;border:5px solid #fff;clip-path:polygon(50% 50%,50% 0,100% 0,100% 100%,0 100%,0 0,10% 0)}
+.notes{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px;max-width:1450px}
+.note{background:#fff;border-radius:14px;padding:14px 16px;font-size:13px;line-height:1.7;color:#333}
+.note b{display:block;margin-bottom:4px;color:#000}
+.lbl{font-size:11px;color:#666;margin-top:6px;text-align:center}
+</style></head><body>
+<h1>服务器小组件 · 第一版示意（iOS 17+）</h1>
+<div class="sub">小组件约 15–30 分钟才刷新一次，所以主角是「有没有问题、快到期了没」，CPU 只作辅助。四个尺寸：小 · 总览（默认）、小 · 单台（带 1 小时趋势线）、中 · 关注列表、锁屏三种。同一套内容分别在浅色、深色、着色（iOS 26 着色 / 透明主屏）下检查：着色模式颜色会被系统抹成单色，所以状态必须同时有图标（✕ 离线、! 告警、⏱ 到期）。</div>
+
+<script>
+const S = {
+ overview:(o)=>`<div class="w">
+   <div class="row"><span class="k sec">NS PROBE · 3 个探针</span></div>
+   <div style="margin-top:10px"><span class="big" style="font-size:44px">27</span><span class="big sec" style="font-size:22px">/28</span></div>
+   <div style="font-size:12px;font-weight:600;margin-top:2px" class="sec">在线</div>
+   <div style="display:flex;gap:5px;margin-top:8px"><span class="pill bred red">✕ 离线 1</span><span class="pill bor orange">! 告警 2</span></div>
+   <div style="margin-top:auto;font-size:11px" class="row"><span><span class="orange">⏱</span> HK-01 3 天到期</span></div>
+   <div class="ter mono" style="font-size:9.5px;margin-top:2px">5 分钟前</div></div>`,
+ single:(o)=>`<div class="w">
+   <div class="row"><span style="font-size:14px;font-weight:700">🇯🇵 JP-02</span><span class="green" style="font-size:11px">●</span></div>
+   <div class="row" style="margin-top:6px;align-items:flex-end"><div><div class="k sec">CPU</div><div class="big" style="font-size:30px">4.1<span style="font-size:14px">%</span></div></div>
+     <svg width="70" height="30" viewBox="0 0 70 30"><polyline fill="none" stroke="currentColor" stroke-opacity=".75" stroke-width="1.6" points="0,22 6,20 12,23 18,18 24,21 30,12 36,19 42,20 48,9 54,17 60,15 66,18 70,16"/></svg></div>
+   <div class="mrow"><span class="sec">内存</span><div class="track orange"><i style="width:77%"></i></div><span class="mono orange">77%</span></div>
+   <div class="mrow"><span class="sec">硬盘</span><div class="track"><i style="width:56%"></i></div><span class="mono">56%</span></div>
+   <div class="row" style="margin-top:auto;font-size:10px"><span class="sec">347 天到期</span><span class="ter mono">5 分钟前</span></div></div>`,
+ list:(o)=>`<div class="w m list">
+   <div class="row"><span class="k sec">需要关注 · 4</span><span class="k sec">27/28 在线 · 5 分钟前</span></div>
+   <div style="margin-top:6px">
+   <div class="it"><span class="ic red">✕</span><span>🇺🇸 US-01 <span class="sec" style="font-size:11px">· 离线 2 小时</span></span><span class="red mono" style="font-size:11px">离线</span></div>
+   <div class="it"><span class="ic orange">!</span><span>🇯🇵 JP-02 <span class="sec" style="font-size:11px">· 内存</span></span><span class="orange mono" style="font-size:12px;font-weight:700">93%</span></div>
+   <div class="it"><span class="ic orange">⏱</span><span>🇭🇰 HK-01 <span class="sec" style="font-size:11px">· ¥99/年</span></span><span class="orange" style="font-size:12px;font-weight:700">3 天到期</span></div>
+   <div class="it"><span class="ic">◔</span><span>🇸🇬 SG-01 <span class="sec" style="font-size:11px">· 本月流量</span></span><span class="mono" style="font-size:12px;font-weight:700">92%</span></div>
+   </div></div>`,
+ stale:(o)=>`<div class="w" style="opacity:.95">
+   <div class="row"><span class="k sec">NS PROBE</span><span class="sec" style="font-size:12px">🕘</span></div>
+   <div style="margin-top:10px" class="sec"><span class="big" style="font-size:44px">27</span><span class="big" style="font-size:22px">/28</span></div>
+   <div style="font-size:12px;font-weight:600;margin-top:2px" class="sec">在线（缓存）</div>
+   <div style="margin-top:auto;font-size:11px" class="sec">连不上面板</div>
+   <div class="ter mono" style="font-size:9.5px;margin-top:2px">缓存 · 52 分钟前</div></div>`,
+ allok:(o)=>`<div class="w m list">
+   <div class="row"><span class="k sec">全部正常</span><span class="k sec">28/28 在线 · 5 分钟前</span></div>
+   <div style="margin-top:6px">
+   <div class="it"><span class="ic green">✓</span><span>🇯🇵 JP-04</span><span class="mono" style="font-size:12px">CPU 4.1%</span></div>
+   <div class="it"><span class="ic green">✓</span><span>🇺🇸 LAX-02</span><span class="mono" style="font-size:12px">CPU 2.7%</span></div>
+   <div class="it"><span class="ic green">✓</span><span>🇭🇰 HK-01</span><span class="mono" style="font-size:12px">CPU 1.2%</span></div>
+   <div class="it"><span class="ic sec">⏱</span><span class="sec">最近到期 · HK-03</span><span class="sec" style="font-size:12px">28 天</span></div>
+   </div></div>`
+};
+function board(cls){return `<div class="board ${cls}">${S.overview()}${S.single()}${S.list()}${S.stale()}${S.single().replace('JP-02','SG-01')}${S.allok()}</div>`}
+document.write(`<div class="title">浅色</div><div class="cap">上排：小·总览、小·单台（带 1 小时 CPU 趋势）、中·关注列表；下排：拿不到新数据时的缓存样式、另一台单台、中尺寸全部正常时的样子</div>${board('light')}`);
+document.write(`<div class="title">深色</div>${board('dark')}`);
+document.write(`<div class="title">着色 / 透明主屏（iOS 26）</div><div class="cap">系统把颜色统一成单色：红橙绿看不出来，靠 ✕ ! ⏱ ✓ 图标区分</div>${board('tint')}`);
+</script>
+
+<div class="title">锁屏（设备锁定时不显示服务器名）</div>
+<div class="lock">
+ <div><div class="lk" style="font-size:15px;font-weight:600">● 27/28 在线 · 1 离线</div><div class="lbl" style="color:#ddd">单行</div></div>
+ <div><div class="circle">27</div><div class="lbl" style="color:#ddd">圆形 · 在线比例</div></div>
+ <div><div class="lk" style="width:170px;font-size:13px;line-height:1.5"><b>✕ 1 离线 · ! 2 告警</b><br>⏱ 最近 3 天后到期</div><div class="lbl" style="color:#ddd">矩形 · 锁定时</div></div>
+ <div><div class="lk" style="width:170px;font-size:13px;line-height:1.5"><b>✕ US-01 离线</b><br>⏱ HK-01 3 天后到期</div><div class="lbl" style="color:#ddd">矩形 · 解锁后</div></div>
+</div>
+
+<div class="notes">
+ <div class="note"><b>点按跳转</b>小·总览 → 探针列表（自动切到「异常优先」）；小·单台 → 这台的详情；中·关注列表 → 每一行跳到各自的详情；缓存状态 → 打开 App 并立即刷新。</div>
+ <div class="note"><b>长按编辑（iOS 17 AppIntent）</b>小·总览：选全部探针或某一个探针；小·单台：选一台服务器；中·关注列表：选范围，以及「都正常时显示 CPU 最高 / 最近到期」。</div>
+ <div class="note"><b>趋势线只放在单台小组件</b>一台只多一次历史请求；趋势本身是过去 1 小时的形状，就算小组件 20 分钟没刷新也仍然有意义。列表和总览不放趋势，避免一次刷新发十几个请求。</div>
+ <div class="note"><b>关注列表的排序</b>离线 → 告警（CPU/内存/硬盘 ≥90%）→ 7 天内到期或已过期 → 流量 ≥90% → 都没有时显示「全部正常」。最多 4 行，多出的写在标题「需要关注 · N」里。</div>
+</div>
+</body></html>
