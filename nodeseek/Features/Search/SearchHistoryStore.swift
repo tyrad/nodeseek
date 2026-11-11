@@ -44,13 +44,10 @@ struct SearchHistoryRecord: Codable, Equatable, Sendable {
         )
     }
 
-    var displayTitle: String {
-        switch scope {
-        case .post:
-            return category == .all ? query : "\(category.title) · \(query)"
-        case .user, .google:
-            return "\(scope.title) · \(query)"
-        }
+    /// 历史标签右侧的小标签：帖子显示分类，其他显示搜索范围；帖子「全部」不再标注，减少重复信息
+    var tagTitle: String? {
+        guard scope == .post else { return scope.title }
+        return category == .all ? nil : category.title
     }
 }
 

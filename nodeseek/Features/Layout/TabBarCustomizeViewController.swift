@@ -382,8 +382,9 @@ extension TabBarCustomizeViewController: UITableViewDataSource, UITableViewDeleg
     func tableView(_ tableView: UITableView, moveRowAt sourceIndexPath: IndexPath, to destinationIndexPath: IndexPath) {
         let item = shownItems.remove(at: sourceIndexPath.row)
         shownItems.insert(item, at: destinationIndexPath.row)
+        // 系统此时还在收尾拖动，同步刷新列表会让行错乱（重复、跑到别的分区）；
+        // 行内按钮按项目而非行号绑定，不需要刷新
         updatePreview()
-        tableView.reloadSections(IndexSet(integer: Section.shown.rawValue), with: .none)
         if mode == .settings {
             settings.setTabItems(shownItems)
         }

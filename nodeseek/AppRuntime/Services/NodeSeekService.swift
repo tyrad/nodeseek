@@ -56,20 +56,26 @@ struct NodeSeekService: Sendable {
         query: String,
         page: Int = 1,
         category: PostListCategory = .all
-    ) async throws -> NodeSeekResult<[PostSummary]> {
+    ) async throws -> NodeSeekResult<NodeSeekSearchPage> {
         let targetURL = searchURL(query: query, page: page, category: category)
         AppLog.info(.service, "开始抓取 NodeSeek 搜索，category=\(category.rawValue), page=\(page): \(targetURL.absoluteString)")
         let response = try await htmlClient.get(targetURL)
         AppLog.info(.service, "搜索抓取返回 category=\(category.rawValue), page=\(page), status=\(response.statusCode), htmlLength=\(response.html.utf8.count), finalURL=\(response.finalURL.absoluteString)")
 
-        switch try await parseInBackground(response: response, parse: { [parser] in try parser.parsePostList(html: $0.html) }) {
+        let parsePage: @Sendable (HTMLResponse) throws -> NodeSeekSearchPage = { [parser] response in
+            let posts = try parser.parsePostList(html: response.html)
+            // 只有没帖子时才需要站点提示（搜索词太短、未找到等）
+            let notice = posts.isEmpty ? NodeSeekSearchNoticeParser.notice(in: response.html) : nil
+            return NodeSeekSearchPage(posts: posts, notice: notice)
+        }
+        switch try await parseInBackground(response: response, parse: parsePage) {
         case .challenge(let challenge):
             AppLog.warning(.service, "检测到搜索 challenge: \(challenge.logDescription)")
             return .challenge(challenge)
-        case .parsed(let posts, let account):
+        case .parsed(let searchPage, let account):
             await saveOpportunisticAccount(account)
-            AppLog.info(.service, "搜索解析完成，帖子数量: \(posts.count)")
-            return .value(posts)
+            AppLog.info(.service, "搜索解析完成，帖子数量: \(searchPage.posts.count), 提示: \(searchPage.notice ?? "无")")
+            return .value(searchPage)
         }
     }
 

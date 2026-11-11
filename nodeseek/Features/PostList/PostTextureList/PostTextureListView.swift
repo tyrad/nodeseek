@@ -181,11 +181,22 @@ final class PostTextureListView: UIView {
     }
 
     func showFirstPageError(message: String) {
+        showFirstPageMessage(message, isError: true)
+    }
+
+    /// 没有内容时的说明文字（如搜索词太短），不是加载失败，不显示标题和重试按钮。
+    func showEmptyMessage(_ message: String) {
+        showFirstPageMessage(message, isError: false)
+    }
+
+    private func showFirstPageMessage(_ message: String, isError: Bool) {
         displayMode = .firstPageError
         items = []
         lastBatchFetchRequestedItemCount = nil
         hideLoadingMore()
         hideRefreshing()
+        errorTitleLabel.isHidden = !isError
+        retryButton.isHidden = !isError
         errorMessageLabel.text = message
         errorStackView.isHidden = false
         reloadTable()
