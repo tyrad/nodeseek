@@ -91,7 +91,7 @@ final class MeViewController: UIViewController {
 
     @objc private func appTextSizeDidChange() {
         profileCard.updateTextSize()
-        [discussionsRow, commentsRow, collectionsRow, recentRow, probeRow].forEach { $0.updateTextSize() }
+        [checkInRow, discussionsRow, commentsRow, collectionsRow, recentRow, probeRow].forEach { $0.updateTextSize() }
     }
 
     override func viewWillAppear(_ animated: Bool) {
