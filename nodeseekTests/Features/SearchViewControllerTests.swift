@@ -11,6 +11,37 @@ import UIKit
 
 @MainActor
 struct SearchViewControllerTests {
+    @Test func largestTextSizeRefreshesExistingSearchControls() throws {
+        let settings = AppTextSizeSettings.shared
+        let original = settings.pointOffset
+        defer { settings.setPointOffset(original) }
+        settings.setPointOffset(0)
+        let controller = SearchViewController()
+        controller.loadViewIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 320, height: 740)
+        controller.view.layoutIfNeeded()
+        let field = try #require(controller.view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
+        #expect(field.font?.pointSize == 16)
+        settings.setPointOffset(AppTextSizeSettings.maximumPointOffset)
+        controller.view.layoutIfNeeded()
+        #expect(field.font?.pointSize == 24)
+        #expect(field.bounds.height >= field.font!.lineHeight)
+        let button = try #require(controller.view.firstButton(accessibilityIdentifier: "search-submit-button"))
+        #expect(button.bounds.width >= 64)
+        #expect(field.bounds.width > 40)
+        let category = try #require(controller.view.firstButton(accessibilityIdentifier: "search-category-selector-button"))
+        var categoryConfiguration = category.configuration
+        categoryConfiguration?.title = "Promotions"
+        category.configuration = categoryConfiguration
+        var searchConfiguration = button.configuration
+        searchConfiguration?.title = "Search"
+        button.configuration = searchConfiguration
+        controller.view.layoutIfNeeded()
+        #expect(field.bounds.width >= 44)
+        #expect(button.bounds.width >= button.intrinsicContentSize.width - 1)
+        #expect(category.configuration?.titleLineBreakMode == .byTruncatingTail)
+    }
+
     @Test func defaultServiceUsesHTTPFirstLoadingStrategy() throws {
         let service = SearchViewController.makeDefaultService()
         let htmlClient = try #require(Mirror(reflecting: service).descendant("htmlClient"))
@@ -31,21 +62,21 @@ struct SearchViewControllerTests {
         let keywordFrame = keywordTextField.convert(keywordTextField.bounds, to: viewController.view)
         let searchFrame = searchButton.convert(searchButton.bounds, to: viewController.view)
 
-        #expect(categoryButton.configuration?.title == "全部")
+        #expect(categoryButton.configuration?.title == NSLocalizedString("全部", tableName: "Search", comment: ""))
         #expect(categoryButton.configuration?.image != nil)
         #expect(categoryButton.menu != nil)
         #expect(categoryButton.showsMenuAsPrimaryAction == true)
-        #expect(viewController.view.firstButton(title: "日常") == nil)
+        #expect(viewController.view.firstButton(title: NSLocalizedString("日常", tableName: "Search", comment: "")) == nil)
         let menuTitles = categoryButton.menu?.children.compactMap { ($0 as? UIAction)?.title } ?? []
         #expect(menuTitles.contains("DF") == false)
-        #expect(menuTitles.contains("推荐阅读") == false)
+        #expect(menuTitles.contains(NSLocalizedString("推荐阅读", tableName: "Search", comment: "")) == false)
         #expect(abs(categoryFrame.midY - keywordFrame.midY) < 1)
         #expect(abs(searchFrame.midY - keywordFrame.midY) < 1)
         #expect(categoryFrame.maxX < keywordFrame.minX)
         #expect(keywordFrame.maxX < searchFrame.minX)
         #expect(try inputRowTop(in: viewController.view) < 160)
         #expect(abs(searchButton.bounds.width - 64) < 0.5)
-        #expect(searchButton.configuration?.title == "搜索")
+        #expect(searchButton.configuration?.title == NSLocalizedString("搜索", tableName: "Search", comment: ""))
         #expect(searchButton.configuration?.image == nil)
         #expect(keywordTextField.borderStyle == .none)
     }
@@ -58,7 +89,7 @@ struct SearchViewControllerTests {
         let viewController = SearchViewController(searchHistoryStore: store)
         viewController.loadViewIfNeeded()
 
-        _ = try #require(viewController.view.firstLabel(text: "最近搜索"))
+        _ = try #require(viewController.view.firstLabel(text: NSLocalizedString("最近搜索", tableName: "Search", comment: "")))
         _ = try #require(viewController.view.firstButton(accessibilityIdentifier: "search-history-clear-button"))
         let historyButtons = viewController.view.allButtons(accessibilityIdentifierPrefix: "search-history-record-button-")
 
@@ -198,7 +229,7 @@ struct SearchViewControllerTests {
         try await waitUntil { !messageView.isHidden }
         #expect(viewController.view.firstLabel(text: "搜索词太短😭") != nil)
         #expect(viewController.view.firstButton(accessibilityIdentifier: "post-list-first-page-retry-button")?.isHidden == true)
-        #expect(viewController.view.firstLabel(text: "加载失败")?.isHidden == true)
+        #expect(viewController.view.firstLabel(text: NSLocalizedString("加载失败", tableName: "Search", comment: ""))?.isHidden == true)
         #expect(viewController.presentedViewController == nil)
     }
 
@@ -212,19 +243,19 @@ struct SearchViewControllerTests {
         let categoryButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "search-category-selector-button"))
         let keywordTextField = try #require(viewController.view.firstTextField(accessibilityIdentifier: "search-keyword-text-field"))
 
-        #expect((0..<scopeControl.numberOfSegments).map { scopeControl.titleForSegment(at: $0) } == ["帖子", "用户", "谷歌"])
+        #expect((0..<scopeControl.numberOfSegments).map { scopeControl.titleForSegment(at: $0) } == [NSLocalizedString("帖子", tableName: "Search", comment: ""), NSLocalizedString("用户", tableName: "Search", comment: ""), NSLocalizedString("谷歌", tableName: "Search", comment: "")])
         #expect(scopeControl.selectedSegmentIndex == 0)
         #expect(categoryButton.isHidden == false)
 
         scopeControl.selectedSegmentIndex = 1
         scopeControl.sendActions(for: .valueChanged)
         #expect(categoryButton.isHidden)
-        #expect(keywordTextField.placeholder == "输入用户名")
+        #expect(keywordTextField.placeholder == NSLocalizedString("输入用户名", tableName: "Search", comment: ""))
 
         scopeControl.selectedSegmentIndex = 2
         scopeControl.sendActions(for: .valueChanged)
         #expect(categoryButton.isHidden)
-        #expect(keywordTextField.placeholder == "用谷歌搜索本站")
+        #expect(keywordTextField.placeholder == NSLocalizedString("用谷歌搜索本站", tableName: "Search", comment: ""))
     }
 
     @Test func userScopeSearchShowsMembersAndRecordsHistory() async throws {
@@ -309,7 +340,7 @@ struct SearchViewControllerTests {
         _ = viewController.textFieldShouldReturn(keywordTextField)
 
         try await waitUntil { resultsView.state != .loading }
-        #expect(resultsView.state == .failed("登录后才能搜索用户"))
+        #expect(resultsView.state == .failed(NSLocalizedString("登录后才能搜索用户", tableName: "Search", comment: "")))
     }
 
     @Test func searchPageHidesNavigationBarAndShowsBackOnlyWhenPushed() throws {
@@ -408,7 +439,7 @@ struct SearchViewControllerTests {
 
         // 有结果时历史仍然展示，只占一行，放不下时出现展开
         #expect(container.isHidden == false)
-        #expect(viewController.view.firstLabel(text: "最近搜索")?.superview?.isHidden == true)
+        #expect(viewController.view.firstLabel(text: NSLocalizedString("最近搜索", tableName: "Search", comment: ""))?.superview?.isHidden == true)
         let visibleChips = viewController.view.allButtons(accessibilityIdentifierPrefix: "search-history-record-button-")
             .filter { !$0.isHidden }
         #expect(visibleChips.count < 7)
@@ -443,7 +474,7 @@ struct SearchViewControllerTests {
         let resetChips = viewController.view.allButtons(accessibilityIdentifierPrefix: "search-history-record-button-")
         #expect(resetChips.first?.configuration?.title == "甲骨文")
         #expect(resetChips.allSatisfy { !$0.isHidden })
-        #expect(viewController.view.firstLabel(text: "最近搜索")?.superview?.isHidden == false)
+        #expect(viewController.view.firstLabel(text: NSLocalizedString("最近搜索", tableName: "Search", comment: ""))?.superview?.isHidden == false)
         #expect(expandButton.isHidden)
     }
 
@@ -467,7 +498,7 @@ struct SearchViewControllerTests {
         store.record(query: "ns", category: .all, scope: .google)
         store.record(query: "酒神", category: .all, scope: .post)
         #expect(store.records().map(\.query) == ["酒神", "ns", "酒神", "美西"])
-        #expect(store.records().map(\.tagTitle) == [nil, "谷歌", "用户", "技术"])
+        #expect(store.records().map(\.tagTitle) == [nil, NSLocalizedString("谷歌", tableName: "Search", comment: ""), NSLocalizedString("用户", tableName: "Search", comment: ""), NSLocalizedString("技术", tableName: "Search", comment: "")])
     }
 }
 

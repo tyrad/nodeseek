@@ -3,7 +3,7 @@ import Foundation
 /// 小组件库里的预览和占位用的假数据。
 enum ProbeWidgetSample {
     private static let instance = ProbeInstance(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
-                                                name: "示例探针", baseURL: URL(string: "https://example.com")!, adapterID: "komari")
+                                                name: NSLocalizedString("示例探针", tableName: "ProbeWidget", comment: ""), baseURL: URL(string: "https://example.com")!, adapterID: "komari")
 
     private static func server(_ id: String, _ name: String, region: String, online: Bool = true,
                                cpu: Double, mem: Double, disk: Double, expiresIn days: Int? = nil, price: Double? = nil) -> (ProbeNode, ProbeStatus) {

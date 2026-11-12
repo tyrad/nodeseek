@@ -15,9 +15,9 @@ enum SearchScope: String, Codable, CaseIterable, Sendable {
 
     var title: String {
         switch self {
-        case .post: return "帖子"
-        case .user: return "用户"
-        case .google: return "谷歌"
+        case .post: return NSLocalizedString("帖子", tableName: "Search", comment: "")
+        case .user: return NSLocalizedString("用户", tableName: "Search", comment: "")
+        case .google: return NSLocalizedString("谷歌", tableName: "Search", comment: "")
         }
     }
 }
@@ -47,7 +47,7 @@ struct SearchHistoryRecord: Codable, Equatable, Sendable {
     /// 历史标签右侧的小标签：帖子显示分类，其他显示搜索范围；帖子「全部」不再标注，减少重复信息
     var tagTitle: String? {
         guard scope == .post else { return scope.title }
-        return category == .all ? nil : category.title
+        return category == .all ? nil : NSLocalizedString(category.title, tableName: "Search", comment: "")
     }
 }
 

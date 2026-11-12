@@ -171,7 +171,7 @@ nonisolated struct ProbeWidgetDigest: Equatable, Sendable {
                 return item(entry, kind: .offline, value: offlineText(since: entry.server.status?.sampledAt, now: now))
             }
             if entry.server.availability == .online, let metrics = entry.server.status?.metrics {
-                let candidates: [(String, Double?)] = [("CPU", metrics.cpuPercent), ("内存", metrics.memPercent), ("硬盘", metrics.diskPercent)]
+                let candidates: [(String, Double?)] = [("CPU", metrics.cpuPercent), (NSLocalizedString("内存", tableName: "ProbeWidget", comment: ""), metrics.memPercent), (NSLocalizedString("硬盘", tableName: "ProbeWidget", comment: ""), metrics.diskPercent)]
                 if let worst = candidates.compactMap({ name, value in value.map { (name, $0) } }).max(by: { $0.1 < $1.1 }),
                    worst.1 >= alertThreshold {
                     return item(entry, kind: .alert, value: "\(worst.0) \(ProbeFormat.percent(worst.1, decimals: 0))%")
@@ -183,8 +183,8 @@ nonisolated struct ProbeWidgetDigest: Equatable, Sendable {
         }
         if let traffic = summary?.traffic, traffic.isOver || traffic.percent >= trafficThreshold {
             let value = traffic.isOver
-                ? "流量超出 \(ProbeFormat.bytes(traffic.used - traffic.limit))"
-                : "流量 \(ProbeFormat.percent(traffic.percent, decimals: 0))%"
+                ? String(format: NSLocalizedString("流量超出 %@", tableName: "ProbeWidget", comment: ""), ProbeFormat.bytes(traffic.used - traffic.limit))
+                : String(format: NSLocalizedString("流量 %@%%", tableName: "ProbeWidget", comment: ""), ProbeFormat.percent(traffic.percent, decimals: 0))
             return item(entry, kind: .traffic, value: value)
         }
         return nil
@@ -197,10 +197,10 @@ nonisolated struct ProbeWidgetDigest: Equatable, Sendable {
 
     /// “离线 2 小时”；不知道从什么时候开始离线时只写“离线”。
     static func offlineText(since: Date?, now: Date) -> String {
-        guard let since else { return "离线" }
+        guard let since else { return NSLocalizedString("离线", tableName: "ProbeWidget", comment: "") }
         let seconds = max(0, now.timeIntervalSince(since))
-        if seconds < 3600 { return "离线 \(max(1, Int(seconds / 60))) 分钟" }
-        if seconds < 86_400 { return "离线 \(Int(seconds / 3600)) 小时" }
-        return "离线 \(Int(seconds / 86_400)) 天"
+        if seconds < 3600 { return String(format: NSLocalizedString("离线 %ld 分钟", tableName: "ProbeWidget", comment: ""), max(1, Int(seconds / 60))) }
+        if seconds < 86_400 { return String(format: NSLocalizedString("离线 %ld 小时", tableName: "ProbeWidget", comment: ""), Int(seconds / 3600)) }
+        return String(format: NSLocalizedString("离线 %ld 天", tableName: "ProbeWidget", comment: ""), Int(seconds / 86_400))
     }
 }

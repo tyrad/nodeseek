@@ -8,6 +8,7 @@ import UIKit
 /// 搜索范围切换：选中项用 .label 反色胶囊，其余为次要文字，替代系统分段控件。
 /// 接口沿用 UISegmentedControl 的命名，切换时发送 .valueChanged。
 final class SearchScopeTabsView: UIControl {
+    private let scrollView = UIScrollView()
     private let titles: [String]
     private var buttons: [UIButton] = []
     private let stackView: UIStackView = {
@@ -28,12 +29,21 @@ final class SearchScopeTabsView: UIControl {
     init(titles: [String]) {
         self.titles = titles
         super.init(frame: .zero)
-        addSubview(stackView)
+        scrollView.showsHorizontalScrollIndicator = false
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(scrollView)
+        scrollView.addSubview(stackView)
         NSLayoutConstraint.activate([
-            stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stackView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
-            stackView.topAnchor.constraint(equalTo: topAnchor),
-            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            stackView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            stackView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            stackView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            stackView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            stackView.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
+            heightAnchor.constraint(greaterThanOrEqualToConstant: 44)
         ])
 
         buttons = titles.enumerated().map { index, title in
@@ -43,7 +53,7 @@ final class SearchScopeTabsView: UIControl {
                 self?.select(index)
             }, for: .touchUpInside)
             stackView.addArrangedSubview(button)
-            button.heightAnchor.constraint(equalToConstant: 32).isActive = true
+            button.heightAnchor.constraint(greaterThanOrEqualToConstant: 32).isActive = true
             return button
         }
         updateAppearance()
@@ -60,7 +70,13 @@ final class SearchScopeTabsView: UIControl {
     private func select(_ index: Int) {
         guard index != selectedSegmentIndex else { return }
         selectedSegmentIndex = index
+        scrollView.scrollRectToVisible(buttons[index].frame, animated: !UIAccessibility.isReduceMotionEnabled)
         sendActions(for: .valueChanged)
+    }
+
+    func refreshTypography() {
+        updateAppearance()
+        invalidateIntrinsicContentSize()
     }
 
     private func updateAppearance() {
@@ -74,7 +90,7 @@ final class SearchScopeTabsView: UIControl {
             configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14)
             configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
                 var outgoing = incoming
-                outgoing.font = .systemFont(ofSize: 15, weight: isSelected ? .semibold : .medium)
+                outgoing.font = AppTypography.font(basePointSize: 15, weight: isSelected ? .semibold : .medium)
                 return outgoing
             }
             button.configuration = configuration

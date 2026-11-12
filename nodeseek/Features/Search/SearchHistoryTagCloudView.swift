@@ -26,7 +26,7 @@ final class SearchHistoryTagCloudView: UIView {
 
     private lazy var expandButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
-        configuration.title = "展开"
+        configuration.title = NSLocalizedString("展开", tableName: "Search", comment: "")
         configuration.image = UIImage(
             systemName: "chevron.down",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
@@ -37,14 +37,14 @@ final class SearchHistoryTagCloudView: UIView {
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 0)
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = .systemFont(ofSize: 13, weight: .regular)
+            outgoing.font = AppTypography.font(basePointSize: 13, weight: .regular)
             return outgoing
         }
 
         let button = UIButton(type: .system)
         button.configuration = configuration
         button.isHidden = true
-        button.accessibilityLabel = "展开搜索历史"
+        button.accessibilityLabel = NSLocalizedString("展开搜索历史", tableName: "Search", comment: "")
         button.accessibilityIdentifier = "search-history-expand-button"
         button.addAction(UIAction { [weak self] _ in
             self?.onExpand?()
@@ -60,6 +60,13 @@ final class SearchHistoryTagCloudView: UIView {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    func refreshTypography() {
+        expandButton.setNeedsUpdateConfiguration()
+        expandButton.invalidateIntrinsicContentSize()
+        invalidateIntrinsicContentSize()
+        setNeedsLayout()
     }
 
     func setButtons(_ buttons: [UIButton]) {
@@ -196,7 +203,7 @@ final class SearchHistoryChipButton: UIButton {
         var trailing: CGFloat = 14
         if let tag {
             tagLabel.text = tag
-            tagLabel.font = .systemFont(ofSize: 11, weight: .medium)
+            tagLabel.font = AppTypography.font(basePointSize: 11, weight: .medium)
             tagLabel.textAlignment = .center
             tagLabel.textColor = .secondaryLabel
             tagBackgroundView.backgroundColor = .systemBackground
@@ -218,7 +225,7 @@ final class SearchHistoryChipButton: UIButton {
         configuration.titleLineBreakMode = .byTruncatingTail
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = .systemFont(ofSize: 14, weight: .regular)
+            outgoing.font = AppTypography.font(basePointSize: 14, weight: .regular)
             return outgoing
         }
         self.configuration = configuration

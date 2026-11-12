@@ -51,7 +51,7 @@ final class PostTextureListView: UIView {
 
     private let errorTitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "加载失败"
+        label.text = NSLocalizedString("加载失败", tableName: "Search", comment: "")
         label.font = .preferredFont(forTextStyle: .headline)
         label.textColor = .label
         label.textAlignment = .center
@@ -71,7 +71,7 @@ final class PostTextureListView: UIView {
 
     private lazy var retryButton: UIButton = {
         var configuration = UIButton.Configuration.filled()
-        configuration.title = "重试"
+        configuration.title = NSLocalizedString("重试", tableName: "Search", comment: "")
         configuration.cornerStyle = .capsule
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 18, bottom: 8, trailing: 18)
         let button = UIButton(type: .system)

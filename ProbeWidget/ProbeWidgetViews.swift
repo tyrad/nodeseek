@@ -71,15 +71,15 @@ private struct ProbeWidgetMessage: View {
 
     private var title: String {
         switch state {
-        case .needsAppLaunch: return "打开 App 一次"
-        case .noProbe, .ready: return "还没有探针"
+        case .needsAppLaunch: return NSLocalizedString("打开 App 一次", tableName: "ProbeWidget", comment: "")
+        case .noProbe, .ready: return NSLocalizedString("还没有探针", tableName: "ProbeWidget", comment: "")
         }
     }
 
     private var detail: String {
         switch state {
-        case .needsAppLaunch: return "更新后需要先打开 App，小组件才能读到探针。"
-        case .noProbe, .ready: return "在 App 的探针页添加后显示。"
+        case .needsAppLaunch: return NSLocalizedString("更新后需要先打开 App，小组件才能读到探针。", tableName: "ProbeWidget", comment: "")
+        case .noProbe, .ready: return NSLocalizedString("在 App 的探针页添加后显示。", tableName: "ProbeWidget", comment: "")
         }
     }
 }
@@ -103,7 +103,7 @@ struct ProbeOverviewView: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("在线服务器").font(ProbeWidgetStyle.caption).foregroundStyle(.secondary)
+                Text(NSLocalizedString("在线服务器", tableName: "ProbeWidget", comment: "")).font(ProbeWidgetStyle.caption).foregroundStyle(.secondary)
                 Spacer(minLength: 4)
                 UpdatedTime(date: entry.data.updatedAt, cached: cached)
             }
@@ -124,13 +124,13 @@ struct ProbeOverviewView: View {
     @ViewBuilder
     private var pills: some View {
         if cached {
-            ProbePill(symbol: nil, text: "缓存数据", tint: .secondary)
+            ProbePill(symbol: nil, text: NSLocalizedString("缓存数据", tableName: "ProbeWidget", comment: ""), tint: .secondary)
         } else if digest.offline == 0 && digest.alerts == 0 {
-            ProbePill(symbol: "checkmark", text: "全部正常", tint: .secondary)
+            ProbePill(symbol: "checkmark", text: NSLocalizedString("全部正常", tableName: "ProbeWidget", comment: ""), tint: .secondary)
         } else {
             HStack(spacing: 5) {
-                if digest.offline > 0 { ProbePill(symbol: "xmark", text: "离线 \(digest.offline)", tint: ProbeWidgetStyle.critical) }
-                if digest.alerts > 0 { ProbePill(symbol: "exclamationmark", text: "告警 \(digest.alerts)", tint: ProbeWidgetStyle.warning) }
+                if digest.offline > 0 { ProbePill(symbol: "xmark", text: String(format: NSLocalizedString("离线 %ld", tableName: "ProbeWidget", comment: ""), digest.offline), tint: ProbeWidgetStyle.critical) }
+                if digest.alerts > 0 { ProbePill(symbol: "exclamationmark", text: String(format: NSLocalizedString("告警 %ld", tableName: "ProbeWidget", comment: ""), digest.alerts), tint: ProbeWidgetStyle.warning) }
             }
         }
     }
@@ -138,7 +138,7 @@ struct ProbeOverviewView: View {
     @ViewBuilder
     private var footer: some View {
         if cached {
-            Text("连不上面板，点按重试").font(ProbeWidgetStyle.caption).foregroundStyle(.secondary)
+            Text(NSLocalizedString("连不上面板，点按重试", tableName: "ProbeWidget", comment: "")).font(ProbeWidgetStyle.caption).foregroundStyle(.secondary)
         } else if let expiry = digest.nearestExpiry {
             HStack(spacing: 3) {
                 Image(systemName: "clock")
@@ -163,7 +163,7 @@ struct ProbePill: View {
             if let symbol {
                 Image(systemName: symbol).font(.system(size: 9, weight: .heavy)).foregroundStyle(tint).widgetAccentable()
             }
-            Text(text).font(.system(size: 11, weight: .semibold))
+            Text(text).font(.system(size: 11, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.8)
         }
         .padding(.horizontal, 7)
         .padding(.vertical, 3)
@@ -197,11 +197,11 @@ struct ProbeAttentionView: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text(digest.attention.isEmpty ? "全部正常" : "需要关注 · \(digest.attention.count)")
+                Text(digest.attention.isEmpty ? NSLocalizedString("全部正常", tableName: "ProbeWidget", comment: "") : String(format: NSLocalizedString("需要关注 · %ld", tableName: "ProbeWidget", comment: ""), digest.attention.count))
                     .font(ProbeWidgetStyle.caption).foregroundStyle(.secondary)
                 Spacer(minLength: 6)
                 HStack(spacing: 4) {
-                    Text("\(digest.online)/\(digest.total) 在线").monospacedDigit()
+                    Text(String(format: NSLocalizedString("%ld/%ld 在线", tableName: "ProbeWidget", comment: ""), digest.online, digest.total)).monospacedDigit()
                     if entry.data.updatedAt != nil {
                         Text("·")
                         UpdatedTime(date: entry.data.updatedAt, cached: entry.data.isCached)
@@ -268,8 +268,8 @@ struct ProbeServerView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Image(systemName: "questionmark.circle").font(.system(size: 20, weight: .semibold)).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
-                Text("这台服务器已不在面板上").font(.system(size: 13, weight: .semibold))
-                Text("长按小组件重新选择。").font(.system(size: 11)).foregroundStyle(.secondary)
+                Text(NSLocalizedString("这台服务器已不在面板上", tableName: "ProbeWidget", comment: "")).font(.system(size: 13, weight: .semibold))
+                Text(NSLocalizedString("长按小组件重新选择。", tableName: "ProbeWidget", comment: "")).font(.system(size: 11)).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .widgetURL(ProbeWidgetLink().url)
@@ -303,8 +303,8 @@ private struct ProbeServerContent: View {
                 status
             } else {
                 cpu
-                ProbeMeterRow(title: "内存", percent: metrics?.memPercent).padding(.top, 6)
-                ProbeMeterRow(title: "硬盘", percent: metrics?.diskPercent).padding(.top, 4)
+                ProbeMeterRow(title: NSLocalizedString("内存", tableName: "ProbeWidget", comment: ""), percent: metrics?.memPercent).padding(.top, 6)
+                ProbeMeterRow(title: NSLocalizedString("硬盘", tableName: "ProbeWidget", comment: ""), percent: metrics?.diskPercent).padding(.top, 4)
             }
             Spacer(minLength: 4)
             footer
@@ -340,7 +340,7 @@ private struct ProbeServerContent: View {
                 .foregroundStyle(offline ? ProbeWidgetStyle.critical : .secondary)
                 .widgetAccentable()
             Text(offline ? ProbeWidgetDigest.offlineText(since: server.server.status?.sampledAt, now: now)
-                         : server.isStale ? "连不上面板" : "暂无数据")
+                         : server.isStale ? NSLocalizedString("连不上面板", tableName: "ProbeWidget", comment: "") : NSLocalizedString("暂无数据", tableName: "ProbeWidget", comment: ""))
                 .font(.system(size: 17, weight: .bold))
         }
     }
@@ -368,7 +368,7 @@ private struct ProbeMeterRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(title).font(.system(size: 10.5)).foregroundStyle(.secondary).frame(width: 26, alignment: .leading)
+            Text(title).font(.system(size: 10.5)).foregroundStyle(.secondary).frame(minWidth: 26, alignment: .leading)
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     Capsule().fill(.quaternary)

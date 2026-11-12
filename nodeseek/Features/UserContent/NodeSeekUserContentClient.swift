@@ -240,9 +240,9 @@ enum UserContentClientError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .httpStatus(let status):
-            return "请求失败：HTTP \(status)"
+            return String(format: NSLocalizedString("请求失败：HTTP %ld", tableName: "Search", comment: ""), status)
         case .unsuccessfulResponse:
-            return "接口返回失败"
+            return NSLocalizedString("接口返回失败", tableName: "Search", comment: "")
         case .rejected(let message):
             return message
         }

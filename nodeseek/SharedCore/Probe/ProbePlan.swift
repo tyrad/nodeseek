@@ -171,9 +171,9 @@ nonisolated struct ProbePlanSummary: Equatable, Sendable {
     init?(plan: ProbePlan?, metrics: ProbeMetrics?, now: Date = Date(), calendar: Calendar = .current) {
         guard let plan else { return nil }
         if plan.isLongTerm(now: now) {
-            expiry = "长期有效"
+            expiry = NSLocalizedString("长期有效", tableName: "ProbeWidget", comment: "")
         } else if let days = plan.daysLeft(now: now, calendar: calendar), let date = plan.expiresAt {
-            expiry = days > 0 ? "\(days) 天后到期" : days == 0 ? "今天到期" : "已过期 \(-days) 天"
+            expiry = days > 0 ? String(format: NSLocalizedString("%ld 天后到期", tableName: "ProbeWidget", comment: ""), days) : days == 0 ? NSLocalizedString("今天到期", tableName: "ProbeWidget", comment: "") : String(format: NSLocalizedString("已过期 %ld 天", tableName: "ProbeWidget", comment: ""), -days)
             expiryLevel = days < 0 ? .critical : days <= 7 ? .warning : .normal
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -205,8 +205,8 @@ nonisolated struct ProbePlanSummary: Equatable, Sendable {
         if let price { parts.append(price) }
         if let traffic {
             parts.append(traffic.isOver
-                ? "流量超出 \(ProbeFormat.bytes(traffic.used - traffic.limit))"
-                : "流量 \(ProbeFormat.percent(traffic.percent, decimals: 0))%")
+                ? String(format: NSLocalizedString("流量超出 %@", tableName: "ProbeWidget", comment: ""), ProbeFormat.bytes(traffic.used - traffic.limit))
+                : String(format: NSLocalizedString("流量 %@%%", tableName: "ProbeWidget", comment: ""), ProbeFormat.percent(traffic.percent, decimals: 0)))
         }
         return parts
     }

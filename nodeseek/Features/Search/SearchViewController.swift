@@ -55,18 +55,19 @@ final class SearchViewController: UIViewController {
     /// 分类嵌在搜索框左侧，带下拉箭头，一眼能看出可切换；只在帖子搜索时出现。
     private let categorySelectorButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
-        configuration.title = "全部"
+        configuration.title = NSLocalizedString("全部", tableName: "Search", comment: "")
         configuration.image = UIImage(
             systemName: "chevron.down",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 10, weight: .bold)
         )
+        configuration.titleLineBreakMode = .byTruncatingTail
         configuration.imagePlacement = .trailing
         configuration.imagePadding = 4
         configuration.baseForegroundColor = .label
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = .systemFont(ofSize: 15, weight: .semibold)
+            outgoing.font = AppTypography.font(basePointSize: 15, weight: .semibold)
             return outgoing
         }
 
@@ -75,7 +76,7 @@ final class SearchViewController: UIViewController {
         button.showsMenuAsPrimaryAction = true
         button.accessibilityIdentifier = "search-category-selector-button"
         button.setContentHuggingPriority(.required, for: .horizontal)
-        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -100,15 +101,16 @@ final class SearchViewController: UIViewController {
 
     private let keywordTextField: UITextField = {
         let textField = UITextField()
-        textField.placeholder = "输入关键字"
+        textField.placeholder = NSLocalizedString("输入关键字", tableName: "Search", comment: "")
         textField.borderStyle = .none
         textField.backgroundColor = .clear
-        textField.font = .systemFont(ofSize: 16)
+        textField.font = AppTypography.font(basePointSize: 16)
         textField.clearButtonMode = .whileEditing
         textField.returnKeyType = .search
         textField.textContentType = .none
         textField.autocapitalizationType = .none
         textField.autocorrectionType = .no
+        textField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         textField.accessibilityIdentifier = "search-keyword-text-field"
         textField.translatesAutoresizingMaskIntoConstraints = false
         return textField
@@ -138,7 +140,7 @@ final class SearchViewController: UIViewController {
 
     private let searchButton: UIButton = {
         var configuration = UIButton.Configuration.filled()
-        configuration.title = "搜索"
+        configuration.title = NSLocalizedString("搜索", tableName: "Search", comment: "")
         configuration.baseBackgroundColor = .label
         configuration.baseForegroundColor = .systemBackground
         configuration.cornerStyle = .fixed
@@ -147,12 +149,13 @@ final class SearchViewController: UIViewController {
         configuration.titleLineBreakMode = .byTruncatingTail
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = .systemFont(ofSize: 15, weight: .semibold)
+            outgoing.font = AppTypography.font(basePointSize: 15, weight: .semibold)
             return outgoing
         }
 
         let button = UIButton(type: .system)
         button.configuration = configuration
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
         button.accessibilityIdentifier = "search-submit-button"
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
@@ -182,7 +185,7 @@ final class SearchViewController: UIViewController {
         // 箭头贴左，和下方分类按钮左边缘对齐，点击区域仍保持 44pt
         button.contentHorizontalAlignment = .leading
         button.isHidden = true
-        button.accessibilityLabel = "返回"
+        button.accessibilityLabel = NSLocalizedString("返回", tableName: "Search", comment: "")
         button.accessibilityIdentifier = "search-back-button"
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
@@ -208,8 +211,8 @@ final class SearchViewController: UIViewController {
 
     private let recentSearchesTitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "最近搜索"
-        label.font = .systemFont(ofSize: 15, weight: .semibold)
+        label.text = NSLocalizedString("最近搜索", tableName: "Search", comment: "")
+        label.font = AppTypography.font(basePointSize: 15, weight: .semibold)
         label.textColor = ReadingColors.text
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
@@ -217,12 +220,12 @@ final class SearchViewController: UIViewController {
 
     private let clearRecentSearchesButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
-        configuration.title = "清空"
+        configuration.title = NSLocalizedString("清空", tableName: "Search", comment: "")
         configuration.baseForegroundColor = .secondaryLabel
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8)
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = .systemFont(ofSize: 14, weight: .regular)
+            outgoing.font = AppTypography.font(basePointSize: 14, weight: .regular)
             return outgoing
         }
 
@@ -235,7 +238,7 @@ final class SearchViewController: UIViewController {
 
     private let collapseRecentSearchesButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
-        configuration.title = "收起"
+        configuration.title = NSLocalizedString("收起", tableName: "Search", comment: "")
         configuration.image = UIImage(
             systemName: "chevron.up",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
@@ -246,14 +249,14 @@ final class SearchViewController: UIViewController {
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 0)
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = .systemFont(ofSize: 14, weight: .regular)
+            outgoing.font = AppTypography.font(basePointSize: 14, weight: .regular)
             return outgoing
         }
 
         let button = UIButton(type: .system)
         button.configuration = configuration
         button.isHidden = true
-        button.accessibilityLabel = "收起搜索历史"
+        button.accessibilityLabel = NSLocalizedString("收起搜索历史", tableName: "Search", comment: "")
         button.accessibilityIdentifier = "search-history-collapse-button"
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
@@ -346,9 +349,23 @@ final class SearchViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
+        NotificationCenter.default.addObserver(self, selector: #selector(refreshTextSize), name: AppTextSizeSettings.didChangeNotification, object: nil)
         let rememberedCategory = searchPreferenceStore.category()
         applySelectedCategory(categories.contains(rememberedCategory) ? rememberedCategory : .all)
         applyScope(.post)
+    }
+
+    @objc private func refreshTextSize() {
+        keywordTextField.font = AppTypography.font(basePointSize: 16)
+        recentSearchesTitleLabel.font = AppTypography.font(basePointSize: 15, weight: .semibold)
+        scopeControl.refreshTypography()
+        for button in [categorySelectorButton, searchButton, clearRecentSearchesButton, collapseRecentSearchesButton] {
+            button.setNeedsUpdateConfiguration()
+            button.invalidateIntrinsicContentSize()
+        }
+        recentSearchesTagCloudView.refreshTypography()
+        renderRecentSearches()
+        view.setNeedsLayout()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -356,6 +373,7 @@ final class SearchViewController: UIViewController {
         // 隐藏导航条把空间让给结果列表；进入下一页时在 viewWillDisappear 里恢复。
         navigationController?.setNavigationBarHidden(true, animated: animated)
         backButton.isHidden = !canGoBack
+        refreshTextSize()
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -392,7 +410,7 @@ final class SearchViewController: UIViewController {
     }
 
     private func setupUI() {
-        title = "搜一搜"
+        title = NSLocalizedString("搜一搜", tableName: "Search", comment: "")
         view.backgroundColor = UIColor.systemBackground
         keywordTextField.delegate = self
         keywordTextField.addTarget(self, action: #selector(keywordTextChanged), for: .editingChanged)
@@ -429,6 +447,10 @@ final class SearchViewController: UIViewController {
             userResultsView.topAnchor.constraint(equalTo: formContainerView.bottomAnchor, constant: 12)
         ]
         NSLayoutConstraint.activate(resultsBelowFormConstraints)
+        // 默认保持紧凑宽度，长译文和大字号可按内容撑开。
+        let preferredSearchWidth = searchButton.widthAnchor.constraint(equalToConstant: 64)
+        preferredSearchWidth.priority = .defaultLow
+        preferredSearchWidth.isActive = true
 
         NSLayoutConstraint.activate([
             // 搜索框固定在顶部：搜索时不再移动布局，避免和键盘收起动画叠在一起。
@@ -441,16 +463,18 @@ final class SearchViewController: UIViewController {
             formStackView.topAnchor.constraint(equalTo: formContainerView.topAnchor),
             formStackView.bottomAnchor.constraint(equalTo: formContainerView.bottomAnchor),
 
-            searchFieldContainerView.heightAnchor.constraint(equalToConstant: 44),
+            searchFieldContainerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
             searchFieldStackView.leadingAnchor.constraint(equalTo: searchFieldContainerView.leadingAnchor, constant: 14),
             searchFieldStackView.trailingAnchor.constraint(equalTo: searchFieldContainerView.trailingAnchor, constant: -8),
             searchFieldStackView.topAnchor.constraint(equalTo: searchFieldContainerView.topAnchor),
             searchFieldStackView.bottomAnchor.constraint(equalTo: searchFieldContainerView.bottomAnchor),
+            categorySelectorButton.widthAnchor.constraint(lessThanOrEqualTo: searchFieldContainerView.widthAnchor, multiplier: 0.35),
             categoryDividerView.widthAnchor.constraint(equalToConstant: 1),
             categoryDividerView.heightAnchor.constraint(equalToConstant: 18),
-            keywordTextField.heightAnchor.constraint(equalToConstant: 44),
-            searchButton.widthAnchor.constraint(equalToConstant: 64),
-            topRowStackView.heightAnchor.constraint(equalToConstant: 44),
+            keywordTextField.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            keywordTextField.widthAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            searchButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 64),
+            topRowStackView.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
             backButton.widthAnchor.constraint(equalToConstant: 44),
             backButton.heightAnchor.constraint(equalToConstant: 44),
 
@@ -531,7 +555,7 @@ final class SearchViewController: UIViewController {
     private func applySelectedCategory(_ category: PostListCategory) {
         selectedCategory = category
         var configuration = categorySelectorButton.configuration ?? UIButton.Configuration.bordered()
-        configuration.title = category.title
+        configuration.title = NSLocalizedString(category.title, tableName: "Search", comment: "")
         categorySelectorButton.configuration = configuration
         categorySelectorButton.menu = makeCategoryMenu()
     }
@@ -560,9 +584,9 @@ final class SearchViewController: UIViewController {
         categorySelectorButton.isHidden = scope != .post
         categoryDividerView.isHidden = scope != .post
         switch scope {
-        case .post: keywordTextField.placeholder = "输入关键字"
-        case .user: keywordTextField.placeholder = "输入用户名"
-        case .google: keywordTextField.placeholder = "用谷歌搜索本站"
+        case .post: keywordTextField.placeholder = NSLocalizedString("输入关键字", tableName: "Search", comment: "")
+        case .user: keywordTextField.placeholder = NSLocalizedString("输入用户名", tableName: "Search", comment: "")
+        case .google: keywordTextField.placeholder = NSLocalizedString("用谷歌搜索本站", tableName: "Search", comment: "")
         }
         updateContentVisibility()
     }
@@ -578,13 +602,13 @@ final class SearchViewController: UIViewController {
     private func makeCategoryMenu() -> UIMenu {
         let actions = categories.map { category in
             UIAction(
-                title: category.title,
+                title: NSLocalizedString(category.title, tableName: "Search", comment: ""),
                 state: category == selectedCategory ? .on : .off
             ) { [weak self] _ in
                 self?.applySelectedCategory(category)
             }
         }
-        return UIMenu(title: "选择分类", options: .singleSelection, children: actions)
+        return UIMenu(title: NSLocalizedString("选择分类", tableName: "Search", comment: ""), options: .singleSelection, children: actions)
     }
 
     @objc private func scopeControlChanged() {
@@ -693,7 +717,7 @@ final class SearchViewController: UIViewController {
             } catch {
                 guard let self, !Task.isCancelled, self.activeUserQuery == query else { return }
                 // 游客请求时站点直接返回 HTTP 500，这里换成可理解的提示
-                let message = await self.isLoggedIn() ? error.localizedDescription : "登录后才能搜索用户"
+                let message = await self.isLoggedIn() ? error.localizedDescription : NSLocalizedString("登录后才能搜索用户", tableName: "Search", comment: "")
                 guard !Task.isCancelled, self.activeUserQuery == query else { return }
                 // 限流等接口提示原样展示，不弹窗打断
                 self.userResultsView.setState(.failed(message))
@@ -816,7 +840,7 @@ final class SearchViewController: UIViewController {
         }
         if posts.isEmpty {
             // 站点对过短、含违规字符或无结果的搜索只返回一句提示，原样展示给用户
-            listView.showEmptyMessage(searchPage.notice ?? "未找到相关帖子，换个关键词试试")
+            listView.showEmptyMessage(searchPage.notice ?? NSLocalizedString("未找到相关帖子，换个关键词试试", tableName: "Search", comment: ""))
         }
     }
 
@@ -862,8 +886,8 @@ final class SearchViewController: UIViewController {
     }
 
     private func showError(message: String) {
-        let alert = UIAlertController(title: "错误", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        let alert = UIAlertController(title: NSLocalizedString("错误", tableName: "Search", comment: ""), message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: NSLocalizedString("确定", tableName: "Search", comment: ""), style: .default))
         present(alert, animated: true)
     }
 }

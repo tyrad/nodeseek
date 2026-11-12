@@ -100,7 +100,7 @@ final class SearchUserResultsView: UIView, UITableViewDataSource, UITableViewDel
             messageLabel.text = nil
         case .loaded(let records):
             activityIndicator.stopAnimating()
-            messageLabel.text = records.isEmpty ? "未找到用户，换个关键词试试" : nil
+            messageLabel.text = records.isEmpty ? NSLocalizedString("未找到用户，换个关键词试试", tableName: "Search", comment: "") : nil
             if !records.isEmpty {
                 tableView.setContentOffset(CGPoint(x: 0, y: -tableView.adjustedContentInset.top), animated: false)
             }
