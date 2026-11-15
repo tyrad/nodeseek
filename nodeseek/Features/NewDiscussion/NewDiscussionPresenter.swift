@@ -322,11 +322,11 @@ final class NewDiscussionPresenter: NewDiscussionPresenterProtocol {
             } catch let error as NodeSeekDiscussionSubmitError {
                 isSubmitting = false
                 render()
-                let title = error == .resultUnknown ? "发布结果未知" : "发布失败"
+                let title = error.isResultUnknown ? "发布结果未知" : "发布失败"
                 view?.showSubmitFailure(
                     title: title,
                     message: error.localizedDescription,
-                    allowsRetry: error != .resultUnknown
+                    allowsRetry: !error.isResultUnknown
                 )
             } catch {
                 isSubmitting = false
@@ -393,12 +393,12 @@ final class NewDiscussionPresenter: NewDiscussionPresenterProtocol {
             } catch {
                 isSubmitting = false
                 render()
-                // 重复保存同样的内容没有副作用，结果未知时也可以直接重试。
-                let isUnknown = (error as? NodeSeekDiscussionSubmitError) == .resultUnknown
+                // 结果未知时先确认保存状态，避免直接重复提交。
+                let isUnknown = (error as? NodeSeekDiscussionSubmitError)?.isResultUnknown == true
                 view?.showSubmitFailure(
                     title: isUnknown ? "保存结果未知" : "保存失败",
                     message: Self.editFailureMessage(for: error),
-                    allowsRetry: true
+                    allowsRetry: !isUnknown
                 )
             }
         }
@@ -409,7 +409,7 @@ final class NewDiscussionPresenter: NewDiscussionPresenterProtocol {
         case .notLoggedIn:
             return "登录状态已失效，请重新登录后再保存。"
         case .resultUnknown:
-            return "可能已经保存，可以直接重试，重复保存同样的内容没有影响。"
+            return "操作结果未确认，请刷新查看。"
         case .network(let message):
             return "网络异常，修改没有保存：\(message)"
         case .unexpected(let message):

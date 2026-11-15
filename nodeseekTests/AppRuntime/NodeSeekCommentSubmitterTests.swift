@@ -10,6 +10,73 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct NodeSeekCommentSubmitterTests {
+    @Test(arguments: ["submit_timeout", "network_error", "invalid_response"])
+    func distinguishesTimeoutFromUnknown(reason: String) async throws {
+        let expected = reason == "submit_timeout"
+            ? "提交超时，请刷新确认是否成功。" : "操作结果未确认，请刷新查看。"
+        let referer = URL(string: "https://www.nodeseek.com/post-123-1")!
+        let comment = CapturingCommentAutomation(response: .init(
+            ok: false, statusCode: nil, message: "internal error", reason: reason
+        ))
+        let reaction = CapturingCommentUpvoteAutomation(response: .init(
+            ok: false, statusCode: nil, response: CommentUpvoteResponse(), reason: reason
+        ))
+        let collection = CapturingCollectionAutomation(response: .init(
+            ok: false, statusCode: nil, response: PostCollectionResponse(), reason: reason
+        ))
+        do {
+            _ = try await NodeSeekCommentSubmitter(automation: comment).submitComment(postID: "123", content: "测试", referer: referer)
+            Issue.record("应返回错误")
+        } catch { #expect(error.localizedDescription == expected) }
+        do {
+            _ = try await NodeSeekCommentUpvoteSubmitter(automation: reaction).addUpvote(commentID: "123", referer: referer)
+            Issue.record("应返回错误")
+        } catch { #expect(error.localizedDescription == expected) }
+        do {
+            _ = try await NodeSeekPostCollectionSubmitter(automation: collection).addFavorite(postID: "123", referer: referer)
+            Issue.record("应返回错误")
+        } catch { #expect(error.localizedDescription == expected) }
+    }
+
+
+    @Test func missingSuccessDoesNotPassSwiftFallback() async throws {
+        let referer = URL(string: "https://www.nodeseek.com/post-123-1")!
+        let reaction = CapturingCommentUpvoteAutomation(response: .init(
+            ok: true, statusCode: 200, response: CommentUpvoteResponse(), reason: "submitted"
+        ))
+        do {
+            _ = try await NodeSeekCommentUpvoteSubmitter(automation: reaction).addUpvote(commentID: "123", referer: referer)
+            Issue.record("缺少成功标志时必须拒绝成功")
+        } catch {
+            #expect(error.localizedDescription == "操作结果未确认，请刷新查看。")
+        }
+        let collection = CapturingCollectionAutomation(response: .init(
+            ok: true, statusCode: 200, response: PostCollectionResponse(), reason: "submitted"
+        ))
+        do {
+            _ = try await NodeSeekPostCollectionSubmitter(automation: collection).addFavorite(postID: "123", referer: referer)
+            Issue.record("缺少成功标志时必须拒绝成功")
+        } catch {
+            #expect(error.localizedDescription == "操作结果未确认，请刷新查看。")
+        }
+    }
+
+
+    @Test func uncertainSubmissionDoesNotExposeScriptErrorOrEncourageResending() async throws {
+        let automation = CapturingCommentAutomation(response: .init(
+            ok: false, statusCode: nil, message: "WKErrorDomain internal error", reason: "javascript_exception"
+        ))
+        let submitter = NodeSeekCommentSubmitter(automation: automation)
+        do {
+            _ = try await submitter.submitComment(
+                postID: "123", content: "回复", referer: URL(string: "https://www.nodeseek.com/post-123-1")!
+            )
+            Issue.record("应提示提交结果未知")
+        } catch {
+            #expect(error.localizedDescription == "操作结果未确认，请刷新查看。")
+        }
+    }
+
     @Test func submitsCommentThroughPageAutomation() async throws {
         let automation = CapturingCommentAutomation(response: .init(ok: true, statusCode: 200, message: nil, reason: "submitted"))
         let submitter = NodeSeekCommentSubmitter(

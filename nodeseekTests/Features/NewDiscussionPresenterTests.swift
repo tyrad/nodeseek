@@ -199,9 +199,10 @@ struct NewDiscussionPresenterTests {
         #expect(submitter.submissions.isEmpty)
     }
 
-    @Test func timeoutKeepsDraftAndDoesNotOfferRetry() async throws {
+    @Test(arguments: [NodeSeekDiscussionSubmitError.resultUnknown, .submissionTimedOut])
+    func timeoutKeepsDraftAndDoesNotOfferRetry(error: NodeSeekDiscussionSubmitError) async throws {
         let submitter = StubDiscussionSubmitter()
-        submitter.submitResult = .failure(NodeSeekDiscussionSubmitError.resultUnknown)
+        submitter.submitResult = .failure(error)
         let (presenter, store, router, _, view) = makePresenter(submitter: submitter)
         presenter.viewDidLoad()
         fillValidDraft(presenter, category: .tech)
@@ -339,9 +340,10 @@ struct NewDiscussionPresenterTests {
         #expect(editor.edits.first?.rank == .onlyMe)
     }
 
-    @Test func editTimeoutReportsUnknownAndAllowsRetry() async throws {
+    @Test(arguments: [NodeSeekDiscussionSubmitError.resultUnknown, .submissionTimedOut])
+    func editTimeoutKeepsDraftAndDoesNotOfferRetry(error: NodeSeekDiscussionSubmitError) async throws {
         let editor = StubDiscussionSubmitter()
-        editor.editResult = .failure(NodeSeekDiscussionSubmitError.resultUnknown)
+        editor.editResult = .failure(error)
         let (presenter, store, _, _, view) = makeEditPresenter(editor: editor)
         presenter.viewDidLoad()
         presenter.didChangeContent("新正文")
@@ -350,7 +352,7 @@ struct NewDiscussionPresenterTests {
         try await waitUntil { !view.failures.isEmpty }
 
         #expect(view.failures.first?.title == "保存结果未知")
-        #expect(view.failures.first?.allowsRetry == true)
+        #expect(view.failures.first?.allowsRetry == false)
         #expect(store.saved?.content == "新正文")
         #expect(presenter.state.isSubmitting == false)
     }

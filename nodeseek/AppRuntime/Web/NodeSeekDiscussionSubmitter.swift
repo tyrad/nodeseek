@@ -11,10 +11,15 @@ enum NodeSeekDiscussionSubmitError: LocalizedError, Equatable {
     case serverMessage(String)
     /// 请求已经发出但没等到结果，帖子可能已经发出，不能自动重试。
     case resultUnknown
+    case submissionTimedOut
     case network(String)
     case unexpected(String)
     /// 帖子或评论不是当前登录用户发的。
     case notOwner
+
+    var isResultUnknown: Bool {
+        self == .resultUnknown || self == .submissionTimedOut
+    }
 
     var errorDescription: String? {
         switch self {
@@ -22,8 +27,10 @@ enum NodeSeekDiscussionSubmitError: LocalizedError, Equatable {
             return "登录状态已失效，请重新登录后再发帖。"
         case .challenge(let message), .serverMessage(let message):
             return message
+        case .submissionTimedOut:
+            return "提交超时，请刷新确认是否成功。"
         case .resultUnknown:
-            return "可能已经发出，请先到“我的帖子”确认，再决定是否重试。"
+            return "操作结果未确认，请刷新查看。"
         case .network(let message):
             return "网络异常，帖子没有发出：\(message)"
         case .unexpected(let message):
@@ -232,10 +239,12 @@ final class WebViewNodeSeekDiscussionSubmitter: NodeSeekDiscussionSubmitting, No
             throw NodeSeekDiscussionSubmitError.notOwner
         case "challenge":
             throw NodeSeekDiscussionSubmitError.challenge(message ?? "需要先通过站点验证，请稍后重试。")
-        case "submit_timeout", "response_unreadable":
+        case "submit_timeout":
+            throw NodeSeekDiscussionSubmitError.submissionTimedOut
+        case "response_unreadable":
             throw NodeSeekDiscussionSubmitError.resultUnknown
         case "network_error":
-            throw NodeSeekDiscussionSubmitError.network(message ?? "未知错误")
+            throw NodeSeekDiscussionSubmitError.resultUnknown
         default:
             throw NodeSeekDiscussionSubmitError.unexpected(message ?? reason)
         }

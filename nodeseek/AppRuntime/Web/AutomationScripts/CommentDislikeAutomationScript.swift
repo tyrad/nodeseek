@@ -20,7 +20,8 @@ enum CommentDislikeAutomationScript {
 
       const parseJSON = (body) => {
         try {
-          return JSON.parse(body || "{}");
+          const value = JSON.parse(body);
+          return value && typeof value === "object" && !Array.isArray(value) ? value : {};
         } catch (_) {
           return {};
         }
@@ -46,15 +47,20 @@ enum CommentDislikeAutomationScript {
 
         const body = await response.text();
         const json = parseJSON(body);
+        // 非 2xx 优先保留状态码，交给 Swift 区分登录失效、限流等明确失败。
+        if (response.status >= 200 && response.status < 300 && typeof json.success !== "boolean") {
+          finish({ ok: false, statusCode: response.status, reason: "invalid_response", body });
+          return;
+        }
         finish({
-          ok: response.status >= 200 && response.status < 300 && json.success !== false,
+          ok: response.status >= 200 && response.status < 300 && json.success === true,
           statusCode: response.status,
           response: {
             success: typeof json.success === "boolean" ? json.success : null,
             message: json.message || json.msg || json.error || null,
             current: typeof json.current === "number" ? json.current : null
           },
-          reason: response.status >= 200 && response.status < 300 && json.success !== false ? "submitted" : "server_error",
+          reason: response.status >= 200 && response.status < 300 && json.success === true ? "submitted" : "server_error",
           body
         });
       } catch (error) {

@@ -93,12 +93,26 @@ final class NodeSeekCommentSubmitter {
             )
         }
 
+        if response.reason == "submit_timeout" {
+            throw NodeSeekCommentSubmitterError.pageAutomationFailed("提交超时，请刷新确认是否成功。")
+        }
+
+        // 先看状态码：非 2xx 的 HTML 响应（登录失效、限流）是明确失败，不能落入“结果未确认”。
         if let statusCode = response.statusCode, !(200..<300).contains(statusCode) {
             AppLog.warning(.postDetail, "Submitter 收到非 2xx 状态: postID=\(numericPostID), status=\(statusCode), message=\(response.message ?? "nil")")
             if let message = response.message?.trimmingCharacters(in: .whitespacesAndNewlines), !message.isEmpty {
                 throw NodeSeekCommentSubmitterError.serverMessage(message)
             }
+            if let message = UserFacingError.submissionHTTPStatusMessage(statusCode) {
+                throw NodeSeekCommentSubmitterError.serverMessage(message)
+            }
             throw NodeSeekCommentSubmitterError.httpStatus(statusCode)
+        }
+
+        if ["javascript_exception", "submit_timeout", "invalid_script_result", "invalid_response", "network_error"].contains(response.reason) {
+            throw NodeSeekCommentSubmitterError.pageAutomationFailed(
+                "操作结果未确认，请刷新查看。"
+            )
         }
 
         guard response.ok else {
@@ -534,14 +548,26 @@ private func submitReaction(
     let automationResponse = try await automation(numericTargetID, action, referer)
     let response = automationResponse.response
 
+    if automationResponse.reason == "submit_timeout" {
+        throw errors.serverMessage("提交超时，请刷新确认是否成功。")
+    }
+
+    // 先看状态码：非 2xx 的 HTML 响应（登录失效、限流）是明确失败，不能落入“结果未确认”。
     if let statusCode = automationResponse.statusCode, !(200..<300).contains(statusCode) {
         if let message = response.message {
+            throw errors.serverMessage(message)
+        }
+        if let message = UserFacingError.submissionHTTPStatusMessage(statusCode) {
             throw errors.serverMessage(message)
         }
         throw errors.httpStatus(statusCode)
     }
 
-    guard automationResponse.ok, response.success != false else {
+    if ["javascript_exception", "submit_timeout", "invalid_script_result", "invalid_response", "network_error"].contains(automationResponse.reason) || response.success == nil {
+        throw errors.serverMessage("操作结果未确认，请刷新查看。")
+    }
+
+    guard automationResponse.ok, response.success == true else {
         if let message = response.message {
             throw errors.serverMessage(message)
         }
@@ -580,15 +606,26 @@ final class NodeSeekPostCollectionSubmitter: PostCollectionSubmitting {
             referer: referer
         )
         let collectionResponse = automationResponse.response
+        if automationResponse.reason == "submit_timeout" {
+            throw NodeSeekPostCollectionSubmitterError.serverMessage("提交超时，请刷新确认是否成功。")
+        }
 
+        // 先看状态码：非 2xx 的 HTML 响应（登录失效、限流）是明确失败，不能落入“结果未确认”。
         if let statusCode = automationResponse.statusCode, !(200..<300).contains(statusCode) {
             if let message = collectionResponse.message {
+                throw NodeSeekPostCollectionSubmitterError.serverMessage(message)
+            }
+            if let message = UserFacingError.submissionHTTPStatusMessage(statusCode) {
                 throw NodeSeekPostCollectionSubmitterError.serverMessage(message)
             }
             throw NodeSeekPostCollectionSubmitterError.httpStatus(statusCode)
         }
 
-        guard automationResponse.ok, collectionResponse.success != false else {
+        if ["javascript_exception", "submit_timeout", "invalid_script_result", "invalid_response", "network_error"].contains(automationResponse.reason) || collectionResponse.success == nil {
+            throw NodeSeekPostCollectionSubmitterError.serverMessage("操作结果未确认，请刷新查看。")
+        }
+
+        guard automationResponse.ok, collectionResponse.success == true else {
             if let message = collectionResponse.message {
                 throw NodeSeekPostCollectionSubmitterError.serverMessage(message)
             }

@@ -44,11 +44,17 @@ struct WebViewNodeSeekNotificationMarkViewedSubmitter: NodeSeekNotificationMarkV
             "通知标记已读 WebView 请求结束: path=\(request.apiPath), ok=\(result.ok), status=\(result.statusCode.map(String.init) ?? "nil"), reason=\(result.reason), message=\(result.message ?? "nil"), bodyLength=\(result.body?.count ?? 0), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))"
         )
         guard result.ok else {
+            if let statusCode = result.statusCode,
+               !(200..<300).contains(statusCode),
+               let message = UserFacingError.submissionHTTPStatusMessage(statusCode) {
+                throw NodeSeekNotificationClientError.unsuccessfulResponse(message)
+            }
             let message: String
             switch result.reason {
-            case "submit_timeout": message = "请求超时，请重试"
+            case "submit_timeout": message = "提交超时，请刷新确认是否成功。"
+            case "invalid_response": message = "操作结果未确认，请刷新查看。"
             case "challenge": message = "需要网页验证，请打开通知网页后重试"
-            case "network_error": message = "网络连接失败，请稍后重试"
+            case "network_error": message = "操作结果未确认，请刷新查看。"
             default: message = "标记已读失败，请稍后重试"
             }
             throw NodeSeekNotificationClientError.unsuccessfulResponse(message)

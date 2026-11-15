@@ -22,7 +22,8 @@ enum NotificationMarkViewedAutomationScript {
 
       const parseJSON = (body) => {
         try {
-          return JSON.parse(body || "{}");
+          const value = JSON.parse(body);
+          return value && typeof value === "object" && !Array.isArray(value) ? value : {};
         } catch (_) {
           return {};
         }
@@ -48,6 +49,11 @@ enum NotificationMarkViewedAutomationScript {
         const response = await window.fetch(apiPath, options);
         const body = await response.text();
         const json = parseJSON(body);
+        // 非 2xx 优先保留状态码，交给 Swift 区分登录失效、限流等明确失败。
+        if (response.status >= 200 && response.status < 300 && typeof json.success !== "boolean") {
+          finish({ ok: false, statusCode: response.status, reason: "invalid_response", body });
+          return;
+        }
         const ok = response.status >= 200 && response.status < 300 && json && json.success === true;
         finish({
           ok,

@@ -31,6 +31,7 @@ enum NewDiscussionAutomationScript {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     let response;
+    let body;
     try {
       response = await fetch(endpoint, {
         method: "POST",
@@ -43,6 +44,7 @@ enum NewDiscussionAutomationScript {
         body: payload,
         signal: controller.signal
       });
+      body = await response.text();
     } catch (error) {
       const aborted = error && error.name === "AbortError";
       return {
@@ -54,18 +56,6 @@ enum NewDiscussionAutomationScript {
       clearTimeout(timer);
     }
 
-    // 请求已经发出去了，读不到返回内容时结果未知，不能当普通失败重试。
-    let body;
-    try {
-      body = await response.text();
-    } catch (error) {
-      return {
-        ok: false,
-        statusCode: response.status,
-        reason: "response_unreadable",
-        message: String(error && error.message ? error.message : error)
-      };
-    }
     return {
       ok: response.status >= 200 && response.status < 300,
       statusCode: response.status,

@@ -36,18 +36,23 @@ enum CommentSubmissionAutomationScript {
 
         const parseResponseBody = (statusCode, body) => {
           logStep("comment_response_received", `status=${statusCode} bodyLength=${(body || "").length}`);
-          let message = null;
+          let json;
           try {
-            const json = JSON.parse(body || "{}");
-            message = json.message || json.error || json.msg || null;
-          } catch (_) {}
-          finish({
-            ok: statusCode >= 200 && statusCode < 300,
-            statusCode,
-            message,
-            reason: statusCode >= 200 && statusCode < 300 ? "submitted" : "server_error",
-            body: body || ""
-          });
+            json = JSON.parse(body);
+          } catch (_) {
+            json = null;
+          }
+          const httpOK = statusCode >= 200 && statusCode < 300;
+          // 非 2xx 返回 HTML（登录失效、验证页、限流）时保留状态码，不归为结果未知。
+          if (json === null && httpOK) {
+            finish({ ok: false, statusCode, reason: "invalid_response", body: body || "" });
+            return;
+          }
+          const message = typeof json?.message === "string" ? json.message : null;
+          const success = httpOK && json?.success === true;
+          const reason = success ? "submitted"
+            : (!httpOK || json?.success === false ? "server_error" : "invalid_response");
+          finish({ ok: success, statusCode, message, reason, body: body || "" });
         };
 
         const visible = (element) => {
@@ -66,25 +71,27 @@ enum CommentSubmissionAutomationScript {
 
         const sleep = (milliseconds) => new Promise((done) => window.setTimeout(done, milliseconds));
 
-        const findEditor = () =>
-          document.querySelector(".comment-container textarea[tabindex='2']") ||
-          document.querySelector("textarea[tabindex='2']") ||
-          document.querySelector(".vditor textarea") ||
-          document.querySelector(".vditor [contenteditable='true']") ||
-          document.querySelector(".milkdown .editor") ||
-          document.querySelector(".milkdown [contenteditable='true']") ||
-          document.querySelector(".ProseMirror") ||
-          document.querySelector("[contenteditable='true']") ||
-          document.querySelector("textarea");
+        let editorAPI = null;
+        const findEditor = () => {
+          const root = document.querySelector("#editor");
+          if (!root) return null;
+          // 隐藏 WebView 的几何尺寸不能代表编辑器是否就绪。
+          try {
+            const api = window.editor?.cme?.();
+            if (typeof api?.setValue === "function" && typeof api?.getValue === "function") {
+              editorAPI = api;
+              return root;
+            }
+          } catch (_) {}
+          return Array.from(root.querySelectorAll("textarea, [contenteditable='true']"))
+            .find((element) => !element.disabled && !element.readOnly) || null;
+        };
 
         const findSubmitButton = () => {
-          const selectorButton = document.querySelector("button.submit.btn:not(:disabled)");
-          const buttons = Array.from(document.querySelectorAll("button, input[type='button'], input[type='submit']"));
-          const textButton = buttons.find((button) => {
-            const text = (button.innerText || button.textContent || button.value || "").trim();
-            return visible(button) && !button.disabled && /发送|提交|评论|回复|发布|submit|send|comment|reply/i.test(text);
-          });
-          return selectorButton || textButton;
+          const root = document.querySelector("#editor");
+          if (!root) return null;
+          return Array.from(root.querySelectorAll("button.submit.btn"))
+            .find((button) => !button.disabled) || null;
         };
 
         const waitFor = async (finder, milliseconds) => {
@@ -113,28 +120,29 @@ enum CommentSubmissionAutomationScript {
         }
 
         logStep("editor_found", describeElement(editor));
-        editor.focus();
-        editor.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-        editor.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-        editor.click();
-        logStep("editor_focus_click_done", describeElement(editor));
+        if (!editorAPI) {
+          editor.focus();
+          editor.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+          editor.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+          editor.click();
+          logStep("editor_focus_click_done", describeElement(editor));
+        }
 
         const readText = (target) => {
           if ("value" in target) return target.value || "";
           return target.innerText || target.textContent || "";
         };
 
-        const readRenderedText = (target) => [
-          readText(target),
-          document.querySelector(".vditor-reset")?.innerText || "",
-          document.querySelector(".vditor-ir textarea")?.value || "",
-          document.querySelector(".milkdown .editor")?.innerText || "",
-          document.querySelector(".ProseMirror")?.innerText || "",
-          document.querySelector("[contenteditable='true']")?.innerText || ""
-        ].join("\\n");
+        const readRenderedText = (target) => editorAPI ? editorAPI.getValue() : readText(target);
 
         const setText = async (target, text) => {
           logStep("set_text_begin", `target=${describeElement(target)} textLength=${text.length}`);
+          if (editorAPI) {
+            editorAPI.setValue(text);
+            await sleep(0);
+            logStep("set_text_editor_api", "verified=" + (readRenderedText(target) === text));
+            return;
+          }
           const assignText = (value) => {
             if ("value" in target) {
               const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(target), "value");
@@ -189,17 +197,17 @@ enum CommentSubmissionAutomationScript {
           } catch (_) {}
 
           await sleep(120);
-          logStep("set_text_after_paste", `contains=${readRenderedText(target).includes(text)} renderedLength=${readRenderedText(target).length}`);
+          logStep("set_text_after_paste", `contains=${(readRenderedText(target) === text)} renderedLength=${readRenderedText(target).length}`);
 
-          if (!readRenderedText(target).includes(text)) {
+          if (!(readRenderedText(target) === text)) {
             assignText(text);
             logStep("set_text_direct_assign_fallback", `renderedLength=${readRenderedText(target).length}`);
           }
 
           await sleep(120);
-          logStep("set_text_after_direct_assign", `contains=${readRenderedText(target).includes(text)} renderedLength=${readRenderedText(target).length}`);
+          logStep("set_text_after_direct_assign", `contains=${(readRenderedText(target) === text)} renderedLength=${readRenderedText(target).length}`);
 
-          if (!readRenderedText(target).includes(text)) {
+          if (!(readRenderedText(target) === text)) {
             try {
               if ("select" in target) {
                 target.select();
@@ -217,9 +225,9 @@ enum CommentSubmissionAutomationScript {
           }
 
           await sleep(120);
-          logStep("set_text_after_exec_command", `contains=${readRenderedText(target).includes(text)} renderedLength=${readRenderedText(target).length}`);
+          logStep("set_text_after_exec_command", `contains=${(readRenderedText(target) === text)} renderedLength=${readRenderedText(target).length}`);
 
-          if (!readRenderedText(target).includes(text)) {
+          if (!(readRenderedText(target) === text)) {
             if ("select" in target) {
               target.select();
             }
@@ -239,12 +247,12 @@ enum CommentSubmissionAutomationScript {
 
           target.dispatchEvent(new KeyboardEvent("keydown", { key: " ", keyCode: 32, bubbles: true }));
           target.dispatchEvent(new KeyboardEvent("keyup", { key: " ", keyCode: 32, bubbles: true }));
-          logStep("set_text_end", `contains=${readRenderedText(target).includes(text)} renderedLength=${readRenderedText(target).length}`);
+          logStep("set_text_end", `contains=${(readRenderedText(target) === text)} renderedLength=${readRenderedText(target).length}`);
         };
 
         await setText(editor, commentText);
 
-        if (!readRenderedText(editor).includes(commentText)) {
+        if (readRenderedText(editor) !== commentText) {
           logStep("fill_failed", `bodyLength=${readRenderedText(editor).length}`);
           finish({ ok: false, reason: "fill_failed", body: readRenderedText(editor) });
           return;
@@ -293,7 +301,7 @@ enum CommentSubmissionAutomationScript {
         logStep("submit_button_wait_begin", `timeoutMs=${Math.min(5000, timeoutMs)}`);
         const submitButton = await waitFor(findSubmitButton, Math.min(5000, timeoutMs));
 
-        if (!submitButton || !visible(submitButton) || submitButton.disabled) {
+        if (!submitButton || submitButton.disabled) {
           logStep("submit_button_not_found", describeElement(submitButton));
           finish({ ok: false, reason: "submit_button_not_found" });
           return;

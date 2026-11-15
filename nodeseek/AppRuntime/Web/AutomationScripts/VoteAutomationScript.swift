@@ -28,7 +28,10 @@ enum VoteAutomationScript {
         const current = await request("/api/vote/info/" + voteID, "GET");
         if (!current.ok) return current;
         const vote = JSON.parse(current.body).vote;
-        if (!vote || vote.id !== voteID || vote.locked || vote.items.some(x => x.voted)) {
+        if (!vote || !Array.isArray(vote.items) || vote.items.some(x => !x || typeof x !== "object" || Array.isArray(x))) {
+          return {ok:false, reason:"invalid_response", message:"投票数据读取失败，请刷新后查看。"};
+        }
+        if (vote.id !== voteID || vote.locked || vote.items.some(x => x.voted)) {
           return {ok:false, reason:"state_changed", message:"投票状态已改变，请刷新后查看。"};
         }
         if (!Array.isArray(ids) || ids.length === 0 || new Set(ids).size !== ids.length ||
