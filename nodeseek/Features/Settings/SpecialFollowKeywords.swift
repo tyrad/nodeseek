@@ -26,8 +26,18 @@ struct SpecialFollowKeyword: Codable, Equatable, Sendable {
     }
 }
 
-enum SpecialFollowKeywordImportError: Error, Equatable {
+enum SpecialFollowKeywordImportError: LocalizedError, Equatable {
     case invalidFormat
+    case invalidJSON
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidJSON:
+            return "文件格式不正确，请选择有效的 JSON 文件。"
+        case .invalidFormat:
+            return "文件内容不符合关键词导入格式，请使用本应用导出的文件。"
+        }
+    }
 }
 
 struct SpecialFollowKeywordRule: Equatable {
@@ -105,6 +115,11 @@ final class SpecialFollowKeywordStore {
     }
 
     func importJSONData(_ data: Data) throws {
+        do {
+            _ = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+        } catch {
+            throw SpecialFollowKeywordImportError.invalidJSON
+        }
         let imported: [SpecialFollowKeyword]
         do {
             imported = try decoder.decode([SpecialFollowKeyword].self, from: data)

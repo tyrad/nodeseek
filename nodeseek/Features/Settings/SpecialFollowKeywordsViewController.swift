@@ -214,8 +214,10 @@ final class SpecialFollowKeywordsViewController: UITableViewController {
             try store.importJSONData(data)
             reloadKeywords()
             showAlert(title: "导入完成", message: "同名关键词已覆盖。")
+        } catch let error as SpecialFollowKeywordImportError {
+            showAlert(title: "导入失败", message: error.localizedDescription)
         } catch {
-            showAlert(title: "导入失败", message: "JSON 格式不符合要求。")
+            showAlert(title: "导入失败", message: "无法读取所选文件，请重新选择。")
         }
     }
 

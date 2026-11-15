@@ -8,6 +8,20 @@ import UIKit
 @testable import nodeseek
 
 struct SpecialFollowKeywordsTests {
+    @Test func importDistinguishesJSONSyntaxFromSchema() throws {
+        let suiteName = "special-follow-errors-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = SpecialFollowKeywordStore(userDefaults: defaults)
+        #expect(throws: SpecialFollowKeywordImportError.invalidJSON) {
+            try store.importJSONData(Data("{".utf8))
+        }
+        #expect(throws: SpecialFollowKeywordImportError.invalidFormat) {
+            try store.importJSONData(Data("{}".utf8))
+        }
+        #expect(store.count == 0)
+    }
+
     @Test func storePersistsKeywordWithDefaultRedColor() throws {
         let suiteName = "special-follow-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
