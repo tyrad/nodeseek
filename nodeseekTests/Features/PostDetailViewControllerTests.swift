@@ -14,6 +14,217 @@ import UIKit
 import WebKit
 @testable import nodeseek
 
+/// 回归测试：覆盖共享附件先更新尺寸、旧视图后收到加载回调的顺序。
+@Suite(.serialized)
+@MainActor
+struct InlineImageLayoutTimingReproductionTests {
+    @Test(arguments: [false, true], [240.0, 1600.0])
+    func cachedMeasurementBeforeImageCallback(cacheFirst: Bool, imageHeight: Double) async throws {
+        for iteration in 0..<5 {
+            let url = try #require(URL(string: "https://example.invalid/repro-\(cacheFirst)-\(imageHeight)-\(iteration).png"))
+            let blocks = DTCoreTextHTMLContentRenderer().render(
+                fragment: "<p>前面的文字<img src=\"\(url.absoluteString)\">后面的文字</p>",
+                baseURL: URL(string: "https://www.nodeseek.com")!,
+                maxImageWidth: 398
+            )
+            let text = try #require(blocks.compactMap { block -> NSAttributedString? in
+                guard case .text(let value) = block else { return nil }
+                return value
+            }.first)
+            var invalidationCount = 0
+            let node = DetailRichTextNode(
+                attributedText: text,
+                onImageTapped: { _, _ in },
+                onLayoutInvalidated: { invalidationCount += 1 }
+            )
+            let constraint = CGSize(width: 398, height: CGFloat.greatestFiniteMagnitude)
+            let initialSize = node.calculateSizeThatFits(constraint)
+            let view = try #require(node.view as? DetailRichTextView)
+            // 手动驱动尺寸回调，避免真实网络失败混入布局时序。
+            view.shouldLayoutCustomSubviews = false
+            let host = UIView(frame: CGRect(x: 0, y: 0, width: 398, height: 2000))
+            host.addSubview(view)
+            view.frame = CGRect(origin: .zero, size: initialSize)
+            view.layoutIfNeeded()
+            let initialHeight = try #require(view.layoutFrame).frame.height
+            let loadedSize = CGSize(width: 800, height: imageHeight)
+            if cacheFirst {
+                // 页面重建的节点复用已渲染正文，测量时读取已知图片尺寸。
+                let replacementNode = DetailRichTextNode(
+                    attributedText: text,
+                    imageSizeProvider: { _ in loadedSize },
+                    onImageTapped: { _, _ in },
+                    onLayoutInvalidated: {}
+                )
+                _ = replacementNode.calculateSizeThatFits(constraint)
+            }
+            view.debugHandleLoadedImage(url, imageSize: loadedSize)
+            try await Task.sleep(nanoseconds: 150_000_000)
+            view.layoutIfNeeded()
+            let actualHeight = try #require(view.layoutFrame).frame.height
+            let reference = DetailRichTextView(frame: view.frame)
+            reference.shouldLayoutCustomSubviews = false
+            reference.configure(view.debugAttributedString, onImageTapped: nil, onLayoutInvalidated: nil)
+            reference.layoutIfNeeded()
+            let expectedHeight = try #require(reference.layoutFrame).frame.height
+            #expect(abs(actualHeight - expectedHeight) < 1,
+                    "iteration=\(iteration), initial=\(initialHeight), actual=\(actualHeight), expected=\(expectedHeight)")
+            #expect(invalidationCount == 1)
+            view.debugHandleLoadedImage(url, imageSize: loadedSize)
+            try await Task.sleep(nanoseconds: 150_000_000)
+            #expect(invalidationCount == 1, "相同尺寸重复回调不应再次重排")
+            withExtendedLifetime(host) {}
+        }
+    }
+}
+
+@Suite(.serialized)
+@MainActor
+struct FrequentPostBrowsingReproductionTests {
+    @Test(arguments: ["reopen", "refresh", "scroll", "switchWhileLoading", "delayedRefresh", "delayedSwitch"])
+    func repeatedBrowsing(scenario: String) async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.coordinateSpace.bounds
+        let navigation = UINavigationController(rootViewController: UIViewController())
+        window.rootViewController = navigation
+        window.makeKeyAndVisible()
+        defer {
+            window.rootViewController = nil
+            window.isHidden = true
+        }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        for iteration in 0..<10 {
+            // 每轮新 URL 覆盖首次加载；轮内返回和刷新复用 URL，覆盖缓存命中。
+            let url = directory.appendingPathComponent("image-\(iteration).png")
+            let size = CGSize(width: 800, height: iteration.isMultiple(of: 2) ? 240 : 1600)
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            let data = UIGraphicsImageRenderer(size: size, format: format).pngData { context in
+                UIColor.systemOrange.setFill()
+                context.fill(CGRect(origin: .zero, size: size))
+            }
+            // 延迟组使用空文件让下载明确结束，再控制图片成功回调的交付时间。
+            // 这是页面级回调时序测试，不是网络限速测试。
+            try (scenario.hasPrefix("delayed") ? Data() : data).write(to: url)
+            let detail = PostDetail(
+                id: "browsing-\(iteration)", title: "连续浏览复现 \(iteration)", authorName: "Probe",
+                avatarURL: nil, metadataText: "", contentHTML:
+                    String(repeating: "<p>图片前的文字<img src='\(url.absoluteString)'>图片后的文字，应该完整可读。</p>",
+                           count: iteration.isMultiple(of: 3) ? 3 : 1)
+                    + String(repeating: "<p>用于滚动的正文内容。</p>", count: 35), comments: []
+            )
+            let controller = PostDetailViewController(presenter: SpyPostDetailPresenter())
+            navigation.pushViewController(controller, animated: false)
+            controller.render(detail: detail)
+            if scenario.hasPrefix("delayed") {
+                await waitForDetailContent(in: controller)
+                let appeared = await waitUntil(timeout: 3) {
+                    window.layoutIfNeeded()
+                    return !self.inlineImages(in: controller.view).isEmpty
+                }
+                try #require(appeared)
+                let originalViews = inlineImages(in: controller.view)
+                try #require(originalViews.allSatisfy { $0.image == nil })
+                let decoded = try #require(UIImage(data: data))
+                Task { @MainActor in
+                    try await Task.sleep(nanoseconds: 1_000_000_000)
+                    try data.write(to: url)
+                    // 同时覆盖旧节点晚到回调和刷新后新节点的回调。
+                    let targets = originalViews + self.inlineImages(in: controller.view)
+                    for image in targets where image.image == nil {
+                        image.applyLoadedImage(DetailInlineImageResult(
+                            image: decoded, resolvedKind: nil, originalSize: size
+                        ))
+                    }
+                }
+            }
+            if scenario == "delayedRefresh" {
+                controller.render(detail: detail)
+            }
+            if scenario == "switchWhileLoading" || scenario == "delayedSwitch" {
+                // 不等待图片回调，立即离开详情，再返回。
+                let next = PostDetailViewController(presenter: SpyPostDetailPresenter())
+                navigation.pushViewController(next, animated: false)
+                next.render(detail: PostDetail(
+                    id: "next-\(iteration)", title: "下一帖", authorName: "Probe", avatarURL: nil,
+                    metadataText: "", contentHTML: "<p>另一个帖子</p>", comments: []
+                ))
+                await waitForDetailContent(in: next)
+                navigation.popViewController(animated: false)
+            }
+            await waitForDetailContent(in: controller)
+            try await verify(controller, window: window, label: "\(scenario)-\(iteration)-initial")
+
+            if scenario == "refresh" {
+                controller.render(detail: detail)
+                await waitForDetailContent(in: controller)
+                try await verify(controller, window: window, label: "refresh-\(iteration)-again")
+            } else if scenario == "scroll" {
+                controller.tableNode.view.setContentOffset(CGPoint(x: 0, y: 700), animated: false)
+                try await Task.sleep(nanoseconds: 100_000_000)
+                controller.tableNode.view.setContentOffset(.zero, animated: false)
+                try await verify(controller, window: window, label: "scroll-\(iteration)-return")
+            } else if scenario == "reopen" {
+                navigation.popViewController(animated: false)
+                let reopened = PostDetailViewController(presenter: SpyPostDetailPresenter())
+                navigation.pushViewController(reopened, animated: false)
+                reopened.render(detail: detail)
+                await waitForDetailContent(in: reopened)
+                try await verify(reopened, window: window, label: "reopen-\(iteration)-cached")
+            }
+            navigation.popToRootViewController(animated: false)
+            await Task.yield()
+        }
+    }
+
+    private func inlineImages(in root: UIView) -> [DetailInlineImageView] {
+        if let image = root as? DetailInlineImageView { return [image] }
+        return root.subviews.flatMap { inlineImages(in: $0) }
+    }
+
+    private func verify(_ controller: PostDetailViewController, window: UIWindow, label: String) async throws {
+        func views<T: UIView>(_ root: UIView, of type: T.Type) -> [T] {
+            (root as? T).map { [$0] } ?? root.subviews.flatMap { views($0, of: type) }
+        }
+        let loaded = await waitUntil(timeout: 5) {
+            window.layoutIfNeeded()
+            let images = views(controller.view, of: DetailInlineImageView.self)
+            return !images.isEmpty && images.allSatisfy { $0.image != nil }
+        }
+        try #require(loaded, "\(label): 实际图片必须加载成功，避免空白页面误判为通过")
+        // 等待图片重排与列表刷新两层防抖。
+        try await Task.sleep(nanoseconds: 350_000_000)
+        window.layoutIfNeeded()
+        let richViews = views(controller.view, of: DetailRichTextView.self)
+        #expect(!richViews.isEmpty, "\(label)")
+        for view in richViews {
+            guard let text = view.debugAttributedString, text.length > 0 else { continue }
+            let reference = DetailRichTextView(frame: view.frame)
+            reference.shouldLayoutCustomSubviews = false
+            reference.configure(text, onImageTapped: nil, onLayoutInvalidated: nil)
+            reference.layoutIfNeeded()
+            let frame = try #require(view.layoutFrame)
+            let actual = frame.frame.height
+            let expected = try #require(reference.layoutFrame).frame.height
+            #expect(abs(actual - expected) < 1, "\(label): actual=\(actual), expected=\(expected)")
+            for image in views(view, of: DetailInlineImageView.self) {
+                #expect(image.frame.maxY <= view.bounds.height + 1, "\(label): 图片超出正文高度")
+                for line in frame.lines as? [DTCoreTextLayoutLine] ?? [] {
+                    for run in line.glyphRuns as? [DTCoreTextGlyphRun] ?? [] where run.attachment == nil {
+                        let overlap = image.frame.intersection(run.frame)
+                        #expect(overlap.isNull || overlap.width <= 1 || overlap.height <= 1,
+                                "\(label): 图片与文字相交 \(overlap)")
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Suite(.serialized)
 @MainActor
 struct PostDetailViewControllerTests {

@@ -31,6 +31,8 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
     private var imageFailedHandler: ((URL) -> Void)?
     private var failedImageURLs = Set<URL>()
     private var fixedQuoteImageAttachments = Set<ObjectIdentifier>()
+    // 附件对象可能被其他节点改写；尺寸快照必须由当前视图独立保存。
+    private var layoutAttachmentSizes: [ObjectIdentifier: CGSize] = [:]
     private var lastLayoutWidth: CGFloat = 0
     private let diagnosticID = String(UUID().uuidString.prefix(8))
     private var pendingRelayoutWorkItem: DispatchWorkItem?
@@ -158,6 +160,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         )
         removeAllCustomViews()
         removeAllCustomViewsForLinks()
+        recordLayoutAttachmentSizes()
         layouter = nil
         relayoutText()
         invalidateIntrinsicContentSize()
@@ -183,6 +186,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         if width > 0, abs(width - lastLayoutWidth) > 0.5 {
             lastLayoutWidth = width
             logDiagnostics("layoutSubviews widthChanged width=\(Self.numberString(width)) bounds=\(Self.string(from: bounds.size))")
+            recordLayoutAttachmentSizes()
             layouter = nil
             relayoutText()
             invalidateIntrinsicContentSize()
@@ -213,6 +217,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         attributedString = snapshot
         removeAllCustomViews()
         removeAllCustomViewsForLinks()
+        recordLayoutAttachmentSizes()
         layouter = nil
         relayoutText()
         invalidateIntrinsicContentSize()
@@ -432,7 +437,19 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
             stickerAspectRatioProvider.recordLoadedSize(imageSize, for: url)
         }
 
-        guard let update = updateImageAttachments(matching: url, originalSize: imageSize) else {
+        guard imageSize.width > 0, imageSize.height > 0 else { return }
+        var attachmentUpdate = updateImageAttachments(matching: url, originalSize: imageSize)
+        attributedString.enumerateAttribute(.attachment, in: NSRange(location: 0, length: attributedString.length)) { value, _, _ in
+            guard let attachment = value as? DTTextAttachment,
+                  attachment.contentURL == url,
+                  let laidOutSize = layoutAttachmentSizes[ObjectIdentifier(attachment)],
+                  Self.layoutSizeNeedsUpdate(from: laidOutSize, to: attachment.displaySize) else { return }
+            attachmentUpdate = Self.merging(
+                attachmentUpdate,
+                with: ImageAttachmentUpdate(displaySize: attachment.displaySize, requiresRelayout: true)
+            )
+        }
+        guard let update = attachmentUpdate else {
             logDiagnostics(
                 "imageLoaded noAttachmentUpdate url=\(url.absoluteString) imageSize=\(Self.string(from: imageSize)) attachments=\(attachmentDiagnostics())"
             )
@@ -462,12 +479,21 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         scheduleDebouncedRelayout(reason: "imageFailed")
     }
 
+    private func recordLayoutAttachmentSizes() {
+        layoutAttachmentSizes.removeAll(keepingCapacity: true)
+        attributedString.enumerateAttribute(.attachment, in: NSRange(location: 0, length: attributedString.length)) { value, _, _ in
+            guard let attachment = value as? DTTextAttachment else { return }
+            layoutAttachmentSizes[ObjectIdentifier(attachment)] = attachment.displaySize
+        }
+    }
+
     private func scheduleDebouncedRelayout(reason: String) {
         pendingRelayoutWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.removeAllCustomViews()
             self.removeAllCustomViewsForLinks()
+            self.recordLayoutAttachmentSizes()
             self.layouter = nil
             self.relayoutText()
             self.invalidateIntrinsicContentSize()
