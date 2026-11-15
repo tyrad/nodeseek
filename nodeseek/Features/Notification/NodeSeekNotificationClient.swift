@@ -125,6 +125,7 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
             try await markViewedSubmitter.submit(request, referer: referer)
             AppLog.info(.service, "通知已读 WebView 成功 id=\(operationID)")
         } catch {
+            if UserFacingError.isCancellation(error) { throw error }
             let failure = error as NSError
             AppLog.error(.service, "通知已读 WebView 失败 id=\(operationID), domain=\(failure.domain), code=\(failure.code), error=\(error.localizedDescription)")
             if case HiddenWebViewHTMLClientError.timeout = error {
@@ -134,7 +135,7 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
                 throw NodeSeekNotificationClientError.unsuccessfulResponse("请求超时，请重试")
             }
             if let failure = error as? NodeSeekNotificationClientError { throw failure }
-            throw NodeSeekNotificationClientError.unsuccessfulResponse("标记已读失败，请稍后重试")
+            throw NodeSeekNotificationClientError.unsuccessfulResponse(UserFacingError.message(for: error, fallback: "标记已读失败，请稍后重试。"))
         }
     }
 
@@ -198,7 +199,7 @@ final class NodeSeekNotificationClient: NodeSeekNotificationClientProtocol {
                 .service,
                 "通知接口解析失败 method=\(method), url=\(target), status=\(status), bytes=\(data.count), responseType=\(Response.self), error=\(error.localizedDescription), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))"
             )
-            throw error
+            throw NodeSeekNotificationClientError.invalidData
         }
     }
 
@@ -270,15 +271,24 @@ private extension URLRequest {
 }
 
 enum NodeSeekNotificationClientError: LocalizedError, Equatable {
+    case invalidData
     case httpStatus(Int)
     case unsuccessfulResponse(String?)
 
     var errorDescription: String? {
         switch self {
+        case .invalidData:
+            return "通知数据读取失败，请稍后刷新。"
         case .httpStatus(let status):
-            return "请求失败：HTTP \(status)"
+            switch status {
+            case 401: return "登录状态已失效，请重新登录。"
+            case 403: return "暂时无法访问通知，请在网页中确认访问状态。"
+            case 429: return "操作过于频繁，请稍后再试。"
+            case 500...599: return "通知服务暂时不可用，请稍后再试。"
+            default: return "通知请求失败，请稍后重试。"
+            }
         case .unsuccessfulResponse(let message):
-            return message ?? "接口返回失败"
+            return (message?.isEmpty == false ? message : nil) ?? "通知操作失败，请稍后重试。"
         }
     }
 }

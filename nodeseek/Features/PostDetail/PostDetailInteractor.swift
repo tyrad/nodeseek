@@ -116,7 +116,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
                         presenter?.didCancelLoadPostDetail()
                     } else {
                         AppLog.error(.postDetail, "帖子详情加载失败，postID=\(post.id): \(error.localizedDescription)")
-                        presenter?.didFailLoadPostDetail(error: error.localizedDescription)
+                        presenter?.didFailLoadPostDetail(error: UserFacingError.message(for: error, fallback: "帖子加载失败，请稍后刷新。"))
                     }
                 }
             }
@@ -190,9 +190,10 @@ class PostDetailInteractor: PostDetailInteractorInput {
                     presenter?.didSubmitReply(PostDetailSubmitReplyResponse(message: response.message))
                 }
             } catch {
+                guard !Task.isCancelled, !UserFacingError.isCancellation(error) else { return }
                 AppLog.error(.postDetail, "Interactor 回复提交失败: postID=\(post.id), error=\(error.localizedDescription), elapsedMs=\(AppLog.elapsedMilliseconds(since: taskStartedAt))")
                 await MainActor.run {
-                    presenter?.didFailSubmitReply(error: error.localizedDescription)
+                    presenter?.didFailSubmitReply(error: UserFacingError.message(for: error, fallback: "操作未完成，请刷新页面确认后再试。"))
                 }
             }
         }
@@ -222,9 +223,10 @@ class PostDetailInteractor: PostDetailInteractorInput {
                     presenter?.didAddPostLike(response)
                 }
             } catch {
+                guard !Task.isCancelled, !UserFacingError.isCancellation(error) else { return }
                 AppLog.error(.postDetail, "点赞帖子失败，postID=\(post.id): \(error.localizedDescription)")
                 await MainActor.run {
-                    presenter?.didFailAddPostLike(error: error.localizedDescription)
+                    presenter?.didFailAddPostLike(error: UserFacingError.message(for: error, fallback: "操作未完成，请刷新页面确认后再试。"))
                 }
             }
         }
@@ -246,9 +248,10 @@ class PostDetailInteractor: PostDetailInteractorInput {
                     presenter?.didAddCommentLike(commentID: commentID, response: response)
                 }
             } catch {
+                guard !Task.isCancelled, !UserFacingError.isCancellation(error) else { return }
                 AppLog.error(.postDetail, "点赞评论失败，commentID=\(commentID): \(error.localizedDescription)")
                 await MainActor.run {
-                    presenter?.didFailAddCommentLike(commentID: commentID, error: error.localizedDescription)
+                    presenter?.didFailAddCommentLike(commentID: commentID, error: UserFacingError.message(for: error, fallback: "操作未完成，请刷新页面确认后再试。"))
                 }
             }
         }
@@ -270,9 +273,10 @@ class PostDetailInteractor: PostDetailInteractorInput {
                     presenter?.didAddPostChickenLeg(response)
                 }
             } catch {
+                guard !Task.isCancelled, !UserFacingError.isCancellation(error) else { return }
                 AppLog.error(.postDetail, "给帖子投放鸡腿失败，postID=\(post.id): \(error.localizedDescription)")
                 await MainActor.run {
-                    presenter?.didFailAddPostChickenLeg(error: error.localizedDescription)
+                    presenter?.didFailAddPostChickenLeg(error: UserFacingError.message(for: error, fallback: "操作未完成，请刷新页面确认后再试。"))
                 }
             }
         }
@@ -294,9 +298,10 @@ class PostDetailInteractor: PostDetailInteractorInput {
                     presenter?.didAddCommentChickenLeg(commentID: commentID, response: response)
                 }
             } catch {
+                guard !Task.isCancelled, !UserFacingError.isCancellation(error) else { return }
                 AppLog.error(.postDetail, "给评论投放鸡腿失败，commentID=\(commentID): \(error.localizedDescription)")
                 await MainActor.run {
-                    presenter?.didFailAddCommentChickenLeg(commentID: commentID, error: error.localizedDescription)
+                    presenter?.didFailAddCommentChickenLeg(commentID: commentID, error: UserFacingError.message(for: error, fallback: "操作未完成，请刷新页面确认后再试。"))
                 }
             }
         }
@@ -318,9 +323,10 @@ class PostDetailInteractor: PostDetailInteractorInput {
                     presenter?.didAddPostOppose(response)
                 }
             } catch {
+                guard !Task.isCancelled, !UserFacingError.isCancellation(error) else { return }
                 AppLog.error(.postDetail, "反对帖子失败，postID=\(post.id): \(error.localizedDescription)")
                 await MainActor.run {
-                    presenter?.didFailAddPostOppose(error: error.localizedDescription)
+                    presenter?.didFailAddPostOppose(error: UserFacingError.message(for: error, fallback: "操作未完成，请刷新页面确认后再试。"))
                 }
             }
         }
@@ -342,9 +348,10 @@ class PostDetailInteractor: PostDetailInteractorInput {
                     presenter?.didAddCommentOppose(commentID: commentID, response: response)
                 }
             } catch {
+                guard !Task.isCancelled, !UserFacingError.isCancellation(error) else { return }
                 AppLog.error(.postDetail, "反对评论失败，commentID=\(commentID): \(error.localizedDescription)")
                 await MainActor.run {
-                    presenter?.didFailAddCommentOppose(commentID: commentID, error: error.localizedDescription)
+                    presenter?.didFailAddCommentOppose(commentID: commentID, error: UserFacingError.message(for: error, fallback: "操作未完成，请刷新页面确认后再试。"))
                 }
             }
         }
@@ -390,13 +397,14 @@ class PostDetailInteractor: PostDetailInteractorInput {
                     }
                 }
             } catch {
+                guard !Task.isCancelled, !UserFacingError.isCancellation(error) else { return }
                 AppLog.error(.postDetail, "\(actionText)帖子失败: \(error.localizedDescription)")
                 await MainActor.run {
                     switch action {
                     case .add:
-                        presenter?.didFailAddFavorite(error: error.localizedDescription)
+                        presenter?.didFailAddFavorite(error: UserFacingError.message(for: error, fallback: "操作未完成，请刷新页面确认后再试。"))
                     case .remove:
-                        presenter?.didFailRemoveFavorite(error: error.localizedDescription)
+                        presenter?.didFailRemoveFavorite(error: UserFacingError.message(for: error, fallback: "操作未完成，请刷新页面确认后再试。"))
                     }
                 }
             }

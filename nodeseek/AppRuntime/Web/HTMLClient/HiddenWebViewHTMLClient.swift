@@ -9,10 +9,21 @@ import Foundation
 import UIKit
 import WebKit
 
-enum HiddenWebViewHTMLClientError: Error {
+enum HiddenWebViewHTMLClientError: LocalizedError {
     case timeout
     case noNavigationStarted
     case processTerminated
+
+    var errorDescription: String? {
+        switch self {
+        case .timeout:
+            return "加载超时，请重试。"
+        case .noNavigationStarted:
+            return "无法加载页面，请稍后重试。"
+        case .processTerminated:
+            return "页面加载意外中断，请稍后重试。"
+        }
+    }
 }
 
 private enum WebViewCachePolicy {
@@ -717,7 +728,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
                 "ok": false,
                 "statusCode": NSNull(),
                 "reason": "javascript_exception",
-                "message": error.localizedDescription,
+                "message": "操作结果未确认，请刷新查看。",
                 "response": [:]
             ]
         }
@@ -936,7 +947,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
             AppLog.error(.webView, "评论脚本执行异常: domain=\(nsError.domain), code=\(nsError.code), message=\(nsError.localizedDescription)")
             return CommentAutomationResponse(
                 ok: false,
-                message: error.localizedDescription,
+                message: "操作结果未确认，请刷新查看。",
                 reason: "javascript_exception"
             )
         }
@@ -989,7 +1000,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
             AppLog.error(.webView, "收藏脚本执行异常: domain=\(nsError.domain), code=\(nsError.code), message=\(nsError.localizedDescription)")
             return PostCollectionAutomationResponse(
                 ok: false,
-                response: PostCollectionResponse(message: error.localizedDescription),
+                response: PostCollectionResponse(message: "操作结果未确认，请刷新查看。"),
                 reason: "javascript_exception"
             )
         }
@@ -1141,7 +1152,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
             AppLog.error(.webView, "\(logContext)脚本执行异常: domain=\(nsError.domain), code=\(nsError.code), message=\(nsError.localizedDescription)")
             return CommentUpvoteAutomationResponse(
                 ok: false,
-                response: CommentUpvoteResponse(message: error.localizedDescription),
+                response: CommentUpvoteResponse(message: "操作结果未确认，请刷新查看。"),
                 reason: "javascript_exception"
             )
         }

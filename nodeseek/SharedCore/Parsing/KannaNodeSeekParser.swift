@@ -8,9 +8,18 @@
 import Foundation
 import Kanna
 
-nonisolated enum NodeSeekParserError: Error {
+nonisolated enum NodeSeekParserError: LocalizedError {
     case notImplemented
     case postDetailNotFound
+
+    var errorDescription: String? {
+        switch self {
+        case .notImplemented:
+            return "暂不支持读取此内容。"
+        case .postDetailNotFound:
+            return "无法读取帖子内容，请刷新后重试。"
+        }
+    }
 }
 
 nonisolated struct KannaNodeSeekParser: NodeSeekParser {

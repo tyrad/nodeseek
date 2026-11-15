@@ -281,7 +281,8 @@ final class NotificationViewController: UIViewController {
                 loadedTabs.insert(tab)
                 finishLoading(tab: tab, token: token)
             } catch {
-                showError(error.localizedDescription, tab: tab, token: token)
+                guard !Task.isCancelled, !UserFacingError.isCancellation(error) else { return }
+                showError(UserFacingError.message(for: error, fallback: "通知加载失败，请稍后刷新。"), tab: tab, token: token)
             }
         }
     }
@@ -452,7 +453,8 @@ final class NotificationViewController: UIViewController {
                 if selectedTab == tab {
                     tableView.reloadData()
                 }
-                BottomToast.show(error.localizedDescription, style: .failure, in: view)
+                guard !Task.isCancelled, !UserFacingError.isCancellation(error) else { return }
+                BottomToast.show(UserFacingError.message(for: error, fallback: "通知操作未完成，请刷新查看。"), style: .failure, in: view)
             }
         }
     }
@@ -513,8 +515,8 @@ final class NotificationViewController: UIViewController {
                 } else {
                     loadUnreadCount()
                 }
-                if showFailure {
-                    BottomToast.show(error.localizedDescription, style: .failure, in: view)
+                if showFailure, !Task.isCancelled, !UserFacingError.isCancellation(error) {
+                    BottomToast.show(UserFacingError.message(for: error, fallback: "通知操作未完成，请刷新查看。"), style: .failure, in: view)
                 }
             }
         }
