@@ -95,6 +95,9 @@ final class SeekMailInboxModel {
     let provider: SeekMailProvider<SeekMailAPI>
     let selectionStore: SeekMailSelectionStore
     private let deleteDelay: TimeInterval
+    private let cache: SeekMailListCache?
+    /// 快照按 Key 指纹隔离，取不到 Key 时不读写快照。
+    private let cacheKey: () -> String?
 
     private(set) var mailboxes: [SeekMailbox] = []
     private(set) var names: [Int64: SeekMailboxDisplay] = [:]
@@ -122,11 +125,15 @@ final class SeekMailInboxModel {
     init(
         provider: SeekMailProvider<SeekMailAPI>,
         selectionStore: SeekMailSelectionStore = SeekMailSelectionStore(),
-        deleteDelay: TimeInterval = 4
+        deleteDelay: TimeInterval = 4,
+        cache: SeekMailListCache? = nil,
+        cacheKey: @escaping () -> String? = { nil }
     ) {
         self.provider = provider
         self.selectionStore = selectionStore
         self.deleteDelay = deleteDelay
+        self.cache = cache
+        self.cacheKey = cacheKey
         selectedMailboxID = selectionStore.mailboxID
         scope = selectionStore.scope
     }
@@ -147,6 +154,9 @@ final class SeekMailInboxModel {
     }
 
     var isTrash: Bool { scope == .trash }
+
+    /// 没有能发信的邮箱时不显示写信入口。
+    var canCompose: Bool { mailboxes.contains { $0.canSendMail } }
     var isSearching: Bool { searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false }
 
     /// 「全部邮箱」时摘要开头标出收件邮箱。
@@ -194,6 +204,7 @@ final class SeekMailInboxModel {
     /// 首次进入：邮箱和文件夹拿到后再加载邮件。
     func start() {
         phase = .loading
+        restoreSnapshot()
         onChange?()
         generation += 1
         let token = generation
@@ -207,6 +218,7 @@ final class SeekMailInboxModel {
                 let (mailboxes, folders) = try await (mailboxRequest, folderRequest)
                 guard token == generation else { return }
                 applyMailboxes(mailboxes, folders: folders ?? [])
+                if let key = cacheKey() { cache?.saveMailboxes(mailboxes, folders: folders ?? [], for: key) }
                 try await fetchFirstPage(token: token)
             } catch {
                 guard token == generation else { return }
@@ -286,7 +298,26 @@ final class SeekMailInboxModel {
         allMails = []
         hasMore = false
         isLoadingMore = false
+        // 切到看过的范围时先显示上次的内容
+        if isSearching == false, let key = cacheKey(), let cached = cache?.mails(for: key, page: currentPageKey) {
+            allMails = cached
+            phase = .loaded
+        }
         reload()
+    }
+
+    private var currentPageKey: String {
+        SeekMailListCache.pageKey(mailboxID: selectedMailboxID, scope: scope)
+    }
+
+    /// 先显示上次的邮箱和第一页，网络回来后再替换。
+    private func restoreSnapshot() {
+        guard let key = cacheKey(), let cache, let saved = cache.mailboxes(for: key) else { return }
+        applyMailboxes(saved.mailboxes, folders: saved.folders)
+        if let mails = cache.mails(for: key, page: currentPageKey) {
+            allMails = mails
+            phase = .loaded
+        }
     }
 
     private func applyMailboxes(_ mailboxes: [SeekMailbox], folders: [SeekMailFolder]) {
@@ -310,6 +341,9 @@ final class SeekMailInboxModel {
         allMails = list.mails
         hasMore = Self.hasMore(list, received: list.mails.count, offset: 0)
         phase = .loaded
+        if isSearching == false, let key = cacheKey() {
+            cache?.saveMails(list.mails, for: key, page: currentPageKey)
+        }
         clearRateLimitIfExpired()
         onChange?()
     }

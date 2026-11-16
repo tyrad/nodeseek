@@ -17,14 +17,17 @@ final class SeekMailHomeViewController: UIViewController {
     /// Key 失效被清掉时，回到绑定页要说明原因。
     private var pendingBindMessage: String?
     private let selectionStore: SeekMailSelectionStore
+    private let cache: SeekMailListCache?
 
     /// transport 只在测试里替换，正常使用走 URLSession。
     init(keyStore: SeekMailAPIKeyStoring = SeekMailAPIKeyStore.shared,
          transport: SeekMailProvider<SeekMailAPI>.Transport? = nil,
-         selectionStore: SeekMailSelectionStore = SeekMailSelectionStore()) {
+         selectionStore: SeekMailSelectionStore = SeekMailSelectionStore(),
+         cache: SeekMailListCache? = SeekMailListCache()) {
         self.keyStore = keyStore
         self.transport = transport
         self.selectionStore = selectionStore
+        self.cache = cache
         super.init(nibName: nil, bundle: nil)
         title = "邮箱"
     }
@@ -43,6 +46,14 @@ final class SeekMailHomeViewController: UIViewController {
         render()
     }
 
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        // 刚读过邮件，离开时让入口的未读数跟上
+        if isMovingFromParent || navigationController?.isBeingDismissed == true {
+            SeekMailUnreadMonitor.shared.check(force: true)
+        }
+    }
+
     @objc private func keyDidChange() {
         render()
     }
@@ -55,8 +66,9 @@ final class SeekMailHomeViewController: UIViewController {
         shownKey = key
         let next: UIViewController
         if key != nil {
-            let inbox = SeekMailInboxViewController(keyStore: keyStore, transport: transport, selectionStore: selectionStore)
-            inbox.onNavigationChange = { [weak self] in self?.syncInboxNavigation() }
+            let inbox = SeekMailInboxViewController(keyStore: keyStore, transport: transport,
+                                                    selectionStore: selectionStore, cache: cache)
+            inbox.onNavigationChange = { [weak self] in self?.configureNavigationItems(bound: true) }
             inbox.onUnauthorized = { [weak self] in
                 self?.pendingBindMessage = "之前保存的 Key 已失效，请重新粘贴"
                 self?.keyStore.clear()
@@ -107,7 +119,16 @@ final class SeekMailHomeViewController: UIViewController {
         let more = UIBarButtonItem(image: UIImage(systemName: "ellipsis"), menu: makeMoreMenu())
         more.accessibilityLabel = "更多"
         more.accessibilityIdentifier = "seek-mail-more"
-        navigationItem.rightBarButtonItems = [more]
+        var items = [more]
+        if let inbox = content as? SeekMailInboxViewController, inbox.model.canCompose {
+            let compose = UIBarButtonItem(image: UIImage(systemName: "square.and.pencil"), primaryAction: UIAction { [weak inbox] _ in
+                inbox?.presentCompose()
+            })
+            compose.accessibilityLabel = "写信"
+            compose.accessibilityIdentifier = "seek-mail-compose"
+            items.append(compose)
+        }
+        navigationItem.rightBarButtonItems = items
     }
 
     private func makeMoreMenu() -> UIMenu {
@@ -154,15 +175,9 @@ final class SeekMailHomeViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "移除", style: .destructive) { [weak self] _ in
             // 记住的邮箱属于旧账号，一起清掉
             self?.selectionStore.clear()
+            self?.cache?.clear()
             self?.keyStore.clear()
         })
         present(alert, animated: true)
-    }
-
-    /// 标题按钮的内容变了，作为 Tab 根页面时外层导航栏也要跟着更新。
-    private func syncInboxNavigation() {
-        if let tabs = parent as? MainTabBarController, tabs.selectedViewController === self {
-            tabs.syncNavigationItemWithSelectedTab()
-        }
     }
 }

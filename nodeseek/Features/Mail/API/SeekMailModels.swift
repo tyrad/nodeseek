@@ -5,7 +5,7 @@
 
 import Foundation
 
-nonisolated struct SeekMailbox: Decodable, Equatable, Sendable {
+nonisolated struct SeekMailbox: Codable, Equatable, Sendable {
     let id: Int64
     let address: String
     let alias: String?
@@ -21,7 +21,7 @@ nonisolated struct SeekMailbox: Decodable, Equatable, Sendable {
     }
 }
 
-nonisolated struct SeekMail: Decodable, Equatable, Sendable {
+nonisolated struct SeekMail: Codable, Equatable, Sendable {
     let id: Int64
     let mailboxId: Int64
     let folderId: Int64?
@@ -194,7 +194,7 @@ nonisolated struct SeekMailAttachment: Decodable, Equatable, Sendable {
     let index: Int
 }
 
-nonisolated struct SeekMailFolder: Decodable, Equatable, Sendable {
+nonisolated struct SeekMailFolder: Codable, Equatable, Sendable {
     let id: Int64
     let name: String
     let color: String?

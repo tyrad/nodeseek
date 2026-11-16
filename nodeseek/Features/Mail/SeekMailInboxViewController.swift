@@ -31,14 +31,16 @@ final class SeekMailInboxViewController: UIViewController {
     init(keyStore: SeekMailAPIKeyStoring,
          transport: SeekMailProvider<SeekMailAPI>.Transport? = nil,
          selectionStore: SeekMailSelectionStore = SeekMailSelectionStore(),
-         deleteDelay: TimeInterval = 4) {
+         deleteDelay: TimeInterval = 4,
+         cache: SeekMailListCache? = nil) {
         let provider: SeekMailProvider<SeekMailAPI>
         if let transport {
             provider = SeekMailProvider(apiKey: { [keyStore] in keyStore.apiKey() }, transport: transport)
         } else {
             provider = SeekMailProvider(apiKey: { [keyStore] in keyStore.apiKey() })
         }
-        model = SeekMailInboxModel(provider: provider, selectionStore: selectionStore, deleteDelay: deleteDelay)
+        model = SeekMailInboxModel(provider: provider, selectionStore: selectionStore, deleteDelay: deleteDelay,
+                                   cache: cache, cacheKey: { [keyStore] in keyStore.apiKey() })
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -61,8 +63,18 @@ final class SeekMailInboxViewController: UIViewController {
             self, selector: #selector(appWillResignActive),
             name: UIApplication.willResignActiveNotification, object: nil
         )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(newMailArrived),
+            name: SeekMailUnreadMonitor.newMailNotification, object: nil
+        )
         render()
         model.start()
+    }
+
+    /// 回到前台时发现新邮件，列表正停在这里就直接刷新。
+    @objc private func newMailArrived() {
+        guard model.phase == .loaded, model.isSearching == false else { return }
+        model.reload()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -299,10 +311,26 @@ final class SeekMailInboxViewController: UIViewController {
         undoToast.showUndo(seconds: 4, in: view)
     }
 
-    private func openMail(_ mail: SeekMail) {
-        let detail = SeekMailDetailViewController(mailID: mail.id, model: model) { [weak self] id in
-            self?.scheduleDelete(id)
+    /// 写新信或回复；发送成功后在列表页提示。
+    func presentCompose(_ content: SeekMailComposeContent = SeekMailComposeContent()) {
+        var content = content
+        if content.mailboxID == nil { content.mailboxID = model.selectedMailboxID }
+        let compose = SeekMailComposeViewController(
+            provider: model.provider, mailboxes: model.mailboxes, names: model.names, content: content
+        ) { [weak self] in
+            guard let self else { return }
+            // 接口返回 queued 只代表进了发送队列，不代表已经送达
+            undoToast.showMessage("已提交发送", in: view)
         }
+        present(UINavigationController(rootViewController: compose), animated: true)
+    }
+
+    private func openMail(_ mail: SeekMail) {
+        let detail = SeekMailDetailViewController(mailID: mail.id, model: model, onDelete: { [weak self] id in
+            self?.scheduleDelete(id)
+        }, onReply: { [weak self] content in
+            self?.presentCompose(content)
+        })
         navigationController?.pushViewController(detail, animated: true)
     }
 

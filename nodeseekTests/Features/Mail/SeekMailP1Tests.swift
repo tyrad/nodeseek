@@ -1,0 +1,203 @@
+import Foundation
+import Testing
+import UIKit
+@testable import nodeseek
+
+/// 写信、新邮件提醒、列表缓存。地址都是假值。
+@MainActor
+struct SeekMailP1Tests {
+    // MARK: - 写信内容
+
+    @Test func parsesRecipientsAndValidates() {
+        #expect(SeekMailComposeContent.addresses(from: " a@x.com, b@y.org；c@z.io\nd@w.net ") == ["a@x.com", "b@y.org", "c@z.io", "d@w.net"])
+        var content = SeekMailComposeContent(mailboxID: 1, to: "a@x.com", subject: "Hi")
+        #expect(content.problem == nil)
+        #expect(content.draft == SeekMailDraft(mailboxID: 1, to: ["a@x.com"], subject: "Hi", bodyText: ""))
+        content.cc = "bad-address"
+        #expect(content.problem == .invalidAddress("bad-address"))
+        content.cc = ""
+        content.subject = " "
+        #expect(content.problem == .emptyContent)
+        content.to = ""
+        #expect(content.problem == .noRecipient)
+        #expect(SeekMailComposeContent(to: "a@x.com", subject: "s").problem == .noSender)
+    }
+
+    @Test func replyPrefillsRecipientSubjectQuoteAndSender() throws {
+        let mailboxes = try decode([SeekMailbox].self, #"[{"id":1,"address":"me@nodeseek.org"},{"id":2,"address":"me@seek.li"}]"#)
+        let mail = try decode(SeekMail.self, #"{"id":9,"mailboxId":1,"fromAddress":"bob@example.com","fromName":"Bob","subject":"Question","bodyText":"line1\nline2\n\n"}"#)
+        let reply = SeekMailComposeContent.reply(to: mail, mailboxes: mailboxes)
+        #expect(reply.to == "bob@example.com")
+        #expect(reply.subject == "Re: Question")
+        // 收信邮箱不能发信，换成第一个能发信的
+        #expect(reply.mailboxID == 2)
+        #expect(reply.body.hasSuffix("Bob <bob@example.com> 写道：\n> line1\n> line2"))
+
+        let again = try decode(SeekMail.self, #"{"id":10,"mailboxId":2,"fromAddress":"bob@example.com","subject":"RE: Question","bodyText":""}"#)
+        #expect(SeekMailComposeContent.reply(to: again, mailboxes: mailboxes).subject == "RE: Question")
+        #expect(SeekMailComposeContent.reply(to: again, mailboxes: mailboxes).mailboxID == 2)
+    }
+
+    @Test func composeSendsAndReportsSuccess() async throws {
+        let transport = SeekMailRouteTransport()
+        transport.details["/openapi/v1/send"] = #"{"data":{"id":5,"status":"queued"}}"#
+        var sent = 0
+        let compose = try makeCompose(transport) { sent += 1 }
+        let to = try #require(compose.view.mailTestView(id: "seek-mail-compose-to") as? UITextField)
+        let subject = try #require(compose.view.mailTestView(id: "seek-mail-compose-subject") as? UITextField)
+        let send = try #require(compose.navigationItem.rightBarButtonItem)
+        #expect(send.isEnabled == false)
+        to.text = "a@x.com, b@y.org"
+        to.sendActions(for: .editingChanged)
+        subject.text = "Hello"
+        subject.sendActions(for: .editingChanged)
+        #expect(send.isEnabled)
+
+        guard #available(iOS 16.0, *) else { return }
+        send.primaryAction?.performWithSender(nil, target: nil)
+        await mailWaitUntil { sent == 1 }
+        let request = try #require(transport.requests.last)
+        #expect(request.httpMethod == "POST")
+        let body = try #require(request.httpBody.flatMap { try JSONSerialization.jsonObject(with: $0) as? [String: Any] })
+        #expect(body["to"] as? String == "a@x.com,b@y.org")
+        #expect(body["mailboxId"] as? Int == 2)
+    }
+
+    @Test func composeKeepsDraftAndShowsServerMessageOnFailure() async throws {
+        let transport = SeekMailRouteTransport()
+        transport.status = 500
+        transport.override = #"{"error":{"code":"SEND_FAILED","message":"该域名已禁止发信"}}"#
+        var sent = 0
+        let compose = try makeCompose(transport) { sent += 1 }
+        let to = try #require(compose.view.mailTestView(id: "seek-mail-compose-to") as? UITextField)
+        let error = try #require(compose.view.mailTestView(id: "seek-mail-compose-error") as? UILabel)
+        to.text = "a@x.com"
+        to.sendActions(for: .editingChanged)
+        (compose.view.mailTestView(id: "seek-mail-compose-body") as? UITextView)?.text = "正文"
+
+        guard #available(iOS 16.0, *) else { return }
+        compose.navigationItem.rightBarButtonItem?.primaryAction?.performWithSender(nil, target: nil)
+        await mailWaitUntil { error.isHidden == false }
+        #expect(error.text == "该域名已禁止发信")
+        #expect(sent == 0)
+        #expect(to.text == "a@x.com")
+        #expect(compose.navigationItem.rightBarButtonItem?.accessibilityIdentifier == "seek-mail-compose-send")
+    }
+
+    // MARK: - 新邮件提醒
+
+    @Test func monitorReadsCountsThrottlesAndDetectsNewMail() async throws {
+        let transport = SeekMailRouteTransport()
+        transport.details["/openapi/v1/mails/counts"] = #"{"data":{"mailboxes":{"1":2,"2":1},"total":3}}"#
+        transport.details["/openapi/v1/mails/unread"] = #"{"data":[{"id":40,"mailboxId":1,"fromAddress":"a@x.com"},{"id":41,"mailboxId":2,"fromAddress":"b@x.com"}],"page":{"limit":50,"hasMore":false,"nextCursor":""}}"#
+        let center = NotificationCenter()
+        var clock = Date(timeIntervalSince1970: 1_000_000)
+        let defaults = makeDefaults()
+        let monitor = SeekMailUnreadMonitor(
+            keyStore: InMemorySeekMailKeyStore(key: "sk_live_ok"), transport: transport.load,
+            defaults: defaults, notificationCenter: center, now: { clock }
+        )
+        var newMail: [Int] = []
+        center.addObserver(forName: SeekMailUnreadMonitor.newMailNotification, object: nil, queue: nil) { note in
+            newMail.append(note.userInfo?["count"] as? Int ?? -1)
+        }
+
+        monitor.check()
+        await mailWaitUntil { transport.requests.count == 2 }
+        #expect(monitor.totalUnread == 3)
+        // 第一次是完整同步，只记位置，不算新邮件
+        #expect(transport.requests.last?.url?.query == "limit=50")
+        #expect(newMail.isEmpty)
+
+        // 30 秒内不重复检查
+        clock += 10
+        monitor.check()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        #expect(transport.requests.count == 2)
+
+        clock += 40
+        transport.details["/openapi/v1/mails/unread"] = #"{"data":[{"id":42,"mailboxId":1,"fromAddress":"c@x.com"}],"page":{"limit":50,"hasMore":false,"nextCursor":""}}"#
+        monitor.check()
+        await mailWaitUntil { newMail.count == 1 }
+        #expect(transport.requests.last?.url?.query == "after_id=41&limit=50")
+        #expect(newMail == [1])
+        #expect(SeekMailUnreadMonitor.badgeText(0) == nil)
+        #expect(SeekMailUnreadMonitor.badgeText(120) == "99+")
+    }
+
+    @Test func monitorClearsCountWithoutKey() {
+        let center = NotificationCenter()
+        let monitor = SeekMailUnreadMonitor(keyStore: InMemorySeekMailKeyStore(), transport: SeekMailRouteTransport().load,
+                                            defaults: makeDefaults(), notificationCenter: center)
+        monitor.check(force: true)
+        #expect(monitor.totalUnread == nil)
+    }
+
+    // MARK: - 列表缓存
+
+    @Test func cacheRoundTripsAndIsolatesAccounts() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let mails = try decode([SeekMail].self, #"[{"id":1,"mailboxId":1,"fromAddress":"a@x.com","subject":"s","bodyText":"b","receivedAt":"2026-11-16T03:31:18.123456789Z","verificationCode":"123456"}]"#)
+        let boxes = try decode([SeekMailbox].self, #"[{"id":1,"address":"me@seek.li"}]"#)
+
+        let cache = SeekMailListCache(directory: directory)
+        cache.saveMailboxes(boxes, folders: [], for: "key-a")
+        cache.saveMails(mails, for: "key-a", page: "all|inbox")
+
+        // 新实例从文件读回
+        let reloaded = SeekMailListCache(directory: directory)
+        #expect(reloaded.mailboxes(for: "key-a")?.mailboxes == boxes)
+        #expect(reloaded.mails(for: "key-a", page: "all|inbox") == mails)
+        #expect(reloaded.mails(for: "key-b", page: "all|inbox") == nil)
+        reloaded.clear()
+        #expect(SeekMailListCache(directory: directory).mailboxes(for: "key-a") == nil)
+    }
+
+    @Test func modelShowsSnapshotBeforeNetwork() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cache = SeekMailListCache(directory: directory)
+        let transport = SeekMailRouteTransport()
+        let provider = SeekMailProvider<SeekMailAPI>(apiKey: { "sk_live_test" }, plugins: [], transport: transport.load)
+        let first = SeekMailInboxModel(provider: provider, selectionStore: makeSelectionStore(),
+                                       cache: cache, cacheKey: { "sk_live_test" })
+        first.start()
+        await mailWaitUntil { first.phase == .loaded }
+
+        transport.delayNanoseconds = 300_000_000
+        let second = SeekMailInboxModel(provider: provider, selectionStore: makeSelectionStore(),
+                                        cache: SeekMailListCache(directory: directory), cacheKey: { "sk_live_test" })
+        second.start()
+        // 网络还没回来，已经能看到上次的邮件和邮箱名
+        #expect(second.phase == .loaded)
+        #expect(second.mails.map(\.id) == [11, 12])
+        #expect(second.names[2]?.title == "账单")
+    }
+
+    // MARK: - 辅助
+
+    private func makeCompose(_ transport: SeekMailRouteTransport, onSent: @escaping () -> Void) throws -> SeekMailComposeViewController {
+        let mailboxes = try decode([SeekMailbox].self, #"[{"id":1,"address":"me@nodeseek.org"},{"id":2,"address":"me@seek.li"}]"#)
+        let provider = SeekMailProvider<SeekMailAPI>(apiKey: { "sk_live_test" }, plugins: [], transport: transport.load)
+        let compose = SeekMailComposeViewController(
+            provider: provider, mailboxes: mailboxes, names: SeekMailboxNaming.displays(for: mailboxes),
+            content: SeekMailComposeContent(), onSent: onSent
+        )
+        compose.loadViewIfNeeded()
+        return compose
+    }
+
+    private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
+        try SeekMailJSON.decoder.decode(T.self, from: Data(json.utf8))
+    }
+
+    private func makeDefaults() -> UserDefaults {
+        let suite = "seek-mail-monitor-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return defaults
+    }
+}
