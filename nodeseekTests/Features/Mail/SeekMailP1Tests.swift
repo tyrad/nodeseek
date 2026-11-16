@@ -245,6 +245,21 @@ struct SeekMailMarkAllReadTests {
         #expect(states.contains(.running(done: 1, total: 2)))
     }
 
+    @Test func immediateStopPreventsRequestsAndDuplicateStart() async throws {
+        let transport = SeekMailRouteTransport()
+        transport.details["/openapi/v1/mails/unread"] = Self.unread
+        let provider = SeekMailProvider<SeekMailAPI>(apiKey: { "sk_live_test" }, transport: transport.load)
+        let job = SeekMailMarkAllReadJob(provider: provider, sleep: { _ in })
+        let mails = try await job.collect(mailboxID: 1).mails
+        job.start(mails)
+        #expect(job.isActive)
+        job.start(mails)
+        job.stop()
+        await mailWaitUntil { if case .stopped = job.state { return true }; return false }
+        #expect(job.state == .stopped(done: 0, total: 2))
+        #expect(transport.requests.filter { $0.httpMethod == "PUT" }.isEmpty)
+    }
+
     @Test func waitsForQuotaWindowWhenRemainingIsLow() async throws {
         let transport = SeekMailRouteTransport()
         transport.details["/openapi/v1/mails/unread"] = Self.unread
@@ -359,6 +374,23 @@ struct SeekMailCreateMailboxTests {
         #expect(createRequest.httpMethod == "POST")
         let body = try #require(createRequest.httpBody)
         #expect(try JSONSerialization.jsonObject(with: body) as? [String: String] == ["address": "shop@seek.li"])
+    }
+
+    @Test func recheckInvalidatesPreviouslyAvailableAddress() async throws {
+        let transport = SeekMailRouteTransport()
+        transport.posts["/openapi/v1/mailboxes/check"] = #"{"data":{"available":true}}"#
+        let (controller, field, check, status) = try Self.makeController(transport)
+        let submit = try #require(controller.navigationItem.rightBarButtonItem)
+        Self.type("shop", into: field)
+        check.sendActions(for: .touchUpInside)
+        await mailWaitUntil { submit.isEnabled }
+        #expect(submit.isEnabled)
+        transport.posts["/openapi/v1/mailboxes/check"] = #"{"data":{"available":false,"message":"taken"}}"#
+        check.sendActions(for: .touchUpInside)
+        #expect(submit.isEnabled == false)
+        await mailWaitUntil { status.text == "taken" }
+        #expect(submit.isEnabled == false)
+        withExtendedLifetime(controller) {}
     }
 
     @Test func pastedFullAddressIsSplit() throws {

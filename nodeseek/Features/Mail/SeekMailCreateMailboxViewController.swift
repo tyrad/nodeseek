@@ -190,6 +190,9 @@ final class SeekMailCreateMailboxViewController: UIViewController, UITextFieldDe
 
     private func check() {
         guard let address, checkTask == nil, createTask == nil else { return }
+        // 重新检查期间及失败后，不得沿用旧的可用结果。
+        availableAddress = nil
+        createItem.isEnabled = false
         showStatus(SeekMailL10n.text("正在检查…"), color: .secondaryLabel)
         checkTask = Task { [weak self] in
             guard let self else { return }
@@ -215,7 +218,7 @@ final class SeekMailCreateMailboxViewController: UIViewController, UITextFieldDe
     }
 
     private func create() {
-        guard let address = availableAddress, createTask == nil else { return }
+        guard let address = availableAddress, address == self.address, checkTask == nil, createTask == nil else { return }
         prefixField.resignFirstResponder()
         createTask = Task { [weak self] in
             guard let self else { return }

@@ -78,6 +78,8 @@ final class SeekMailMarkAllReadJob {
         guard isActive == false, mails.isEmpty == false else { return }
         failed = []
         task = Task { [weak self] in await self?.run(mails) }
+        // 同步占用任务状态，避免下一次主线程轮次前重复启动或漏掉停止。
+        state = .running(done: 0, total: mails.count)
     }
 
     func retryFailed() {
@@ -95,6 +97,7 @@ final class SeekMailMarkAllReadJob {
         state = .running(done: 0, total: total)
         for mail in mails {
             do {
+                try Task.checkCancellation()
                 try await waitForQuota(done: done, total: total)
                 try await mark(mail, done: done, total: total)
                 onMarked?(mail)
