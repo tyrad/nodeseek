@@ -25,6 +25,7 @@ final class SeekMailInboxViewController: UIViewController {
     private let undoToast = SeekMailUndoToast()
     private var noticeTimer: Timer?
     private var lastDeletedID: Int64?
+    private var autoRefreshTimer: Timer?
 
     private enum Section: Int, CaseIterable { case code, mails }
 
@@ -63,6 +64,11 @@ final class SeekMailInboxViewController: UIViewController {
         folderTabs.onSelect = { [weak self] scope in self?.model.selectScope(scope) }
         mailboxTags.onSelect = { [weak self] id in self?.model.selectMailbox(id) }
         mailboxTags.onToggle = { [weak self] expanded in self?.model.selectionStore.tagsExpanded = expanded }
+        mailboxTags.onCopyAddress = { [weak self] address in self?.copyAddress(address) }
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(appDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification, object: nil
+        )
         NotificationCenter.default.addObserver(
             self, selector: #selector(unreadCountsDidChange(_:)),
             name: SeekMailUnreadMonitor.didChangeNotification, object: nil
@@ -103,8 +109,14 @@ final class SeekMailInboxViewController: UIViewController {
         model.reload()
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        startAutoRefresh()
+    }
+
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        stopAutoRefresh()
         // 推入详情页不算离开列表，只有真正离开才立即提交删除
         if isMovingFromParent || parent?.isMovingFromParent == true || navigationController?.isBeingDismissed == true {
             model.commitPendingDeletes()
@@ -114,6 +126,39 @@ final class SeekMailInboxViewController: UIViewController {
     @objc private func appWillResignActive() {
         model.commitPendingDeletes()
         undoToast.dismiss()
+        stopAutoRefresh()
+    }
+
+    @objc private func appDidBecomeActive() {
+        guard viewIfLoaded?.window != nil else { return }
+        startAutoRefresh()
+    }
+
+    // MARK: - 自动刷新
+
+    /// 只在列表显示且 App 在前台时计时；离开列表、进详情、切到后台都会停。
+    private func startAutoRefresh() {
+        stopAutoRefresh()
+        let seconds = model.selectionStore.autoRefreshSeconds
+        guard seconds > 0 else { return }
+        autoRefreshTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(seconds), repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.model.autoRefresh() }
+        }
+    }
+
+    private func stopAutoRefresh() {
+        autoRefreshTimer?.invalidate()
+        autoRefreshTimer = nil
+    }
+
+    private static func autoRefreshTitle(_ seconds: Int) -> String {
+        seconds == 0 ? SeekMailL10n.text("关闭") : SeekMailL10n.format("每 %@ 秒", String(seconds))
+    }
+
+    private func copyAddress(_ address: String) {
+        UIPasteboard.general.string = address
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        undoToast.showMessage(SeekMailL10n.format("已复制 %@", address), in: view)
     }
 
     /// 入口页「更多」菜单里属于列表的部分。
@@ -136,7 +181,19 @@ final class SeekMailInboxViewController: UIViewController {
                 completion([item])
             }
         }
-        return [refresh, storage]
+        let current = model.selectionStore.autoRefreshSeconds
+        let intervals = SeekMailSelectionStore.autoRefreshOptions.map { seconds in
+            UIAction(title: Self.autoRefreshTitle(seconds), state: seconds == current ? .on : .off) { [weak self] _ in
+                guard let self else { return }
+                model.selectionStore.autoRefreshSeconds = seconds
+                if viewIfLoaded?.window != nil { startAutoRefresh() }
+                // 让入口页重建菜单，显示新的勾选
+                onNavigationChange?()
+            }
+        }
+        let autoRefresh = UIMenu(title: SeekMailL10n.text("自动刷新"), subtitle: Self.autoRefreshTitle(current),
+                                 image: UIImage(systemName: "timer"), children: intervals)
+        return [refresh, autoRefresh, storage]
     }
 
     // MARK: - 布局

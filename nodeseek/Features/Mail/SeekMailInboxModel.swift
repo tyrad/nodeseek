@@ -51,6 +51,7 @@ final class SeekMailSelectionStore {
         static let scope = "seekMail.selectedScope"
         static let recents = "seekMail.recentMailboxIDs"
         static let tagsExpanded = "seekMail.mailboxTagsExpanded"
+        static let autoRefresh = "seekMail.autoRefreshSeconds"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -60,6 +61,13 @@ final class SeekMailSelectionStore {
     var scope: SeekMailFolderScope {
         get { defaults.string(forKey: Key.scope).flatMap(SeekMailFolderScope.init(storageValue:)) ?? .inbox }
         set { defaults.set(newValue.storageValue, forKey: Key.scope) }
+    }
+
+    /// 停在列表时自动检查新邮件的间隔（秒），0 表示关闭。
+    static let autoRefreshOptions = [0, 10, 20, 30, 60]
+    var autoRefreshSeconds: Int {
+        get { (defaults.object(forKey: Key.autoRefresh) as? Int) ?? 20 }
+        set { defaults.set(newValue, forKey: Key.autoRefresh) }
     }
 
     /// 邮箱标签区是否展开；默认折叠。
@@ -79,7 +87,7 @@ final class SeekMailSelectionStore {
     }
 
     func clear() {
-        [Key.mailbox, Key.scope, Key.recents, Key.tagsExpanded].forEach(defaults.removeObject(forKey:))
+        [Key.mailbox, Key.scope, Key.recents, Key.tagsExpanded, Key.autoRefresh].forEach(defaults.removeObject(forKey:))
     }
 }
 
@@ -539,6 +547,40 @@ final class SeekMailInboxModel {
             pendingDeletes[id] = nil
             onChange?()
             report(error)
+        }
+    }
+
+    // MARK: - 自动刷新
+
+    /// 剩余额度低于这个数就不自动刷新，留给用户手动操作。seek.li 每个请求实际扣 2。
+    static let autoRefreshQuotaReserve = 20
+    private var isAutoRefreshing = false
+
+    /// 停在列表时定时调用：额度不够或被限流时跳过；先查未读数（1 个请求），有变化才刷新列表。
+    func autoRefresh(now: Date = Date()) {
+        guard phase == .loaded, isSearching == false, isLoadingMore == false, isAutoRefreshing == false else { return }
+        if let until = rateLimitedUntil, until > now { return }
+        if let limit = provider.rateLimit, now.timeIntervalSince(limit.observedAt) < 60,
+           limit.remaining < Self.autoRefreshQuotaReserve {
+            return
+        }
+        isAutoRefreshing = true
+        let previous = unreadTotal.map { SeekMailUnreadCounts(byMailbox: unreadByMailbox, total: $0) }
+        Task { [weak self] in
+            guard let self else { return }
+            defer { isAutoRefreshing = false }
+            do {
+                let counts = try await provider.unreadCounts()
+                guard counts != previous else { return }
+                applyUnreadCounts(counts)
+                reload()
+            } catch {
+                // 静默失败；被限流时记下时间，到期前不再自动刷新
+                if case .rateLimited(let resetAt)? = error as? SeekMailError {
+                    rateLimitedUntil = resetAt ?? now.addingTimeInterval(60)
+                    onChange?()
+                }
+            }
         }
     }
 

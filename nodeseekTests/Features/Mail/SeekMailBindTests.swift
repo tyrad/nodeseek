@@ -223,6 +223,8 @@ final class SeekMailRouteTransport {
     var details: [String: String] = [:]
     /// 模拟网络耗时，用来看到加载中的骨架行。
     var delayNanoseconds: UInt64 = 0
+    /// 附加的响应头，例如限流额度。
+    var headers: [String: String] = [:]
     private(set) var requests: [URLRequest] = []
     var authorizations: [String?] { requests.map { $0.value(forHTTPHeaderField: "Authorization") } }
 
@@ -245,7 +247,7 @@ final class SeekMailRouteTransport {
         } else {
             body = #"{"data":{"success":true}}"#
         }
-        let response = HTTPURLResponse(url: request.url!, statusCode: override == nil ? 200 : status, httpVersion: "HTTP/1.1", headerFields: nil)!
+        let response = HTTPURLResponse(url: request.url!, statusCode: override == nil ? 200 : status, httpVersion: "HTTP/1.1", headerFields: headers)!
         return (Data(body.utf8), response)
     }
 }

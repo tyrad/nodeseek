@@ -129,6 +129,9 @@ struct SeekMailInboxViewTests {
         // 有未读的邮箱排在前面，标签带未读数
         #expect(title(tagsView.mailTestView(id: "seek-mail-tag-3") as? UIButton) == "box3 (4)")
         #expect(title(tagsView.mailTestView(id: "seek-mail-tag-all") as? UIButton) == "全部 (4)")
+        // 长按邮箱标签可复制完整地址；「全部」没有菜单
+        #expect((tagsView.mailTestView(id: "seek-mail-tag-3") as? UIButton)?.menu?.title == "box3@seek.li")
+        #expect((tagsView.mailTestView(id: "seek-mail-tag-all") as? UIButton)?.menu == nil)
 
         // 展开后显示全部，状态记住
         toggle.sendActions(for: .touchUpInside)

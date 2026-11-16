@@ -16,8 +16,10 @@ nonisolated struct SeekMailRateLimit: Equatable, Sendable {
     let limit: Int
     let remaining: Int
     let resetAt: Date?
+    /// 额度按分钟窗口计算，太久之前的剩余数已经不准。
+    let observedAt: Date
 
-    init?(response: HTTPURLResponse) {
+    init?(response: HTTPURLResponse, observedAt: Date = Date()) {
         guard let limit = response.value(forHTTPHeaderField: "x-ratelimit-limit").flatMap(Int.init),
               let remaining = response.value(forHTTPHeaderField: "x-ratelimit-remaining").flatMap(Int.init) else {
             return nil
@@ -25,6 +27,7 @@ nonisolated struct SeekMailRateLimit: Equatable, Sendable {
         self.limit = limit
         self.remaining = remaining
         resetAt = Self.resetDate(response)
+        self.observedAt = observedAt
     }
 
     static func resetDate(_ response: HTTPURLResponse) -> Date? {

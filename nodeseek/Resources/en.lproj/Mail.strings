@@ -121,3 +121,9 @@
 "验证码" = "Verification code";
 "验证码 %@" = "Verification code %@";
 "（无主题）" = "(No subject)";
+"复制地址" = "Copy Address";
+"长按复制地址" = "Touch and hold to copy the address";
+"已复制 %@" = "Copied %@";
+"自动刷新" = "Auto Refresh";
+"每 %@ 秒" = "Every %@ s";
+"关闭" = "Off";

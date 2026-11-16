@@ -162,6 +162,41 @@ struct SeekMailInboxModelTests {
         #expect(second.showsRecipientMailbox)
     }
 
+    @Test func autoRefreshReloadsOnlyWhenCountsChangeAndRespectsQuota() async throws {
+        let transport = SeekMailRouteTransport()
+        transport.details["/openapi/v1/mails/counts"] = #"{"data":{"mailboxes":{"1":1},"total":1}}"#
+        let selection = makeSelectionStore()
+        #expect(selection.autoRefreshSeconds == 20)
+        let model = makeModel(transport, selection: selection)
+        model.start()
+        await mailWaitUntil { model.phase == .loaded && model.unreadTotal == 1 }
+        func count(_ suffix: String) -> Int { transport.requests.filter { $0.url?.path.hasSuffix(suffix) == true }.count }
+
+        // 未读数没变：只查一次 counts，不拉列表
+        let mailsBefore = count("/mails")
+        let countsBefore = count("/counts")
+        model.autoRefresh()
+        await mailWaitUntil { count("/counts") == countsBefore + 1 }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        #expect(count("/mails") == mailsBefore)
+
+        // 有新邮件：未读数变了才刷新列表
+        transport.details["/openapi/v1/mails/counts"] = #"{"data":{"mailboxes":{"1":2},"total":2}}"#
+        model.autoRefresh()
+        await mailWaitUntil { count("/mails") == mailsBefore + 1 }
+        #expect(model.unreadTotal == 2)
+
+        // 剩余额度不够时不自动刷新
+        await mailWaitUntil { model.phase == .loaded }
+        transport.headers = ["x-ratelimit-limit": "60", "x-ratelimit-remaining": "10"]
+        model.reload()
+        await mailWaitUntil { model.phase == .loaded && model.provider.rateLimit?.remaining == 10 }
+        let countsLow = count("/counts")
+        model.autoRefresh()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        #expect(count("/counts") == countsLow)
+    }
+
     @Test func unreadCountsDriveTagsAndFollowLocalReadChanges() async throws {
         let transport = SeekMailRouteTransport()
         transport.details["/openapi/v1/mails/counts"] = #"{"data":{"mailboxes":{"1":3},"total":3}}"#

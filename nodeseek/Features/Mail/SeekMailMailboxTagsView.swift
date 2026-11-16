@@ -10,6 +10,8 @@ struct SeekMailMailboxTag: Equatable {
     let id: Int64?
     let title: String
     let unread: Int
+    /// 完整地址，长按标签可复制；「全部」没有。
+    var address: String? = nil
 
     /// 「名称 (9)」里括号部分；没有未读时不显示。
     var countText: String? {
@@ -23,7 +25,7 @@ extension SeekMailInboxModel {
         guard mailboxes.isEmpty == false else { return [] }
         let all = SeekMailMailboxTag(id: nil, title: SeekMailL10n.text("全部"), unread: unreadTotal ?? 0)
         return [all] + mailboxOrder.compactMap { id in
-            names[id].map { SeekMailMailboxTag(id: id, title: $0.title, unread: unreadByMailbox[id] ?? 0) }
+            names[id].map { SeekMailMailboxTag(id: id, title: $0.title, unread: unreadByMailbox[id] ?? 0, address: $0.address) }
         }
     }
 }
@@ -32,6 +34,8 @@ extension SeekMailInboxModel {
 final class SeekMailMailboxTagsView: UIView {
     var onSelect: ((Int64?) -> Void)?
     var onToggle: ((Bool) -> Void)?
+    /// 注册网站时要填自己的地址，长按标签直接复制。
+    var onCopyAddress: ((String) -> Void)?
     private(set) var isExpanded = false
 
     static let collapsedRows = 2
@@ -92,6 +96,14 @@ final class SeekMailMailboxTagsView: UIView {
         isExpanded = expanded
         for (tag, button) in zip(tags, buttons) {
             style(button, tag: tag, selected: tag.id == selectedID)
+            button.menu = tag.address.map { address in
+                UIMenu(title: address, children: [
+                    UIAction(title: SeekMailL10n.text("复制地址"), image: UIImage(systemName: "doc.on.doc")) { [weak self] _ in
+                        self?.onCopyAddress?(address)
+                    }
+                ])
+            }
+            button.accessibilityHint = tag.address == nil ? nil : SeekMailL10n.text("长按复制地址")
         }
         setNeedsLayout()
     }
