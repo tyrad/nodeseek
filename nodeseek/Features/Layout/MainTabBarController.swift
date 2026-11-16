@@ -124,6 +124,8 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         navigationItem.titleView = source.titleView
         navigationItem.leftBarButtonItems = source.leftBarButtonItems
         navigationItem.rightBarButtonItems = source.rightBarButtonItems
+        navigationItem.searchController = source.searchController
+        navigationItem.hidesSearchBarWhenScrolling = source.hidesSearchBarWhenScrolling
         navigationItem.largeTitleDisplayMode = source.largeTitleDisplayMode
         navigationItem.backButtonTitle = source.backButtonTitle
         navigationItem.backBarButtonItem = source.backBarButtonItem

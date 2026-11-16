@@ -16,12 +16,15 @@ final class SeekMailHomeViewController: UIViewController {
     private var shownKey: String?
     /// Key 失效被清掉时，回到绑定页要说明原因。
     private var pendingBindMessage: String?
+    private let selectionStore: SeekMailSelectionStore
 
     /// transport 只在测试里替换，正常使用走 URLSession。
     init(keyStore: SeekMailAPIKeyStoring = SeekMailAPIKeyStore.shared,
-         transport: SeekMailProvider<SeekMailAPI>.Transport? = nil) {
+         transport: SeekMailProvider<SeekMailAPI>.Transport? = nil,
+         selectionStore: SeekMailSelectionStore = SeekMailSelectionStore()) {
         self.keyStore = keyStore
         self.transport = transport
+        self.selectionStore = selectionStore
         super.init(nibName: nil, bundle: nil)
         title = "邮箱"
     }
@@ -31,6 +34,8 @@ final class SeekMailHomeViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
+        // 搜索框挂在导航栏上，结果直接显示在本页
+        definesPresentationContext = true
         NotificationCenter.default.addObserver(
             self, selector: #selector(keyDidChange),
             name: SeekMailAPIKeyStore.didChangeNotification, object: nil
@@ -50,7 +55,8 @@ final class SeekMailHomeViewController: UIViewController {
         shownKey = key
         let next: UIViewController
         if key != nil {
-            let inbox = SeekMailInboxViewController(keyStore: keyStore, transport: transport)
+            let inbox = SeekMailInboxViewController(keyStore: keyStore, transport: transport, selectionStore: selectionStore)
+            inbox.onNavigationChange = { [weak self] in self?.syncInboxNavigation() }
             inbox.onUnauthorized = { [weak self] in
                 self?.pendingBindMessage = "之前保存的 Key 已失效，请重新粘贴"
                 self?.keyStore.clear()
@@ -89,7 +95,14 @@ final class SeekMailHomeViewController: UIViewController {
         }
         guard bound else {
             navigationItem.rightBarButtonItems = []
+            navigationItem.titleView = nil
+            navigationItem.searchController = nil
             return
+        }
+        if let inbox = content as? SeekMailInboxViewController {
+            navigationItem.titleView = inbox.titleButton
+            navigationItem.searchController = inbox.searchController
+            navigationItem.hidesSearchBarWhenScrolling = true
         }
         let more = UIBarButtonItem(image: UIImage(systemName: "ellipsis"), menu: makeMoreMenu())
         more.accessibilityLabel = "更多"
@@ -108,7 +121,9 @@ final class SeekMailHomeViewController: UIViewController {
                               attributes: .destructive) { [weak self] _ in
             self?.confirmRemoveKey()
         }
+        let inboxItems = (content as? SeekMailInboxViewController)?.menuElements() ?? []
         return UIMenu(children: [
+            UIMenu(options: .displayInline, children: inboxItems),
             UIMenu(options: .displayInline, children: [manage]),
             UIMenu(options: .displayInline, children: [replace, remove])
         ])
@@ -137,88 +152,17 @@ final class SeekMailHomeViewController: UIViewController {
         )
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         alert.addAction(UIAlertAction(title: "移除", style: .destructive) { [weak self] _ in
+            // 记住的邮箱属于旧账号，一起清掉
+            self?.selectionStore.clear()
             self?.keyStore.clear()
         })
         present(alert, animated: true)
     }
-}
 
-/// 已绑定时的邮件页。第 2 步只显示连接状态，邮件列表在下一步实现。
-final class SeekMailInboxViewController: UIViewController {
-    private let keyStore: SeekMailAPIKeyStoring
-    /// Key 已在网页上删除或失效（401）时回调，由入口页清掉 Key 并回到绑定页。
-    var onUnauthorized: (() -> Void)?
-    private let provider: SeekMailProvider<SeekMailAPI>
-    private var loadTask: Task<Void, Never>?
-
-    private let stack = UIStackView()
-    private let titleLabel = UILabel()
-    private let detailLabel = UILabel()
-    private let spinner = UIActivityIndicatorView(style: .medium)
-
-    init(keyStore: SeekMailAPIKeyStoring, transport: SeekMailProvider<SeekMailAPI>.Transport? = nil) {
-        self.keyStore = keyStore
-        if let transport {
-            provider = SeekMailProvider(apiKey: { [keyStore] in keyStore.apiKey() }, transport: transport)
-        } else {
-            provider = SeekMailProvider(apiKey: { [keyStore] in keyStore.apiKey() })
-        }
-        super.init(nibName: nil, bundle: nil)
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    deinit { loadTask?.cancel() }
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        view.backgroundColor = .systemBackground
-        let icon = UIImageView(image: UIImage(systemName: "envelope.badge"))
-        icon.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 40, weight: .light)
-        icon.tintColor = .tertiaryLabel
-        titleLabel.font = .preferredFont(forTextStyle: .headline)
-        titleLabel.textAlignment = .center
-        detailLabel.font = .preferredFont(forTextStyle: .subheadline)
-        detailLabel.textColor = .secondaryLabel
-        detailLabel.textAlignment = .center
-        detailLabel.numberOfLines = 0
-        detailLabel.accessibilityIdentifier = "seek-mail-inbox-detail"
-        [icon, titleLabel, detailLabel, spinner].forEach(stack.addArrangedSubview)
-        stack.axis = .vertical
-        stack.alignment = .center
-        stack.spacing = 10
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
-            stack.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor, constant: 16),
-            stack.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor, constant: -16)
-        ])
-        load()
-    }
-
-    private func load() {
-        titleLabel.text = "已连接 seek.li 邮箱"
-        detailLabel.text = nil
-        spinner.startAnimating()
-        loadTask = Task { [weak self] in
-            guard let self else { return }
-            do {
-                let mailboxes = try await provider.mailboxes()
-                spinner.stopAnimating()
-                detailLabel.text = "共 \(mailboxes.count) 个邮箱"
-            } catch is CancellationError {
-            } catch let error as SeekMailError {
-                spinner.stopAnimating()
-                if case .unauthorized = error {
-                    onUnauthorized?()
-                    return
-                }
-                detailLabel.text = error.userMessage
-            } catch {
-                spinner.stopAnimating()
-                detailLabel.text = "加载失败，请稍后重试"
-            }
+    /// 标题按钮的内容变了，作为 Tab 根页面时外层导航栏也要跟着更新。
+    private func syncInboxNavigation() {
+        if let tabs = parent as? MainTabBarController, tabs.selectedViewController === self {
+            tabs.syncNavigationItemWithSelectedTab()
         }
     }
 }

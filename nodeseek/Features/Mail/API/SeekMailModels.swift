@@ -35,8 +35,8 @@ nonisolated struct SeekMail: Decodable, Equatable, Sendable {
     /// 列表里为空字符串，详情里才有。
     let bodyHtml: String
     let verificationCode: String?
-    let isRead: Bool
-    let isFlagged: Bool
+    var isRead: Bool
+    var isFlagged: Bool
     let isPinned: Bool
     let hasAttachments: Bool
     let status: String?

@@ -299,7 +299,7 @@ let raw = try await api.request(.rawMail(id: 1))
 
 1. ✅ `feat(mail): 新增 seek.li 邮箱接口层`：仿 Moya 的接口枚举、Provider、模型、错误和测试。
 2. ✅ `feat(mail): 绑定 seek.li API Key`：钥匙串存储、绑定页和三个入口。
-3. `feat(mail): 查看邮件列表和验证码`：列表、验证码卡片、滑动操作。
+3. ✅ `feat(mail): 查看邮件列表和验证码`：列表、验证码卡片、滑动操作。
 4. `feat(mail): 查看邮件详情和附件`：详情、HTML 安全渲染、附件预览。
 5. P1：`feat(mail): 用 seek.li 邮箱写信和回复`、`feat(mail): 回到前台提醒新邮件`。
 
