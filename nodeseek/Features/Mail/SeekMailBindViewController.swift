@@ -3,7 +3,6 @@
 //  nodeseek
 //
 
-import SafariServices
 import UIKit
 
 enum SeekMailLinks {
@@ -116,7 +115,7 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
         titleLabel.numberOfLines = 0
 
         let descLabel = UILabel()
-        descLabel.text = "用 seek.li 控制台里创建的 API Key 在 App 里收邮件、看验证码。Key 只保存在本机钥匙串。"
+        descLabel.text = "用 seek.li 控制台里创建的 API Key 在 App 里收发邮件、看验证码。Key 只保存在本机钥匙串。"
         descLabel.font = .preferredFont(forTextStyle: .subheadline)
         descLabel.adjustsFontForContentSizeCategory = true
         descLabel.textColor = .secondaryLabel
@@ -290,7 +289,8 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
     }
 
     private func openConsole() {
-        present(SFSafariViewController(url: SeekMailLinks.developerConsole), animated: true)
+        // 用系统浏览器：控制台需要登录，Safari 里通常已有登录态，也方便复制 Key 后切回来
+        UIApplication.shared.open(SeekMailLinks.developerConsole)
     }
 
     // MARK: - 小组件
@@ -365,7 +365,7 @@ final class SeekMailKeyHelpViewController: UITableViewController {
         Scope(title: "下载附件", scope: "attachment:read", required: true),
         Scope(title: "读取文件夹", scope: "folder:read", required: true),
         Scope(title: "查看存储用量", scope: "storage:read", required: true),
-        Scope(title: "写信（以后的版本）", scope: "mail:send", required: false)
+        Scope(title: "写信和回复（可选，只有 seek.li 地址能发信）", scope: "mail:send", required: false)
     ]
 
     init() {
@@ -394,7 +394,7 @@ final class SeekMailKeyHelpViewController: UITableViewController {
     }
 
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
-        section == 1 ? "不需要勾选全部权限。少勾的权限对应功能会提示无法使用，可随时在 seek.li 重新创建 Key。" : nil
+        section == 1 ? "不需要勾选全部权限。少勾的权限对应功能会提示无法使用，例如不勾 mail:send 只是不能写信；可随时在 seek.li 重新创建 Key。" : nil
     }
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -432,6 +432,6 @@ final class SeekMailKeyHelpViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         guard indexPath.section == 2 else { return }
-        present(SFSafariViewController(url: SeekMailLinks.developerConsole), animated: true)
+        UIApplication.shared.open(SeekMailLinks.developerConsole)
     }
 }
