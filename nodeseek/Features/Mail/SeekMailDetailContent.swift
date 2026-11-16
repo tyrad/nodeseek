@@ -31,14 +31,15 @@ enum SeekMailDetailContent {
     }
 
     /// 注入 color-scheme 和最小样式：没有样式的邮件在深色模式下也能看清，自带背景色的保持原样。
-    static func wrappedHTML(_ html: String) -> String {
+    /// fontSize 是正文默认字号（px），跟随 App 的「字体大小」设置；邮件自带字号的部分保持原样。
+    static func wrappedHTML(_ html: String, fontSize: Int = 17) -> String {
         let head = """
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="color-scheme" content="light dark">
         <style>
         :root { color-scheme: light dark; }
-        body { margin: 0; font: -apple-system-body; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%; }
+        body { margin: 0; font-family: -apple-system, sans-serif; font-size: \(fontSize)px; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%; }
         img { max-width: 100%; height: auto; }
         table { max-width: 100% !important; }
         pre { white-space: pre-wrap; }

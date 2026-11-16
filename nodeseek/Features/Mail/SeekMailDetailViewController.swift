@@ -60,7 +60,19 @@ final class SeekMailDetailViewController: UIViewController {
         navigationItem.rightBarButtonItem = starItem
         setupLayout()
         updateToolbar()
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(textSizeDidChange),
+            name: AppTextSizeSettings.didChangeNotification, object: nil
+        )
         load()
+    }
+
+    /// 详情停在导航栈里时调整了字体大小，回来要按新字号重排。
+    @objc private func textSizeDidChange() {
+        (errorView.arrangedSubviews.first as? UILabel)?.font = SeekMailFont.of(.subheadline)
+        guard let mail else { return }
+        render(mail)
+        renderAttachments()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -120,7 +132,7 @@ final class SeekMailDetailViewController: UIViewController {
         scrollView.addSubview(stack)
 
         let errorLabel = UILabel()
-        errorLabel.font = .preferredFont(forTextStyle: .subheadline)
+        errorLabel.font = SeekMailFont.of(.subheadline)
         errorLabel.textColor = .secondaryLabel
         errorLabel.numberOfLines = 0
         errorLabel.textAlignment = .center
@@ -186,19 +198,18 @@ final class SeekMailDetailViewController: UIViewController {
     private func makeHeader(_ mail: SeekMail) -> UIView {
         let subject = UILabel()
         subject.text = mail.subject.isEmpty ? "（无主题）" : mail.subject
-        subject.font = UIFont.preferredFont(forTextStyle: .title2).withSymbolicTraits(.traitBold)
-        subject.adjustsFontForContentSizeCategory = true
+        subject.font = SeekMailFont.of(.title2).withSymbolicTraits(.traitBold)
         subject.numberOfLines = 0
         subject.accessibilityIdentifier = "seek-mail-detail-subject"
 
         let sender = UILabel()
         let name = mail.fromName ?? mail.fromAddress
         var senderText = AttributedString(name)
-        senderText.font = UIFont.preferredFont(forTextStyle: .subheadline).withSymbolicTraits(.traitBold)
+        senderText.font = SeekMailFont.of(.subheadline).withSymbolicTraits(.traitBold)
         senderText.foregroundColor = .label
         if mail.fromName != nil {
             var address = AttributedString("  \(mail.fromAddress)")
-            address.font = UIFont.preferredFont(forTextStyle: .subheadline)
+            address.font = SeekMailFont.of(.subheadline)
             address.foregroundColor = .secondaryLabel
             senderText += address
         }
@@ -207,14 +218,14 @@ final class SeekMailDetailViewController: UIViewController {
 
         let time = UILabel()
         time.text = SeekMailFormat.detailTime(mail.receivedAt)
-        time.font = .preferredFont(forTextStyle: .footnote)
+        time.font = SeekMailFont.of(.footnote)
         time.textColor = .secondaryLabel
 
         // 收件地址始终显示完整地址，长按复制
         let recipient = UILabel()
         let address = mail.toAddress ?? model.mailboxes.first { $0.id == mail.mailboxId }?.address ?? ""
         recipient.text = "发给 \(address)"
-        recipient.font = .preferredFont(forTextStyle: .footnote)
+        recipient.font = SeekMailFont.of(.footnote)
         recipient.textColor = .secondaryLabel
         recipient.lineBreakMode = .byTruncatingMiddle
         recipient.isUserInteractionEnabled = true
@@ -239,7 +250,7 @@ final class SeekMailDetailViewController: UIViewController {
         icon.setContentHuggingPriority(.required, for: .horizontal)
         let label = UILabel()
         label.text = text
-        label.font = .preferredFont(forTextStyle: .footnote)
+        label.font = SeekMailFont.of(.footnote)
         label.textColor = .secondaryLabel
         label.numberOfLines = 0
         let row = UIStackView(arrangedSubviews: [icon, label])
@@ -257,11 +268,11 @@ final class SeekMailDetailViewController: UIViewController {
         bar.layer.cornerCurve = .continuous
         let title = UILabel()
         title.text = "验证码"
-        title.font = .preferredFont(forTextStyle: .footnote)
+        title.font = SeekMailFont.of(.footnote)
         title.textColor = .systemBackground.withAlphaComponent(0.7)
         let codeLabel = UILabel()
         codeLabel.text = code
-        codeLabel.font = .monospacedDigitSystemFont(ofSize: 24, weight: .bold)
+        codeLabel.font = SeekMailFont.digits(24, weight: .bold)
         codeLabel.textColor = .systemBackground
         codeLabel.adjustsFontSizeToFitWidth = true
         codeLabel.accessibilityIdentifier = "seek-mail-detail-code"
@@ -299,8 +310,7 @@ final class SeekMailDetailViewController: UIViewController {
     private func makeTextBody(_ text: String) -> UIView {
         let textView = UITextView()
         textView.text = text
-        textView.font = .preferredFont(forTextStyle: .body)
-        textView.adjustsFontForContentSizeCategory = true
+        textView.font = SeekMailFont.of(.body)
         textView.textColor = .label
         textView.backgroundColor = .clear
         textView.isEditable = false
@@ -362,7 +372,7 @@ final class SeekMailDetailViewController: UIViewController {
         }
         self.webView = webView
 
-        let wrapped = SeekMailDetailContent.wrappedHTML(html)
+        let wrapped = SeekMailDetailContent.wrappedHTML(html, fontSize: SeekMailFont.bodyPixelSize)
         guard allowsRemoteImages == false else {
             webView.loadHTMLString(wrapped, baseURL: nil)
             return
@@ -407,7 +417,7 @@ final class SeekMailDetailViewController: UIViewController {
         guard attachments.isEmpty == false else { return }
         let header = UILabel()
         header.text = "附件 \(attachments.count)"
-        header.font = .preferredFont(forTextStyle: .footnote)
+        header.font = SeekMailFont.of(.footnote)
         header.textColor = .secondaryLabel
         stack.addArrangedSubview(header)
         stack.setCustomSpacing(6, after: header)

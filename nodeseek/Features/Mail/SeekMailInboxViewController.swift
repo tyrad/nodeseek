@@ -72,11 +72,23 @@ final class SeekMailInboxViewController: UIViewController {
             name: UIApplication.willResignActiveNotification, object: nil
         )
         NotificationCenter.default.addObserver(
+            self, selector: #selector(textSizeDidChange),
+            name: AppTextSizeSettings.didChangeNotification, object: nil
+        )
+        NotificationCenter.default.addObserver(
             self, selector: #selector(newMailArrived),
             name: SeekMailUnreadMonitor.newMailNotification, object: nil
         )
         render()
         model.start()
+    }
+
+    /// 调整「字体大小」后重设字体；单元格、标签和文件夹 tab 都在刷新时按当前字号配置。
+    @objc private func textSizeDidChange() {
+        noticeLabel.font = SeekMailFont.of(.footnote)
+        undoToast.refreshFonts()
+        render()
+        mailboxTags.setNeedsLayout()
     }
 
     /// 回到前台检查到的未读数直接用在标签上，不再单独请求。
@@ -132,9 +144,8 @@ final class SeekMailInboxViewController: UIViewController {
     private func setupLayout() {
         folderTabs.translatesAutoresizingMaskIntoConstraints = false
 
-        noticeLabel.font = .preferredFont(forTextStyle: .footnote)
+        noticeLabel.font = SeekMailFont.of(.footnote)
         noticeLabel.textColor = .secondaryLabel
-        noticeLabel.adjustsFontForContentSizeCategory = true
         noticeLabel.numberOfLines = 0
         noticeLabel.textAlignment = .center
         noticeLabel.accessibilityIdentifier = "seek-mail-notice"
@@ -502,7 +513,7 @@ final class SeekMailFolderTabsView: UIView {
             configuration.baseForegroundColor = isSelected ? .label : .secondaryLabel
             configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
             var title = AttributedString(titles[index])
-            title.font = UIFont.systemFont(ofSize: 15, weight: isSelected ? .semibold : .regular)
+            title.font = SeekMailFont.system(15, weight: isSelected ? .semibold : .regular)
             configuration.attributedTitle = title
             button.configuration = configuration
             button.accessibilityTraits = isSelected ? [.button, .selected] : .button
@@ -528,9 +539,8 @@ final class SeekMailStateView: UIView {
         super.init(frame: .zero)
         let label = UILabel()
         label.text = message
-        label.font = .preferredFont(forTextStyle: .subheadline)
+        label.font = SeekMailFont.of(.subheadline)
         label.textColor = .secondaryLabel
-        label.adjustsFontForContentSizeCategory = true
         label.numberOfLines = 0
         label.textAlignment = .center
         label.accessibilityIdentifier = "seek-mail-state-message"
@@ -575,16 +585,10 @@ final class SeekMailUndoToast: UIView {
         backgroundColor = .label
         layer.cornerRadius = 14
         layer.cornerCurve = .continuous
-        label.font = .preferredFont(forTextStyle: .subheadline)
         label.textColor = .systemBackground
         label.numberOfLines = 2
         label.accessibilityIdentifier = "seek-mail-toast-message"
-        var configuration = UIButton.Configuration.plain()
-        configuration.baseForegroundColor = .systemBackground
-        var title = AttributedString("撤销")
-        title.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
-        configuration.attributedTitle = title
-        undoButton.configuration = configuration
+        refreshFonts()
         undoButton.accessibilityIdentifier = "seek-mail-toast-undo"
         undoButton.setContentHuggingPriority(.required, for: .horizontal)
         undoButton.addAction(UIAction { [weak self] _ in
@@ -607,6 +611,16 @@ final class SeekMailUndoToast: UIView {
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func refreshFonts() {
+        label.font = SeekMailFont.of(.subheadline)
+        var configuration = UIButton.Configuration.plain()
+        configuration.baseForegroundColor = .systemBackground
+        var title = AttributedString("撤销")
+        title.font = SeekMailFont.system(15, weight: .semibold)
+        configuration.attributedTitle = title
+        undoButton.configuration = configuration
+    }
 
     func showUndo(seconds: Int, in container: UIView?) {
         remaining = seconds

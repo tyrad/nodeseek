@@ -82,8 +82,8 @@ enum SeekMailStyle {
             : NSDirectionalEdgeInsets(top: 7, leading: 14, bottom: 7, trailing: 14)
         var attributes = AttributeContainer()
         attributes.font = compact
-            ? UIFont.monospacedDigitSystemFont(ofSize: 14, weight: .semibold)
-            : UIFont.systemFont(ofSize: 15, weight: .semibold)
+            ? SeekMailFont.digits(14, weight: .semibold)
+            : SeekMailFont.system(15, weight: .semibold)
         configuration.attributedTitle = AttributedString(title, attributes: attributes)
         return configuration
     }
@@ -128,12 +128,10 @@ final class SeekMailCell: UITableViewCell {
         unreadDot.layer.cornerRadius = 4
         unreadDot.translatesAutoresizingMaskIntoConstraints = false
 
-        senderLabel.font = .preferredFont(forTextStyle: .body)
-        senderLabel.adjustsFontForContentSizeCategory = true
+        senderLabel.font = SeekMailFont.of(.body)
         senderLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        timeLabel.font = .preferredFont(forTextStyle: .footnote)
+        timeLabel.font = SeekMailFont.of(.footnote)
         timeLabel.textColor = .secondaryLabel
-        timeLabel.adjustsFontForContentSizeCategory = true
         timeLabel.setContentHuggingPriority(.required, for: .horizontal)
         timeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         flagView.tintColor = .systemOrange
@@ -142,11 +140,9 @@ final class SeekMailCell: UITableViewCell {
         attachmentView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(textStyle: .caption1)
         [flagView, attachmentView].forEach { $0.setContentHuggingPriority(.required, for: .horizontal) }
 
-        subjectLabel.font = .preferredFont(forTextStyle: .subheadline)
-        subjectLabel.adjustsFontForContentSizeCategory = true
-        previewLabel.font = .preferredFont(forTextStyle: .subheadline)
+        subjectLabel.font = SeekMailFont.of(.subheadline)
+        previewLabel.font = SeekMailFont.of(.subheadline)
         previewLabel.textColor = .secondaryLabel
-        previewLabel.adjustsFontForContentSizeCategory = true
 
         codeButton.accessibilityIdentifier = "seek-mail-row-code"
         codeButton.setContentHuggingPriority(.required, for: .horizontal)
@@ -185,17 +181,18 @@ final class SeekMailCell: UITableViewCell {
     func configure(mail: SeekMail, recipient: SeekMailboxDisplay?, keyword: String) {
         unreadDot.isHidden = mail.isRead
         let sender = mail.fromName ?? mail.fromAddress
-        senderLabel.font = UIFont.preferredFont(forTextStyle: .body).withWeight(mail.isRead ? .regular : .semibold)
+        senderLabel.font = SeekMailFont.of(.body).withWeight(mail.isRead ? .regular : .semibold)
         senderLabel.attributedText = SeekMailFormat.highlighted(sender, keyword: keyword, font: senderLabel.font, color: .label)
         flagView.isHidden = mail.isFlagged == false
         attachmentView.isHidden = mail.hasAttachments == false
+        timeLabel.font = SeekMailFont.of(.footnote)
         timeLabel.text = SeekMailFormat.listTime(mail.receivedAt)
 
         let subject = mail.subject.isEmpty ? "（无主题）" : mail.subject
-        let subjectFont = UIFont.preferredFont(forTextStyle: .subheadline).withWeight(mail.isRead ? .regular : .semibold)
+        let subjectFont = SeekMailFont.of(.subheadline).withWeight(mail.isRead ? .regular : .semibold)
         subjectLabel.attributedText = SeekMailFormat.highlighted(subject, keyword: keyword, font: subjectFont, color: .label)
 
-        let previewFont = UIFont.preferredFont(forTextStyle: .subheadline)
+        let previewFont = SeekMailFont.of(.subheadline)
         let preview = NSMutableAttributedString()
         if let recipient {
             preview.append(NSAttributedString(string: "→ \(recipient.title) · ", attributes: [
@@ -274,13 +271,12 @@ final class SeekMailCodeCell: UITableViewCell {
         card.layer.cornerCurve = .continuous
         card.translatesAutoresizingMaskIntoConstraints = false
 
-        codeLabel.font = .monospacedDigitSystemFont(ofSize: 26, weight: .bold)
+        codeLabel.font = SeekMailFont.digits(26, weight: .bold)
         codeLabel.adjustsFontSizeToFitWidth = true
         codeLabel.minimumScaleFactor = 0.6
         codeLabel.accessibilityIdentifier = "seek-mail-code-card-code"
-        detailLabel.font = .preferredFont(forTextStyle: .footnote)
+        detailLabel.font = SeekMailFont.of(.footnote)
         detailLabel.textColor = .secondaryLabel
-        detailLabel.adjustsFontForContentSizeCategory = true
         detailLabel.lineBreakMode = .byTruncatingMiddle
         copyButton.configuration = SeekMailStyle.codeButtonConfiguration("复制", compact: false)
         copyButton.accessibilityIdentifier = "seek-mail-code-card-copy"
@@ -317,6 +313,9 @@ final class SeekMailCodeCell: UITableViewCell {
 
     func configure(mail: SeekMail, recipient: SeekMailboxDisplay?) {
         code = mail.verificationCode
+        // 每次配置时取当前字号，调整「字体大小」后刷新列表即可生效
+        codeLabel.font = SeekMailFont.digits(26, weight: .bold)
+        detailLabel.font = SeekMailFont.of(.footnote)
         codeLabel.text = mail.verificationCode
         let sender = mail.fromName ?? mail.fromAddress
         let target = recipient.map { " → \($0.title)" } ?? ""

@@ -105,8 +105,7 @@ final class SeekMailComposeViewController: UIViewController {
         ccToggle.setContentHuggingPriority(.required, for: .horizontal)
         ccToggle.addAction(UIAction { [weak self] _ in self?.showCC() }, for: .touchUpInside)
 
-        bodyView.font = .preferredFont(forTextStyle: .body)
-        bodyView.adjustsFontForContentSizeCategory = true
+        bodyView.font = SeekMailFont.of(.body)
         bodyView.textColor = .label
         bodyView.backgroundColor = .clear
         bodyView.isScrollEnabled = false
@@ -116,7 +115,7 @@ final class SeekMailComposeViewController: UIViewController {
         bodyView.accessibilityIdentifier = "seek-mail-compose-body"
         bodyView.accessibilityLabel = "正文"
 
-        errorLabel.font = .preferredFont(forTextStyle: .footnote)
+        errorLabel.font = SeekMailFont.of(.footnote)
         errorLabel.textColor = .systemRed
         errorLabel.numberOfLines = 0
         errorLabel.isHidden = true
@@ -156,8 +155,7 @@ final class SeekMailComposeViewController: UIViewController {
 
     private func configure(_ field: UITextField, placeholder: String, identifier: String, keyboard: UIKeyboardType) {
         field.placeholder = placeholder
-        field.font = .preferredFont(forTextStyle: .body)
-        field.adjustsFontForContentSizeCategory = true
+        field.font = SeekMailFont.of(.body)
         field.keyboardType = keyboard
         field.autocapitalizationType = .none
         field.autocorrectionType = .no
@@ -170,7 +168,7 @@ final class SeekMailComposeViewController: UIViewController {
     private func makeRow(title: String, content: UIView, trailing: UIView? = nil) -> UIView {
         let label = UILabel()
         label.text = title
-        label.font = .preferredFont(forTextStyle: .body)
+        label.font = SeekMailFont.of(.body)
         label.textColor = .secondaryLabel
         label.setContentHuggingPriority(.required, for: .horizontal)
         label.setContentCompressionResistancePriority(.required, for: .horizontal)

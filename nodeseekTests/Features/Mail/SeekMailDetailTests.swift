@@ -25,6 +25,8 @@ struct SeekMailDetailTests {
         """#
         #expect(SeekMailDetailContent.remoteImageCount(in: html) == 2)
         #expect(SeekMailDetailContent.wrappedHTML("<p>x</p>").contains(#"<meta name="color-scheme" content="light dark">"#))
+        // 正文默认字号跟随 App 的「字体大小」
+        #expect(SeekMailDetailContent.wrappedHTML("<p>x</p>", fontSize: 21).contains("font-size: 21px"))
     }
 
     // MARK: - 页面
@@ -93,5 +95,12 @@ struct SeekMailDetailTests {
         model.start()
         await mailWaitUntil { model.phase == .loaded }
         return (model, transport)
+    }
+
+    @Test func mailFontsFollowAppTextSizeOffset() {
+        #expect(SeekMailFont.of(.body, pointOffset: 0).pointSize == 17)
+        #expect(SeekMailFont.of(.subheadline, pointOffset: 4).pointSize == 19)
+        #expect(SeekMailFont.of(.footnote, pointOffset: -4).pointSize == 9)
+        #expect(SeekMailFont.of(.title2, pointOffset: 8).pointSize == 30)
     }
 }

@@ -35,7 +35,8 @@ final class SeekMailMailboxTagsView: UIView {
     private(set) var isExpanded = false
 
     static let collapsedRows = 2
-    private static let rowHeight: CGFloat = 30
+    /// 字号调大时标签跟着变高，默认档是 30。
+    private static var rowHeight: CGFloat { max(30, ceil(SeekMailFont.system(14).lineHeight) + 12) }
     private static let spacing: CGFloat = 8
     private static let insets = UIEdgeInsets(top: 8, left: 16, bottom: 10, right: 16)
 
@@ -189,10 +190,10 @@ final class SeekMailMailboxTagsView: UIView {
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12)
         configuration.titleLineBreakMode = .byTruncatingMiddle
         var title = AttributedString(tag.title)
-        title.font = UIFont.systemFont(ofSize: 14, weight: selected ? .semibold : .regular)
+        title.font = SeekMailFont.system(14, weight: selected ? .semibold : .regular)
         if let count = tag.countText {
             var suffix = AttributedString(count)
-            suffix.font = UIFont.systemFont(ofSize: 14, weight: .regular)
+            suffix.font = SeekMailFont.system(14, weight: .regular)
             suffix.foregroundColor = foreground.withAlphaComponent(0.62)
             title += suffix
         }
@@ -211,7 +212,7 @@ final class SeekMailMailboxTagsView: UIView {
         configuration.imagePlacement = .trailing
         configuration.imagePadding = 3
         var text = AttributedString(title)
-        text.font = UIFont.systemFont(ofSize: 14)
+        text.font = SeekMailFont.system(14)
         configuration.attributedTitle = text
         toggleButton.configuration = configuration
     }
