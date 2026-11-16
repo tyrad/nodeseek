@@ -1,0 +1,634 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>seek.li 邮箱 UI v2</title><style>* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #e9ebee; font-family: -apple-system, "PingFang SC", "SF Pro Text", sans-serif; padding: 48px; color: #111; width: 1830px; -webkit-font-smoothing: antialiased; }
+body > h1 { font-size: 32px; font-weight: 700; letter-spacing: -.5px; }
+body > h1.sec { font-size: 26px; margin-top: 64px; }
+.sub { color: #6b6b70; font-size: 15px; margin: 6px 0 22px; max-width: 1560px; line-height: 1.5; }
+.rules { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 40px; }
+.rule { background: #fff; border-radius: 16px; padding: 14px 16px; font-size: 13px; line-height: 1.55; color: #48484c; }
+.rule b { display: block; color: #111; font-size: 14px; margin-bottom: 4px; }
+.row { display: flex; gap: 48px; align-items: flex-start; }
+.cell { width: 390px; flex: none; }
+.cap { margin-top: 18px; font-size: 13.5px; line-height: 1.65; color: #3a3a3e; }
+.cap b { display: block; font-size: 16px; margin-bottom: 4px; color: #111; }
+.mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+
+.phone, .wall {
+  --bg: #fff; --bg2: #f2f2f7; --card: #fff; --label: #000; --label2: rgba(60,60,67,.6); --label3: rgba(60,60,67,.3);
+  --sep: rgba(60,60,67,.14); --fill: rgba(120,120,128,.12); --glass: rgba(255,255,255,.82); --glass-b: rgba(0,0,0,.06);
+  --red: #FF3B30; --orange: #FF9500; --blue: #007AFF; --indigo: #5856D6; --teal: #30B0C7; --dim: rgba(0,0,0,.18);
+}
+.phone.dark, .wall.dark {
+  --bg: #000; --bg2: #000; --card: #1c1c1e; --label: #fff; --label2: rgba(235,235,245,.6); --label3: rgba(235,235,245,.3);
+  --sep: rgba(84,84,88,.6); --fill: rgba(120,120,128,.28); --glass: rgba(44,44,46,.82); --glass-b: rgba(255,255,255,.07);
+  --red: #FF453A; --orange: #FF9F0A; --blue: #0A84FF; --indigo: #5E5CE6; --teal: #40C8E0; --dim: rgba(0,0,0,.45);
+}
+.phone { position: relative; width: 390px; height: 844px; border-radius: 55px; background: var(--bg); color: var(--label); overflow: hidden; box-shadow: 0 0 0 10px #18181a, 0 30px 60px rgba(0,0,0,.25); }
+.phone.grouped { background: var(--bg2); }
+.status { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 8px 36px 0 48px; font-weight: 600; font-size: 17px; }
+.island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; border-radius: 20px; background: #000; }
+.bat { width: 25px; height: 12px; border: 1.5px solid currentColor; border-radius: 4px; position: relative; }
+.bat::after { content: ""; position: absolute; inset: 1.5px; width: 72%; background: currentColor; border-radius: 1.5px; }
+.home { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--label); z-index: 9; }
+.nav { height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; gap: 8px; position: relative; }
+.nav .grp { display: flex; gap: 8px; }
+.gbtn { height: 40px; min-width: 40px; border-radius: 20px; background: var(--glass); border: .5px solid var(--glass-b); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; box-shadow: 0 1px 6px rgba(0,0,0,.06); }
+.gbtn.pill { padding: 0 14px; }
+.gbtn.inv { background: var(--label); color: var(--bg); border: 0; }
+.gbtn svg { width: 19px; height: 19px; }
+.ttl { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; font-size: 17px; font-weight: 700; }
+.ttl small { font-size: 11px; opacity: .55; }
+.ptitle { font-size: 34px; font-weight: 800; letter-spacing: -.8px; padding: 2px 20px 10px; }
+.ic { width: 1em; height: 1em; display: inline-block; vertical-align: -.12em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* 顶部 tab：和首页分类一致，选中加粗 + 短下划线 */
+.tabs { display: flex; gap: 22px; padding: 4px 20px 0; border-bottom: .5px solid var(--sep); font-size: 15px; color: var(--label2); white-space: nowrap; overflow: hidden; }
+.tabs span { padding: 8px 0 10px; position: relative; }
+.tabs span.on { color: var(--label); font-weight: 700; }
+.tabs span.on::after { content: ""; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 18px; height: 3px; border-radius: 2px; background: var(--label); }
+.tabs em { font-style: normal; font-size: 11px; margin-left: 3px; color: var(--label2); font-weight: 600; }
+
+/* 验证码 */
+.codes { padding: 10px 16px 6px; border-bottom: .5px solid var(--sep); }
+.codes h5 { font-size: 11px; letter-spacing: .6px; color: var(--label2); font-weight: 600; margin: 0 4px 6px; display: flex; justify-content: space-between; }
+.code { display: flex; align-items: center; gap: 12px; background: var(--fill); border-radius: 14px; padding: 10px 12px; margin-bottom: 6px; }
+.code b { font-family: "SF Mono", ui-monospace, monospace; font-size: 24px; font-weight: 700; letter-spacing: 2px; }
+.code .m { flex: 1; min-width: 0; font-size: 11.5px; color: var(--label2); line-height: 1.35; }
+.code .m i { display: block; font-style: normal; color: var(--label); font-weight: 600; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp { height: 30px; padding: 0 14px; border-radius: 15px; background: var(--label); color: var(--bg); font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+.cp.done { background: transparent; color: var(--label2); border: 1px solid var(--sep); }
+
+/* 邮件行：高密度、细分割线、不做卡片 */
+.ml { position: relative; }
+.mr { position: relative; display: grid; grid-template-columns: 14px 1fr auto; column-gap: 6px; padding: 10px 16px 10px 10px; border-bottom: .5px solid var(--sep); background: var(--bg); }
+.mr .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--label); margin: 6px 0 0 3px; }
+.mr .dot.r { background: transparent; }
+.mr .fr { font-size: 15.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mr.u .fr { font-weight: 800; }
+.mr .tm { font-size: 12.5px; color: var(--label2); text-align: right; display: flex; gap: 5px; align-items: center; justify-content: flex-end; }
+.mr .tm .ic { font-size: 12px; }
+.mr .sj { grid-column: 2 / 4; font-size: 14px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mr.u .sj { font-weight: 600; }
+.mr .pv { grid-column: 2 / 4; font-size: 13px; color: var(--label2); line-height: 1.38; margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mr .bx { grid-column: 2 / 4; margin-top: 5px; display: flex; gap: 6px; }
+.tag { font-size: 10.5px; color: var(--label2); background: var(--fill); padding: 2px 6px; border-radius: 5px; font-weight: 500; }
+.hl { background: color-mix(in srgb, var(--label) 14%, transparent); border-radius: 3px; padding: 0 1px; color: var(--label); font-weight: 600; }
+.star { color: var(--orange); }
+
+/* 滑动操作 */
+.swl { display: flex; overflow: hidden; border-bottom: .5px solid var(--sep); }
+.swl .mr { border-bottom: 0; }
+.swl.left .mr { margin-left: -74px; }
+.swl .mr { flex: none; width: 100%; }
+.act { flex: none; width: 74px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #fff; font-size: 12px; font-weight: 600; }
+.act .ic { font-size: 20px; }
+.act.del { background: var(--red); }
+.act.rd { background: #636366; } .act.fl { background: var(--orange); }
+.shiftL { margin-left: -74px; } .shiftR { margin-left: -148px; }
+
+/* 遮罩与菜单 */
+.mask { position: absolute; inset: 0; background: var(--dim); z-index: 5; }
+.menu { position: absolute; z-index: 6; width: 262px; border-radius: 16px; background: var(--glass); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); box-shadow: 0 12px 40px rgba(0,0,0,.22); border: .5px solid var(--glass-b); overflow: hidden; font-size: 15.5px; }
+.phone:not(.dark) .menu { background: rgba(250,250,252,.94); }
+.phone.dark .menu { background: rgba(37,37,39,.96); }
+.mi { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: .5px solid var(--sep); }
+.mi:last-child { border-bottom: 0; }
+.mi .ck { width: 16px; font-weight: 700; }
+.mi .t { flex: 1; min-width: 0; }
+.mi .t small { display: block; font-size: 12px; color: var(--label2); margin-top: 1px; }
+.mi .n { font-size: 13px; color: var(--label2); font-weight: 600; }
+.mi .ic { font-size: 18px; }
+.mi.red { color: var(--red); }
+.mi.gap { border-bottom: 7px solid var(--sep); }
+.bar { height: 5px; border-radius: 3px; background: var(--fill); margin-top: 6px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 8%; background: var(--label); border-radius: 3px; }
+
+/* 详情 */
+.dsub { font-size: 22px; font-weight: 800; letter-spacing: -.4px; line-height: 1.25; padding: 6px 20px 12px; }
+.from { display: flex; gap: 10px; padding: 0 20px 12px; align-items: center; }
+.av { width: 38px; height: 38px; border-radius: 50%; background: var(--fill); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; flex: none; }
+.from .w { flex: 1; min-width: 0; font-size: 12.5px; color: var(--label2); line-height: 1.4; }
+.from .w b { display: block; color: var(--label); font-size: 15px; }
+.from time { font-size: 12.5px; color: var(--label2); align-self: flex-start; margin-top: 2px; }
+.warn { margin: 0 16px 10px; font-size: 12px; color: var(--label2); display: flex; gap: 6px; align-items: center; }
+.cbar { margin: 0 16px 10px; display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 14px; border-radius: 14px; background: var(--label); color: var(--bg); }
+.cbar span { font-size: 12px; opacity: .65; }
+.cbar b { flex: 1; font-family: "SF Mono", ui-monospace, monospace; font-size: 22px; letter-spacing: 3px; }
+.cbar .cp { background: var(--bg); color: var(--label); }
+.blk { margin: 0 16px 10px; display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 12px; background: var(--fill); font-size: 12.5px; color: var(--label2); }
+.blk b { margin-left: auto; color: var(--label); font-weight: 700; }
+.mailbody { margin: 0 16px; border-radius: 14px; border: .5px solid var(--sep); padding: 16px; font-size: 13.5px; line-height: 1.6; background: var(--bg); }
+.mailbody .logo { display: flex; align-items: center; justify-content: center; height: 54px; border-radius: 10px; border: 1px dashed var(--label3); color: var(--label3); font-size: 12px; margin-bottom: 12px; gap: 6px; }
+.mailbody h4 { font-size: 16px; margin-bottom: 6px; }
+.mailbody p { color: var(--label); margin-bottom: 8px; }
+.mailbody .btn { display: inline-block; background: #2f6fed; color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; }
+.mailbody.native { background: #fff; color: #222; }
+.mailbody.native p, .mailbody.native h4 { color: #222; }
+.atts { margin: 12px 16px 0; }
+.atts h5 { font-size: 11px; letter-spacing: .6px; color: var(--label2); font-weight: 600; margin: 0 4px 6px; }
+.att { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--fill); font-size: 13.5px; }
+.att .fi { width: 30px; height: 36px; border-radius: 6px; background: var(--label); color: var(--bg); font-size: 9px; font-weight: 800; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5px; }
+.att .t { flex: 1; min-width: 0; }
+.att .t small { display: block; color: var(--label2); font-size: 11.5px; }
+.tb { position: absolute; left: 16px; right: 16px; bottom: 26px; height: 54px; border-radius: 27px; background: var(--glass); border: .5px solid var(--glass-b); box-shadow: 0 4px 18px rgba(0,0,0,.1); display: flex; align-items: center; justify-content: space-around; font-size: 22px; z-index: 4; backdrop-filter: blur(20px); }
+.tb span { display: flex; flex-direction: column; align-items: center; font-size: 10px; gap: 2px; color: var(--label); font-weight: 500; }
+.tb span .ic { font-size: 21px; }
+.tb span.off { color: var(--label3); }
+.fade { position: absolute; left: 0; right: 0; bottom: 0; height: 130px; background: linear-gradient(transparent, var(--bg) 60%); z-index: 3; }
+
+/* 绑定页 */
+.hero-ic { width: 64px; height: 64px; border-radius: 18px; background: var(--label); color: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 10px 20px 14px; }
+.lead { font-size: 26px; font-weight: 800; letter-spacing: -.5px; padding: 0 20px; }
+.desc { font-size: 14px; color: var(--label2); line-height: 1.5; padding: 6px 20px 16px; }
+.grp-t { font-size: 12.5px; color: var(--label2); padding: 0 32px 6px; }
+.box { margin: 0 16px 14px; background: var(--card); border-radius: 14px; overflow: hidden; }
+.ta { padding: 12px 14px; height: 76px; font-family: "SF Mono", ui-monospace, monospace; font-size: 13px; color: var(--label3); position: relative; }
+.ta .paste { position: absolute; right: 10px; bottom: 10px; font-family: -apple-system, sans-serif; font-size: 13px; font-weight: 700; color: var(--label); background: var(--fill); padding: 5px 12px; border-radius: 13px; }
+.pm { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: .5px solid var(--sep); font-size: 14px; }
+.pm:last-child { border-bottom: 0; }
+.pm code { font-family: "SF Mono", ui-monospace, monospace; font-size: 11.5px; color: var(--label2); margin-left: auto; }
+.pm .ok { width: 18px; height: 18px; border-radius: 50%; background: var(--label); color: var(--bg); font-size: 11px; display: flex; align-items: center; justify-content: center; font-weight: 800; }
+.pm .opt { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--label3); }
+.pm.muted { color: var(--label2); }
+.note { font-size: 12px; color: var(--label2); padding: 0 32px 16px; line-height: 1.5; }
+.pbtn { margin: 0 16px; height: 52px; border-radius: 26px; background: var(--label); color: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; }
+.lbtn { text-align: center; font-size: 15px; font-weight: 600; margin-top: 14px; }
+
+/* 搜索 */
+.sf { margin: 4px 16px 8px; height: 38px; border-radius: 12px; background: var(--fill); display: flex; align-items: center; gap: 6px; padding: 0 10px; font-size: 16px; color: var(--label); }
+.sf .ic { color: var(--label2); }
+.sf .x { margin-left: auto; width: 18px; height: 18px; border-radius: 50%; background: var(--label3); color: var(--bg); font-size: 11px; display: flex; align-items: center; justify-content: center; }
+.srow { display: flex; align-items: center; gap: 10px; }
+.srow .sf { flex: 1; margin-right: 0; }
+.srow > b { font-size: 16px; font-weight: 500; margin-right: 16px; }
+.scope { display: flex; gap: 8px; padding: 0 16px 8px; }
+.scope span { font-size: 13px; padding: 5px 12px; border-radius: 14px; background: var(--fill); font-weight: 600; color: var(--label2); }
+.scope span.on { background: var(--label); color: var(--bg); }
+.more { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 16px; font-size: 13px; color: var(--label2); }
+.spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--label3); border-top-color: var(--label); }
+
+/* 状态墙 */
+.wall { border-radius: 26px; background: #d9dce1; padding: 18px; }
+.wall.dark { background: #1b1b1d; }
+.mini { background: var(--bg); color: var(--label); border-radius: 22px; overflow: hidden; height: 300px; position: relative; }
+.mini .nav { height: 44px; }
+.mini .gbtn { height: 34px; min-width: 34px; font-size: 13px; }
+.empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 38px 30px 0; }
+.empty .ic { font-size: 40px; color: var(--label3); stroke-width: 1.6; }
+.empty b { font-size: 17px; margin-top: 12px; }
+.empty p { font-size: 13px; color: var(--label2); margin-top: 6px; line-height: 1.5; }
+.empty .pbtn { height: 40px; border-radius: 20px; font-size: 14.5px; padding: 0 20px; margin-top: 16px; }
+.toast { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); white-space: nowrap; background: var(--label); color: var(--bg); padding: 9px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; display: flex; gap: 6px; align-items: center; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+.bnr { margin: 6px 12px 4px; padding: 9px 12px; border-radius: 12px; background: var(--fill); font-size: 12.5px; display: flex; gap: 8px; align-items: center; }
+.bnr b { margin-left: auto; font-weight: 700; }
+.skl { padding: 12px 16px; border-bottom: .5px solid var(--sep); }
+.skl i { display: block; height: 10px; border-radius: 5px; background: var(--fill); margin-bottom: 7px; }
+.minis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.mcap { font-size: 12px; color: #55555a; text-align: center; margin-top: 8px; }
+.wall.dark .mcap { color: #98989d; }
+
+/* 入口 */
+.ent { background: var(--bg2); color: var(--label); border-radius: 22px; padding: 14px 0; }
+.ent .box { margin-bottom: 0; }
+.erow { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: .5px solid var(--sep); font-size: 16px; }
+.erow:last-child { border-bottom: 0; }
+.erow .ic { font-size: 20px; }
+.erow .r { margin-left: auto; color: var(--label3); display: flex; gap: 6px; align-items: center; font-size: 14px; }
+.badge { min-width: 20px; height: 20px; border-radius: 10px; background: var(--label); color: var(--bg); font-size: 11.5px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px; }
+.erow.new { background: color-mix(in srgb, var(--label) 5%, var(--card)); }
+.tabbar { margin: 0 14px; height: 62px; border-radius: 31px; background: var(--glass); border: .5px solid var(--glass-b); box-shadow: 0 4px 18px rgba(0,0,0,.1); display: flex; align-items: center; justify-content: space-around; }
+.tabbar span { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; color: var(--label2); position: relative; }
+.tabbar span .ic { font-size: 22px; }
+.tabbar span.on { color: var(--label); font-weight: 700; }
+.tabbar .badge { position: absolute; top: -6px; right: -10px; height: 17px; min-width: 17px; font-size: 10px; }
+.side { display: flex; gap: 0; border-radius: 18px; overflow: hidden; height: 250px; }
+.side .sm { width: 62%; background: var(--card); padding: 16px 0; }
+.side .sm .erow { border: 0; padding: 10px 18px; font-size: 15px; }
+.side .rest { flex: 1; background: var(--dim); }
+
+/* 写信 */
+.cf { display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-bottom: .5px solid var(--sep); font-size: 15.5px; }
+.cf > span:first-child { color: var(--label2); width: 52px; flex: none; }
+.cf .chip { background: var(--fill); padding: 4px 10px; border-radius: 13px; font-size: 14.5px; font-weight: 500; }
+.cf .ph { color: var(--label3); }
+.cf .sel { font-weight: 600; display: flex; align-items: center; gap: 4px; }
+.cbody { padding: 14px 20px; font-size: 15.5px; line-height: 1.6; }
+.quote { margin-top: 14px; padding-left: 12px; border-left: 2px solid var(--label3); color: var(--label2); font-size: 13.5px; line-height: 1.55; }
+.fromsheet { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 6; background: var(--card); border-radius: 36px 36px 46px 46px; padding: 8px 0 26px; box-shadow: 0 -10px 40px rgba(0,0,0,.18); }
+.grab { width: 36px; height: 5px; border-radius: 3px; background: var(--label3); margin: 0 auto 10px; }
+.fromsheet h4 { text-align: center; font-size: 16px; margin-bottom: 8px; }
+.fromsheet .mi { padding: 13px 22px; }
+.fromsheet .mi.dis { color: var(--label3); }
+/* v2：次要文字略加深，摘要一行 */
+.phone { --label2: rgba(60,60,67,.72); }
+.phone.dark { --label2: rgba(235,235,245,.68); }
+.mr .pv { -webkit-line-clamp: 1; }
+.mr .pv .to { color: var(--label2); font-weight: 600; }
+.mr .cd { grid-column: 3; grid-row: 2 / 4; align-self: center; margin-left: 8px; font-family: "SF Mono", ui-monospace, monospace; font-size: 15px; font-weight: 700; letter-spacing: 1.5px; padding: 5px 9px; border-radius: 9px; background: var(--fill); display: flex; gap: 5px; align-items: center; }
+.mr .cd .ic { font-size: 13px; letter-spacing: 0; }
+.mr.hascode .sj, .mr.hascode .pv { grid-column: 2; }
+.code1 { margin: 10px 16px 8px; display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 14px; border-radius: 16px; background: var(--label); color: var(--bg); }
+.code1 b { font-family: "SF Mono", ui-monospace, monospace; font-size: 26px; font-weight: 700; letter-spacing: 3px; }
+.code1 .m { flex: 1; min-width: 0; font-size: 11.5px; opacity: .7; line-height: 1.4; }
+.code1 .m i { display: block; font-style: normal; font-size: 12.5px; font-weight: 700; opacity: 1; }
+.code1 .cp { background: var(--bg); color: var(--label); }
+.code1 .cp.done { background: transparent; color: var(--bg); border: 1px solid rgba(255,255,255,.35); }
+.phone.dark .code1 .cp.done { border-color: rgba(0,0,0,.35); }
+.dom { color: var(--label3); font-weight: 400; }
+/* 邮箱面板 */
+.sheet { position: absolute; left: 0; right: 0; top: 64px; bottom: 0; z-index: 6; background: var(--bg2); border-radius: 22px 22px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,.18); overflow: hidden; }
+.phone.dark .sheet { background: #1c1c1e; }
+.sheet .grab { margin: 8px auto 4px; }
+.shead { display: flex; align-items: center; justify-content: space-between; padding: 4px 16px 8px; }
+.shead b { font-size: 17px; }
+.shead span { font-size: 15px; font-weight: 600; }
+.sheet .sf { background: var(--fill); margin: 0 16px 10px; }
+.recent { display: flex; gap: 8px; padding: 0 16px 10px; overflow: hidden; }
+.recent span { flex: none; font-size: 13px; padding: 6px 11px; border-radius: 15px; background: var(--card); font-weight: 600; }
+.sec-t { font-size: 12px; color: var(--label2); padding: 6px 32px 6px; letter-spacing: .3px; }
+.sbox { margin: 0 16px 10px; background: var(--card); border-radius: 12px; overflow: hidden; }
+.phone.dark .sbox, .phone.dark .recent span { background: #2c2c2e; }
+.mb { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: .5px solid var(--sep); font-size: 15.5px; }
+.mb:last-child { border-bottom: 0; }
+.mb .ck { width: 14px; font-weight: 700; font-size: 14px; }
+.mb .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mb .t small { display: block; font-size: 11.5px; color: var(--label2); margin-top: 1px; }
+.mb .snd { font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 5px; border: 1px solid var(--label3); color: var(--label2); }
+.mb .n { min-width: 22px; text-align: right; font-size: 13.5px; font-weight: 700; }
+.mb .pin { color: var(--label3); font-size: 12px; }
+/* 长按菜单 */
+.ctxprev { position: absolute; left: 16px; right: 16px; z-index: 6; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.2); }
+.ctxprev .mr { border-bottom: 0; }
+/* 系统工具栏 */
+.stb { position: absolute; left: 0; right: 0; bottom: 0; height: 84px; padding: 10px 30px 0; display: flex; justify-content: space-between; align-items: flex-start; border-top: .5px solid var(--sep); background: var(--glass); backdrop-filter: blur(20px); z-index: 4; font-size: 23px; }
+.mailbody.flat { margin: 0; border: 0; border-radius: 0; padding: 4px 20px 16px; }
+.toaddr { display: flex; gap: 6px; font-size: 12.5px; color: var(--label2); padding: 0 20px 12px; margin-top: -6px; }
+.toaddr b { color: var(--label); font-weight: 500; }
+.toaddr .copyhint { margin-left: auto; color: var(--label3); }
+.disc { display: flex; align-items: center; padding: 12px 14px; font-size: 15px; }
+.disc span { margin-left: auto; color: var(--label3); }
+.err { font-size: 12.5px; color: var(--red); padding: 0 32px 12px; }
+.ro { margin: 8px 12px 4px; padding: 9px 12px; border-radius: 12px; background: var(--fill); font-size: 12.5px; color: var(--label2); display: flex; gap: 8px; align-items: center; }
+.ro b { margin-left: auto; color: var(--label); }
+.toast .ct { font-variant-numeric: tabular-nums; opacity: .6; }
+</style></head><body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></symbol>
+  <symbol id="i-env" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3.5 7l8.5 6 8.5-6"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="M20 11.5l-8 8a5 5 0 01-7-7l8.5-8.5a3.3 3.3 0 014.7 4.7L10 17a1.7 1.7 0 01-2.4-2.4L15 7.3"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9L3.5 9.7l5.9-.8z"/></symbol>
+  <symbol id="i-starf" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9L3.5 9.7l5.9-.8z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v5.5M14 11v5.5"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 012-2h4l2 2.2h7a2 2 0 012 2V17a2 2 0 01-2 2h-13a2 2 0 01-2-2z"/></symbol>
+  <symbol id="i-reply" viewBox="0 0 24 24"><path d="M9.5 6L4 11.5 9.5 17M4.5 11.5H14a6 6 0 016 6V19"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6.5a2 2 0 00-2-2h-7a2 2 0 00-2 2v7a2 2 0 002 2h2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-img" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4.5 4 3.5 3-2.5 4 3.5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5l7 3v5.5c0 4.2-3 7.3-7 8.5-4-1.2-7-4.3-7-8.5V6.5z"/><path d="M12 8.5v4M12 15.5v.2"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 11-2.2-5.3M19.5 4.5v4h-4"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></symbol>
+  <symbol id="i-safari" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="3.5"/><path d="M10.5 12.5L19 4M16 7l2.5 2.5M14 9l2 2"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24"><path d="M14 4.5h4a1.5 1.5 0 011.5 1.5v12a1.5 1.5 0 01-1.5 1.5h-4M10 16l4-4-4-4M14 12H4"/></symbol>
+  <symbol id="i-envo" viewBox="0 0 24 24"><path d="M3.5 9.5l8.5-6 8.5 6V18a2 2 0 01-2 2h-13a2 2 0 01-2-2z"/><path d="M3.5 9.5l8.5 6 8.5-6"/></symbol>
+  <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></symbol>
+  <symbol id="i-house" viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 01-1 1h-4.5v-6h-5v6H5a1 1 0 01-1-1z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0112 0v5.5l1.5 2h-15zM10 20.5h4"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c.8-3.8 3.8-6 7.5-6s6.7 2.2 7.5 6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0119 0M5.5 12.5a9.5 9.5 0 0113 0M8.5 16a5 5 0 017 0"/><circle cx="12" cy="19" r=".8" fill="currentColor"/></symbol>
+  <symbol id="i-hour" viewBox="0 0 24 24"><path d="M7 3.5h10M7 20.5h10M8 3.5c0 4 8 5 8 8.5s-8 4.5-8 8.5M16 3.5c0 4-8 5-8 8.5s8 4.5 8 8.5"/></symbol>
+</svg>
+
+<h1>seek.li 邮箱 · 第一期 UI（v2）</h1>
+<p class="sub">P0 只做收信。v2 按评审收敛：验证码复制不标已读、删除改为 4 秒延迟提交可撤销、去掉批量已读和未来功能占位、入口不显示未读数，并补上邮箱很多时的可读性方案。示例数据均为假值。</p>
+<div class="rules">
+  <div class="rule"><b>验证码：复制 ≠ 已读</b>顶部只放当前范围内最新的一条验证码，列表里带验证码的行右侧可直接复制。复制后原位显示「已复制」，卡片保留；进入详情才标已读。只写「几分钟前收到」，不暗示有效期。</div>
+  <div class="rule"><b>邮箱名：别名 &gt; @ 前缀</b>有别名显示别名；没有就显示 @ 前部分，域名浅灰，重名时才补域名。过长时省略中间（如 aws-root-…-2026），开头结尾都保留。详情页的收件地址始终完整、可长按复制。</div>
+  <div class="rule"><b>删除先隐藏、4 秒后才提交</b>接口实测无法从回收站恢复（移回收件箱后状态仍是 deleted），所以真正的撤销只能靠延迟提交：先本地隐藏，toast 倒计时内可撤销，期间不发请求。回收站页只读。</div>
+  <div class="rule"><b>省请求次数</b>每分钟限 60 次。打开邮箱 3 个请求（邮箱、文件夹本次缓存），打开邮件 2 个（详情 + 标已读）。验证码直接取自列表字段，不另请求；未读数只在打开邮箱面板时请求一次。</div>
+</div>
+
+<div class="row">
+  <!-- ① 绑定 Key -->
+  <div class="cell">
+    <div class="phone grouped">
+      <div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+      <div class="nav"><div class="gbtn"><svg class="ic"><use href="#i-back"/></svg></div></div>
+      <div class="hero-ic"><svg class="ic"><use href="#i-env"/></svg></div>
+      <div class="lead">连接 seek.li 邮箱</div>
+      <div class="desc">用 seek.li 控制台里创建的 API Key 在 App 里收邮件、看验证码。Key 只保存在本机钥匙串。</div>
+      <div class="grp-t">API KEY</div>
+      <div class="box"><div class="ta">sk_live_…<span class="paste">粘贴</span></div></div>
+      <div class="box"><div class="disc"><svg class="ic" style="margin-right:10px"><use href="#i-key"/></svg>如何获取 Key、需要哪些权限<span>›</span></div></div>
+      <div style="height:250px"></div>
+      <div class="pbtn">验证并保存</div>
+      <div class="lbtn">去 seek.li 创建 Key ↗</div>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>① 绑定 Key</b>主界面只有输入框、验证按钮和创建链接，权限说明收进「如何获取 Key」（推入一页图文说明）。验证只请求一次邮箱列表；401 提示「Key 无效或已失效」。其他权限不在这里逐项验证，用到时遇到 403 再提示具体缺哪项（见 ⑨）。</div>
+  </div>
+
+  <!-- ② 收件箱（全部邮箱） -->
+  <div class="cell">
+    <div class="phone">
+      <div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+      <div class="nav">
+        <div class="gbtn"><svg class="ic"><use href="#i-back"/></svg></div>
+        <div class="ttl">全部邮箱 <small>23</small> <svg class="ic"><use href="#i-down"/></svg></div>
+        <div class="grp"><div class="gbtn"><svg class="ic"><use href="#i-search"/></svg></div><div class="gbtn"><svg class="ic"><use href="#i-more"/></svg></div></div>
+      </div>
+      <div class="tabs"><span class="on">收件箱</span><span>垃圾邮件</span><span>回收站</span><span>📁 账单</span><span>📁 工作</span></div>
+      <div class="code1"><b>482913</b><div class="m"><i>GitHub → github-alt</i>2 分钟前收到</div><span class="cp"><svg class="ic"><use href="#i-copy"/></svg>复制</span></div>
+      <div class="ml">
+        <div class="mr u hascode"><span class="dot"></span><span class="fr">GitHub</span><span class="tm">09:39</span><span class="sj">[GitHub] Please verify your device</span><span class="pv"><span class="to">→ github-alt</span> · Verification code: 482913. If you did not…</span><span class="cd">482913</span></div>
+        <div class="mr u hascode"><span class="dot"></span><span class="fr">Cloudflare</span><span class="tm">09:28</span><span class="sj">Your verification code</span><span class="pv"><span class="to">→ mist-cloudflare</span> · Use the code below to finish signing in.</span><span class="cd">7310</span></div>
+        <div class="mr u"><span class="dot"></span><span class="fr">VMISS</span><span class="tm"><svg class="ic"><use href="#i-clip"/></svg>昨天</span><span class="sj">Invoice Payment Confirmation</span><span class="pv"><span class="to">→ VMISS 账单</span> · This is a payment receipt for Invoice VMISS-2026517956.</span></div>
+        <div class="mr"><span class="dot r"></span><span class="fr">Linear</span><span class="tm">昨天</span><span class="sj">Your sign-in link</span><span class="pv"><span class="to">→ me</span> · Click the link below to sign in. This link expires in 15 minutes.</span></div>
+        <div class="mr"><span class="dot r"></span><span class="fr">V.PS</span><span class="tm"><svg class="ic star"><use href="#i-starf"/></svg>11月4日</span><span class="sj">[V.PS] Emergency Maintenance Notification</span><span class="pv"><span class="to">→ vps-hk-01</span> · We are notifying you about a new alert.</span></div>
+        <div class="mr"><span class="dot r"></span><span class="fr">AWS</span><span class="tm">11月3日</span><span class="sj">Your AWS account billing alert</span><span class="pv"><span class="to">→ aws-root-…-2026</span> · Your estimated charges have exceeded the threshold.</span></div>
+        <div class="mr"><span class="dot r"></span><span class="fr">Stripe</span><span class="tm">11月2日</span><span class="sj">Your receipt from Example Inc.</span><span class="pv"><span class="to">→ me</span> · Receipt #1432-8811 · Amount paid $12.00.</span></div>
+      </div>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>② 收件箱 · 全部邮箱</b>摘要只留一行，开头用灰字标收件邮箱（别名或 @ 前缀，过长省略中间）；选中单个邮箱时不显示。带验证码的行右侧显示可复制的验证码。顶部卡片只放当前范围最新的一条。标题旁的小数字是邮箱个数，不是未读数。</div>
+  </div>
+
+  <!-- ③ 邮箱面板（很多邮箱） -->
+  <div class="cell">
+    <div class="phone">
+      <div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+      <div class="nav"><div class="gbtn"><svg class="ic"><use href="#i-back"/></svg></div><div class="ttl">全部邮箱 <svg class="ic"><use href="#i-down"/></svg></div><div></div></div>
+      <div class="mask"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="shead"><b>选择邮箱</b><span>完成</span></div>
+        <div class="sf"><svg class="ic"><use href="#i-search"/></svg><span style="color:var(--label3)">搜索地址或别名</span></div>
+        <div class="recent"><span>VMISS 账单</span><span>github-alt</span><span>me</span></div>
+        <div class="sbox"><div class="mb"><span class="ck">✓</span><span class="t">全部邮箱<small>23 个邮箱</small></span><span class="n">12</span></div></div>
+        <div class="sec-t">置顶</div>
+        <div class="sbox">
+          <div class="mb"><span class="ck"></span><span class="t">me <span class="dom">@seek.li</span></span><span class="snd">可发信</span><span class="n">1</span></div>
+          <div class="mb"><span class="ck"></span><span class="t">VMISS 账单<small>vmiss-billing@nodeseek.org</small></span><span class="n">8</span></div>
+        </div>
+        <div class="sec-t">有未读</div>
+        <div class="sbox">
+          <div class="mb"><span class="ck"></span><span class="t">github-alt <span class="dom">@nodeseek.org</span></span><span class="n">2</span></div>
+          <div class="mb"><span class="ck"></span><span class="t">mist-cloudflare <span class="dom">@nodeseek.org</span></span><span class="n">1</span></div>
+        </div>
+        <div class="sec-t">其他 · 19</div>
+        <div class="sbox">
+          <div class="mb"><span class="ck"></span><span class="t">aws-root-…-2026 <span class="dom">@nodeseek.org</span></span><span class="n"></span></div>
+          <div class="mb"><span class="ck"></span><span class="t">me <span class="dom">@nodeseek.org</span></span><span class="n"></span></div>
+          <div class="mb"><span class="ck"></span><span class="t">vps-hk-01 <span class="dom">@nodeseek.org</span></span><span class="n"></span></div>
+          <div class="mb"><span class="ck"></span><span class="t">vps-sg-02 <span class="dom">@nodeseek.org</span></span><span class="n"></span></div>
+        </div>
+      </div>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>③ 邮箱很多：选择面板</b>超过 5 个邮箱时，点标题弹出面板（可拉到全屏），5 个及以内仍用系统菜单。顶部搜索地址和别名，下面是最近打开的 3 个；列表按「置顶 → 有未读 → 其他」分组，组内按网页上的排序。两个「me」不同域名，所以都补上域名。未读数在打开面板时请求一次。</div>
+  </div>
+
+  <!-- ④ 详情 -->
+  <div class="cell">
+    <div class="phone">
+      <div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+      <div class="nav">
+        <div class="gbtn"><svg class="ic"><use href="#i-back"/></svg></div>
+        <div class="grp"><div class="gbtn"><svg class="ic" style="width:19px;height:19px"><use href="#i-star"/></svg></div><div class="gbtn"><svg class="ic"><use href="#i-more"/></svg></div></div>
+      </div>
+      <div class="dsub">[GitHub] Please verify your device</div>
+      <div class="from"><span class="av">G</span><div class="w"><b>GitHub</b>noreply@github.com</div><time>09:39</time></div>
+      <div class="toaddr">发给 <b>github-alt@nodeseek.org</b><span class="copyhint">长按复制</span></div>
+      <div class="cbar"><span>验证码</span><b>482913</b><span class="cp"><svg class="ic"><use href="#i-copy"/></svg>复制</span></div>
+      <div class="blk"><svg class="ic"><use href="#i-img"/></svg>已阻止 3 张远程图片<b>加载</b></div>
+      <div class="mailbody flat">
+        <div class="logo"><svg class="ic"><use href="#i-img"/></svg>远程图片已阻止</div>
+        <h4>Please verify your device</h4>
+        <p>A sign in attempt requires further verification because we did not recognize your device. To complete the sign in, enter the verification code on the unrecognized device.</p>
+        <p class="mono" style="font-size:20px; letter-spacing:3px; font-weight:700">482913</p>
+        <p>If you did not attempt to sign in to your account, your password may be compromised. Visit <u>github.com/settings/security</u> to review.</p>
+      </div>
+      <div class="atts" style="margin-top:0"><h5>附件 1</h5><div class="att"><span class="fi">PDF</span><span class="t">security-notice.pdf<small>219 KB</small></span><svg class="ic"><use href="#i-down"/></svg></div></div>
+      <div class="stb"><svg class="ic"><use href="#i-folder"/></svg><svg class="ic"><use href="#i-envo"/></svg><svg class="ic"><use href="#i-trash"/></svg></div>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>④ 邮件详情</b>正文去掉外框，占满可读宽度。收件地址完整显示、可长按复制，邮箱多时用来核对。链接用系统方式打开（登录链接能跳回对应 App），长按可复制。底部改为系统工具栏：移动、标为未读、删除；不放「回复」占位。</div>
+  </div>
+</div>
+
+<h1 class="sec">操作、搜索与深色</h1>
+<p class="sub">右滑只保留「已读/未读」，星标在详情页操作；左滑删除走延迟提交。长按邮件可「只看这个邮箱」，邮箱多时不用回面板找。搜索只搜当前文件夹。</p>
+<div class="row">
+  <!-- ⑤ 深色 + 滑动 + 撤销 -->
+  <div class="cell">
+    <div class="phone dark">
+      <div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+      <div class="nav">
+        <div class="gbtn"><svg class="ic"><use href="#i-back"/></svg></div>
+        <div class="ttl">VMISS 账单 <svg class="ic"><use href="#i-down"/></svg></div>
+        <div class="grp"><div class="gbtn"><svg class="ic"><use href="#i-search"/></svg></div><div class="gbtn"><svg class="ic"><use href="#i-more"/></svg></div></div>
+      </div>
+      <div class="tabs"><span class="on">收件箱</span><span>垃圾邮件</span><span>回收站</span></div>
+      <div class="ml">
+        <div class="mr u"><span class="dot"></span><span class="fr">VMISS</span><span class="tm"><svg class="ic"><use href="#i-clip"/></svg>昨天</span><span class="sj">Invoice Payment Confirmation</span><span class="pv">This is a payment receipt for Invoice VMISS-2026517956 sent on 08/04.</span></div>
+        <div class="swl"><div class="act rd"><svg class="ic"><use href="#i-envo"/></svg>已读</div><div class="mr u"><span class="dot"></span><span class="fr">VMISS</span><span class="tm"><svg class="ic"><use href="#i-clip"/></svg>8月2日</span><span class="sj">Invoice Payment Reminder</span><span class="pv">This is a billing reminder that your invoice is due on 08/09.</span></div></div>
+        <div class="swl left"><div class="mr"><span class="dot r"></span><span class="fr">VMISS</span><span class="tm">7月26日</span><span class="sj">Customer Invoice</span><span class="pv">Dear Customer, this is a notice that an invoice has been generated.</span></div><div class="act del"><svg class="ic"><use href="#i-trash"/></svg>删除</div></div>
+        <div class="mr"><span class="dot r"></span><span class="fr">VMISS</span><span class="tm">7月16日</span><span class="sj">Order Confirmation</span><span class="pv">Thank you for your order. Order number: 4417022.</span></div>
+        <div class="mr"><span class="dot r"></span><span class="fr">VMISS</span><span class="tm">7月16日</span><span class="sj">New Dedicated Server Information</span><span class="pv">Your server is ready. Please find the login details below.</span></div>
+        <div class="mr"><span class="dot r"></span><span class="fr">VMISS</span><span class="tm">6月29日</span><span class="sj">Welcome</span><span class="pv">Thank you for signing up with us. Your account has been created.</span></div>
+      </div>
+      <div class="toast" style="bottom:40px"><svg class="ic"><use href="#i-trash"/></svg>已删除 · <u>撤销</u> <span class="ct">3</span></div>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>⑤ 深色 · 单个邮箱</b>标题显示别名。右滑：已读/未读；左滑：删除，邮件先从列表隐藏，toast 倒计时 4 秒内可撤销，到时才发删除请求；离开页面时立即提交。选中单个邮箱时摘要不带收件邮箱。</div>
+  </div>
+
+  <!-- ⑥ 长按：只看这个邮箱 -->
+  <div class="cell">
+    <div class="phone">
+      <div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+      <div class="nav">
+        <div class="gbtn"><svg class="ic"><use href="#i-back"/></svg></div>
+        <div class="ttl">全部邮箱 <small>23</small> <svg class="ic"><use href="#i-down"/></svg></div>
+        <div class="grp"><div class="gbtn"><svg class="ic"><use href="#i-search"/></svg></div><div class="gbtn"><svg class="ic"><use href="#i-more"/></svg></div></div>
+      </div>
+      <div class="tabs"><span class="on">收件箱</span><span>垃圾邮件</span><span>回收站</span><span>📁 账单</span></div>
+      <div class="ml" style="opacity:.5">
+        <div class="mr u"><span class="dot"></span><span class="fr">GitHub</span><span class="tm">09:39</span><span class="sj">[GitHub] Please verify your device</span><span class="pv"><span class="to">→ github-alt</span> · Verification code: 482913.</span></div>
+        <div class="mr u"><span class="dot"></span><span class="fr">Cloudflare</span><span class="tm">09:28</span><span class="sj">Your verification code</span><span class="pv"><span class="to">→ mist-cloudflare</span> · Use the code below.</span></div>
+      </div>
+      <div class="mask"></div>
+      <div class="ctxprev" style="top:262px"><div class="mr u"><span class="dot"></span><span class="fr">VMISS</span><span class="tm"><svg class="ic"><use href="#i-clip"/></svg>昨天</span><span class="sj">Invoice Payment Confirmation</span><span class="pv"><span class="to">→ VMISS 账单</span> · This is a payment receipt for Invoice VMISS-2026517956.</span></div></div>
+      <div class="menu" style="left:16px; top:372px; width:250px">
+        <div class="mi gap"><svg class="ic"><use href="#i-env"/></svg><span class="t">只看「VMISS 账单」<small>vmiss-billing@nodeseek.org</small></span></div>
+        <div class="mi"><svg class="ic"><use href="#i-envo"/></svg><span class="t">标为已读</span></div>
+        <div class="mi"><svg class="ic"><use href="#i-star"/></svg><span class="t">加星标</span></div>
+        <div class="mi"><svg class="ic"><use href="#i-folder"/></svg><span class="t">移动到…</span></div>
+        <div class="mi red"><svg class="ic"><use href="#i-trash"/></svg><span class="t">删除</span></div>
+      </div>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>⑥ 长按 · 只看这个邮箱</b>系统上下文菜单。第一项直接切到这封信的收件邮箱，副标题给完整地址；邮箱多时比回面板搜索快。其余是单封操作，与滑动和详情页一致。</div>
+  </div>
+
+  <!-- ⑦ 搜索 -->
+  <div class="cell">
+    <div class="phone">
+      <div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+      <div class="srow" style="margin-top:6px"><div class="sf"><svg class="ic"><use href="#i-search"/></svg>invoice<span class="x">✕</span></div><b>取消</b></div>
+      <div class="sec-t" style="padding-left:20px">在「全部邮箱 · 收件箱」中搜索</div>
+      <div class="ml">
+        <div class="mr u"><span class="dot"></span><span class="fr">VMISS</span><span class="tm"><svg class="ic"><use href="#i-clip"/></svg>昨天</span><span class="sj"><span class="hl">Invoice</span> Payment Confirmation</span><span class="pv"><span class="to">→ VMISS 账单</span> · receipt for <span class="hl">Invoice</span> VMISS-2026517956.</span></div>
+        <div class="mr u"><span class="dot"></span><span class="fr">VMISS</span><span class="tm"><svg class="ic"><use href="#i-clip"/></svg>8月2日</span><span class="sj"><span class="hl">Invoice</span> Payment Reminder</span><span class="pv"><span class="to">→ VMISS 账单</span> · your <span class="hl">invoice</span> is due on 08/09.</span></div>
+        <div class="mr"><span class="dot r"></span><span class="fr">VMISS</span><span class="tm"><svg class="ic"><use href="#i-clip"/></svg>7月26日</span><span class="sj">Customer <span class="hl">Invoice</span></span><span class="pv"><span class="to">→ VMISS 账单</span> · an <span class="hl">invoice</span> has been generated.</span></div>
+        <div class="mr"><span class="dot r"></span><span class="fr">AWS</span><span class="tm">11月3日</span><span class="sj">Your AWS <span class="hl">invoice</span> is available</span><span class="pv"><span class="to">→ aws-root-…-2026</span> · View your October <span class="hl">invoice</span>.</span></div>
+        <div class="mr"><span class="dot r"></span><span class="fr">Stripe</span><span class="tm">11月2日</span><span class="sj">Your receipt from Example Inc.</span><span class="pv"><span class="to">→ me</span> · <span class="hl">Invoice</span> #1432-8811 · $12.00.</span></div>
+        <div class="mr"><span class="dot r"></span><span class="fr">V.PS</span><span class="tm">10月1日</span><span class="sj"><span class="hl">Invoice</span> #88213 Generated</span><span class="pv"><span class="to">→ vps-hk-01</span> · Your monthly <span class="hl">invoice</span> is ready.</span></div>
+      </div>
+      <div class="more"><span class="spin"></span>正在加载更多 · 共 12 封</div>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>⑦ 搜索</b>只搜当前邮箱和文件夹，范围写在搜索栏下方，不再提供范围切换。输入停顿 400ms 才请求；关键字在本地高亮。搜索时隐藏顶部验证码卡片。</div>
+  </div>
+
+  <!-- ⑧ 更多菜单 -->
+  <div class="cell">
+    <div class="phone">
+      <div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+      <div class="nav">
+        <div class="gbtn"><svg class="ic"><use href="#i-back"/></svg></div>
+        <div class="ttl">全部邮箱 <small>23</small> <svg class="ic"><use href="#i-down"/></svg></div>
+        <div class="grp"><div class="gbtn"><svg class="ic"><use href="#i-search"/></svg></div><div class="gbtn"><svg class="ic"><use href="#i-more"/></svg></div></div>
+      </div>
+      <div class="tabs"><span class="on">收件箱</span><span>垃圾邮件</span><span>回收站</span><span>📁 账单</span></div>
+      <div class="ml" style="opacity:.5">
+        <div class="mr u"><span class="dot"></span><span class="fr">GitHub</span><span class="tm">09:39</span><span class="sj">[GitHub] Please verify your device</span><span class="pv"><span class="to">→ github-alt</span> · Verification code: 482913.</span></div>
+        <div class="mr u"><span class="dot"></span><span class="fr">VMISS</span><span class="tm">昨天</span><span class="sj">Invoice Payment Confirmation</span><span class="pv"><span class="to">→ VMISS 账单</span> · payment receipt.</span></div>
+      </div>
+      <div class="mask"></div>
+      <div class="menu" style="right:16px; top:108px;">
+        <div class="mi"><svg class="ic"><use href="#i-refresh"/></svg><span class="t">刷新</span></div>
+        <div class="mi gap"><svg class="ic"><use href="#i-chart"/></svg><span class="t">存储用量<small>6.4 MB / 80 MB · 23 个邮箱</small><span class="bar"><i></i></span></span></div>
+        <div class="mi"><svg class="ic"><use href="#i-safari"/></svg><span class="t">在网页中管理</span></div>
+        <div class="mi"><svg class="ic"><use href="#i-key"/></svg><span class="t">更换 API Key</span></div>
+        <div class="mi red"><svg class="ic"><use href="#i-out"/></svg><span class="t">移除 Key 并退出</span></div>
+      </div>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>⑧ 更多菜单</b>去掉「全部标为已读」。用量直接显示在菜单项里。「在网页中管理」用于改别名、建邮箱、恢复已删除邮件等 App 不做的操作。「移除 Key」二次确认后清空钥匙串并回到绑定页。</div>
+  </div>
+</div>
+
+<h1 class="sec">状态与入口</h1>
+<p class="sub">出错时有列表就保留，用顶部条或 toast 提示；没有内容才整块显示空态。提示文案统一来自 SeekMailError.userMessage。入口不显示未读数（第一期没有自动刷新，数字会过时）。</p>
+<div class="row">
+  <div style="width:828px; flex:none">
+    <div class="wall">
+      <div class="minis">
+        <div><div class="mini">
+          <div class="nav"><div class="gbtn"><svg class="ic"><use href="#i-back"/></svg></div><div class="ttl" style="font-size:15px">全部邮箱</div><div></div></div>
+          <div class="tabs" style="font-size:13px; gap:16px"><span class="on">收件箱</span><span>垃圾邮件</span><span>回收站</span></div>
+          <div class="skl"><i style="width:40%"></i><i style="width:85%"></i><i style="width:65%; margin:0"></i></div>
+          <div class="skl"><i style="width:30%"></i><i style="width:90%"></i><i style="width:55%; margin:0"></i></div>
+          <div class="skl"><i style="width:45%"></i><i style="width:75%"></i><i style="width:60%; margin:0"></i></div>
+        </div><div class="mcap">首次加载：骨架行</div></div>
+        <div><div class="mini">
+          <div class="nav"><div class="gbtn"><svg class="ic"><use href="#i-back"/></svg></div><div class="ttl" style="font-size:15px">全部邮箱</div><div></div></div>
+          <div class="tabs" style="font-size:13px; gap:16px"><span>收件箱</span><span>垃圾邮件</span><span class="on">回收站</span></div>
+          <div class="ro"><svg class="ic"><use href="#i-shield"/></svg>回收站只能查看<b>网页中恢复</b></div>
+          <div class="mr" style="padding-top:8px;padding-bottom:8px"><span class="dot r"></span><span class="fr" style="font-size:14px">Notion</span><span class="tm">昨天</span><span class="sj" style="font-size:13px">Welcome to Notion</span></div>
+          <div class="mr" style="padding-top:8px;padding-bottom:8px"><span class="dot r"></span><span class="fr" style="font-size:14px">Vercel</span><span class="tm">11月12日</span><span class="sj" style="font-size:13px">Confirm your email</span></div>
+        </div><div class="mcap">回收站只读，不提供删除或恢复</div></div>
+        <div><div class="mini">
+          <div class="nav"><div class="gbtn"><svg class="ic"><use href="#i-back"/></svg></div><div class="ttl" style="font-size:15px">全部邮箱</div><div></div></div>
+          <div class="tabs" style="font-size:13px; gap:16px"><span class="on">收件箱</span><span>垃圾邮件</span><span>回收站</span></div>
+          <div class="empty"><svg class="ic"><use href="#i-wifi"/></svg><b>网络连接失败</b><p>请检查网络后重试</p><span class="pbtn">重试</span></div>
+        </div><div class="mcap">无内容时网络失败</div></div>
+        <div><div class="mini">
+          <div class="nav"><div class="gbtn"><svg class="ic"><use href="#i-back"/></svg></div><div class="ttl" style="font-size:15px">全部邮箱</div><div></div></div>
+          <div class="bnr"><svg class="ic"><use href="#i-hour"/></svg>请求太频繁，约 40 秒后可刷新</div>
+          <div class="mr" style="padding-top:8px;padding-bottom:8px"><span class="dot"></span><span class="fr" style="font-size:14px">GitHub</span><span class="tm">09:39</span><span class="sj" style="font-size:13px">Please verify your device</span></div>
+          <div class="mr" style="padding-top:8px;padding-bottom:8px"><span class="dot r"></span><span class="fr" style="font-size:14px">V.PS</span><span class="tm">11月4日</span><span class="sj" style="font-size:13px">Emergency Maintenance</span></div>
+          <div class="mr" style="padding-top:8px;padding-bottom:8px"><span class="dot r"></span><span class="fr" style="font-size:14px">VMISS</span><span class="tm">9月8日</span><span class="sj" style="font-size:13px">Invoice Overdue Notice</span></div>
+        </div><div class="mcap">被限流：保留列表 + 顶部倒计时</div></div>
+        <div><div class="mini">
+          <div class="nav"><div class="gbtn"><svg class="ic"><use href="#i-back"/></svg></div><div class="ttl" style="font-size:15px">邮箱</div><div></div></div>
+          <div class="empty"><svg class="ic"><use href="#i-key"/></svg><b>API Key 已失效</b><p>可能已在 seek.li 删除，请重新绑定</p><span class="pbtn">重新绑定</span></div>
+        </div><div class="mcap">401：回到绑定流程</div></div>
+        <div><div class="mini">
+          <div class="nav"><div class="gbtn"><svg class="ic"><use href="#i-back"/></svg></div><div class="ttl" style="font-size:15px">邮件</div><div></div></div>
+          <div class="atts" style="margin-top:20px"><div class="att"><span class="fi">PDF</span><span class="t">invoice.pdf<small>219 KB</small></span></div></div>
+          <div class="toast" style="white-space:normal; width:220px; text-align:center; justify-content:center; bottom:22px">Key 缺少 attachment:read 权限，无法下载附件</div>
+        </div><div class="mcap">403：提示具体缺哪个权限</div></div>
+      </div>
+    </div>
+    <div class="cap"><b>⑨ 列表状态</b>回收站页顶部固定说明「只能查看」，滑动和长按里都没有删除。403 按接口对应到权限名提示，不笼统说 Key 失效。</div>
+  </div>
+
+  <div class="cell">
+    <div class="wall">
+      <div class="ent">
+        <div class="box">
+          <div class="erow"><svg class="ic"><use href="#i-clock"/></svg>最近浏览<span class="r">›</span></div>
+          <div class="erow"><svg class="ic"><use href="#i-pulse"/></svg>探针<span class="r">›</span></div>
+          <div class="erow new"><svg class="ic"><use href="#i-env"/></svg>邮箱<span class="r">›</span></div>
+        </div>
+      </div>
+      <div class="mcap" style="margin-bottom:14px">「我的」页：探针下方</div>
+      <div class="side">
+        <div class="sm">
+          <div class="erow"><svg class="ic"><use href="#i-house"/></svg>首页</div>
+          <div class="erow"><svg class="ic"><use href="#i-bell"/></svg>通知</div>
+          <div class="erow"><svg class="ic"><use href="#i-pulse"/></svg>探针</div>
+          <div class="erow" style="font-weight:700"><svg class="ic"><use href="#i-env"/></svg>邮箱</div>
+          <div class="erow"><svg class="ic"><use href="#i-person"/></svg>我的</div>
+        </div>
+        <div class="rest"></div>
+      </div>
+      <div class="mcap" style="margin-bottom:14px">阅读模式侧边栏</div>
+      <div class="tabbar">
+        <span><svg class="ic"><use href="#i-house"/></svg>首页</span>
+        <span><svg class="ic"><use href="#i-bell"/></svg>通知</span>
+        <span class="on"><svg class="ic"><use href="#i-env"/></svg>邮箱</span>
+        <span><svg class="ic"><use href="#i-person"/></svg>我的</span>
+      </div>
+      <div class="mcap">多 Tab 模式：用户可自行把「邮箱」加到底部栏</div>
+    </div>
+    <div class="cap"><b>⑩ 入口</b>「我的」和侧边栏固定入口，底部栏由用户选配。第一期不显示未读数；P1 做了回到前台刷新后再加，统一表示全部邮箱的未读。</div>
+  </div>
+
+  <!-- ⑪ 少量邮箱：系统菜单 -->
+  <div class="cell">
+    <div class="phone dark">
+      <div class="island"></div><div class="status"><span>9:41</span><span class="bat"></span></div>
+      <div class="nav">
+        <div class="gbtn"><svg class="ic"><use href="#i-back"/></svg></div>
+        <div class="ttl">全部邮箱 <small>3</small> <svg class="ic"><use href="#i-down"/></svg></div>
+        <div class="grp"><div class="gbtn"><svg class="ic"><use href="#i-search"/></svg></div><div class="gbtn"><svg class="ic"><use href="#i-more"/></svg></div></div>
+      </div>
+      <div class="tabs"><span class="on">收件箱</span><span>垃圾邮件</span><span>回收站</span></div>
+      <div class="code1"><b>482913</b><div class="m"><i>GitHub → me</i>2 分钟前收到</div><span class="cp done"><svg class="ic"><use href="#i-check"/></svg>已复制</span></div>
+      <div class="ml" style="opacity:.5">
+        <div class="mr u hascode"><span class="dot"></span><span class="fr">GitHub</span><span class="tm">09:39</span><span class="sj">[GitHub] Please verify your device</span><span class="pv"><span class="to">→ me</span> · Verification code: 482913.</span><span class="cd">482913</span></div>
+        <div class="mr"><span class="dot r"></span><span class="fr">V.PS</span><span class="tm">11月4日</span><span class="sj">[V.PS] Emergency Maintenance Notification</span><span class="pv"><span class="to">→ vps</span> · We are notifying you about a new alert.</span></div>
+      </div>
+      <div class="mask"></div>
+      <div class="menu" style="left:64px; top:108px;">
+        <div class="mi"><span class="ck">✓</span><span class="t">全部邮箱</span></div>
+        <div class="mi"><span class="ck"></span><span class="t">me <span class="dom">@seek.li</span><small>可发信</small></span></div>
+        <div class="mi"><span class="ck"></span><span class="t">me <span class="dom">@nodeseek.org</span></span></div>
+        <div class="mi gap"><span class="ck"></span><span class="t">vps <span class="dom">@nodeseek.org</span></span></div>
+        <div class="mi"><span class="ck"></span><span class="t">在网页中管理邮箱</span><svg class="ic"><use href="#i-safari"/></svg></div>
+      </div>
+      <div class="home"></div>
+    </div>
+    <div class="cap"><b>⑪ 邮箱较少 · 深色</b>5 个及以内用系统菜单，不请求未读数。验证码复制后卡片保留并显示「已复制」，邮件仍是未读。</div>
+  </div>
+</div>
+
+</body></html>
