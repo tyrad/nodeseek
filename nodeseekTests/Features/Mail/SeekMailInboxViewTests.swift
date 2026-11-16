@@ -100,7 +100,6 @@ struct SeekMailInboxViewTests {
         transport.mailboxes = #"{"data":[\#(boxes)]}"#
         transport.details["/openapi/v1/mails/counts"] = #"{"data":{"mailboxes":{"3":4},"total":4}}"#
         let selection = makeSelectionStore()
-        selection.mailboxID = 12
         let inbox = SeekMailInboxViewController(
             keyStore: InMemorySeekMailKeyStore(key: "sk_live_ok"), transport: transport.load, selectionStore: selection
         )
@@ -109,6 +108,9 @@ struct SeekMailInboxViewTests {
         window.isHidden = false
         defer { window.isHidden = true }
         await mailWaitUntil { inbox.model.phase == .loaded && inbox.model.unreadTotal == 4 }
+        // 选中排在最后的邮箱，折叠后也要看得到
+        inbox.model.selectMailbox(12)
+        await mailWaitUntil { inbox.model.phase == .loaded }
         inbox.view.layoutIfNeeded()
 
         let tagsView = try #require(inbox.view.mailTestView(id: "seek-mail-tags"))

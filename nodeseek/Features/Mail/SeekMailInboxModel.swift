@@ -46,6 +46,7 @@ nonisolated enum SeekMailFolderScope: Hashable, Sendable {
 final class SeekMailSelectionStore {
     private let defaults: UserDefaults
     private enum Key {
+        /// 旧版本记住的邮箱；现在每次进入都从「全部」开始，只在清理时删掉。
         static let mailbox = "seekMail.selectedMailboxID"
         static let scope = "seekMail.selectedScope"
         static let recents = "seekMail.recentMailboxIDs"
@@ -54,11 +55,6 @@ final class SeekMailSelectionStore {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-    }
-
-    var mailboxID: Int64? {
-        get { (defaults.object(forKey: Key.mailbox) as? NSNumber)?.int64Value }
-        set { defaults.set(newValue.map { NSNumber(value: $0) }, forKey: Key.mailbox) }
     }
 
     var scope: SeekMailFolderScope {
@@ -150,7 +146,6 @@ final class SeekMailInboxModel {
         self.cache = cache
         self.cacheKey = cacheKey
         self.memoryCache = memoryCache
-        selectedMailboxID = selectionStore.mailboxID
         scope = selectionStore.scope
     }
 
@@ -304,7 +299,6 @@ final class SeekMailInboxModel {
     func selectMailbox(_ id: Int64?) {
         guard id != selectedMailboxID else { return }
         selectedMailboxID = id
-        selectionStore.mailboxID = id
         if let id { selectionStore.recordRecent(id) }
         resetAndReload()
     }
@@ -355,10 +349,9 @@ final class SeekMailInboxModel {
         self.folders = folders.sorted { ($0.sortOrder ?? 0) < ($1.sortOrder ?? 0) }
         names = SeekMailboxNaming.displays(for: mailboxes)
         sortMailboxes()
-        // 记住的邮箱或文件夹已被删掉，回到默认
+        // 选中的邮箱或记住的文件夹已被删掉，回到默认
         if let id = selectedMailboxID, mailboxes.contains(where: { $0.id == id }) == false {
             selectedMailboxID = nil
-            selectionStore.mailboxID = nil
         }
         if case .custom(let id) = scope, folders.contains(where: { $0.id == id }) == false {
             scope = .inbox

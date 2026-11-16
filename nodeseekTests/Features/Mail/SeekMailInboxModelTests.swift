@@ -54,29 +54,25 @@ struct SeekMailInboxModelTests {
     @Test func selectionStoreRemembersScopeAndRecents() {
         let store = makeSelectionStore()
         #expect(store.scope == .inbox)
-        #expect(store.mailboxID == nil)
         store.scope = .custom(42)
-        store.mailboxID = 7
         [1, 2, 3, 1, 4].forEach(store.recordRecent)
         #expect(store.scope == .custom(42))
-        #expect(store.mailboxID == 7)
         #expect(store.recentMailboxIDs == [4, 1, 3])
         store.clear()
-        #expect(store.mailboxID == nil)
+        #expect(store.scope == .inbox)
         #expect(store.recentMailboxIDs.isEmpty)
         #expect(SeekMailFolderScope(storageValue: "folder:x") == nil)
     }
 
     // MARK: - 加载
 
-    @Test func loadsFirstPageWithRememberedSelectionAndPaginates() async throws {
+    @Test func loadsFirstPageWithRememberedFolderAndPaginates() async throws {
         let transport = SeekMailRouteTransport()
         transport.mailPages = [
             Self.page(ids: Array(1...20), total: 25, offset: 0),
             Self.page(ids: Array(21...25), total: 25, offset: 20)
         ]
         let selection = makeSelectionStore()
-        selection.mailboxID = 2
         selection.scope = .spam
         let model = makeModel(transport, selection: selection)
 
@@ -84,15 +80,15 @@ struct SeekMailInboxModelTests {
         await mailWaitUntil { model.phase == .loaded }
         #expect(model.mails.count == 20)
         #expect(model.hasMore)
-        #expect(model.selectionTitle == "账单")
+        #expect(model.selectionTitle == "全部邮箱")
         let first = try #require(transport.requests.last { $0.url?.path.hasSuffix("/mails") == true })
-        #expect(first.url?.query == "folder=spam&limit=20&mailbox_id=2&offset=0")
+        #expect(first.url?.query == "folder=spam&limit=20&offset=0")
 
         model.loadMoreIfNeeded()
         await mailWaitUntil { model.mails.count == 25 }
         #expect(model.hasMore == false)
         let second = try #require(transport.requests.last)
-        #expect(second.url?.query == "folder=spam&limit=20&mailbox_id=2&offset=20")
+        #expect(second.url?.query == "folder=spam&limit=20&offset=20")
     }
 
     @Test func refreshDuringPaginationAllowsLoadingMoreAgain() async throws {
@@ -147,17 +143,23 @@ struct SeekMailInboxModelTests {
         #expect(model.mails.map(\.id) == [99])
     }
 
-    @Test func forgottenMailboxFallsBackToAll() async {
+    @Test func reenteringStartsFromAllMailboxesAndForgetsMissingFolder() async {
         let selection = makeSelectionStore()
-        selection.mailboxID = 999
         selection.scope = .custom(5)
-        let model = makeModel(SeekMailRouteTransport(), selection: selection)
-        model.start()
-        await mailWaitUntil { model.phase == .loaded }
-        #expect(model.selectedMailboxID == nil)
-        #expect(model.scope == .inbox)
-        #expect(selection.mailboxID == nil)
-        #expect(model.showsRecipientMailbox)
+        let first = makeModel(SeekMailRouteTransport(), selection: selection)
+        first.start()
+        await mailWaitUntil { first.phase == .loaded }
+        #expect(first.scope == .inbox)
+        first.selectMailbox(2)
+        #expect(first.selectedMailboxID == 2)
+
+        // 重新进入时不记住上次的邮箱，默认「全部」
+        let second = makeModel(SeekMailRouteTransport(), selection: selection)
+        #expect(second.selectedMailboxID == nil)
+        second.start()
+        await mailWaitUntil { second.phase == .loaded }
+        #expect(second.selectedMailboxID == nil)
+        #expect(second.showsRecipientMailbox)
     }
 
     @Test func unreadCountsDriveTagsAndFollowLocalReadChanges() async throws {
