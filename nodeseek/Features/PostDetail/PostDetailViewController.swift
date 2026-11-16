@@ -230,6 +230,8 @@ class PostDetailViewController: UIViewController {
     var pageIndicatorHideWorkItem: DispatchWorkItem?
     /// 跳页结果渲染后滚到目标页开头，而不是停在旧的滚动位置。
     var pendingPageJumpScroll = false
+    /// 用户在本页跳过页后，提示行改为说明当前起始页。
+    var hasJumpedCommentPage = false
     var actionConfirmationPresenter: PostDetailActionConfirmationPresenter = { viewController, context, onConfirm in
         let alert = UIAlertController(
             title: context.title,

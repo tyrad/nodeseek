@@ -295,12 +295,22 @@ extension PostDetailViewController {
         openFullPostFromBeginning()
     }
 
+    /// 提示行显示的起始页：跳页前是进入时的页码，跳页后是当前已加载的第一页。
+    var entryHintPage: Int {
+        guard hasJumpedCommentPage else { return initialPage }
+        return loadedCommentPageRanges.keys.min() ?? currentPage
+    }
+
     var shouldShowInitialPageHint: Bool {
-        initialPage > 1
+        entryHintPage > 1
     }
 
     func openFullPostFromEntryHint() {
         guard shouldShowInitialPageHint else { return }
+        if hasJumpedCommentPage {
+            jumpToCommentPage(1)
+            return
+        }
         openFullPostFromBeginning()
     }
 

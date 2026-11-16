@@ -121,10 +121,17 @@ extension PostDetailViewController {
 
     func jumpToCommentPage(_ page: Int) {
         AppLog.info(.postDetail, "页码面板选中: page=\(page), visiblePage=\(visibleCommentPage), total=\(totalCommentPages)")
+        let oldRowCount = detailRows.count
+        let clearsAuthorFilter = authorFilter != nil
         // 筛选结果只覆盖已加载的页，跳页后已加载范围被清空，直接退出只看楼主更直观。
-        if authorFilter != nil {
+        if clearsAuthorFilter {
             authorFilter = nil
             resetAuthorFilterAutoLoad()
+        }
+        hasJumpedCommentPage = true
+        // 行变了要立刻刷新，否则跳页结果回来前表格和数据源对不上。
+        if clearsAuthorFilter || detailRows.count != oldRowCount {
+            reloadTableData()
         }
         pendingPageJumpScroll = true
         presenter.didSelectCommentPage(page)

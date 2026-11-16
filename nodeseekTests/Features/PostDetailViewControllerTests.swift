@@ -1297,6 +1297,66 @@ struct PostDetailViewControllerTests {
         #expect(viewController.testDetailRowKinds() == ["header", "entryHint", "postRepliesDivider", "comment"])
     }
 
+    @Test func jumpingToLaterPageShowsStartPageHintThatJumpsBackInPlace() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter, currentPage: 1)
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: makePageJumpDetail(page: 1))
+        await waitForDetailContent(in: viewController)
+        #expect(viewController.testDetailRowKinds().contains("entryHint") == false)
+
+        viewController.jumpToCommentPage(5)
+        #expect(presenter.selectedCommentPages == [5])
+        viewController.render(detail: makePageJumpDetail(page: 5))
+        await waitForDetailContent(in: viewController)
+
+        #expect(viewController.testDetailRowKinds() == ["header", "entryHint", "postRepliesDivider", "comment"])
+        #expect(viewController.entryHintPage == 5)
+
+        // 跳页后的提示按钮原地回到第 1 页，不新开详情页。
+        viewController.openFullPostFromEntryHint()
+        #expect(presenter.selectedCommentPages == [5, 1])
+        #expect(viewController.testOpenedFullPostPage() == nil)
+        await tearDownPostDetailTextureViewController(viewController)
+    }
+
+    @Test func jumpingBackToFirstPageHidesEntryHint() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter, currentPage: 3)
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: makePageJumpDetail(page: 3))
+        await waitForDetailContent(in: viewController)
+        #expect(viewController.testDetailRowKinds().contains("entryHint"))
+
+        viewController.jumpToCommentPage(1)
+        viewController.render(detail: makePageJumpDetail(page: 1))
+        await waitForDetailContent(in: viewController)
+
+        #expect(viewController.testDetailRowKinds().contains("entryHint") == false)
+        await tearDownPostDetailTextureViewController(viewController)
+    }
+
+    private func makePageJumpDetail(page: Int) -> PostDetail {
+        PostDetail(
+            id: "717963",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: "c\(page)", authorName: "a", avatarURL: nil, floorText: "#\(page * 10)", createdAtText: nil, contentHTML: "<p>第 \(page) 页</p>")
+            ],
+            page: page,
+            pagination: PostDetailPagination(
+                currentPage: page,
+                items: (1...5).map { PostDetailPageItem(page: $0, url: nil, isCurrent: $0 == page) },
+                previousPage: page > 1 ? page - 1 : nil,
+                nextPage: page < 5 ? page + 1 : nil
+            )
+        )
+    }
+
     @Test func entryHintCellRefreshesAppearanceWhenThemeChanges() {
         let node = PostDetailEntryHintCellNode(page: 6, onOpenFullPost: {})
         node.layoutIfNeeded()

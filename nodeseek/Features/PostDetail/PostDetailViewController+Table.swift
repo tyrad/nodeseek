@@ -206,9 +206,10 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                 )
             }
         case .entryHint:
-            let page = initialPage
+            let page = entryHintPage
+            let isAfterPageJump = hasJumpedCommentPage
             return { [weak self] in
-                PostDetailEntryHintCellNode(page: page) {
+                PostDetailEntryHintCellNode(page: page, isAfterPageJump: isAfterPageJump) {
                     self?.openFullPostFromEntryHint()
                 }
             }
