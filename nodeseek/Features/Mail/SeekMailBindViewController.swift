@@ -145,6 +145,9 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
         pasteButton.accessibilityIdentifier = "seek-mail-bind-paste"
         pasteButton.addAction(UIAction { [weak self] _ in self?.pasteTapped() }, for: .touchUpInside)
         pasteButton.setContentHuggingPriority(.required, for: .horizontal)
+        // Key 有七十多个字符，输入框要让位，不能把「粘贴」挤出卡片
+        pasteButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        keyField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         let fieldRow = UIStackView(arrangedSubviews: [keyField, pasteButton])
         fieldRow.spacing = 10
@@ -257,7 +260,11 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
             do {
                 let mailboxes = try await verify(key)
                 verifyTask = nil
-                keyStore.save(apiKey: key)
+                guard keyStore.save(apiKey: key) else {
+                    showError("Key 有效，但没能保存到本机钥匙串，请重试")
+                    updateSaveButton()
+                    return
+                }
                 onBound(mailboxes)
             } catch is CancellationError {
                 verifyTask = nil

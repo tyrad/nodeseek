@@ -8,7 +8,9 @@ import Security
 
 protocol SeekMailAPIKeyStoring: AnyObject {
     func apiKey() -> String?
-    func save(apiKey: String)
+    /// 返回是否写入成功；失败时绑定页要告诉用户，不能装作已保存。
+    @discardableResult
+    func save(apiKey: String) -> Bool
     func clear()
 }
 
@@ -52,11 +54,12 @@ final class KeychainSeekMailAPIKeyStore: SeekMailAPIKeyStoring {
         return normalized.isEmpty ? nil : normalized
     }
 
-    func save(apiKey: String) {
+    @discardableResult
+    func save(apiKey: String) -> Bool {
         let normalized = SeekMailAPIKeyStore.normalized(apiKey)
         guard normalized.isEmpty == false else {
             clear()
-            return
+            return false
         }
         // 先删后加，保证访问级别每次都按下面的设置写入
         SecItemDelete(baseQuery() as CFDictionary)
@@ -64,8 +67,13 @@ final class KeychainSeekMailAPIKeyStore: SeekMailAPIKeyStoring {
         query[kSecValueData as String] = Data(normalized.utf8)
         // 只在本机可用，不随 iCloud 钥匙串或备份同步到其他设备
         query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        SecItemAdd(query as CFDictionary, nil)
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            AppLog.warning(.service, "seek.li Key 写入钥匙串失败 status=\(status)")
+            return false
+        }
         notificationCenter.post(name: SeekMailAPIKeyStore.didChangeNotification, object: self)
+        return true
     }
 
     func clear() {
