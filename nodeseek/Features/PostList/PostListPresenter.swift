@@ -17,6 +17,7 @@ class PostListPresenter: PostListPresenterProtocol {
     private let router: PostListRouterProtocol
     private let visitedStore: VisitedPostStoreProtocol
     private let categoryPreferenceStore: PostCategoryPreferenceStore
+    private let sortPreferenceStore: PostListSortPreferenceStoring
     private let notificationUnreadCountInteractor: PostListNotificationUnreadCountInteractorProtocol
     private let currentDateProvider: () -> Date
     private var categoryPreferenceObserver: NSObjectProtocol?
@@ -29,12 +30,14 @@ class PostListPresenter: PostListPresenterProtocol {
         router: PostListRouterProtocol,
         visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore(),
         categoryPreferenceStore: PostCategoryPreferenceStore = .shared,
+        sortPreferenceStore: PostListSortPreferenceStoring = PostListSortPreferenceStore.shared,
         notificationUnreadCountInteractor: PostListNotificationUnreadCountInteractorProtocol? = nil,
         currentDateProvider: @escaping () -> Date = Date.init
     ) {
         self.router = router
         self.visitedStore = visitedStore
         self.categoryPreferenceStore = categoryPreferenceStore
+        self.sortPreferenceStore = sortPreferenceStore
         self.notificationUnreadCountInteractor = notificationUnreadCountInteractor
             ?? PostListNotificationUnreadCountInteractor()
         self.currentDateProvider = currentDateProvider
@@ -56,7 +59,7 @@ class PostListPresenter: PostListPresenterProtocol {
     func viewDidLoad() {
         observeCategoryPreferencesIfNeeded()
         renderCurrentCategories()
-        view?.renderSortMode(.replyTime)
+        view?.renderSortMode(sortPreferenceStore.sortMode)
     }
 
     func viewWillAppear() {

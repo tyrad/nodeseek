@@ -25,15 +25,15 @@ final class PostTextureListInteractor: PostTextureListHostInteractorInput {
     }
     
     // MARK: - Methods
-    func loadPosts(category: PostListCategoryItem, sortMode: PostListSortMode) {
-        load(page: 1, category: category, sortMode: sortMode, isLoadMore: false)
+    func loadPosts(category: PostListCategoryItem, sortMode: PostListSortMode, generation: Int) {
+        load(page: 1, category: category, sortMode: sortMode, isLoadMore: false, generation: generation)
     }
 
-    func loadMorePosts(page: Int, category: PostListCategoryItem, sortMode: PostListSortMode) {
-        load(page: max(2, page), category: category, sortMode: sortMode, isLoadMore: true)
+    func loadMorePosts(page: Int, category: PostListCategoryItem, sortMode: PostListSortMode, generation: Int) {
+        load(page: max(2, page), category: category, sortMode: sortMode, isLoadMore: true, generation: generation)
     }
 
-    private func load(page: Int, category: PostListCategoryItem, sortMode: PostListSortMode, isLoadMore: Bool) {
+    private func load(page: Int, category: PostListCategoryItem, sortMode: PostListSortMode, isLoadMore: Bool, generation: Int) {
         Task {
             AppLog.info(.postList, "开始加载帖子列表，category=\(category.rawValue), sort=\(sortMode.rawValue), page=\(page), isLoadMore=\(isLoadMore)")
             do {
@@ -41,18 +41,18 @@ final class PostTextureListInteractor: PostTextureListHostInteractorInput {
                 AppLog.info(.postList, "帖子列表加载成功，category=\(category.rawValue), sort=\(sortMode.rawValue), page=\(page), 数量: \(posts.count)")
                 await MainActor.run {
                     if isLoadMore {
-                        presenter?.didLoadMorePosts(posts, page: page, category: category, sortMode: sortMode)
+                        presenter?.didLoadMorePosts(posts, page: page, category: category, sortMode: sortMode, generation: generation)
                     } else {
-                        presenter?.didLoadPosts(posts, category: category, sortMode: sortMode)
+                        presenter?.didLoadPosts(posts, category: category, sortMode: sortMode, generation: generation)
                     }
                 }
             } catch {
                 AppLog.error(.postList, "帖子列表加载失败，category=\(category.rawValue), sort=\(sortMode.rawValue), page=\(page): \(error.localizedDescription)")
                 await MainActor.run {
                     if isLoadMore {
-                        presenter?.didFailLoadMorePosts(error: error.localizedDescription, page: page, category: category, sortMode: sortMode)
+                        presenter?.didFailLoadMorePosts(error: error.localizedDescription, page: page, category: category, sortMode: sortMode, generation: generation)
                     } else {
-                        presenter?.didFailLoadPosts(error: error.localizedDescription, category: category, sortMode: sortMode)
+                        presenter?.didFailLoadPosts(error: error.localizedDescription, category: category, sortMode: sortMode, generation: generation)
                     }
                 }
             }

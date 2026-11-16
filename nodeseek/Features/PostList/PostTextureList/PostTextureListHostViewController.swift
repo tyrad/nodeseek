@@ -46,6 +46,14 @@ final class PostTextureListHostViewController: UIViewController {
         presenter.viewDidLoad()
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 在其他分类改过排序后回到这里，按新排序从第一页重新加载并回到顶部。
+        if presenter.syncSortModeWithPreference() {
+            listView.scrollToTop(animated: false)
+        }
+    }
+
     var currentSortMode: PostListSortMode {
         presenter.currentSortMode
     }

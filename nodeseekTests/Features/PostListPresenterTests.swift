@@ -23,6 +23,17 @@ struct PostListPresenterTests {
         #expect(view.renderedSortMode == .replyTime)
     }
 
+    @Test func viewDidLoadRendersSavedSortMode() {
+        let view = SpyPostListView()
+        let sortStore = InMemoryPostListSortPreferenceStore()
+        sortStore.sortMode = .postTime
+        let presenter = makePresenter(view: view, sortPreferenceStore: sortStore)
+
+        presenter.viewDidLoad()
+
+        #expect(view.renderedSortMode == .postTime)
+    }
+
     @Test func viewDidLoadRendersVisibleCategoriesFromPreferences() {
         let view = SpyPostListView()
         let store = makeCategoryPreferenceStore()
@@ -429,6 +440,7 @@ private func makePresenter(
     router: SpyPostListRouter? = nil,
     visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore(),
     categoryPreferenceStore: PostCategoryPreferenceStore = makeCategoryPreferenceStore(),
+    sortPreferenceStore: PostListSortPreferenceStoring = InMemoryPostListSortPreferenceStore(),
     notificationUnreadCountInteractor: PostListNotificationUnreadCountInteractorProtocol? = nil,
     currentDateProvider: @escaping () -> Date = Date.init
 ) -> PostListPresenter {
@@ -437,6 +449,7 @@ private func makePresenter(
         router: router,
         visitedStore: visitedStore,
         categoryPreferenceStore: categoryPreferenceStore,
+        sortPreferenceStore: sortPreferenceStore,
         notificationUnreadCountInteractor: notificationUnreadCountInteractor,
         currentDateProvider: currentDateProvider
     )

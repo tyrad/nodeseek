@@ -27,11 +27,14 @@ final class PostPageContainerViewController: UIPageViewController {
     weak var pagingScrollView: UIScrollView?
     var maximumLeadingBoundaryPullDistance: CGFloat = 0
     private let visitedStore: VisitedPostStoreProtocol
+    private let sortPreferenceStore: PostListSortPreferenceStoring
 
     init(
-        visitedStore: VisitedPostStoreProtocol
+        visitedStore: VisitedPostStoreProtocol,
+        sortPreferenceStore: PostListSortPreferenceStoring = PostListSortPreferenceStore.shared
     ) {
         self.visitedStore = visitedStore
+        self.sortPreferenceStore = sortPreferenceStore
         super.init(
             transitionStyle: .scroll,
             navigationOrientation: .horizontal,
@@ -86,8 +89,9 @@ final class PostPageContainerViewController: UIPageViewController {
         setCurrentCategory(category, animated: animated, notifyDelegate: false)
     }
 
+    /// 所有分类共用全局排序；分类页面可能还没出现、尚未同步，所以按钮状态直接取全局偏好。
     func sortMode(for category: PostListCategoryItem) -> PostListSortMode {
-        hostViewControllers[category]?.currentSortMode ?? .replyTime
+        sortPreferenceStore.sortMode
     }
 
     @discardableResult

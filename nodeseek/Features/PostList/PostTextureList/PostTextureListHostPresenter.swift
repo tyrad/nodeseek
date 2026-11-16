@@ -12,7 +12,9 @@ final class PostTextureListHostPresenter: PostTextureListHostPresenterProtocol {
     private let category: PostListCategoryItem
     private let interactor: PostTextureListHostInteractorInput
     private let visitedStore: VisitedPostStoreProtocol
-    private var sortMode: PostListSortMode = .replyTime
+    private let sortPreferenceStore: PostListSortPreferenceStoring
+    private var requestGeneration = 0
+    private var sortMode: PostListSortMode
     private var items: [PostListItem] = []
     private var loadedIDs: Set<String> = []
     private var nextPage: Int = 2
@@ -27,11 +29,14 @@ final class PostTextureListHostPresenter: PostTextureListHostPresenterProtocol {
     init(
         category: PostListCategoryItem,
         interactor: PostTextureListHostInteractorInput,
-        visitedStore: VisitedPostStoreProtocol
+        visitedStore: VisitedPostStoreProtocol,
+        sortPreferenceStore: PostListSortPreferenceStoring = PostListSortPreferenceStore.shared
     ) {
         self.category = category
         self.interactor = interactor
         self.visitedStore = visitedStore
+        self.sortPreferenceStore = sortPreferenceStore
+        self.sortMode = sortPreferenceStore.sortMode
         self.interactor.presenter = self
     }
 
@@ -44,11 +49,22 @@ final class PostTextureListHostPresenter: PostTextureListHostPresenterProtocol {
     }
 
     func viewDidLoad() {
+        // 分类页面可能早于用户改排序就已创建，首次加载前对齐全局排序，避免先按旧排序请求一次。
+        sortMode = sortPreferenceStore.sortMode
         loadFirstPageIfNeeded()
+    }
+
+    func syncSortModeWithPreference() -> Bool {
+        let preferred = sortPreferenceStore.sortMode
+        guard preferred != sortMode else { return false }
+        sortMode = preferred
+        resetAndLoadFirstPage()
+        return true
     }
 
     func toggleSortMode() -> PostListSortMode {
         sortMode = sortMode.toggled
+        sortPreferenceStore.sortMode = sortMode
         resetAndLoadFirstPage()
         delegate?.postTextureListHostDidChangeSortMode(sortMode, category: category)
         return sortMode
@@ -99,8 +115,10 @@ extension PostTextureListHostPresenter: PostTextureListHostInteractorOutput {
     func didLoadPosts(
         _ posts: [PostSummary],
         category: PostListCategoryItem,
-        sortMode: PostListSortMode
+        sortMode: PostListSortMode,
+        generation: Int
     ) {
+        guard generation == requestGeneration else { return }
         guard category == self.category else { return }
         guard sortMode == self.sortMode else { return }
         items = postItems(for: posts)
@@ -124,8 +142,10 @@ extension PostTextureListHostPresenter: PostTextureListHostInteractorOutput {
         _ posts: [PostSummary],
         page: Int,
         category: PostListCategoryItem,
-        sortMode: PostListSortMode
+        sortMode: PostListSortMode,
+        generation: Int
     ) {
+        guard generation == requestGeneration else { return }
         guard category == self.category else { return }
         guard sortMode == self.sortMode else { return }
         isLoadingMore = false
@@ -151,7 +171,8 @@ extension PostTextureListHostPresenter: PostTextureListHostInteractorOutput {
         view?.hideLoadingMore()
     }
 
-    func didFailLoadPosts(error: String, category: PostListCategoryItem, sortMode: PostListSortMode) {
+    func didFailLoadPosts(error: String, category: PostListCategoryItem, sortMode: PostListSortMode, generation: Int) {
+        guard generation == requestGeneration else { return }
         guard category == self.category else { return }
         guard sortMode == self.sortMode else { return }
         isLoadingFirstPage = false
@@ -166,7 +187,8 @@ extension PostTextureListHostPresenter: PostTextureListHostInteractorOutput {
         }
     }
 
-    func didFailLoadMorePosts(error: String, page: Int, category: PostListCategoryItem, sortMode: PostListSortMode) {
+    func didFailLoadMorePosts(error: String, page: Int, category: PostListCategoryItem, sortMode: PostListSortMode, generation: Int) {
+        guard generation == requestGeneration else { return }
         guard category == self.category else { return }
         guard sortMode == self.sortMode else { return }
         isLoadingMore = false
@@ -183,6 +205,8 @@ private extension PostTextureListHostPresenter {
     }
 
     func resetAndLoadFirstPage() {
+        // 排序切回原值时也必须丢弃之前的首页、分页及失败回调。
+        requestGeneration += 1
         // 切换排序等会丢弃进行中的刷新结果，加载提示要一起收起
         finishTabReselectRefresh(failureMessage: nil)
         items = []
@@ -190,6 +214,8 @@ private extension PostTextureListHostPresenter {
         nextPage = 2
         hasMorePages = true
         hasLoadedFirstPage = false
+        // 新批次独立维护加载状态，不等待旧请求结束。
+        isLoadingFirstPage = false
         isRefreshing = false
         isLoadingMore = false
         view?.setItems([])
@@ -207,7 +233,7 @@ private extension PostTextureListHostPresenter {
         view?.hideFirstPageError()
         view?.hideRefreshing()
         view?.hideLoadingMore()
-        interactor.loadPosts(category: category, sortMode: sortMode)
+        interactor.loadPosts(category: category, sortMode: sortMode, generation: requestGeneration)
     }
 
     func refreshFirstPage() {
@@ -215,8 +241,9 @@ private extension PostTextureListHostPresenter {
         guard !isRefreshing else { return }
         guard !isLoadingFirstPage else { return }
         guard !isLoadingMore else { return }
+        requestGeneration += 1
         isRefreshing = true
-        interactor.loadPosts(category: category, sortMode: sortMode)
+        interactor.loadPosts(category: category, sortMode: sortMode, generation: requestGeneration)
     }
 
     func loadMoreIfNeeded(currentIndex: Int, totalCount: Int) {
@@ -243,7 +270,7 @@ private extension PostTextureListHostPresenter {
             "触发帖子列表加载更多: page=\(nextPage), category=\(category.rawValue), sortMode=\(sortMode.rawValue), currentIndex=\(currentIndex), totalCount=\(totalCount)"
         )
         view?.showLoadingMore()
-        interactor.loadMorePosts(page: nextPage, category: category, sortMode: sortMode)
+        interactor.loadMorePosts(page: nextPage, category: category, sortMode: sortMode, generation: requestGeneration)
     }
 
     func postItems(for posts: [PostSummary]) -> [PostListItem] {

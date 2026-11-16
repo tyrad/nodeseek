@@ -34,6 +34,8 @@ protocol PostTextureListHostPresenterProtocol: AnyObject {
 
     func setView(_ view: PostTextureListHostViewProtocol)
     func viewDidLoad()
+    /// 当前排序与全局偏好不一致时，切换并从第一页重新加载；返回是否发生了切换。
+    func syncSortModeWithPreference() -> Bool
     func toggleSortMode() -> PostListSortMode
     func reloadFirstPage()
     func didSelectPost(at index: Int)
@@ -47,16 +49,16 @@ protocol PostTextureListHostPresenterProtocol: AnyObject {
 protocol PostTextureListHostInteractorInput: AnyObject {
     var presenter: PostTextureListHostInteractorOutput? { get set }
 
-    func loadPosts(category: PostListCategoryItem, sortMode: PostListSortMode)
-    func loadMorePosts(page: Int, category: PostListCategoryItem, sortMode: PostListSortMode)
+    func loadPosts(category: PostListCategoryItem, sortMode: PostListSortMode, generation: Int)
+    func loadMorePosts(page: Int, category: PostListCategoryItem, sortMode: PostListSortMode, generation: Int)
 }
 
 // MARK: - Interactor Output (Interactor -> Presenter)
 protocol PostTextureListHostInteractorOutput: AnyObject {
-    func didLoadPosts(_ posts: [PostSummary], category: PostListCategoryItem, sortMode: PostListSortMode)
-    func didLoadMorePosts(_ posts: [PostSummary], page: Int, category: PostListCategoryItem, sortMode: PostListSortMode)
-    func didFailLoadPosts(error: String, category: PostListCategoryItem, sortMode: PostListSortMode)
-    func didFailLoadMorePosts(error: String, page: Int, category: PostListCategoryItem, sortMode: PostListSortMode)
+    func didLoadPosts(_ posts: [PostSummary], category: PostListCategoryItem, sortMode: PostListSortMode, generation: Int)
+    func didLoadMorePosts(_ posts: [PostSummary], page: Int, category: PostListCategoryItem, sortMode: PostListSortMode, generation: Int)
+    func didFailLoadPosts(error: String, category: PostListCategoryItem, sortMode: PostListSortMode, generation: Int)
+    func didFailLoadMorePosts(error: String, page: Int, category: PostListCategoryItem, sortMode: PostListSortMode, generation: Int)
 }
 
 // MARK: - Router Protocol (Module Assembly)
