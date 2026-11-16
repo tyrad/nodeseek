@@ -30,7 +30,7 @@ concurrency:
 jobs:
   testflight:
     name: Build and upload TestFlight
-    runs-on: macos-15
+    runs-on: macos-15-intel
     environment: app-store
 
     steps:
