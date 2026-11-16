@@ -95,6 +95,58 @@ struct SeekMailInboxModelTests {
         #expect(second.url?.query == "folder=spam&limit=20&mailbox_id=2&offset=20")
     }
 
+    @Test func refreshDuringPaginationAllowsLoadingMoreAgain() async throws {
+        let transport = SeekMailRouteTransport()
+        transport.mailPages = [
+            Self.page(ids: Array(1...20), total: 25, offset: 0),
+            Self.page(ids: Array(1...20), total: 25, offset: 0),
+            Self.page(ids: Array(21...25), total: 25, offset: 20)
+        ]
+        let model = makeModel(transport)
+        model.start()
+        await mailWaitUntil { model.phase == .loaded }
+        transport.delayNanoseconds = 50_000_000
+        model.loadMoreIfNeeded()
+        await mailWaitUntil { transport.requests.filter { $0.url?.path.hasSuffix("/mails") == true }.count == 2 }
+        #expect(model.isLoadingMore)
+        transport.mailPages = [Self.page(ids: Array(1...20), total: 25, offset: 0)]
+        // 分页仍在等待时刷新，新首页接管状态。
+        model.reload()
+        #expect(model.isLoadingMore == false)
+        await mailWaitUntil {
+            transport.requests.filter { $0.url?.path.hasSuffix("/mails") == true }.count >= 3
+        }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        transport.mailPages = [Self.page(ids: Array(21...25), total: 25, offset: 20)]
+        model.loadMoreIfNeeded()
+        await mailWaitUntil { model.mails.count == 25 }
+        #expect(model.isLoadingMore == false)
+    }
+
+    @Test func failedMoveDoesNotInsertMailIntoAnotherMailbox() async throws {
+        let transport = SeekMailRouteTransport()
+        var pendingMove: CheckedContinuation<Void, Error>?
+        var failureReported = false
+        let provider = SeekMailProvider<SeekMailAPI>(apiKey: { "sk_live_test" }, plugins: [], transport: { request in
+            if request.httpMethod == "PUT", request.url?.path.hasSuffix("/folder") == true {
+                try await withCheckedThrowingContinuation { pendingMove = $0 }
+            }
+            return try await transport.load(request)
+        })
+        let model = SeekMailInboxModel(provider: provider, selectionStore: makeSelectionStore())
+        model.onMessage = { _ in failureReported = true }
+        model.start()
+        await mailWaitUntil { model.phase == .loaded }
+        model.move(11, toFolderID: 42)
+        await mailWaitUntil { pendingMove != nil }
+        transport.mailPages = [Self.page(ids: [99], total: 1, offset: 0)]
+        model.selectMailbox(2)
+        await mailWaitUntil { model.mails.map(\.id) == [99] }
+        pendingMove?.resume(throwing: URLError(.notConnectedToInternet))
+        await mailWaitUntil { failureReported }
+        #expect(model.mails.map(\.id) == [99])
+    }
+
     @Test func forgottenMailboxFallsBackToAll() async {
         let selection = makeSelectionStore()
         selection.mailboxID = 999

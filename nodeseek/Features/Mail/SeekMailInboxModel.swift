@@ -220,6 +220,7 @@ final class SeekMailInboxModel {
     /// 首次进入：邮箱和文件夹拿到后再加载邮件。
     func start() {
         phase = .loading
+        isLoadingMore = false
         restoreSnapshot()
         onChange?()
         refreshUnreadCounts()
@@ -261,6 +262,8 @@ final class SeekMailInboxModel {
         }
         generation += 1
         let token = generation
+        // 新的首页请求接管分页状态，旧分页回调会因 generation 不同被忽略。
+        isLoadingMore = false
         if allMails.isEmpty { phase = .loading }
         onChange?()
         loadTask?.cancel()
@@ -480,6 +483,7 @@ final class SeekMailInboxModel {
     func move(_ id: Int64, toFolderID folderID: Int64?) {
         guard let index = allMails.firstIndex(where: { $0.id == id }) else { return }
         let removed = allMails.remove(at: index)
+        let token = generation
         memoryCache?.removeMail(id: id)
         onChange?()
         Task { [weak self] in
@@ -487,8 +491,11 @@ final class SeekMailInboxModel {
             do {
                 try await provider.moveMail(id: id, folderID: folderID)
             } catch {
-                allMails.insert(removed, at: min(index, allMails.count))
-                onChange?()
+                // 切换范围或刷新后，不能把旧列表的邮件插入新结果。
+                if token == generation {
+                    allMails.insert(removed, at: min(index, allMails.count))
+                    onChange?()
+                }
                 report(error)
             }
         }
