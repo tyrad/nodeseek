@@ -83,6 +83,13 @@ final class SeekMailProvider<Target: SeekMailTargetType> {
         self.transport = transport
     }
 
+#if compiler(<6.4)
+    // Swift 6.2/6.3 优化泛型类型的自动析构时会崩溃，只跳过析构函数的优化。
+    // https://github.com/swiftlang/swift/issues/88173
+    @_optimize(none)
+    deinit {}
+#endif
+
     /// 发出请求并校验状态码，非 2xx 统一转成 SeekMailError。
     func request(_ target: Target) async throws -> SeekMailResponse {
         let result: Result<SeekMailResponse, Error>
