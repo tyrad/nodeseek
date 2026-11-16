@@ -121,6 +121,15 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
         descLabel.textColor = .secondaryLabel
         descLabel.numberOfLines = 0
 
+        // 实测 OpenAPI 的已发送列表为空、按发信 id 也查不到，提前说明免得用户以为是 bug
+        let sentNoteLabel = UILabel()
+        sentNoteLabel.text = SeekMailL10n.text("目前 seek.li 接口查不到已发送的邮件，App 里只能收信和写信，看不到发件记录。")
+        sentNoteLabel.font = .preferredFont(forTextStyle: .footnote)
+        sentNoteLabel.adjustsFontForContentSizeCategory = true
+        sentNoteLabel.textColor = .secondaryLabel
+        sentNoteLabel.numberOfLines = 0
+        sentNoteLabel.accessibilityIdentifier = "seek-mail-bind-sent-note"
+
         let fieldHeader = Self.makeSectionHeader("API KEY")
 
         keyField.placeholder = "sk_live_…"
@@ -166,10 +175,11 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
         helpButton.addAction(UIAction { [weak self] _ in self?.showHelp() }, for: .touchUpInside)
         let helpCard = Self.makeCard(containing: helpButton, insets: .zero)
 
-        [iconRow, titleLabel, descLabel, fieldHeader, fieldCard, errorLabel, helpCard].forEach(contentStack.addArrangedSubview)
+        [iconRow, titleLabel, descLabel, sentNoteLabel, fieldHeader, fieldCard, errorLabel, helpCard].forEach(contentStack.addArrangedSubview)
         contentStack.setCustomSpacing(16, after: iconRow)
         contentStack.setCustomSpacing(6, after: titleLabel)
-        contentStack.setCustomSpacing(24, after: descLabel)
+        contentStack.setCustomSpacing(6, after: descLabel)
+        contentStack.setCustomSpacing(24, after: sentNoteLabel)
         contentStack.setCustomSpacing(6, after: fieldHeader)
         contentStack.setCustomSpacing(12, after: fieldCard)
         contentStack.setCustomSpacing(12, after: errorLabel)

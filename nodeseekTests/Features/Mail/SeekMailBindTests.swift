@@ -96,6 +96,15 @@ struct SeekMailBindTests {
         #expect(pasteFrame.width > 30)
     }
 
+    @Test func explainsSentMailIsUnavailable() throws {
+        let bind = SeekMailBindViewController(keyStore: InMemorySeekMailKeyStore(), verify: { _ in [] })
+        bind.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        bind.view.layoutIfNeeded()
+        let note = try #require(bind.view.mailTestView(id: "seek-mail-bind-sent-note") as? UILabel)
+        #expect(note.text == SeekMailL10n.text("目前 seek.li 接口查不到已发送的邮件，App 里只能收信和写信，看不到发件记录。"))
+        #expect(note.isHidden == false)
+    }
+
     @Test func keychainFailureIsReported() async throws {
         let store = InMemorySeekMailKeyStore()
         store.failsToSave = true
