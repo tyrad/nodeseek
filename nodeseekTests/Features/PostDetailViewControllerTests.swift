@@ -4706,6 +4706,11 @@ private final class SpyPostDetailPresenter: PostDetailPresenterProtocol {
         loadCount += 1
     }
 
+    private(set) var selectedCommentPages: [Int] = []
+    func didSelectCommentPage(_ page: Int) {
+        selectedCommentPages.append(page)
+    }
+
     func didTapLogin() {
         didTapLoginCount += 1
     }

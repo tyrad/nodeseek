@@ -71,6 +71,77 @@ struct PostDetailPresenterTests {
         #expect(view.loadingCount == 1)
     }
 
+    @Test func selectingCommentPageReloadsFromThatPageAndRefreshKeepsIt() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let view = SpyPostDetailView()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        presenter.setView(view)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: makePagedDetail(page: 1, commentID: "1")))
+
+        presenter.didSelectCommentPage(5)
+        #expect(interactor.loadedPages == [5])
+        #expect(view.loadingCount == 1)
+
+        presenter.didLoadPostDetail(PostDetailResponse(detail: makePagedDetail(page: 5, commentID: "41")))
+        #expect(view.renderedDetails.last?.page == 5)
+        #expect(view.appendedCommentPageDetails.isEmpty)
+
+        // 跳页后右上角刷新留在跳到的页，不回到进入时的第 1 页。
+        presenter.refreshInitialPage()
+        #expect(interactor.loadedPages == [5, 5])
+    }
+
+    @Test func selectingCommentPageDropsStaleAppendResult() {
+        let interactor = SpyPostDetailInteractor()
+        let router = SpyPostDetailRouter()
+        let view = SpyPostDetailView()
+        let presenter = PostDetailPresenter(interactor: interactor, router: router, initialPage: 1)
+        presenter.setView(view)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: makePagedDetail(page: 1, commentID: "1")))
+        presenter.didApproachCommentEnd()
+        #expect(interactor.loadedPages == [2])
+
+        presenter.didSelectCommentPage(5)
+        // 跳页前发出的第 2 页请求晚到，不能覆盖跳页结果。
+        presenter.didLoadPostDetail(PostDetailResponse(detail: makePagedDetail(page: 2, commentID: "11")))
+        #expect(view.renderedDetails.count == 1)
+        #expect(view.appendedCommentPageDetails.isEmpty)
+
+        presenter.didLoadPostDetail(PostDetailResponse(detail: makePagedDetail(page: 5, commentID: "41")))
+        #expect(view.renderedDetails.map(\.page) == [1, 5])
+    }
+
+    @Test func selectingCommentPageIsIgnoredBeforeFirstLoad() {
+        let interactor = SpyPostDetailInteractor()
+        let presenter = PostDetailPresenter(interactor: interactor, router: SpyPostDetailRouter(), initialPage: 1)
+
+        presenter.didSelectCommentPage(3)
+
+        #expect(interactor.loadedPages.isEmpty)
+    }
+
+    private func makePagedDetail(page: Int, commentID: String) -> PostDetail {
+        PostDetail(
+            id: "706958",
+            title: "标题",
+            authorName: "mist",
+            avatarURL: nil,
+            metadataText: nil,
+            contentHTML: "<p>正文</p>",
+            comments: [
+                Comment(id: commentID, authorName: "a", avatarURL: nil, floorText: "#\(commentID)", createdAtText: nil, contentHTML: "<p>评论</p>")
+            ],
+            page: page,
+            pagination: PostDetailPagination(
+                currentPage: page,
+                items: (1...5).map { PostDetailPageItem(page: $0, url: nil, isCurrent: $0 == page) },
+                previousPage: page > 1 ? page - 1 : nil,
+                nextPage: page < 5 ? page + 1 : nil
+            )
+        )
+    }
+
     @Test func editOwnPostLoadsOriginalThenRefreshesAfterSaving() async throws {
         let interactor = SpyPostDetailInteractor()
         let router = SpyPostDetailRouter()

@@ -227,6 +227,9 @@ class PostDetailViewController: UIViewController {
     var authorFilter: PostDetailAuthorFilter?
     var authorFilterAutoLoadStreak = 0
     var authorFilterAutoLoadWorkItem: DispatchWorkItem?
+    var pageIndicatorHideWorkItem: DispatchWorkItem?
+    /// 跳页结果渲染后滚到目标页开头，而不是停在旧的滚动位置。
+    var pendingPageJumpScroll = false
     var actionConfirmationPresenter: PostDetailActionConfirmationPresenter = { viewController, context, onConfirm in
         let alert = UIAlertController(
             title: context.title,
@@ -516,6 +519,31 @@ class PostDetailViewController: UIViewController {
 
     let replyStickerPickerView = NodeSeekStickerPickerView()
 
+    /// 滚动时浮出的页码胶囊，点一下打开页码面板。
+    let pageIndicatorButton: UIButton = {
+        let button = UIButton(type: .system)
+        var configuration = UIButton.Configuration.filled()
+        configuration.baseBackgroundColor = .label
+        configuration.baseForegroundColor = .systemBackground
+        configuration.cornerStyle = .capsule
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 7, leading: 14, bottom: 7, trailing: 14)
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = UIFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
+            return outgoing
+        }
+        button.configuration = configuration
+        button.layer.shadowColor = UIColor.black.cgColor
+        button.layer.shadowOpacity = 0.16
+        button.layer.shadowRadius = 10
+        button.layer.shadowOffset = CGSize(width: 0, height: 4)
+        button.accessibilityIdentifier = "post-detail-page-indicator"
+        button.isHidden = true
+        button.alpha = 0
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     let toastContainerView: UIView = {
         let view = UIView()
         view.backgroundColor = UIColor.label.withAlphaComponent(0.92)
@@ -597,6 +625,7 @@ class PostDetailViewController: UIViewController {
         tableReloadWorkItem?.cancel()
         toastHideWorkItem?.cancel()
         authorFilterAutoLoadWorkItem?.cancel()
+        pageIndicatorHideWorkItem?.cancel()
         imageUploadTask?.cancel()
         NotificationCenter.default.removeObserver(self)
     }
@@ -705,6 +734,7 @@ class PostDetailViewController: UIViewController {
         loginButton.addTarget(self, action: #selector(loginButtonTapped), for: .touchUpInside)
         loadMoreCommentsRefreshButton.addTarget(self, action: #selector(refreshCommentsAtEndTapped), for: .touchUpInside)
         view.addSubview(loginButton)
+        configurePageIndicator()
         toastContainerView.addSubview(toastIconView)
         toastContainerView.addSubview(toastLabel)
         view.addSubview(toastContainerView)

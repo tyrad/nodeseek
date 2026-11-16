@@ -62,6 +62,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
     }
 
     func showError(message: String) {
+        pendingPageJumpScroll = false
         cancelPendingInitialContentReveal()
         hideLoadingSkeleton()
         let alert = UIAlertController(title: "错误", message: message, preferredStyle: .alert)
@@ -126,7 +127,8 @@ extension PostDetailViewController: PostDetailViewProtocol {
             return
         }
         cancelPendingInitialContentReveal()
-        let shouldScrollToTop = false
+        let shouldScrollToTop = pendingPageJumpScroll
+        pendingPageJumpScroll = false
         let existingHeaderContent = currentHeaderContent
         let existingRenderedContent = headerRenderedContent
         var existingComments: [String: Comment] = [:]
@@ -565,7 +567,8 @@ extension PostDetailViewController: PostDetailViewProtocol {
         commentRenderInFlight.removeAll(keepingCapacity: true)
         reloadTableData()
         if shouldScrollToTop {
-            let targetRow = pageCompletionScrollRow()
+            // 跳到第 1 页时回到主楼顶部，其他页停在该页第一条评论。
+            let targetRow = targetPage == 1 ? 0 : pageCompletionScrollRow()
             #if DEBUG
             pendingScrollToRow = targetRow
             #endif

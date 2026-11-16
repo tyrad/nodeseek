@@ -352,5 +352,19 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         updateNavigationAuthorVisibility(contentOffsetY: scrollView.contentOffset.y, animated: true)
+        // 只响应手指拖动和惯性滚动，代码触发的滚动不浮出页码。
+        if scrollView.isDragging || scrollView.isDecelerating {
+            showPageIndicatorWhileScrolling()
+        }
+    }
+
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        if decelerate == false {
+            schedulePageIndicatorHide()
+        }
+    }
+
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        schedulePageIndicatorHide()
     }
 }
