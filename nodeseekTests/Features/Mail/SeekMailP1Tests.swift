@@ -210,3 +210,71 @@ struct SeekMailP1Tests {
         return defaults
     }
 }
+
+/// 全部标为已读：逐封处理、限速和额度等待。
+@MainActor
+struct SeekMailMarkAllReadTests {
+    private static let unread = #"{"data":[{"id":31,"mailboxId":1,"fromAddress":"a@x.com"},{"id":32,"mailboxId":2,"fromAddress":"b@x.com"},{"id":33,"mailboxId":1,"fromAddress":"c@x.com"}],"page":{"limit":50,"hasMore":false,"nextCursor":""}}"#
+
+    @Test func collectsCurrentMailboxAndMarksOneByOne() async throws {
+        let transport = SeekMailRouteTransport()
+        transport.details["/openapi/v1/mails/unread"] = Self.unread
+        let provider = SeekMailProvider<SeekMailAPI>(apiKey: { "sk_live_test" }, transport: transport.load)
+        var sleeps: [TimeInterval] = []
+        let job = SeekMailMarkAllReadJob(provider: provider, sleep: { sleeps.append($0) })
+        var marked: [Int64] = []
+        var states: [SeekMailMarkAllReadJob.State] = []
+        job.onMarked = { marked.append($0.id) }
+        job.onChange = { states.append($0) }
+
+        let result = try await job.collect(mailboxID: 1)
+        #expect(result.mails.map(\.id) == [31, 33])
+        #expect(result.total == 2)
+
+        job.start(result.mails)
+        await mailWaitUntil { if case .finished = job.state { return true } else { return false } }
+        #expect(job.state == .finished(succeeded: 2, failed: 0))
+        #expect(marked == [31, 33])
+        let puts = transport.requests.filter { $0.httpMethod == "PUT" }.compactMap { $0.url?.path }
+        #expect(puts == ["/openapi/v1/mails/31/read", "/openapi/v1/mails/33/read"])
+        // 两封之间主动间隔，最后一封后不再等
+        #expect(sleeps == [SeekMailMarkAllReadJob.interval])
+        #expect(states.contains(.running(done: 1, total: 2)))
+    }
+
+    @Test func waitsForQuotaWindowWhenRemainingIsLow() async throws {
+        let transport = SeekMailRouteTransport()
+        transport.details["/openapi/v1/mails/unread"] = Self.unread
+        transport.headers = ["x-ratelimit-limit": "60", "x-ratelimit-remaining": "4"]
+        let provider = SeekMailProvider<SeekMailAPI>(apiKey: { "sk_live_test" }, transport: transport.load)
+        var sleeps: [TimeInterval] = []
+        let job = SeekMailMarkAllReadJob(provider: provider, sleep: { sleeps.append($0) })
+        var sawWaiting = false
+        job.onChange = { if case .waiting = $0 { sawWaiting = true } }
+
+        let result = try await job.collect(mailboxID: nil)
+        job.start(Array(result.mails.prefix(1)))
+        await mailWaitUntil { if case .finished = job.state { return true } else { return false } }
+        // 统计时看到额度只剩 4，先等窗口过去再标记
+        #expect(sawWaiting)
+        #expect(sleeps.first.map { $0 > 50 && $0 <= 60 } == true)
+        #expect(job.state == .finished(succeeded: 1, failed: 0))
+    }
+
+    @Test func modelAppliesMarkedReadLocally() async {
+        let transport = SeekMailRouteTransport()
+        transport.details["/openapi/v1/mails/counts"] = #"{"data":{"mailboxes":{"1":1},"total":1}}"#
+        let model = SeekMailInboxModel(
+            provider: SeekMailProvider(apiKey: { "sk_live_ok" }, transport: transport.load),
+            selectionStore: makeSelectionStore()
+        )
+        model.start()
+        await mailWaitUntil { model.phase == .loaded && model.unreadTotal == 1 }
+        model.applyMarkedRead(id: 11, mailboxID: 1)
+        #expect(model.mail(id: 11)?.isRead == true)
+        #expect(model.unreadTotal == 0)
+        // 已经是已读的不重复扣
+        model.applyMarkedRead(id: 11, mailboxID: 1)
+        #expect(model.unreadTotal == 0)
+    }
+}

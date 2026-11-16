@@ -609,6 +609,17 @@ final class SeekMailInboxModel {
         mailboxOrder = (sections.pinned + sections.unread + sections.others).map(\.mailboxID)
     }
 
+    /// 「全部标为已读」每成功一封调用一次：列表里有就改圆点，未读数减一。
+    func applyMarkedRead(id: Int64, mailboxID: Int64) {
+        if let mail = mail(id: id), mail.isRead { return }
+        adjustUnread(mailboxID: mailboxID, by: -1)
+        if mail(id: id) != nil {
+            update(id) { $0.isRead = true }
+        } else {
+            onChange?()
+        }
+    }
+
     /// 本地标已读、删除时就地加减，不再请求；还没拿到数字时不动。
     private func adjustUnread(mailboxID: Int64, by delta: Int) {
         guard let total = unreadTotal else { return }

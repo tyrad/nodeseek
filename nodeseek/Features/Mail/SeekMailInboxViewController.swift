@@ -26,6 +26,13 @@ final class SeekMailInboxViewController: UIViewController {
     private var noticeTimer: Timer?
     private var lastDeletedID: Int64?
     private var autoRefreshTimer: Timer?
+    private let progressBar = SeekMailProgressBar()
+    private lazy var markJob: SeekMailMarkAllReadJob = {
+        let job = SeekMailMarkAllReadJob(provider: model.provider)
+        job.onChange = { [weak self] state in self?.renderMarkJob(state) }
+        job.onMarked = { [weak self] mail in self?.model.applyMarkedRead(id: mail.id, mailboxID: mail.mailboxId) }
+        return job
+    }()
 
     private enum Section: Int, CaseIterable { case code, mails }
 
@@ -119,6 +126,8 @@ final class SeekMailInboxViewController: UIViewController {
         stopAutoRefresh()
         // 推入详情页不算离开列表，只有真正离开才立即提交删除
         if isMovingFromParent || parent?.isMovingFromParent == true || navigationController?.isBeingDismissed == true {
+            // 离开邮箱就停止逐封标已读，已处理的保留
+            markJob.stop()
             model.commitPendingDeletes()
         }
     }
@@ -142,7 +151,11 @@ final class SeekMailInboxViewController: UIViewController {
         let seconds = model.selectionStore.autoRefreshSeconds
         guard seconds > 0 else { return }
         autoRefreshTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(seconds), repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.model.autoRefresh() }
+            MainActor.assumeIsolated {
+                // 逐封标已读时额度留给它，不自动刷新
+                guard let self, self.markJob.isActive == false else { return }
+                self.model.autoRefresh()
+            }
         }
     }
 
@@ -153,6 +166,85 @@ final class SeekMailInboxViewController: UIViewController {
 
     private static func autoRefreshTitle(_ seconds: Int) -> String {
         seconds == 0 ? SeekMailL10n.text("关闭") : SeekMailL10n.format("每 %@ 秒", String(seconds))
+    }
+
+    // MARK: - 全部标为已读
+
+    /// 先只取未读 ID 算出数量，确认时写清楚要逐封处理、大概多久，避免用户以为卡住。
+    private func markAllRead() {
+        guard markJob.isActive == false else { return }
+        let mailboxID = model.selectedMailboxID
+        let scopeTitle = model.selectionTitle
+        progressBar.show(text: SeekMailL10n.text("正在统计未读…"), progress: nil)
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let result = try await markJob.collect(mailboxID: mailboxID)
+                progressBar.hide()
+                guard result.mails.isEmpty == false else {
+                    undoToast.showMessage(SeekMailL10n.text("没有未读邮件"), in: view)
+                    model.refreshUnreadCounts()
+                    return
+                }
+                confirmMarkAllRead(result.mails, hasMore: result.total > result.mails.count, scopeTitle: scopeTitle)
+            } catch {
+                progressBar.hide()
+                undoToast.showMessage((error as? SeekMailError)?.userMessage ?? SeekMailL10n.text("加载失败，请稍后重试"), in: view)
+            }
+        }
+    }
+
+    private func confirmMarkAllRead(_ mails: [SeekUnreadMail], hasMore: Bool, scopeTitle: String) {
+        let seconds = Int((Double(mails.count) * SeekMailMarkAllReadJob.interval).rounded(.up))
+        let duration = seconds < 60
+            ? SeekMailL10n.format("%@ 秒", String(max(seconds, 1)))
+            : SeekMailL10n.format("%@ 分钟", String(Int((Double(seconds) / 60).rounded(.up))))
+        var lines = [
+            SeekMailL10n.format("将把 %@ 的 %@ 封未读标为已读（不含垃圾邮件和回收站）。", scopeTitle, String(mails.count)),
+            SeekMailL10n.format("seek.li 没有批量接口，会逐封处理，约 %@，期间可继续看邮件。", duration)
+        ]
+        if hasMore {
+            lines.append(SeekMailL10n.format("超过 %@ 封，本次先处理 %@ 封，之后可再执行一次。",
+                                             String(SeekMailMarkAllReadJob.maxPerRun), String(mails.count)))
+        }
+        let alert = UIAlertController(title: SeekMailL10n.text("全部标为已读"), message: lines.joined(separator: "\n"), preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: SeekMailL10n.text("取消"), style: .cancel))
+        alert.addAction(UIAlertAction(title: SeekMailL10n.text("开始"), style: .default) { [weak self] _ in
+            self?.markJob.start(mails)
+        })
+        present(alert, animated: true)
+    }
+
+    private func renderMarkJob(_ state: SeekMailMarkAllReadJob.State) {
+        switch state {
+        case .idle:
+            progressBar.hide()
+        case .running(let done, let total):
+            progressBar.show(text: SeekMailL10n.format("正在标为已读 %@/%@", String(done), String(total)),
+                             progress: Float(done) / Float(max(total, 1)),
+                             actionTitle: SeekMailL10n.text("停止")) { [weak self] in self?.markJob.stop() }
+        case .waiting(let until, let done, let total):
+            let seconds = max(Int(until.timeIntervalSinceNow.rounded(.up)), 1)
+            progressBar.show(text: SeekMailL10n.format("额度用完，约 %@ 秒后继续 · %@/%@", String(seconds), String(done), String(total)),
+                             progress: Float(done) / Float(max(total, 1)),
+                             actionTitle: SeekMailL10n.text("停止")) { [weak self] in self?.markJob.stop() }
+        case .finished(let succeeded, let failed):
+            model.refreshUnreadCounts()
+            if failed == 0 {
+                progressBar.hide()
+                undoToast.showMessage(SeekMailL10n.format("已标为已读 %@ 封", String(succeeded)), in: view)
+            } else {
+                progressBar.show(text: SeekMailL10n.format("%@ 封成功，%@ 封失败", String(succeeded), String(failed)), progress: nil,
+                                 actionTitle: SeekMailL10n.text("重试")) { [weak self] in self?.markJob.retryFailed() }
+            }
+        case .stopped(let done, let total):
+            progressBar.hide()
+            model.refreshUnreadCounts()
+            if viewIfLoaded?.window != nil {
+                undoToast.showMessage(SeekMailL10n.format("已停止，已处理 %@/%@", String(done), String(total)), in: view)
+            }
+        }
+        onNavigationChange?()
     }
 
     private func copyAddress(_ address: String) {
@@ -193,7 +285,11 @@ final class SeekMailInboxViewController: UIViewController {
         }
         let autoRefresh = UIMenu(title: SeekMailL10n.text("自动刷新"), subtitle: Self.autoRefreshTitle(current),
                                  image: UIImage(systemName: "timer"), children: intervals)
-        return [refresh, autoRefresh, storage]
+        let markAll = UIAction(title: SeekMailL10n.text("全部标为已读"), image: UIImage(systemName: "envelope.open"),
+                               attributes: model.unreadTotal == 0 || markJob.isActive ? .disabled : []) { [weak self] _ in
+            self?.markAllRead()
+        }
+        return [refresh, markAll, autoRefresh, storage]
     }
 
     // MARK: - 布局
@@ -226,7 +322,8 @@ final class SeekMailInboxViewController: UIViewController {
         }, for: .valueChanged)
         tableView.refreshControl = refresh
 
-        let stack = UIStackView(arrangedSubviews: [mailboxTags, folderTabs, noticeBar, tableView])
+        progressBar.isHidden = true
+        let stack = UIStackView(arrangedSubviews: [mailboxTags, folderTabs, progressBar, noticeBar, tableView])
         stack.axis = .vertical
         stack.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(stack)
@@ -503,6 +600,71 @@ extension SeekMailInboxViewController: UITableViewDataSource, UITableViewDelegat
 }
 
 // MARK: - 小组件
+
+/// 列表上方的进度条：逐封标已读时显示进度，可停止或重试。
+final class SeekMailProgressBar: UIView {
+    private let label = UILabel()
+    private let progressView = UIProgressView(progressViewStyle: .default)
+    private let button = UIButton(type: .system)
+    private var action: (() -> Void)?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .secondarySystemBackground
+        accessibilityIdentifier = "seek-mail-progress"
+        label.textColor = .secondaryLabel
+        label.numberOfLines = 0
+        label.accessibilityIdentifier = "seek-mail-progress-text"
+        progressView.progressTintColor = .label
+        progressView.trackTintColor = .tertiarySystemFill
+        button.accessibilityIdentifier = "seek-mail-progress-action"
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        button.addAction(UIAction { [weak self] _ in self?.action?() }, for: .touchUpInside)
+        let row = UIStackView(arrangedSubviews: [label, button])
+        row.alignment = .center
+        row.spacing = 8
+        let column = UIStackView(arrangedSubviews: [row, progressView])
+        column.axis = .vertical
+        column.spacing = 6
+        column.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(column)
+        NSLayoutConstraint.activate([
+            column.leadingAnchor.constraint(equalTo: layoutMarginsGuide.leadingAnchor),
+            column.trailingAnchor.constraint(equalTo: layoutMarginsGuide.trailingAnchor),
+            column.topAnchor.constraint(equalTo: topAnchor, constant: 8),
+            column.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8)
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    var text: String? { label.text }
+
+    func show(text: String, progress: Float?, actionTitle: String? = nil, action: (() -> Void)? = nil) {
+        label.font = SeekMailFont.of(.footnote)
+        label.text = text
+        progressView.isHidden = progress == nil
+        progressView.setProgress(progress ?? 0, animated: isHidden == false)
+        self.action = action
+        button.isHidden = actionTitle == nil
+        if let actionTitle {
+            var configuration = UIButton.Configuration.plain()
+            configuration.baseForegroundColor = .label
+            configuration.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 0)
+            var title = AttributedString(actionTitle)
+            title.font = SeekMailFont.of(.footnote, weight: .semibold)
+            configuration.attributedTitle = title
+            button.configuration = configuration
+        }
+        isHidden = false
+    }
+
+    func hide() {
+        action = nil
+        isHidden = true
+    }
+}
 
 /// 横向文件夹 tab，选中态用 .label 反色胶囊。
 final class SeekMailFolderTabsView: UIView {
