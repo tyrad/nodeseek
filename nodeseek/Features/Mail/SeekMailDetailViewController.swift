@@ -83,11 +83,11 @@ final class SeekMailDetailViewController: UIViewController {
         loadTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let detail = try await model.provider.mail(id: mailID)
+                let detail = try await model.loadDetail(id: mailID)
                 mail = detail.mail
                 render(detail.mail)
                 if detail.mail.hasAttachments {
-                    attachments = (try? await model.provider.attachments(mailID: mailID))?.filter { $0.isInline != true } ?? []
+                    attachments = (try? await model.loadAttachments(mailID: mailID))?.filter { $0.isInline != true } ?? []
                     renderAttachments()
                 }
             } catch is CancellationError {

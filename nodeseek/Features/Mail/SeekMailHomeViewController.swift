@@ -18,16 +18,19 @@ final class SeekMailHomeViewController: UIViewController {
     private var pendingBindMessage: String?
     private let selectionStore: SeekMailSelectionStore
     private let cache: SeekMailListCache?
+    private let memoryCache: SeekMailMemoryCache?
 
     /// transport 只在测试里替换，正常使用走 URLSession。
     init(keyStore: SeekMailAPIKeyStoring = SeekMailAPIKeyStore.shared,
          transport: SeekMailProvider<SeekMailAPI>.Transport? = nil,
          selectionStore: SeekMailSelectionStore = SeekMailSelectionStore(),
-         cache: SeekMailListCache? = SeekMailListCache()) {
+         cache: SeekMailListCache? = SeekMailListCache(),
+         memoryCache: SeekMailMemoryCache? = .shared) {
         self.keyStore = keyStore
         self.transport = transport
         self.selectionStore = selectionStore
         self.cache = cache
+        self.memoryCache = memoryCache
         super.init(nibName: nil, bundle: nil)
         title = "邮箱"
     }
@@ -67,7 +70,7 @@ final class SeekMailHomeViewController: UIViewController {
         let next: UIViewController
         if key != nil {
             let inbox = SeekMailInboxViewController(keyStore: keyStore, transport: transport,
-                                                    selectionStore: selectionStore, cache: cache)
+                                                    selectionStore: selectionStore, cache: cache, memoryCache: memoryCache)
             inbox.onNavigationChange = { [weak self] in self?.configureNavigationItems(bound: true) }
             inbox.onUnauthorized = { [weak self] in
                 self?.pendingBindMessage = "之前保存的 Key 已失效，请重新粘贴"
@@ -176,6 +179,7 @@ final class SeekMailHomeViewController: UIViewController {
             // 记住的邮箱属于旧账号，一起清掉
             self?.selectionStore.clear()
             self?.cache?.clear()
+            self?.memoryCache?.clear()
             self?.keyStore.clear()
         })
         present(alert, animated: true)

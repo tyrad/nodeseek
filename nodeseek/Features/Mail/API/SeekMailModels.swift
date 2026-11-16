@@ -83,7 +83,7 @@ nonisolated struct SeekMailTag: Decodable, Equatable, Sendable {
 
 /// `GET /mails/{id}` 实际返回 `data.mail` + `data.tags`，文档写的是直接返回邮件。
 nonisolated struct SeekMailDetail: Decodable, Equatable, Sendable {
-    let mail: SeekMail
+    var mail: SeekMail
     let tags: [SeekMailTag]
 
     private enum CodingKeys: String, CodingKey { case mail, tags }

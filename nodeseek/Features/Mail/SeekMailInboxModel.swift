@@ -98,6 +98,8 @@ final class SeekMailInboxModel {
     private let cache: SeekMailListCache?
     /// 快照按 Key 指纹隔离，取不到 Key 时不读写快照。
     private let cacheKey: () -> String?
+    /// 进程内短期缓存：邮箱列表和最近打开的详情，减少重复请求。
+    private let memoryCache: SeekMailMemoryCache?
 
     private(set) var mailboxes: [SeekMailbox] = []
     private(set) var names: [Int64: SeekMailboxDisplay] = [:]
@@ -127,13 +129,15 @@ final class SeekMailInboxModel {
         selectionStore: SeekMailSelectionStore = SeekMailSelectionStore(),
         deleteDelay: TimeInterval = 4,
         cache: SeekMailListCache? = nil,
-        cacheKey: @escaping () -> String? = { nil }
+        cacheKey: @escaping () -> String? = { nil },
+        memoryCache: SeekMailMemoryCache? = nil
     ) {
         self.provider = provider
         self.selectionStore = selectionStore
         self.deleteDelay = deleteDelay
         self.cache = cache
         self.cacheKey = cacheKey
+        self.memoryCache = memoryCache
         selectedMailboxID = selectionStore.mailboxID
         scope = selectionStore.scope
     }
@@ -212,13 +216,23 @@ final class SeekMailInboxModel {
         loadTask = Task { [weak self] in
             guard let self else { return }
             do {
+                // 几分钟内重新进入邮箱，邮箱和文件夹基本不会变，只拉邮件
+                if let key = cacheKey(), let cached = memoryCache?.mailboxes(for: key) {
+                    applyMailboxes(cached.mailboxes, folders: cached.folders)
+                    try await fetchFirstPage(token: token)
+                    return
+                }
                 async let mailboxRequest = provider.mailboxes()
                 // 文件夹没有也能用，权限不足时不影响收件箱
                 async let folderRequest: [SeekMailFolder]? = try? provider.folders()
                 let (mailboxes, folders) = try await (mailboxRequest, folderRequest)
                 guard token == generation else { return }
                 applyMailboxes(mailboxes, folders: folders ?? [])
-                if let key = cacheKey() { cache?.saveMailboxes(mailboxes, folders: folders ?? [], for: key) }
+                if let key = cacheKey() {
+                    cache?.saveMailboxes(mailboxes, folders: folders ?? [], for: key)
+                    // 文件夹请求失败时不进内存缓存，下次进入再试
+                    if let folders { memoryCache?.saveMailboxes(mailboxes, folders: folders, for: key) }
+                }
                 try await fetchFirstPage(token: token)
             } catch {
                 guard token == generation else { return }
@@ -400,6 +414,29 @@ final class SeekMailInboxModel {
         }
     }
 
+    /// 详情 2 分钟内复用上次成功的结果；已读和星标以列表里的最新状态为准。
+    func loadDetail(id: Int64) async throws -> SeekMailDetail {
+        let key = cacheKey()
+        if let key, var cached = memoryCache?.detail(id: id, for: key) {
+            if let current = mail(id: id) {
+                cached.mail.isRead = current.isRead
+                cached.mail.isFlagged = current.isFlagged
+            }
+            return cached
+        }
+        let detail = try await provider.mail(id: id)
+        if let key { memoryCache?.saveDetail(detail, for: key) }
+        return detail
+    }
+
+    func loadAttachments(mailID: Int64) async throws -> [SeekMailAttachment] {
+        let key = cacheKey()
+        if let key, let cached = memoryCache?.attachments(mailID: mailID, for: key) { return cached }
+        let list = try await provider.attachments(mailID: mailID)
+        if let key { memoryCache?.saveAttachments(list, mailID: mailID, for: key) }
+        return list
+    }
+
     /// 打开详情时标已读，失败不提示；不在列表里的邮件直接发请求。
     func markOpened(_ id: Int64) {
         if let mail = mail(id: id) {
@@ -427,6 +464,7 @@ final class SeekMailInboxModel {
     func move(_ id: Int64, toFolderID folderID: Int64?) {
         guard let index = allMails.firstIndex(where: { $0.id == id }) else { return }
         let removed = allMails.remove(at: index)
+        memoryCache?.removeMail(id: id)
         onChange?()
         Task { [weak self] in
             guard let self else { return }
@@ -444,6 +482,7 @@ final class SeekMailInboxModel {
     func scheduleDelete(_ id: Int64) {
         guard isTrash == false, mail(id: id) != nil, pendingDeletes[id] == nil else { return }
         let delay = deleteDelay
+        memoryCache?.removeMail(id: id)
         pendingDeletes[id] = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             guard Task.isCancelled == false else { return }

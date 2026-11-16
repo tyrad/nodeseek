@@ -115,7 +115,16 @@ struct SeekMailP1Tests {
         try await Task.sleep(nanoseconds: 100_000_000)
         #expect(transport.requests.count == 2)
 
+        // 未读总数没涨：只查 counts，不再拉 unread
         clock += 40
+        monitor.check()
+        await mailWaitUntil { transport.requests.count == 3 }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        #expect(transport.requests.count == 3)
+        #expect(transport.requests.last?.url?.path.hasSuffix("/mails/counts") == true)
+
+        clock += 40
+        transport.details["/openapi/v1/mails/counts"] = #"{"data":{"mailboxes":{"1":3,"2":1},"total":4}}"#
         transport.details["/openapi/v1/mails/unread"] = #"{"data":[{"id":42,"mailboxId":1,"fromAddress":"c@x.com"}],"page":{"limit":50,"hasMore":false,"nextCursor":""}}"#
         monitor.check()
         await mailWaitUntil { newMail.count == 1 }

@@ -32,7 +32,8 @@ final class SeekMailInboxViewController: UIViewController {
          transport: SeekMailProvider<SeekMailAPI>.Transport? = nil,
          selectionStore: SeekMailSelectionStore = SeekMailSelectionStore(),
          deleteDelay: TimeInterval = 4,
-         cache: SeekMailListCache? = nil) {
+         cache: SeekMailListCache? = nil,
+         memoryCache: SeekMailMemoryCache? = nil) {
         let provider: SeekMailProvider<SeekMailAPI>
         if let transport {
             provider = SeekMailProvider(apiKey: { [keyStore] in keyStore.apiKey() }, transport: transport)
@@ -40,7 +41,8 @@ final class SeekMailInboxViewController: UIViewController {
             provider = SeekMailProvider(apiKey: { [keyStore] in keyStore.apiKey() })
         }
         model = SeekMailInboxModel(provider: provider, selectionStore: selectionStore, deleteDelay: deleteDelay,
-                                   cache: cache, cacheKey: { [keyStore] in keyStore.apiKey() })
+                                   cache: cache, cacheKey: { [keyStore] in keyStore.apiKey() },
+                                   memoryCache: memoryCache)
         super.init(nibName: nil, bundle: nil)
     }
 

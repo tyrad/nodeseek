@@ -104,7 +104,7 @@ struct SeekMailBindTests {
     @Test func homeSwitchesBetweenBindAndInboxWhenKeyChanges() async throws {
         let store = InMemorySeekMailKeyStore()
         let transport = SeekMailRouteTransport()
-        let home = SeekMailHomeViewController(keyStore: store, transport: transport.load, selectionStore: makeSelectionStore(), cache: nil)
+        let home = SeekMailHomeViewController(keyStore: store, transport: transport.load, selectionStore: makeSelectionStore(), cache: nil, memoryCache: nil)
         home.loadViewIfNeeded()
 
         #expect(home.children.first is SeekMailBindViewController)
@@ -136,7 +136,7 @@ struct SeekMailBindTests {
         let transport = SeekMailRouteTransport()
         transport.status = 401
         transport.override = #"{"error":{"code":"UNAUTHORIZED","message":"无效的 API Key"}}"#
-        let home = SeekMailHomeViewController(keyStore: store, transport: transport.load, selectionStore: makeSelectionStore(), cache: nil)
+        let home = SeekMailHomeViewController(keyStore: store, transport: transport.load, selectionStore: makeSelectionStore(), cache: nil, memoryCache: nil)
         home.loadViewIfNeeded()
         #expect(home.children.first is SeekMailInboxViewController)
 

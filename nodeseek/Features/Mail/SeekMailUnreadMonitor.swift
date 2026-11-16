@@ -92,8 +92,13 @@ final class SeekMailUnreadMonitor {
     private func performCheck(at date: Date) async {
         do {
             let counts = try await provider.unreadCounts()
+            let previous = totalUnread
             setTotal(counts.total)
-            try await checkNewMail(at: date)
+            // 未读总数没涨就不会有要提醒的新邮件，省掉一次请求；每天的完整同步照常做
+            let increased = previous.map { counts.total > $0 } ?? true
+            if increased || needsFullSync(at: date) {
+                try await checkNewMail(at: date)
+            }
         } catch is CancellationError {
         } catch {
             // 检查失败不打扰用户，保留上次的数字；Key 失效时清掉
@@ -104,8 +109,7 @@ final class SeekMailUnreadMonitor {
     /// 用 after_id 只拿新邮件；每天做一次不带 after_id 的完整同步，校正最大 ID。
     private func checkNewMail(at date: Date) async throws {
         let storedMaxID = (defaults.object(forKey: Key.maxID) as? NSNumber)?.int64Value
-        let lastFull = defaults.object(forKey: Key.lastFullSync) as? Date
-        let needsFullSync = storedMaxID == nil || lastFull.map { date.timeIntervalSince($0) >= Self.fullSyncInterval } ?? true
+        let needsFullSync = needsFullSync(at: date)
         let page = try await provider.unreadMails(limit: 50, afterID: needsFullSync ? nil : storedMaxID)
         let maxID = page.mails.map(\.id).max()
         if needsFullSync {
@@ -119,6 +123,12 @@ final class SeekMailUnreadMonitor {
         guard let maxID else { return }
         defaults.set(NSNumber(value: max(maxID, storedMaxID ?? 0)), forKey: Key.maxID)
         postNewMail(page.mails)
+    }
+
+    private func needsFullSync(at date: Date) -> Bool {
+        guard defaults.object(forKey: Key.maxID) != nil,
+              let lastFull = defaults.object(forKey: Key.lastFullSync) as? Date else { return true }
+        return date.timeIntervalSince(lastFull) >= Self.fullSyncInterval
     }
 
     private func postNewMail(_ mails: [SeekUnreadMail]) {
