@@ -13,6 +13,8 @@ final class SeekMailDetailViewController: UIViewController {
     private let model: SeekMailInboxModel
     /// 删除交给列表页处理，回到列表后显示可撤销的 toast。
     private let onDelete: (Int64) -> Void
+    /// 回复由列表页弹出写信页，发送结果也在列表页提示。
+    private let onReply: ((SeekMailComposeContent) -> Void)?
 
     private var mail: SeekMail?
     private var attachments: [SeekMailAttachment] = []
@@ -32,10 +34,12 @@ final class SeekMailDetailViewController: UIViewController {
         self?.toggleFlag()
     })
 
-    init(mailID: Int64, model: SeekMailInboxModel, onDelete: @escaping (Int64) -> Void) {
+    init(mailID: Int64, model: SeekMailInboxModel, onDelete: @escaping (Int64) -> Void,
+         onReply: ((SeekMailComposeContent) -> Void)? = nil) {
         self.mailID = mailID
         self.model = model
         self.onDelete = onDelete
+        self.onReply = onReply
         super.init(nibName: nil, bundle: nil)
         mail = model.mail(id: mailID)
         hidesBottomBarWhenPushed = true
@@ -498,9 +502,19 @@ final class SeekMailDetailViewController: UIViewController {
         unread.accessibilityLabel = "标为未读"
         unread.accessibilityIdentifier = "seek-mail-detail-unread"
         let flexible = UIBarButtonItem(systemItem: .flexibleSpace)
+        var replyItems: [UIBarButtonItem] = []
+        if let onReply, model.canCompose, let mail {
+            let reply = UIBarButtonItem(image: UIImage(systemName: "arrowshape.turn.up.left"), primaryAction: UIAction { [weak self] _ in
+                guard let self else { return }
+                onReply(SeekMailComposeContent.reply(to: mail, mailboxes: model.mailboxes))
+            })
+            reply.accessibilityLabel = "回复"
+            reply.accessibilityIdentifier = "seek-mail-detail-reply"
+            replyItems = [flexible, reply]
+        }
         // 回收站只读：不移动、不删除
         guard model.isTrash == false else {
-            toolbarItems = [flexible, unread, flexible]
+            toolbarItems = [flexible, unread] + replyItems + [flexible]
             return
         }
         var targets: [(String, Int64?, SeekMailFolderScope)] = [("收件箱", nil, .inbox)]
@@ -522,7 +536,7 @@ final class SeekMailDetailViewController: UIViewController {
         })
         delete.accessibilityLabel = "删除"
         delete.accessibilityIdentifier = "seek-mail-detail-delete"
-        toolbarItems = [move, flexible, unread, flexible, delete]
+        toolbarItems = [move, flexible, unread] + replyItems + [flexible, delete]
     }
 
     private func showToast(_ message: String) {
