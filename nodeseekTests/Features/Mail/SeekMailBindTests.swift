@@ -35,6 +35,26 @@ struct SeekMailBindTests {
         #expect(store.apiKey() == "sk_live_abc")
     }
 
+    @Test func pastingKeyVerifiesAndSavesDirectly() async throws {
+        let store = InMemorySeekMailKeyStore()
+        var verifiedKeys: [String] = []
+        let bind = SeekMailBindViewController(keyStore: store, verify: { key in
+            verifiedKeys.append(key)
+            return []
+        })
+        bind.loadViewIfNeeded()
+
+        // 不像 Key 的内容只填进输入框，不验证
+        bind.applyPasted("hello")
+        try await Task.sleep(nanoseconds: 50_000_000)
+        #expect(verifiedKeys.isEmpty)
+
+        bind.applyPasted(" Bearer sk_live_pasted ")
+        await mailWaitUntil { store.apiKey() != nil }
+        #expect(verifiedKeys == ["sk_live_pasted"])
+        #expect(store.apiKey() == "sk_live_pasted")
+    }
+
     @Test func invalidKeyShowsErrorAndIsNotSaved() async throws {
         let store = InMemorySeekMailKeyStore()
         let bind = SeekMailBindViewController(

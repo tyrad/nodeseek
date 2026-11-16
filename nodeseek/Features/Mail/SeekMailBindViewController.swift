@@ -235,8 +235,14 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
 
     private func pasteTapped() {
         guard let text = UIPasteboard.general.string else { return }
+        applyPasted(text)
+    }
+
+    /// 粘贴的内容像 Key 就直接验证保存，省掉再点一次按钮；不像的只填进去，让用户自己检查。
+    func applyPasted(_ text: String) {
         keyField.text = SeekMailAPIKeyStore.normalized(text)
         keyDidChange()
+        if normalizedKey.hasPrefix("sk_") { saveTapped() }
     }
 
     private func updateSaveButton() {
