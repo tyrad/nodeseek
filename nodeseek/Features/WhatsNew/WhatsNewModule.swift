@@ -23,7 +23,7 @@ enum WhatsNewModule {
     /// ])
     /// ```
     static let catalog: [WhatsNew] = [
-        release("1.3.2", features: [
+        release("1.4.1", features: [
             feature(
                 systemName: "envelope.fill",
                 tint: .systemBlue,
