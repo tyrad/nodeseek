@@ -21,6 +21,13 @@ nonisolated struct SeekMailbox: Codable, Equatable, Sendable {
     }
 }
 
+/// `POST /mailboxes/check`：不可用时服务端给出可直接展示的原因，例如地址过短被系统预留。
+nonisolated struct SeekMailboxAvailability: Decodable, Equatable, Sendable {
+    let available: Bool
+    let message: String?
+    let reason: String?
+}
+
 nonisolated struct SeekMail: Codable, Equatable, Sendable {
     let id: Int64
     let mailboxId: Int64

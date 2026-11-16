@@ -13,6 +13,9 @@ enum SeekMailAPI {
     // 邮箱
     case mailboxes
     case mailbox(id: Int64)
+    /// 地址要放在 query 上，放在 JSON 里服务端会报「缺少 address 参数」。
+    case checkMailbox(address: String)
+    case createMailbox(address: String)
 
     // 邮件
     case mails(SeekMailListQuery)
@@ -44,7 +47,8 @@ extension SeekMailAPI: SeekMailTargetType {
 
     var path: String {
         switch self {
-        case .mailboxes: return "/mailboxes"
+        case .mailboxes, .createMailbox: return "/mailboxes"
+        case .checkMailbox: return "/mailboxes/check"
         case .mailbox(let id): return "/mailboxes/\(id)"
         case .mails: return "/mails"
         case .unreadMails: return "/mails/unread"
@@ -66,7 +70,7 @@ extension SeekMailAPI: SeekMailTargetType {
         switch self {
         case .markRead, .markFlagged, .moveMail: return .put
         case .deleteMail: return .delete
-        case .send: return .post
+        case .send, .checkMailbox, .createMailbox: return .post
         default: return .get
         }
     }
@@ -74,6 +78,7 @@ extension SeekMailAPI: SeekMailTargetType {
     var requiredScope: String? {
         switch self {
         case .mailboxes, .mailbox: return "mailbox:read"
+        case .checkMailbox, .createMailbox: return "mailbox:write"
         case .mails, .unreadMails, .mail, .mailCounts, .rawMail: return "mail:read"
         case .markRead, .markFlagged, .moveMail, .deleteMail: return "mail:manage"
         case .attachments, .downloadAttachment: return "attachment:read"
@@ -101,6 +106,10 @@ extension SeekMailAPI: SeekMailTargetType {
             return .requestJSON(SeekMailMoveBody(folderId: folderID))
         case .send(let draft):
             return .requestJSON(draft)
+        case .checkMailbox(let address):
+            return .requestParameters(["address": address])
+        case .createMailbox(let address):
+            return .requestJSON(["address": address])
         default:
             return .requestPlain
         }

@@ -609,6 +609,19 @@ final class SeekMailInboxModel {
         mailboxOrder = (sections.pinned + sections.unread + sections.others).map(\.mailboxID)
     }
 
+    /// 新建邮箱成功：加进标签并切过去；缓存里的邮箱列表同步更新，免得下次进入看不到它。
+    func addCreatedMailbox(_ mailbox: SeekMailbox) {
+        if mailboxes.contains(where: { $0.id == mailbox.id }) == false {
+            applyMailboxes(mailboxes + [mailbox], folders: folders)
+            if let key = cacheKey() {
+                cache?.saveMailboxes(mailboxes, folders: folders, for: key)
+                memoryCache?.saveMailboxes(mailboxes, folders: folders, for: key)
+            }
+        }
+        selectMailbox(mailbox.id)
+        onChange?()
+    }
+
     /// 「全部标为已读」每成功一封调用一次：列表里有就改圆点，未读数减一。
     func applyMarkedRead(id: Int64, mailboxID: Int64) {
         if let mail = mail(id: id), mail.isRead { return }

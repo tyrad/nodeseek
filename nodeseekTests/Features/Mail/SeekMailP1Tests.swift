@@ -278,3 +278,89 @@ struct SeekMailMarkAllReadTests {
         #expect(model.unreadTotal == 0)
     }
 }
+
+/// 新建邮箱：先检查地址可用再创建，成功后列表切到新邮箱。
+@MainActor
+struct SeekMailCreateMailboxTests {
+    @Test func routesCheckAsQueryAndCreateAsJSON() throws {
+        let check = SeekMailAPI.checkMailbox(address: "shop@seek.li")
+        #expect(check.path == "/mailboxes/check")
+        #expect(check.method == .post)
+        #expect(check.requiredScope == "mailbox:write")
+        let create = SeekMailAPI.createMailbox(address: "shop@seek.li")
+        #expect(create.path == "/mailboxes")
+        #expect(create.method == .post)
+        #expect(create.requiredScope == "mailbox:write")
+    }
+
+    @Test func checksThenCreates() async throws {
+        let transport = SeekMailRouteTransport()
+        transport.posts["/openapi/v1/mailboxes/check"] = #"{"data":{"available":true}}"#
+        transport.posts["/openapi/v1/mailboxes"] = #"{"data":{"id":9,"address":"shop@seek.li"}}"#
+        let provider = SeekMailProvider<SeekMailAPI>(apiKey: { "sk_live_test" }, transport: transport.load)
+        var created: SeekMailbox?
+        let controller = SeekMailCreateMailboxViewController(provider: provider) { created = $0 }
+        controller.checkDelay = 0
+        controller.loadViewIfNeeded()
+        let submit = try #require(controller.navigationItem.rightBarButtonItem)
+        #expect(submit.isEnabled == false)
+
+        let field = try #require(controller.view.mailTestView(id: "seek-mail-create-prefix") as? UITextField)
+        field.text = "shop"
+        field.sendActions(for: .editingChanged)
+        await mailWaitUntil { submit.isEnabled }
+        let checkRequest = try #require(transport.requests.first { $0.url?.path == "/openapi/v1/mailboxes/check" })
+        #expect(checkRequest.url?.query?.contains("address=shop@seek.li") == true)
+
+        // 改了前缀，之前的检查结果作废
+        field.text = "shop2"
+        field.sendActions(for: .editingChanged)
+        #expect(submit.isEnabled == false)
+        field.text = "shop"
+        field.sendActions(for: .editingChanged)
+        await mailWaitUntil { submit.isEnabled }
+
+        let action = try #require(submit.primaryAction)
+        // 测试 target 的最低版本比 App 低
+        if #available(iOS 16.0, *) { action.performWithSender(nil, target: nil) } else { return }
+        await mailWaitUntil { created != nil }
+        #expect(created?.id == 9)
+        let createRequest = try #require(transport.requests.last { $0.url?.path == "/openapi/v1/mailboxes" })
+        #expect(createRequest.httpMethod == "POST")
+        let body = try #require(createRequest.httpBody)
+        #expect(try JSONSerialization.jsonObject(with: body) as? [String: String] == ["address": "shop@seek.li"])
+    }
+
+    @Test func showsServerReasonWhenTaken() async throws {
+        let transport = SeekMailRouteTransport()
+        transport.posts["/openapi/v1/mailboxes/check"] = #"{"data":{"available":false,"message":"该地址已被使用","reason":"address_taken"}}"#
+        let controller = SeekMailCreateMailboxViewController(
+            provider: SeekMailProvider(apiKey: { "sk_live_test" }, transport: transport.load)
+        ) { _ in }
+        controller.checkDelay = 0
+        controller.loadViewIfNeeded()
+        let field = try #require(controller.view.mailTestView(id: "seek-mail-create-prefix") as? UITextField)
+        let status = try #require(controller.view.mailTestView(id: "seek-mail-create-status") as? UILabel)
+        field.text = "taken"
+        field.sendActions(for: .editingChanged)
+        await mailWaitUntil { status.text == "该地址已被使用" }
+        #expect(controller.navigationItem.rightBarButtonItem?.isEnabled == false)
+    }
+
+    @Test func modelAddsAndSelectsCreatedMailbox() async {
+        let transport = SeekMailRouteTransport()
+        let model = SeekMailInboxModel(
+            provider: SeekMailProvider(apiKey: { "sk_live_ok" }, transport: transport.load),
+            selectionStore: makeSelectionStore()
+        )
+        model.start()
+        await mailWaitUntil { model.phase == .loaded }
+        let mailbox = SeekMailbox(id: 9, address: "shop@seek.li", alias: nil, domainId: nil, status: nil, sendDisabled: nil, isPinned: nil, sortOrder: nil)
+        model.addCreatedMailbox(mailbox)
+        #expect(model.selectedMailboxID == 9)
+        #expect(model.mailboxTags.contains { $0.id == 9 && $0.address == "shop@seek.li" })
+        // 重复回调不会加出两个
+        model.addCreatedMailbox(mailbox)
+        #expect(model.mailboxes.filter { $0.id == 9 }.count == 1)
+    }
+}

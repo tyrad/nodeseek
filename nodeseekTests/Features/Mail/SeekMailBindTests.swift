@@ -225,6 +225,8 @@ final class SeekMailRouteTransport {
     var delayNanoseconds: UInt64 = 0
     /// 附加的响应头，例如限流额度。
     var headers: [String: String] = [:]
+    /// POST 请求按路径返回的内容，例如新建邮箱。
+    var posts: [String: String] = [:]
     private(set) var requests: [URLRequest] = []
     var authorizations: [String?] { requests.map { $0.value(forHTTPHeaderField: "Authorization") } }
 
@@ -235,6 +237,8 @@ final class SeekMailRouteTransport {
         let body: String
         if let override {
             body = override
+        } else if request.httpMethod == "POST", let post = posts[path] {
+            body = post
         } else if path.hasSuffix("/mailboxes") {
             body = mailboxes
         } else if path.hasSuffix("/folders") {

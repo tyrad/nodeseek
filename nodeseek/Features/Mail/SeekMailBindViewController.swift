@@ -371,7 +371,8 @@ final class SeekMailKeyHelpViewController: UITableViewController {
         Scope(title: SeekMailL10n.text("下载附件"), scope: "attachment:read", required: true),
         Scope(title: SeekMailL10n.text("读取文件夹"), scope: "folder:read", required: true),
         Scope(title: SeekMailL10n.text("查看存储用量"), scope: "storage:read", required: true),
-        Scope(title: SeekMailL10n.text("写信和回复（可选，只有 seek.li 地址能发信）"), scope: "mail:send", required: false)
+        Scope(title: SeekMailL10n.text("写信和回复（可选，只有 seek.li 地址能发信）"), scope: "mail:send", required: false),
+        Scope(title: SeekMailL10n.text("新建邮箱（可选）"), scope: "mailbox:write", required: false)
     ]
 
     init() {

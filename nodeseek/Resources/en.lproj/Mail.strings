@@ -142,3 +142,13 @@
 "已标为已读 %@ 封" = "Marked %@ messages as read";
 "%@ 封成功，%@ 封失败" = "%@ succeeded, %@ failed";
 "已停止，已处理 %@/%@" = "Stopped. Processed %@/%@";
+"新建邮箱" = "New Mailbox";
+"创建" = "Create";
+"地址前缀，例如 shop-2026" = "Address prefix, e.g. shop-2026";
+"nodeseek.org 地址只能收信，不能发信。创建后可在网页中设置别名。" = "nodeseek.org addresses can receive but not send mail. You can set an alias on the web afterwards.";
+"创建后会自动复制地址并切换到这个邮箱，可在网页中设置别名。" = "After creating, the address is copied and the mailbox is selected. You can set an alias on the web.";
+"正在检查…" = "Checking…";
+"%@ 可以使用" = "%@ is available";
+"这个地址不可用" = "This address is not available";
+"已创建并复制 %@" = "Created and copied %@";
+"新建邮箱（可选）" = "Create mailboxes (optional)";

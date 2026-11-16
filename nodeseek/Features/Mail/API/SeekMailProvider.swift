@@ -160,6 +160,14 @@ extension SeekMailProvider where Target == SeekMailAPI {
         try await request(.mailboxes, as: [SeekMailbox].self)
     }
 
+    func checkMailbox(address: String) async throws -> SeekMailboxAvailability {
+        try await request(.checkMailbox(address: address), as: SeekMailboxAvailability.self)
+    }
+
+    func createMailbox(address: String) async throws -> SeekMailbox {
+        try await request(.createMailbox(address: address), as: SeekMailbox.self)
+    }
+
     func mails(_ query: SeekMailListQuery) async throws -> SeekMailList {
         try await requestRoot(.mails(query), as: SeekMailList.self)
     }

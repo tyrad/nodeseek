@@ -247,6 +247,23 @@ final class SeekMailInboxViewController: UIViewController {
         onNavigationChange?()
     }
 
+    private func presentCreateMailbox() {
+        let create = SeekMailCreateMailboxViewController(provider: model.provider) { [weak self] mailbox in
+            guard let self else { return }
+            model.addCreatedMailbox(mailbox)
+            UIPasteboard.general.string = mailbox.address
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            undoToast.showMessage(SeekMailL10n.format("已创建并复制 %@", mailbox.address), in: view)
+            onNavigationChange?()
+        }
+        let navigation = UINavigationController(rootViewController: create)
+        if let sheet = navigation.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+        }
+        present(navigation, animated: true)
+    }
+
     private func copyAddress(_ address: String) {
         UIPasteboard.general.string = address
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -289,7 +306,10 @@ final class SeekMailInboxViewController: UIViewController {
                                attributes: model.unreadTotal == 0 || markJob.isActive ? .disabled : []) { [weak self] _ in
             self?.markAllRead()
         }
-        return [refresh, markAll, autoRefresh, storage]
+        let create = UIAction(title: SeekMailL10n.text("新建邮箱"), image: UIImage(systemName: "plus")) { [weak self] _ in
+            self?.presentCreateMailbox()
+        }
+        return [refresh, markAll, create, autoRefresh, storage]
     }
 
     // MARK: - 布局
