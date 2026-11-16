@@ -150,7 +150,7 @@ final class PostListSideMenuViewController: UIViewController {
     }()
 
     private let mailButton: UIButton = {
-        let button = PostListSideMenuViewController.makeMenuButton(title: "邮箱", systemImageName: "envelope")
+        let button = PostListSideMenuViewController.makeMenuButton(title: SeekMailL10n.text("邮箱"), systemImageName: "envelope")
         button.accessibilityIdentifier = "post-list-side-menu-mail-button"
         return button
     }()
@@ -229,7 +229,7 @@ final class PostListSideMenuViewController: UIViewController {
     @objc private func applyMailUnreadCount() {
         let badge = SeekMailUnreadMonitor.badgeText(SeekMailUnreadMonitor.shared.totalUnread)
         var configuration = mailButton.configuration
-        configuration?.title = badge.map { "邮箱 \($0)" } ?? "邮箱"
+        configuration?.title = badge.map { SeekMailL10n.format("邮箱 %@", $0) } ?? SeekMailL10n.text("邮箱")
         let iconColor: UIColor = badge == nil ? .label : .systemRed
         configuration?.imageColorTransformer = UIConfigurationColorTransformer { _ in iconColor }
         mailButton.configuration = configuration

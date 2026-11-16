@@ -40,7 +40,7 @@ struct SeekMailComposeContent: Equatable {
             .map { "> \($0)" }
             .joined(separator: "\n")
         let time = SeekMailFormat.detailTime(mail.receivedAt)
-        let intro = time.isEmpty ? "\(sender) 写道：" : "在 \(time)，\(sender) 写道："
+        let intro = time.isEmpty ? SeekMailL10n.format("%@ 写道：", sender) : SeekMailL10n.format("在 %@，%@ 写道：", time, sender)
         return SeekMailComposeContent(
             mailboxID: defaultSender(in: mailboxes, preferred: mail.mailboxId),
             to: mail.fromAddress,
@@ -86,10 +86,10 @@ struct SeekMailComposeContent: Equatable {
 extension SeekMailComposeContent.Problem {
     var message: String {
         switch self {
-        case .noSender: return "没有可用的发件邮箱"
-        case .noRecipient: return "请填写收件人"
-        case .invalidAddress(let address): return "收件地址格式不对：\(address)"
-        case .emptyContent: return "主题和正文不能都为空"
+        case .noSender: return SeekMailL10n.text("没有可用的发件邮箱")
+        case .noRecipient: return SeekMailL10n.text("请填写收件人")
+        case .invalidAddress(let address): return SeekMailL10n.format("收件地址格式不对：%@", address)
+        case .emptyContent: return SeekMailL10n.text("主题和正文不能都为空")
         }
     }
 }

@@ -179,19 +179,19 @@ final class SeekMailInboxModel {
     var showsRecipientMailbox: Bool { selectedMailboxID == nil }
 
     var selectionTitle: String {
-        guard let id = selectedMailboxID else { return "全部邮箱" }
-        return names[id]?.title ?? "邮箱"
+        guard let id = selectedMailboxID else { return SeekMailL10n.text("全部邮箱") }
+        return names[id]?.title ?? SeekMailL10n.text("邮箱")
     }
 
     var scopeTitle: String { title(for: scope) }
 
     func title(for scope: SeekMailFolderScope) -> String {
         switch scope {
-        case .inbox: return "收件箱"
-        case .spam: return "垃圾邮件"
-        case .trash: return "回收站"
+        case .inbox: return SeekMailL10n.text("收件箱")
+        case .spam: return SeekMailL10n.text("垃圾邮件")
+        case .trash: return SeekMailL10n.text("回收站")
         case .custom(let id):
-            guard let folder = folders.first(where: { $0.id == id }) else { return "文件夹" }
+            guard let folder = folders.first(where: { $0.id == id }) else { return SeekMailL10n.text("文件夹") }
             return [folder.icon, folder.name].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " ")
         }
     }
@@ -405,7 +405,7 @@ final class SeekMailInboxModel {
         if case .rateLimited(let resetAt)? = mailError {
             rateLimitedUntil = resetAt ?? Date().addingTimeInterval(60)
         }
-        let message = mailError?.userMessage ?? "加载失败，请稍后重试"
+        let message = mailError?.userMessage ?? SeekMailL10n.text("加载失败，请稍后重试")
         if allMails.isEmpty, mailboxes.isEmpty || phase != .loaded {
             phase = .failed(message)
         } else {
@@ -592,6 +592,6 @@ final class SeekMailInboxModel {
             onUnauthorized?()
             return
         }
-        onMessage?((error as? SeekMailError)?.userMessage ?? "操作失败，请稍后重试")
+        onMessage?((error as? SeekMailError)?.userMessage ?? SeekMailL10n.text("操作失败，请稍后重试"))
     }
 }

@@ -25,18 +25,18 @@ nonisolated enum SeekMailError: Error, Equatable, Sendable {
 
     var userMessage: String {
         switch self {
-        case .missingAPIKey: return "请先绑定 seek.li API Key"
-        case .unauthorized: return "API Key 无效或已失效，请重新绑定"
+        case .missingAPIKey: return SeekMailL10n.text("请先绑定 seek.li API Key")
+        case .unauthorized: return SeekMailL10n.text("API Key 无效或已失效，请重新绑定")
         case .forbidden(let scope, _):
-            return scope.map { "API Key 缺少 \($0) 权限，请在 seek.li 重新创建 Key" } ?? "API Key 权限不足"
-        case .rateLimited: return "请求太频繁，请稍后再试"
-        case .notFound(let message): return message ?? "邮件不存在或已被删除"
-        case .badRequest(let message): return message ?? "请求参数有误"
-        case .sendFailed(let message): return message ?? "发送失败，请稍后重试"
-        case .server(_, _, let message): return message ?? "seek.li 服务暂时不可用"
-        case .invalidRequest: return "请求参数有误"
-        case .decoding: return "邮箱数据格式异常"
-        case .network: return "网络连接失败，请检查网络"
+            return scope.map { SeekMailL10n.format("API Key 缺少 %@ 权限，请在 seek.li 重新创建 Key", $0) } ?? SeekMailL10n.text("API Key 权限不足")
+        case .rateLimited: return SeekMailL10n.text("请求太频繁，请稍后再试")
+        case .notFound(let message): return message ?? SeekMailL10n.text("邮件不存在或已被删除")
+        case .badRequest(let message): return message ?? SeekMailL10n.text("请求参数有误")
+        case .sendFailed(let message): return message ?? SeekMailL10n.text("发送失败，请稍后重试")
+        case .server(_, _, let message): return message ?? SeekMailL10n.text("seek.li 服务暂时不可用")
+        case .invalidRequest: return SeekMailL10n.text("请求参数有误")
+        case .decoding: return SeekMailL10n.text("邮箱数据格式异常")
+        case .network: return SeekMailL10n.text("网络连接失败，请检查网络")
         }
     }
 

@@ -39,3 +39,5 @@
 "重试" = "Retry";
 "接口返回失败" = "The server could not complete the request.";
 "请求失败：HTTP %ld" = "Request failed: HTTP %ld";
+
+"取消" = "Cancel";

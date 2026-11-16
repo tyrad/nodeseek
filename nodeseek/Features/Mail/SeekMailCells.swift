@@ -10,17 +10,17 @@ enum SeekMailFormat {
     static func listTime(_ date: Date?, now: Date = Date(), calendar: Calendar = .current) -> String {
         guard let date else { return "" }
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.locale = .current
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
         if calendar.isDate(date, inSameDayAs: now) {
-            formatter.dateFormat = "HH:mm"
+            formatter.setLocalizedDateFormatFromTemplate("jm")
         } else if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(date, inSameDayAs: yesterday) {
-            return "昨天"
+            return SeekMailL10n.text("昨天")
         } else if calendar.component(.year, from: date) == calendar.component(.year, from: now) {
-            formatter.dateFormat = "M月d日"
+            formatter.setLocalizedDateFormatFromTemplate("MMMd")
         } else {
-            formatter.dateFormat = "yyyy/M/d"
+            formatter.setLocalizedDateFormatFromTemplate("yMMMd")
         }
         return formatter.string(from: date)
     }
@@ -28,8 +28,8 @@ enum SeekMailFormat {
     static func detailTime(_ date: Date?) -> String {
         guard let date else { return "" }
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
-        formatter.dateFormat = "yyyy年M月d日 HH:mm"
+        formatter.locale = .current
+        formatter.setLocalizedDateFormatFromTemplate("yMMMdjm")
         return formatter.string(from: date)
     }
 
@@ -37,7 +37,7 @@ enum SeekMailFormat {
     static func receivedAgo(_ date: Date?, now: Date = Date()) -> String {
         guard let date else { return "" }
         let minutes = Int(max(0, now.timeIntervalSince(date)) / 60)
-        return minutes < 1 ? "刚刚收到" : "\(minutes) 分钟前收到"
+        return minutes < 1 ? SeekMailL10n.text("刚刚收到") : SeekMailL10n.format("%@ 分钟前收到", String(minutes))
     }
 
     static func bytes(_ value: Int64) -> String {
@@ -93,9 +93,9 @@ enum SeekMailStyle {
         UIPasteboard.general.string = text
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         let original = button.configuration
-        button.configuration = codeButtonConfiguration("已复制", compact: compact)
+        button.configuration = codeButtonConfiguration(SeekMailL10n.text("已复制"), compact: compact)
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak button] in
-            guard let button, button.configuration?.title == "已复制" else { return }
+            guard let button, button.configuration?.title == SeekMailL10n.text("已复制") else { return }
             button.configuration = original
         }
     }
@@ -188,7 +188,7 @@ final class SeekMailCell: UITableViewCell {
         timeLabel.font = SeekMailFont.of(.footnote)
         timeLabel.text = SeekMailFormat.listTime(mail.receivedAt)
 
-        let subject = mail.subject.isEmpty ? "（无主题）" : mail.subject
+        let subject = mail.subject.isEmpty ? SeekMailL10n.text("（无主题）") : mail.subject
         let subjectFont = SeekMailFont.of(.subheadline).withWeight(mail.isRead ? .regular : .semibold)
         subjectLabel.attributedText = SeekMailFormat.highlighted(subject, keyword: keyword, font: subjectFont, color: .label)
 
@@ -207,9 +207,9 @@ final class SeekMailCell: UITableViewCell {
         codeButton.isHidden = code == nil
         if let code { codeButton.configuration = SeekMailStyle.codeButtonConfiguration(code, compact: true) }
 
-        var parts = [mail.isRead ? nil : "未读", sender, subject, mail.isFlagged ? "已加星标" : nil,
-                     mail.hasAttachments ? "有附件" : nil, timeLabel.text]
-        if let code { parts.append("验证码 \(code)") }
+        var parts = [mail.isRead ? nil : SeekMailL10n.text("未读"), sender, subject, mail.isFlagged ? SeekMailL10n.text("已加星标") : nil,
+                     mail.hasAttachments ? SeekMailL10n.text("有附件") : nil, timeLabel.text]
+        if let code { parts.append(SeekMailL10n.format("验证码 %@", code)) }
         accessibilityLabel = parts.compactMap { $0 }.joined(separator: "，")
     }
 }
@@ -278,7 +278,7 @@ final class SeekMailCodeCell: UITableViewCell {
         detailLabel.font = SeekMailFont.of(.footnote)
         detailLabel.textColor = .secondaryLabel
         detailLabel.lineBreakMode = .byTruncatingMiddle
-        copyButton.configuration = SeekMailStyle.codeButtonConfiguration("复制", compact: false)
+        copyButton.configuration = SeekMailStyle.codeButtonConfiguration(SeekMailL10n.text("复制"), compact: false)
         copyButton.accessibilityIdentifier = "seek-mail-code-card-copy"
         copyButton.setContentHuggingPriority(.required, for: .horizontal)
         copyButton.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -320,9 +320,9 @@ final class SeekMailCodeCell: UITableViewCell {
         let sender = mail.fromName ?? mail.fromAddress
         let target = recipient.map { " → \($0.title)" } ?? ""
         detailLabel.text = "\(sender)\(target) · \(SeekMailFormat.receivedAgo(mail.receivedAt))"
-        copyButton.configuration = SeekMailStyle.codeButtonConfiguration("复制", compact: false)
+        copyButton.configuration = SeekMailStyle.codeButtonConfiguration(SeekMailL10n.text("复制"), compact: false)
         accessibilityElements = [codeLabel, detailLabel, copyButton]
-        codeLabel.accessibilityLabel = "最新验证码 \(mail.verificationCode ?? "")"
+        codeLabel.accessibilityLabel = SeekMailL10n.format("最新验证码 %@", mail.verificationCode ?? "")
     }
 }
 

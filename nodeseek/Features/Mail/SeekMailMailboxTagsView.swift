@@ -21,7 +21,7 @@ struct SeekMailMailboxTag: Equatable {
 extension SeekMailInboxModel {
     var mailboxTags: [SeekMailMailboxTag] {
         guard mailboxes.isEmpty == false else { return [] }
-        let all = SeekMailMailboxTag(id: nil, title: "全部", unread: unreadTotal ?? 0)
+        let all = SeekMailMailboxTag(id: nil, title: SeekMailL10n.text("全部"), unread: unreadTotal ?? 0)
         return [all] + mailboxOrder.compactMap { id in
             names[id].map { SeekMailMailboxTag(id: id, title: $0.title, unread: unreadByMailbox[id] ?? 0) }
         }
@@ -109,7 +109,7 @@ final class SeekMailMailboxTagsView: UIView {
         var toggleTitle: String?
         if flow(widths, available: available).rows > Self.collapsedRows {
             if isExpanded {
-                toggleTitle = "收起"
+                toggleTitle = SeekMailL10n.text("收起")
             } else {
                 (visible, toggleTitle) = collapsedPlan(widths: widths, available: available)
             }
@@ -144,14 +144,14 @@ final class SeekMailMailboxTagsView: UIView {
         for count in stride(from: widths.count - 1, through: 1, by: -1) {
             var indices = Array(0..<count)
             if let selectedIndex, selectedIndex >= count { indices[count - 1] = selectedIndex }
-            let title = "展开 \(widths.count - count) 个"
+            let title = SeekMailL10n.format("展开 %@ 个", String(widths.count - count))
             styleToggle(title: title)
             let toggleWidth = ceil(toggleButton.sizeThatFits(CGSize(width: available, height: Self.rowHeight)).width)
             if flow(indices.map { widths[$0] } + [toggleWidth], available: available).rows <= Self.collapsedRows {
                 return (indices, title)
             }
         }
-        return ([selectedIndex ?? 0], "展开 \(widths.count - 1) 个")
+        return ([selectedIndex ?? 0], SeekMailL10n.format("展开 %@ 个", String(widths.count - 1)))
     }
 
     private func flow(_ widths: [CGFloat], available: CGFloat) -> (frames: [CGRect], rows: Int) {
@@ -199,7 +199,7 @@ final class SeekMailMailboxTagsView: UIView {
         }
         configuration.attributedTitle = title
         button.configuration = configuration
-        button.accessibilityLabel = tag.unread > 0 ? "\(tag.title)，\(tag.unread) 封未读" : tag.title
+        button.accessibilityLabel = tag.unread > 0 ? SeekMailL10n.format("%@，%@ 封未读", tag.title, String(tag.unread)) : tag.title
         button.accessibilityTraits = selected ? [.button, .selected] : .button
     }
 

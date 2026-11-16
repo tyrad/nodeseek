@@ -32,7 +32,7 @@ final class SeekMailHomeViewController: UIViewController {
         self.cache = cache
         self.memoryCache = memoryCache
         super.init(nibName: nil, bundle: nil)
-        title = "邮箱"
+        title = SeekMailL10n.text("邮箱")
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -73,7 +73,7 @@ final class SeekMailHomeViewController: UIViewController {
                                                     selectionStore: selectionStore, cache: cache, memoryCache: memoryCache)
             inbox.onNavigationChange = { [weak self] in self?.configureNavigationItems(bound: true) }
             inbox.onUnauthorized = { [weak self] in
-                self?.pendingBindMessage = "之前保存的 Key 已失效，请重新粘贴"
+                self?.pendingBindMessage = SeekMailL10n.text("之前保存的 Key 已失效，请重新粘贴")
                 self?.keyStore.clear()
             }
             next = inbox
@@ -113,14 +113,14 @@ final class SeekMailHomeViewController: UIViewController {
             return
         }
         let more = UIBarButtonItem(image: UIImage(systemName: "ellipsis"), menu: makeMoreMenu())
-        more.accessibilityLabel = "更多"
+        more.accessibilityLabel = SeekMailL10n.text("更多")
         more.accessibilityIdentifier = "seek-mail-more"
         var items = [more]
         if let inbox = content as? SeekMailInboxViewController, inbox.model.canCompose {
             let compose = UIBarButtonItem(image: UIImage(systemName: "square.and.pencil"), primaryAction: UIAction { [weak inbox] _ in
                 inbox?.presentCompose()
             })
-            compose.accessibilityLabel = "写信"
+            compose.accessibilityLabel = SeekMailL10n.text("写信")
             compose.accessibilityIdentifier = "seek-mail-compose"
             items.append(compose)
         }
@@ -128,13 +128,13 @@ final class SeekMailHomeViewController: UIViewController {
     }
 
     private func makeMoreMenu() -> UIMenu {
-        let manage = UIAction(title: "在网页中管理", image: UIImage(systemName: "safari")) { [weak self] _ in
+        let manage = UIAction(title: SeekMailL10n.text("在网页中管理"), image: UIImage(systemName: "safari")) { [weak self] _ in
             self?.present(SFSafariViewController(url: SeekMailLinks.manage), animated: true)
         }
-        let replace = UIAction(title: "更换 API Key", image: UIImage(systemName: "key")) { [weak self] _ in
+        let replace = UIAction(title: SeekMailL10n.text("更换 API Key"), image: UIImage(systemName: "key")) { [weak self] _ in
             self?.showReplaceKey()
         }
-        let remove = UIAction(title: "移除 Key 并退出", image: UIImage(systemName: "rectangle.portrait.and.arrow.right"),
+        let remove = UIAction(title: SeekMailL10n.text("移除 Key 并退出"), image: UIImage(systemName: "rectangle.portrait.and.arrow.right"),
                               attributes: .destructive) { [weak self] _ in
             self?.confirmRemoveKey()
         }
@@ -152,7 +152,7 @@ final class SeekMailHomeViewController: UIViewController {
             guard let self else { return }
             navigationController?.popToViewController(self.navigationAnchor, animated: true)
         })
-        bind.title = "更换 API Key"
+        bind.title = SeekMailL10n.text("更换 API Key")
         navigationController?.pushViewController(bind, animated: true)
     }
 
@@ -163,12 +163,12 @@ final class SeekMailHomeViewController: UIViewController {
 
     private func confirmRemoveKey() {
         let alert = UIAlertController(
-            title: "移除 API Key？",
-            message: "本机保存的 Key 会被删除，邮箱数据不受影响。之后需要重新粘贴 Key 才能查看邮件。",
+            title: SeekMailL10n.text("移除 API Key？"),
+            message: SeekMailL10n.text("本机保存的 Key 会被删除，邮箱数据不受影响。之后需要重新粘贴 Key 才能查看邮件。"),
             preferredStyle: .alert
         )
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "移除", style: .destructive) { [weak self] _ in
+        alert.addAction(UIAlertAction(title: SeekMailL10n.text("取消"), style: .cancel))
+        alert.addAction(UIAlertAction(title: SeekMailL10n.text("移除"), style: .destructive) { [weak self] _ in
             // 记住的邮箱属于旧账号，一起清掉
             self?.selectionStore.clear()
             self?.cache?.clear()

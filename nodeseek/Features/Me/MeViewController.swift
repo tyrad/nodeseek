@@ -36,7 +36,7 @@ final class MeViewController: UIViewController {
     private let checkInRow = MeListRowView(symbolName: "checkmark.seal", title: "每日签到")
     private let recentRow = MeListRowView(symbolName: "clock.arrow.circlepath", title: "最近浏览")
     private let probeRow = MeListRowView(symbolName: "server.rack", title: "探针")
-    private let mailRow = MeListRowView(symbolName: "envelope", title: "邮箱")
+    private let mailRow = MeListRowView(symbolName: "envelope", title: SeekMailL10n.text("邮箱"))
 
     init(
         accountController: PostListSideMenuAccountController? = nil,

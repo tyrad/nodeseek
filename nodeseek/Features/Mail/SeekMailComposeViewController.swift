@@ -25,7 +25,7 @@ final class SeekMailComposeViewController: UIViewController {
     private let subjectField = UITextField()
     private let bodyView = UITextView()
     private let errorLabel = UILabel()
-    private lazy var sendItem = UIBarButtonItem(title: "发送", primaryAction: UIAction { [weak self] _ in self?.send() })
+    private lazy var sendItem = UIBarButtonItem(title: SeekMailL10n.text("发送"), primaryAction: UIAction { [weak self] _ in self?.send() })
 
     init(provider: SeekMailProvider<SeekMailAPI>, mailboxes: [SeekMailbox], names: [Int64: SeekMailboxDisplay],
          content: SeekMailComposeContent, onSent: @escaping () -> Void) {
@@ -38,7 +38,7 @@ final class SeekMailComposeViewController: UIViewController {
         initialContent = content
         self.onSent = onSent
         super.init(nibName: nil, bundle: nil)
-        title = content.subject.isEmpty ? "写信" : "回复"
+        title = content.subject.isEmpty ? SeekMailL10n.text("写信") : SeekMailL10n.text("回复")
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -91,13 +91,13 @@ final class SeekMailComposeViewController: UIViewController {
         senderButton.contentHorizontalAlignment = .leading
         senderButton.accessibilityIdentifier = "seek-mail-compose-sender"
 
-        configure(toField, placeholder: "多个地址用逗号分隔", identifier: "seek-mail-compose-to", keyboard: .emailAddress)
-        configure(ccField, placeholder: "抄送地址", identifier: "seek-mail-compose-cc", keyboard: .emailAddress)
-        configure(subjectField, placeholder: "主题", identifier: "seek-mail-compose-subject", keyboard: .default)
+        configure(toField, placeholder: SeekMailL10n.text("多个地址用逗号分隔"), identifier: "seek-mail-compose-to", keyboard: .emailAddress)
+        configure(ccField, placeholder: SeekMailL10n.text("抄送地址"), identifier: "seek-mail-compose-cc", keyboard: .emailAddress)
+        configure(subjectField, placeholder: SeekMailL10n.text("主题"), identifier: "seek-mail-compose-subject", keyboard: .default)
         subjectField.autocapitalizationType = .sentences
 
         var ccConfiguration = UIButton.Configuration.plain()
-        ccConfiguration.title = "抄送"
+        ccConfiguration.title = SeekMailL10n.text("抄送")
         ccConfiguration.baseForegroundColor = .secondaryLabel
         ccConfiguration.contentInsets = .zero
         ccToggle.configuration = ccConfiguration
@@ -113,7 +113,7 @@ final class SeekMailComposeViewController: UIViewController {
         bodyView.textContainer.lineFragmentPadding = 0
         bodyView.delegate = self
         bodyView.accessibilityIdentifier = "seek-mail-compose-body"
-        bodyView.accessibilityLabel = "正文"
+        bodyView.accessibilityLabel = SeekMailL10n.text("正文")
 
         errorLabel.font = SeekMailFont.of(.footnote)
         errorLabel.textColor = .systemRed
@@ -121,9 +121,9 @@ final class SeekMailComposeViewController: UIViewController {
         errorLabel.isHidden = true
         errorLabel.accessibilityIdentifier = "seek-mail-compose-error"
 
-        let senderRow = makeRow(title: "发件人", content: senderButton)
-        let toRow = makeRow(title: "收件人", content: toField, trailing: ccToggle)
-        let ccContent = makeRow(title: "抄送", content: ccField)
+        let senderRow = makeRow(title: SeekMailL10n.text("发件人"), content: senderButton)
+        let toRow = makeRow(title: SeekMailL10n.text("收件人"), content: toField, trailing: ccToggle)
+        let ccContent = makeRow(title: SeekMailL10n.text("抄送"), content: ccField)
         ccContent.translatesAutoresizingMaskIntoConstraints = false
         ccRow.addSubview(ccContent)
         NSLayoutConstraint.activate([
@@ -133,7 +133,7 @@ final class SeekMailComposeViewController: UIViewController {
             ccContent.trailingAnchor.constraint(equalTo: ccRow.trailingAnchor)
         ])
         ccRow.isHidden = true
-        let subjectRow = makeRow(title: "主题", content: subjectField)
+        let subjectRow = makeRow(title: SeekMailL10n.text("主题"), content: subjectField)
 
         let stack = UIStackView(arrangedSubviews: [senderRow, toRow, ccRow, subjectRow, errorLabel, bodyView])
         stack.axis = .vertical
@@ -215,7 +215,7 @@ final class SeekMailComposeViewController: UIViewController {
             let title = display.map { $0.title + ($0.domainSuffix ?? "") } ?? mailbox.address
             return UIAction(
                 title: title,
-                subtitle: mailbox.canSendMail ? (display?.hasAlias == true ? mailbox.address : nil) : "该域名不支持发信",
+                subtitle: mailbox.canSendMail ? (display?.hasAlias == true ? mailbox.address : nil) : SeekMailL10n.text("该域名不支持发信"),
                 attributes: mailbox.canSendMail ? [] : .disabled,
                 state: mailbox.id == content.mailboxID ? .on : .off
             ) { [weak self] _ in
@@ -226,7 +226,7 @@ final class SeekMailComposeViewController: UIViewController {
         }
         senderButton.menu = UIMenu(children: actions)
         let selected = mailboxes.first { $0.id == content.mailboxID }
-        senderButton.configuration?.title = selected?.address ?? "没有可用的发件邮箱"
+        senderButton.configuration?.title = selected?.address ?? SeekMailL10n.text("没有可用的发件邮箱")
     }
 
     // MARK: - 发送
@@ -278,7 +278,7 @@ final class SeekMailComposeViewController: UIViewController {
                 sendTask = nil
                 navigationItem.rightBarButtonItem = sendItem
                 updateSendButton()
-                showError((error as? SeekMailError)?.userMessage ?? "发送失败，请稍后重试")
+                showError((error as? SeekMailError)?.userMessage ?? SeekMailL10n.text("发送失败，请稍后重试"))
             }
         }
         updateSendButton()
@@ -299,10 +299,10 @@ final class SeekMailComposeViewController: UIViewController {
             return
         }
         let sheet = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-        sheet.addAction(UIAlertAction(title: "放弃这封邮件", style: .destructive) { [weak self] _ in
+        sheet.addAction(UIAlertAction(title: SeekMailL10n.text("放弃这封邮件"), style: .destructive) { [weak self] _ in
             self?.dismiss(animated: true)
         })
-        sheet.addAction(UIAlertAction(title: "继续编辑", style: .cancel))
+        sheet.addAction(UIAlertAction(title: SeekMailL10n.text("继续编辑"), style: .cancel))
         sheet.popoverPresentationController?.barButtonItem = navigationItem.leftBarButtonItem
         present(sheet, animated: true)
     }

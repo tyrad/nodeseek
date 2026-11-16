@@ -5,7 +5,7 @@ final class FeatureLocalizationTests: XCTestCase {
     func testSearchAndWidgetResourcesArePackagedInAllLanguages() throws {
         let widgetURL = try XCTUnwrap(Bundle.main.builtInPlugInsURL?.appendingPathComponent("ProbeWidget.appex"))
         let widget = try XCTUnwrap(Bundle(url: widgetURL))
-        for (bundle, table) in [(Bundle.main, "Search"), (Bundle.main, "ProbeWidget"), (widget, "ProbeWidget"), (widget, "Localizable")] {
+        for (bundle, table) in [(Bundle.main, "Mail"), (Bundle.main, "Search"), (Bundle.main, "ProbeWidget"), (widget, "ProbeWidget"), (widget, "Localizable")] {
             var referenceKeys: Set<String>?
             for language in ["zh-Hans", "zh-Hant", "en"] {
                 let path = try XCTUnwrap(bundle.path(forResource: table, ofType: "strings", inDirectory: nil, forLocalization: language))
@@ -16,6 +16,27 @@ final class FeatureLocalizationTests: XCTestCase {
                 let keys = Set(entries.keys)
                 if let referenceKeys { XCTAssertEqual(keys, referenceKeys) }
                 referenceKeys = keys
+            }
+        }
+    }
+
+    func testMailTranslationsAndPlaceholders() throws {
+        for (language, inbox, expanded) in [
+            ("zh-Hans", "收件箱", "展开 3 个"),
+            ("zh-Hant", "收件箱", "展開 3 個"),
+            ("en", "Inbox", "Show 3 more")
+        ] {
+            let path = try XCTUnwrap(Bundle.main.path(forResource: language, ofType: "lproj"))
+            let bundle = try XCTUnwrap(Bundle(path: path))
+            XCTAssertEqual(SeekMailL10n.text("收件箱", bundle: bundle), inbox)
+            let format = SeekMailL10n.text("展开 %@ 个", bundle: bundle)
+            XCTAssertEqual(String(format: format, "3"), expanded)
+            let pathToTable = try XCTUnwrap(bundle.path(forResource: "Mail", ofType: "strings"))
+            let data = try Data(contentsOf: URL(fileURLWithPath: pathToTable))
+            let entries = try XCTUnwrap(PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String])
+            for (key, value) in entries {
+                XCTAssertEqual(key.components(separatedBy: "%@").count,
+                               value.components(separatedBy: "%@").count, key)
             }
         }
     }

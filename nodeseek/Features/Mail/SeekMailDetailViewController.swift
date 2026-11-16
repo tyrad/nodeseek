@@ -116,7 +116,7 @@ final class SeekMailDetailViewController: UIViewController {
             return
         }
         let label = errorView.arrangedSubviews.first as? UILabel
-        label?.text = (error as? SeekMailError)?.userMessage ?? "加载失败，请稍后重试"
+        label?.text = (error as? SeekMailError)?.userMessage ?? SeekMailL10n.text("加载失败，请稍后重试")
         errorView.isHidden = false
     }
 
@@ -141,7 +141,7 @@ final class SeekMailDetailViewController: UIViewController {
         retry.baseBackgroundColor = .label
         retry.baseForegroundColor = .systemBackground
         retry.cornerStyle = .capsule
-        retry.title = "重试"
+        retry.title = SeekMailL10n.text("重试")
         let retryButton = UIButton(configuration: retry, primaryAction: UIAction { [weak self] _ in self?.load() })
         [errorLabel, retryButton].forEach(errorView.addArrangedSubview)
         errorView.axis = .vertical
@@ -178,7 +178,7 @@ final class SeekMailDetailViewController: UIViewController {
 
         stack.addArrangedSubview(makeHeader(mail))
         if SeekMailDetailContent.hasAuthFailure(scoreDetails: mail.scoreDetails) {
-            stack.addArrangedSubview(makeNotice("发件人未通过验证，请留意邮件里的链接", symbol: "exclamationmark.shield"))
+            stack.addArrangedSubview(makeNotice(SeekMailL10n.text("发件人未通过验证，请留意邮件里的链接"), symbol: "exclamationmark.shield"))
         }
         if let code = mail.verificationCode {
             stack.addArrangedSubview(makeCodeBar(code))
@@ -197,7 +197,7 @@ final class SeekMailDetailViewController: UIViewController {
 
     private func makeHeader(_ mail: SeekMail) -> UIView {
         let subject = UILabel()
-        subject.text = mail.subject.isEmpty ? "（无主题）" : mail.subject
+        subject.text = mail.subject.isEmpty ? SeekMailL10n.text("（无主题）") : mail.subject
         subject.font = SeekMailFont.of(.title2).withSymbolicTraits(.traitBold)
         subject.numberOfLines = 0
         subject.accessibilityIdentifier = "seek-mail-detail-subject"
@@ -224,17 +224,17 @@ final class SeekMailDetailViewController: UIViewController {
         // 收件地址始终显示完整地址，长按复制
         let recipient = UILabel()
         let address = mail.toAddress ?? model.mailboxes.first { $0.id == mail.mailboxId }?.address ?? ""
-        recipient.text = "发给 \(address)"
+        recipient.text = SeekMailL10n.format("发给 %@", address)
         recipient.font = SeekMailFont.of(.footnote)
         recipient.textColor = .secondaryLabel
         recipient.lineBreakMode = .byTruncatingMiddle
         recipient.isUserInteractionEnabled = true
         recipient.accessibilityIdentifier = "seek-mail-detail-recipient"
-        recipient.accessibilityHint = "长按复制收件地址"
+        recipient.accessibilityHint = SeekMailL10n.text("长按复制收件地址")
         recipient.addGestureRecognizer(SeekMailLongPress { [weak self] in
             UIPasteboard.general.string = address
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            self?.showToast("已复制收件地址")
+            self?.showToast(SeekMailL10n.text("已复制收件地址"))
         })
 
         let header = UIStackView(arrangedSubviews: [subject, sender, time, recipient])
@@ -267,7 +267,7 @@ final class SeekMailDetailViewController: UIViewController {
         bar.layer.cornerRadius = 12
         bar.layer.cornerCurve = .continuous
         let title = UILabel()
-        title.text = "验证码"
+        title.text = SeekMailL10n.text("验证码")
         title.font = SeekMailFont.of(.footnote)
         title.textColor = .systemBackground.withAlphaComponent(0.7)
         let codeLabel = UILabel()
@@ -280,7 +280,7 @@ final class SeekMailDetailViewController: UIViewController {
         configuration.baseBackgroundColor = .systemBackground
         configuration.baseForegroundColor = .label
         configuration.cornerStyle = .capsule
-        configuration.title = "复制"
+        configuration.title = SeekMailL10n.text("复制")
         let copy = UIButton(configuration: configuration)
         copy.accessibilityIdentifier = "seek-mail-detail-copy-code"
         copy.setContentHuggingPriority(.required, for: .horizontal)
@@ -288,8 +288,8 @@ final class SeekMailDetailViewController: UIViewController {
             guard let copy else { return }
             UIPasteboard.general.string = code
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            copy.configuration?.title = "已复制"
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak copy] in copy?.configuration?.title = "复制" }
+            copy.configuration?.title = SeekMailL10n.text("已复制")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak copy] in copy?.configuration?.title = SeekMailL10n.text("复制") }
         }, for: .touchUpInside)
         let text = UIStackView(arrangedSubviews: [title, codeLabel])
         text.axis = .vertical
@@ -333,7 +333,7 @@ final class SeekMailDetailViewController: UIViewController {
             configuration.cornerStyle = .medium
             configuration.image = UIImage(systemName: "photo")
             configuration.imagePadding = 6
-            configuration.title = "已阻止 \(remoteImages) 张远程图片 · 加载"
+            configuration.title = SeekMailL10n.format("已阻止 %@ 张远程图片 · 加载", String(remoteImages))
             configuration.titleLineBreakMode = .byTruncatingTail
             imageBanner.configuration = configuration
             imageBanner.contentHorizontalAlignment = .leading
@@ -416,7 +416,7 @@ final class SeekMailDetailViewController: UIViewController {
     private func renderAttachments() {
         guard attachments.isEmpty == false else { return }
         let header = UILabel()
-        header.text = "附件 \(attachments.count)"
+        header.text = SeekMailL10n.format("附件 %@", String(attachments.count))
         header.font = SeekMailFont.of(.footnote)
         header.textColor = .secondaryLabel
         stack.addArrangedSubview(header)
@@ -470,7 +470,7 @@ final class SeekMailDetailViewController: UIViewController {
                 preview.dataSource = self
                 present(preview, animated: true)
             } catch {
-                showToast((error as? SeekMailError)?.userMessage ?? "附件下载失败")
+                showToast((error as? SeekMailError)?.userMessage ?? SeekMailL10n.text("附件下载失败"))
             }
         }
     }
@@ -494,7 +494,7 @@ final class SeekMailDetailViewController: UIViewController {
         let flagged = model.mail(id: mailID)?.isFlagged ?? mail?.isFlagged ?? false
         starItem.image = UIImage(systemName: flagged ? "star.fill" : "star")
         starItem.tintColor = flagged ? .systemOrange : .label
-        starItem.accessibilityLabel = flagged ? "去掉星标" : "加星标"
+        starItem.accessibilityLabel = flagged ? SeekMailL10n.text("去掉星标") : SeekMailL10n.text("加星标")
     }
 
     private func toggleFlag() {
@@ -509,7 +509,7 @@ final class SeekMailDetailViewController: UIViewController {
             model.setRead(mailID, read: false)
             navigationController?.popViewController(animated: true)
         })
-        unread.accessibilityLabel = "标为未读"
+        unread.accessibilityLabel = SeekMailL10n.text("标为未读")
         unread.accessibilityIdentifier = "seek-mail-detail-unread"
         let flexible = UIBarButtonItem(systemItem: .flexibleSpace)
         var replyItems: [UIBarButtonItem] = []
@@ -518,7 +518,7 @@ final class SeekMailDetailViewController: UIViewController {
                 guard let self else { return }
                 onReply(SeekMailComposeContent.reply(to: mail, mailboxes: model.mailboxes))
             })
-            reply.accessibilityLabel = "回复"
+            reply.accessibilityLabel = SeekMailL10n.text("回复")
             reply.accessibilityIdentifier = "seek-mail-detail-reply"
             replyItems = [flexible, reply]
         }
@@ -527,7 +527,7 @@ final class SeekMailDetailViewController: UIViewController {
             toolbarItems = [flexible, unread] + replyItems + [flexible]
             return
         }
-        var targets: [(String, Int64?, SeekMailFolderScope)] = [("收件箱", nil, .inbox)]
+        var targets: [(String, Int64?, SeekMailFolderScope)] = [(SeekMailL10n.text("收件箱"), nil, .inbox)]
         targets += model.folders.map { (model.title(for: .custom($0.id)), $0.id, .custom($0.id)) }
         let moveActions = targets.filter { $0.2 != model.scope }.map { title, folderID, _ in
             UIAction(title: title) { [weak self] _ in
@@ -536,15 +536,15 @@ final class SeekMailDetailViewController: UIViewController {
                 navigationController?.popViewController(animated: true)
             }
         }
-        let move = UIBarButtonItem(image: UIImage(systemName: "folder"), menu: UIMenu(title: "移动到…", children: moveActions))
-        move.accessibilityLabel = "移动到"
+        let move = UIBarButtonItem(image: UIImage(systemName: "folder"), menu: UIMenu(title: SeekMailL10n.text("移动到…"), children: moveActions))
+        move.accessibilityLabel = SeekMailL10n.text("移动到")
         move.isEnabled = moveActions.isEmpty == false
         let delete = UIBarButtonItem(image: UIImage(systemName: "trash"), primaryAction: UIAction { [weak self] _ in
             guard let self else { return }
             navigationController?.popViewController(animated: true)
             onDelete(mailID)
         })
-        delete.accessibilityLabel = "删除"
+        delete.accessibilityLabel = SeekMailL10n.text("删除")
         delete.accessibilityIdentifier = "seek-mail-detail-delete"
         toolbarItems = [move, flexible, unread] + replyItems + [flexible, delete]
     }

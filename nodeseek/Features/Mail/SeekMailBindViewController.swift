@@ -29,7 +29,7 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
 
     private lazy var saveButton: UIButton = {
         var configuration = UIButton.Configuration.filled()
-        configuration.title = "验证并保存"
+        configuration.title = SeekMailL10n.text("验证并保存")
         configuration.cornerStyle = .capsule
         configuration.baseBackgroundColor = .label
         configuration.baseForegroundColor = .systemBackground
@@ -39,7 +39,7 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
         button.configurationUpdateHandler = { [weak self] button in
             let verifying = self?.verifyTask != nil
             button.configuration?.showsActivityIndicator = verifying
-            button.configuration?.title = verifying ? "正在验证" : "验证并保存"
+            button.configuration?.title = verifying ? SeekMailL10n.text("正在验证") : SeekMailL10n.text("验证并保存")
         }
         button.addAction(UIAction { [weak self] _ in self?.saveTapped() }, for: .touchUpInside)
         return button
@@ -56,7 +56,7 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
         }
         self.onBound = onBound
         super.init(nibName: nil, bundle: nil)
-        title = "邮箱"
+        title = SeekMailL10n.text("邮箱")
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -109,13 +109,13 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
         ])
 
         let titleLabel = UILabel()
-        titleLabel.text = "连接 seek.li 邮箱"
+        titleLabel.text = SeekMailL10n.text("连接 seek.li 邮箱")
         titleLabel.font = .systemFont(ofSize: 26, weight: .heavy)
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 0
 
         let descLabel = UILabel()
-        descLabel.text = "用 seek.li 控制台里创建的 API Key 在 App 里收发邮件、看验证码。Key 只保存在本机钥匙串。"
+        descLabel.text = SeekMailL10n.text("用 seek.li 控制台里创建的 API Key 在 App 里收发邮件、看验证码。Key 只保存在本机钥匙串。")
         descLabel.font = .preferredFont(forTextStyle: .subheadline)
         descLabel.adjustsFontForContentSizeCategory = true
         descLabel.textColor = .secondaryLabel
@@ -136,7 +136,7 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
         keyField.addAction(UIAction { [weak self] _ in self?.keyDidChange() }, for: .editingChanged)
 
         var pasteConfiguration = UIButton.Configuration.gray()
-        pasteConfiguration.title = "粘贴"
+        pasteConfiguration.title = SeekMailL10n.text("粘贴")
         pasteConfiguration.cornerStyle = .capsule
         pasteConfiguration.baseForegroundColor = .label
         pasteConfiguration.buttonSize = .small
@@ -161,7 +161,7 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
         errorLabel.isHidden = true
         errorLabel.accessibilityIdentifier = "seek-mail-bind-error"
 
-        let helpButton = Self.makeDisclosureButton(title: "如何获取 Key、需要哪些权限", symbolName: "key")
+        let helpButton = Self.makeDisclosureButton(title: SeekMailL10n.text("如何获取 Key、需要哪些权限"), symbolName: "key")
         helpButton.accessibilityIdentifier = "seek-mail-bind-help"
         helpButton.addAction(UIAction { [weak self] _ in self?.showHelp() }, for: .touchUpInside)
         let helpCard = Self.makeCard(containing: helpButton, insets: .zero)
@@ -187,7 +187,7 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
 
     private func setupBottomBar() {
         var linkConfiguration = UIButton.Configuration.plain()
-        linkConfiguration.title = "去 seek.li 创建 Key"
+        linkConfiguration.title = SeekMailL10n.text("去 seek.li 创建 Key")
         linkConfiguration.image = UIImage(systemName: "arrow.up.right")
         linkConfiguration.imagePlacement = .trailing
         linkConfiguration.imagePadding = 4
@@ -266,7 +266,7 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
                 let mailboxes = try await verify(key)
                 verifyTask = nil
                 guard keyStore.save(apiKey: key) else {
-                    showError("Key 有效，但没能保存到本机钥匙串，请重试")
+                    showError(SeekMailL10n.text("Key 有效，但没能保存到本机钥匙串，请重试"))
                     updateSaveButton()
                     return
                 }
@@ -284,9 +284,9 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
 
     static func message(for error: Error) -> String {
         switch error as? SeekMailError {
-        case .unauthorized?: return "Key 无效或已失效，请检查后重新粘贴"
+        case .unauthorized?: return SeekMailL10n.text("Key 无效或已失效，请检查后重新粘贴")
         case let mailError?: return mailError.userMessage
-        case nil: return "验证失败，请稍后重试"
+        case nil: return SeekMailL10n.text("验证失败，请稍后重试")
         }
     }
 
@@ -358,25 +358,25 @@ final class SeekMailKeyHelpViewController: UITableViewController {
     }
 
     private let steps = [
-        "登录 seek.li 控制台",
-        "进入「开发者」，新建 API Key",
-        "按下方勾选权限后创建，复制 sk_live_ 开头的 Key",
-        "回到 App 粘贴并保存"
+        SeekMailL10n.text("登录 seek.li 控制台"),
+        SeekMailL10n.text("进入「开发者」，新建 API Key"),
+        SeekMailL10n.text("按下方勾选权限后创建，复制 sk_live_ 开头的 Key"),
+        SeekMailL10n.text("回到 App 粘贴并保存")
     ]
 
     private let scopes = [
-        Scope(title: "读取邮箱", scope: "mailbox:read", required: true),
-        Scope(title: "读取邮件", scope: "mail:read", required: true),
-        Scope(title: "已读、星标、移动、删除", scope: "mail:manage", required: true),
-        Scope(title: "下载附件", scope: "attachment:read", required: true),
-        Scope(title: "读取文件夹", scope: "folder:read", required: true),
-        Scope(title: "查看存储用量", scope: "storage:read", required: true),
-        Scope(title: "写信和回复（可选，只有 seek.li 地址能发信）", scope: "mail:send", required: false)
+        Scope(title: SeekMailL10n.text("读取邮箱"), scope: "mailbox:read", required: true),
+        Scope(title: SeekMailL10n.text("读取邮件"), scope: "mail:read", required: true),
+        Scope(title: SeekMailL10n.text("已读、星标、移动、删除"), scope: "mail:manage", required: true),
+        Scope(title: SeekMailL10n.text("下载附件"), scope: "attachment:read", required: true),
+        Scope(title: SeekMailL10n.text("读取文件夹"), scope: "folder:read", required: true),
+        Scope(title: SeekMailL10n.text("查看存储用量"), scope: "storage:read", required: true),
+        Scope(title: SeekMailL10n.text("写信和回复（可选，只有 seek.li 地址能发信）"), scope: "mail:send", required: false)
     ]
 
     init() {
         super.init(style: .insetGrouped)
-        title = "获取 API Key"
+        title = SeekMailL10n.text("获取 API Key")
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -393,14 +393,14 @@ final class SeekMailKeyHelpViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         switch section {
-        case 0: return "步骤"
-        case 1: return "需要勾选的权限"
+        case 0: return SeekMailL10n.text("步骤")
+        case 1: return SeekMailL10n.text("需要勾选的权限")
         default: return nil
         }
     }
 
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
-        section == 1 ? "不需要勾选全部权限。少勾的权限对应功能会提示无法使用，例如不勾 mail:send 只是不能写信；可随时在 seek.li 重新创建 Key。" : nil
+        section == 1 ? SeekMailL10n.text("不需要勾选全部权限。少勾的权限对应功能会提示无法使用，例如不勾 mail:send 只是不能写信；可随时在 seek.li 重新创建 Key。") : nil
     }
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -424,7 +424,7 @@ final class SeekMailKeyHelpViewController: UITableViewController {
             cell.selectionStyle = .none
         default:
             content = .cell()
-            content.text = "打开 seek.li 开发者页面"
+            content.text = SeekMailL10n.text("打开 seek.li 开发者页面")
             content.textProperties.color = .label
             content.textProperties.font = .preferredFont(forTextStyle: .headline)
             content.image = UIImage(systemName: "safari")

@@ -57,7 +57,7 @@ enum MainTabItem: String, CaseIterable {
         case .comments: return "我的评论"
         case .search: return "搜一搜"
         case .probe: return "探针"
-        case .mail: return "邮箱"
+        case .mail: return SeekMailL10n.text("邮箱")
         case .me: return "我的"
         }
     }

@@ -42,7 +42,7 @@ final class ProbeSearchBarView: UIView, UITextFieldDelegate {
         textField.accessibilityIdentifier = "probe-search-field"
         textField.addAction(UIAction { [weak self] _ in self?.notifyChange() }, for: .editingChanged)
 
-        cancelButton.setTitle("取消", for: .normal)
+        cancelButton.setTitle(NSLocalizedString("取消", tableName: "Search", comment: ""), for: .normal)
         cancelButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
         cancelButton.tintColor = .label
         cancelButton.alpha = 0

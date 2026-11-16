@@ -118,7 +118,7 @@ final class SeekMailInboxViewController: UIViewController {
 
     /// 入口页「更多」菜单里属于列表的部分。
     func menuElements() -> [UIMenuElement] {
-        let refresh = UIAction(title: "刷新", image: UIImage(systemName: "arrow.clockwise")) { [weak self] _ in
+        let refresh = UIAction(title: SeekMailL10n.text("刷新"), image: UIImage(systemName: "arrow.clockwise")) { [weak self] _ in
             self?.model.reload()
         }
         let storage = UIDeferredMenuElement.uncached { [weak self] completion in
@@ -127,10 +127,10 @@ final class SeekMailInboxViewController: UIViewController {
                 let item: UIAction
                 if let quota = try? await self.model.provider.quota(), let storage = quota.storage {
                     let percent = storage.usagePercent ?? Int(Double(storage.used) / Double(max(storage.quota, 1)) * 100)
-                    item = UIAction(title: "存储用量", subtitle: "\(SeekMailFormat.bytes(storage.used)) / \(SeekMailFormat.bytes(storage.quota)) · \(percent)%",
+                    item = UIAction(title: SeekMailL10n.text("存储用量"), subtitle: "\(SeekMailFormat.bytes(storage.used)) / \(SeekMailFormat.bytes(storage.quota)) · \(percent)%",
                                     image: UIImage(systemName: "internaldrive")) { _ in }
                 } else {
-                    item = UIAction(title: "存储用量", subtitle: "暂时无法获取", image: UIImage(systemName: "internaldrive"),
+                    item = UIAction(title: SeekMailL10n.text("存储用量"), subtitle: SeekMailL10n.text("暂时无法获取"), image: UIImage(systemName: "internaldrive"),
                                     attributes: .disabled) { _ in }
                 }
                 completion([item])
@@ -227,7 +227,7 @@ final class SeekMailInboxViewController: UIViewController {
         updateTags()
         onNavigationChange?()
         folderTabs.update(scopes: model.scopes, titles: model.scopes.map(model.title(for:)), selected: model.scope)
-        searchBar.textField.placeholder = "搜索 \(model.selectionTitle) · \(model.scopeTitle)"
+        searchBar.textField.placeholder = SeekMailL10n.format("搜索 %@ · %@", model.selectionTitle, model.scopeTitle)
         updateNotice()
         updateBackground()
         tableView.reloadData()
@@ -249,14 +249,14 @@ final class SeekMailInboxViewController: UIViewController {
         var text: String?
         if let until = model.rateLimitedUntil, until > Date() {
             let seconds = Int(until.timeIntervalSinceNow.rounded(.up))
-            text = "请求太频繁，\(seconds) 秒后可刷新"
+            text = SeekMailL10n.format("请求太频繁，%@ 秒后可刷新", String(seconds))
             noticeTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: false) { [weak self] _ in
                 MainActor.assumeIsolated { self?.updateNotice() }
             }
         } else if model.isSearching {
-            text = "只搜索 \(model.selectionTitle) · \(model.scopeTitle)"
+            text = SeekMailL10n.format("只搜索 %@ · %@", model.selectionTitle, model.scopeTitle)
         } else if model.isTrash {
-            text = "回收站只能查看 · 网页中恢复"
+            text = SeekMailL10n.text("回收站只能查看 · 网页中恢复")
         }
         noticeLabel.text = text
         noticeBar.isHidden = text == nil
@@ -268,7 +268,7 @@ final class SeekMailInboxViewController: UIViewController {
             tableView.backgroundView = nil
             tableView.separatorStyle = .singleLine
         case .failed(let message):
-            tableView.backgroundView = SeekMailStateView(message: message, actionTitle: "重试") { [weak self] in
+            tableView.backgroundView = SeekMailStateView(message: message, actionTitle: SeekMailL10n.text("重试")) { [weak self] in
                 self?.model.reload()
             }
             tableView.separatorStyle = .none
@@ -282,12 +282,12 @@ final class SeekMailInboxViewController: UIViewController {
     }
 
     private var emptyMessage: String {
-        if model.isSearching { return "没有找到相关邮件" }
+        if model.isSearching { return SeekMailL10n.text("没有找到相关邮件") }
         switch model.scope {
-        case .inbox: return "收件箱是空的\n新邮件到达后下拉刷新即可看到"
-        case .spam: return "没有垃圾邮件"
-        case .trash: return "回收站是空的"
-        case .custom: return "这个文件夹里还没有邮件"
+        case .inbox: return SeekMailL10n.text("收件箱是空的\n新邮件到达后下拉刷新即可看到")
+        case .spam: return SeekMailL10n.text("没有垃圾邮件")
+        case .trash: return SeekMailL10n.text("回收站是空的")
+        case .custom: return SeekMailL10n.text("这个文件夹里还没有邮件")
         }
     }
 
@@ -308,7 +308,7 @@ final class SeekMailInboxViewController: UIViewController {
         ) { [weak self] in
             guard let self else { return }
             // 接口返回 queued 只代表进了发送队列，不代表已经送达
-            undoToast.showMessage("已提交发送", in: view)
+            undoToast.showMessage(SeekMailL10n.text("已提交发送"), in: view)
         }
         present(UINavigationController(rootViewController: compose), animated: true)
     }
@@ -323,29 +323,29 @@ final class SeekMailInboxViewController: UIViewController {
     }
 
     private func moveMenu(for mail: SeekMail) -> UIMenu {
-        var targets: [(String, Int64?, SeekMailFolderScope)] = [("收件箱", nil, .inbox)]
+        var targets: [(String, Int64?, SeekMailFolderScope)] = [(SeekMailL10n.text("收件箱"), nil, .inbox)]
         targets += model.folders.map { (model.title(for: .custom($0.id)), $0.id, .custom($0.id)) }
         let actions = targets.filter { $0.2 != model.scope }.map { title, folderID, _ in
             UIAction(title: title) { [weak self] _ in self?.model.move(mail.id, toFolderID: folderID) }
         }
-        return UIMenu(title: "移动到…", image: UIImage(systemName: "folder"), children: actions)
+        return UIMenu(title: SeekMailL10n.text("移动到…"), image: UIImage(systemName: "folder"), children: actions)
     }
 
     private func contextMenu(for mail: SeekMail) -> UIMenu {
         var sections: [UIMenuElement] = []
         if model.selectedMailboxID == nil, let display = model.names[mail.mailboxId] {
             sections.append(UIMenu(options: .displayInline, children: [
-                UIAction(title: "只看 \(display.title)", subtitle: display.address, image: UIImage(systemName: "line.3.horizontal.decrease")) { [weak self] _ in
+                UIAction(title: SeekMailL10n.format("只看 %@", display.title), subtitle: display.address, image: UIImage(systemName: "line.3.horizontal.decrease")) { [weak self] _ in
                     self?.model.selectMailbox(mail.mailboxId)
                 }
             ]))
         }
         var actions: [UIMenuElement] = [
-            UIAction(title: mail.isRead ? "标为未读" : "标为已读",
+            UIAction(title: mail.isRead ? SeekMailL10n.text("标为未读") : SeekMailL10n.text("标为已读"),
                      image: UIImage(systemName: mail.isRead ? "envelope.badge" : "envelope.open")) { [weak self] _ in
                 self?.model.setRead(mail.id, read: mail.isRead == false)
             },
-            UIAction(title: mail.isFlagged ? "去掉星标" : "加星标",
+            UIAction(title: mail.isFlagged ? SeekMailL10n.text("去掉星标") : SeekMailL10n.text("加星标"),
                      image: UIImage(systemName: mail.isFlagged ? "star.slash" : "star")) { [weak self] _ in
                 self?.model.setFlagged(mail.id, flagged: mail.isFlagged == false)
             }
@@ -357,7 +357,7 @@ final class SeekMailInboxViewController: UIViewController {
         }
         sections.append(UIMenu(options: .displayInline, children: actions))
         if model.isTrash == false {
-            sections.append(UIAction(title: "删除", image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in
+            sections.append(UIAction(title: SeekMailL10n.text("删除"), image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in
                 self?.scheduleDelete(mail.id)
             })
         }
@@ -417,7 +417,7 @@ extension SeekMailInboxViewController: UITableViewDataSource, UITableViewDelegat
     /// 右滑只有已读/未读。
     func tableView(_ tableView: UITableView, leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
         guard let mail = mail(at: indexPath) else { return nil }
-        let action = UIContextualAction(style: .normal, title: mail.isRead ? "未读" : "已读") { [weak self] _, _, done in
+        let action = UIContextualAction(style: .normal, title: mail.isRead ? SeekMailL10n.text("未读") : SeekMailL10n.text("已读")) { [weak self] _, _, done in
             self?.model.setRead(mail.id, read: mail.isRead == false)
             done(true)
         }
@@ -429,7 +429,7 @@ extension SeekMailInboxViewController: UITableViewDataSource, UITableViewDelegat
     /// 左滑删除，回收站里没有。
     func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
         guard let mail = mail(at: indexPath), model.isTrash == false else { return nil }
-        let action = UIContextualAction(style: .destructive, title: "删除") { [weak self] _, _, done in
+        let action = UIContextualAction(style: .destructive, title: SeekMailL10n.text("删除")) { [weak self] _, _, done in
             self?.scheduleDelete(mail.id)
             done(true)
         }
@@ -616,7 +616,7 @@ final class SeekMailUndoToast: UIView {
         label.font = SeekMailFont.of(.subheadline)
         var configuration = UIButton.Configuration.plain()
         configuration.baseForegroundColor = .systemBackground
-        var title = AttributedString("撤销")
+        var title = AttributedString(SeekMailL10n.text("撤销"))
         title.font = SeekMailFont.system(15, weight: .semibold)
         configuration.attributedTitle = title
         undoButton.configuration = configuration
@@ -625,7 +625,7 @@ final class SeekMailUndoToast: UIView {
     func showUndo(seconds: Int, in container: UIView?) {
         remaining = seconds
         undoButton.isHidden = false
-        label.text = "已删除 · \(remaining)"
+        label.text = SeekMailL10n.format("已删除 · %@", String(remaining))
         present(in: container)
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
@@ -635,7 +635,7 @@ final class SeekMailUndoToast: UIView {
 
     private func tick() {
         remaining -= 1
-        if remaining <= 0 { dismiss() } else { label.text = "已删除 · \(remaining)" }
+        if remaining <= 0 { dismiss() } else { label.text = SeekMailL10n.format("已删除 · %@", String(remaining)) }
     }
 
     func showMessage(_ message: String, in container: UIView?) {
