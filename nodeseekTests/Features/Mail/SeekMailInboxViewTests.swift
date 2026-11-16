@@ -144,4 +144,40 @@ struct SeekMailInboxViewTests {
         (tagsView.mailTestView(id: "seek-mail-tag-3") as? UIButton)?.sendActions(for: .touchUpInside)
         #expect(inbox.model.selectedMailboxID == 3)
     }
+
+    @Test func progressFloatsAboveSearchWithoutTakingListHeight() async throws {
+        let inbox = SeekMailInboxViewController(
+            keyStore: InMemorySeekMailKeyStore(key: "sk_live_ok"),
+            transport: SeekMailRouteTransport().load,
+            selectionStore: makeSelectionStore()
+        )
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = inbox
+        window.isHidden = false
+        defer { window.isHidden = true }
+        inbox.view.layoutIfNeeded()
+        let table = try #require(inbox.view.mailTestView(id: "seek-mail-list") as? UITableView)
+        let tableFrame = table.frame
+        let insetBefore = table.contentInset.bottom
+
+        var stopped = false
+        inbox.progressBar.show(text: "正在标为已读 1/3", progress: 1 / 3, actionTitle: "停止") { stopped = true }
+        inbox.view.layoutIfNeeded()
+        let bar = inbox.progressBar
+        #expect(bar.superview === inbox.view)
+        #expect(bar.isHidden == false)
+        // 列表位置不变，只加大底部留白
+        #expect(table.frame == tableFrame)
+        #expect(table.contentInset.bottom > insetBefore)
+        let search = try #require(inbox.view.mailTestView(id: "seek-mail-search"))
+        #expect(bar.frame.maxY <= search.convert(search.bounds, to: inbox.view).minY)
+        (bar.mailTestView(id: "seek-mail-progress-action") as? UIButton)?.sendActions(for: .touchUpInside)
+        #expect(stopped)
+
+        inbox.progressBar.hide()
+        inbox.view.layoutIfNeeded()
+        // 淡出动画结束后才真正隐藏
+        #expect(bar.isShowing == false)
+        #expect(table.contentInset.bottom == insetBefore)
+    }
 }

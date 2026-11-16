@@ -26,7 +26,8 @@ final class SeekMailInboxViewController: UIViewController {
     private var noticeTimer: Timer?
     private var lastDeletedID: Int64?
     private var autoRefreshTimer: Timer?
-    private let progressBar = SeekMailProgressBar()
+    /// 悬浮在搜索框上方，不占列表高度。
+    let progressBar = SeekMailProgressBar()
     private lazy var markJob: SeekMailMarkAllReadJob = {
         let job = SeekMailMarkAllReadJob(provider: model.provider)
         job.onChange = { [weak self] state in self?.renderMarkJob(state) }
@@ -343,8 +344,7 @@ final class SeekMailInboxViewController: UIViewController {
         }, for: .valueChanged)
         tableView.refreshControl = refresh
 
-        progressBar.isHidden = true
-        let stack = UIStackView(arrangedSubviews: [mailboxTags, folderTabs, progressBar, noticeBar, tableView])
+        let stack = UIStackView(arrangedSubviews: [mailboxTags, folderTabs, noticeBar, tableView])
         stack.axis = .vertical
         stack.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(stack)
@@ -383,12 +383,26 @@ final class SeekMailInboxViewController: UIViewController {
         ])
         // 提示条放在搜索框上方，避免挡住它
         undoToast.bottomOffset = ProbeSearchBarView.height + 8 + 12
+
+        progressBar.translatesAutoresizingMaskIntoConstraints = false
+        progressBar.onVisibilityChange = { [weak self] in
+            self?.view.setNeedsLayout()
+        }
+        view.addSubview(progressBar)
+        NSLayoutConstraint.activate([
+            progressBar.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
+            progressBar.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
+            progressBar.bottomAnchor.constraint(equalTo: searchBar.topAnchor, constant: -8)
+        ])
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        // 列表底部让出搜索框的位置；安全区由系统自动加，这里只补高出的部分
-        let bottom = max(view.bounds.maxY - searchBar.frame.minY + 8 - view.safeAreaInsets.bottom, 0)
+        // 列表底部让出搜索框（和进度条）的位置；安全区由系统自动加，这里只补高出的部分
+        let floatingTop = progressBar.isShowing ? min(progressBar.frame.minY, searchBar.frame.minY) : searchBar.frame.minY
+        let bottom = max(view.bounds.maxY - floatingTop + 8 - view.safeAreaInsets.bottom, 0)
+        // 进度条显示时提示往上让开，不叠在一起
+        undoToast.updateBottomOffset(ProbeSearchBarView.height + 8 + 12 + (progressBar.isShowing ? progressBar.bounds.height + 8 : 0))
         if tableView.contentInset.bottom != bottom {
             tableView.contentInset.bottom = bottom
             tableView.verticalScrollIndicatorInsets.bottom = bottom
@@ -624,6 +638,10 @@ extension SeekMailInboxViewController: UITableViewDataSource, UITableViewDelegat
 
 /// 列表上方的进度条：逐封标已读时显示进度，可停止或重试。
 final class SeekMailProgressBar: UIView {
+    /// 显示或隐藏后通知页面重新计算列表底部留白。
+    var onVisibilityChange: (() -> Void)?
+    private(set) var isShowing = false
+    private let background = UIVisualEffectView(effect: UIBlurEffect(style: .systemThickMaterial))
     private let label = UILabel()
     private let progressView = UIProgressView(progressViewStyle: .default)
     private let button = UIButton(type: .system)
@@ -631,9 +649,21 @@ final class SeekMailProgressBar: UIView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = .secondarySystemBackground
         accessibilityIdentifier = "seek-mail-progress"
-        label.textColor = .secondaryLabel
+        isHidden = true
+        alpha = 0
+        // 阴影在外层，圆角裁切在材质层，两者才能同时生效
+        layer.shadowColor = UIColor.black.cgColor
+        layer.shadowOpacity = 0.12
+        layer.shadowRadius = 12
+        layer.shadowOffset = CGSize(width: 0, height: 4)
+        background.layer.cornerRadius = 16
+        background.layer.cornerCurve = .continuous
+        background.clipsToBounds = true
+        background.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(background)
+
+        label.textColor = .label
         label.numberOfLines = 0
         label.accessibilityIdentifier = "seek-mail-progress-text"
         progressView.progressTintColor = .label
@@ -647,14 +677,19 @@ final class SeekMailProgressBar: UIView {
         row.spacing = 8
         let column = UIStackView(arrangedSubviews: [row, progressView])
         column.axis = .vertical
-        column.spacing = 6
+        column.spacing = 8
         column.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(column)
+        background.contentView.addSubview(column)
         NSLayoutConstraint.activate([
-            column.leadingAnchor.constraint(equalTo: layoutMarginsGuide.leadingAnchor),
-            column.trailingAnchor.constraint(equalTo: layoutMarginsGuide.trailingAnchor),
-            column.topAnchor.constraint(equalTo: topAnchor, constant: 8),
-            column.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8)
+            background.leadingAnchor.constraint(equalTo: leadingAnchor),
+            background.trailingAnchor.constraint(equalTo: trailingAnchor),
+            background.topAnchor.constraint(equalTo: topAnchor),
+            background.bottomAnchor.constraint(equalTo: bottomAnchor),
+            column.leadingAnchor.constraint(equalTo: background.contentView.leadingAnchor, constant: 16),
+            column.trailingAnchor.constraint(equalTo: background.contentView.trailingAnchor, constant: -10),
+            column.topAnchor.constraint(equalTo: background.contentView.topAnchor, constant: 10),
+            column.bottomAnchor.constraint(equalTo: background.contentView.bottomAnchor, constant: -12),
+            row.heightAnchor.constraint(greaterThanOrEqualToConstant: 28)
         ])
     }
 
@@ -662,28 +697,50 @@ final class SeekMailProgressBar: UIView {
 
     var text: String? { label.text }
 
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: 16).cgPath
+    }
+
     func show(text: String, progress: Float?, actionTitle: String? = nil, action: (() -> Void)? = nil) {
-        label.font = SeekMailFont.of(.footnote)
+        label.font = SeekMailFont.of(.footnote, weight: .medium)
         label.text = text
         progressView.isHidden = progress == nil
-        progressView.setProgress(progress ?? 0, animated: isHidden == false)
+        progressView.setProgress(progress ?? 0, animated: isShowing)
         self.action = action
         button.isHidden = actionTitle == nil
         if let actionTitle {
             var configuration = UIButton.Configuration.plain()
             configuration.baseForegroundColor = .label
-            configuration.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 0)
+            configuration.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 6)
             var title = AttributedString(actionTitle)
             title.font = SeekMailFont.of(.footnote, weight: .semibold)
             configuration.attributedTitle = title
             button.configuration = configuration
         }
+        guard isShowing == false else { return }
+        isShowing = true
         isHidden = false
+        superview?.bringSubviewToFront(self)
+        transform = CGAffineTransform(translationX: 0, y: 12)
+        onVisibilityChange?()
+        UIView.animate(withDuration: window == nil ? 0 : 0.25, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) {
+            self.alpha = 1
+            self.transform = .identity
+        }
     }
 
     func hide() {
         action = nil
-        isHidden = true
+        guard isShowing else { return }
+        isShowing = false
+        onVisibilityChange?()
+        UIView.animate(withDuration: window == nil ? 0 : 0.2, delay: 0, options: [.beginFromCurrentState, .curveEaseIn], animations: {
+            self.alpha = 0
+            self.transform = CGAffineTransform(translationX: 0, y: 12)
+        }, completion: { _ in
+            if self.isShowing == false { self.isHidden = true }
+        })
     }
 }
 
@@ -815,6 +872,7 @@ final class SeekMailUndoToast: UIView {
     var onUndo: (() -> Void)?
     /// 距离安全区底部的距离，第一次显示前设置才生效。
     var bottomOffset: CGFloat = 12
+    private var bottomConstraint: NSLayoutConstraint?
     private let label = UILabel()
     private let undoButton = UIButton(type: .system)
     private var timer: Timer?
@@ -888,6 +946,13 @@ final class SeekMailUndoToast: UIView {
         }
     }
 
+    /// 底部有其他悬浮内容时让开；已经显示的也跟着移动。
+    func updateBottomOffset(_ offset: CGFloat) {
+        guard offset != bottomOffset else { return }
+        bottomOffset = offset
+        bottomConstraint?.constant = -offset
+    }
+
     func dismiss() {
         timer?.invalidate()
         timer = nil
@@ -903,10 +968,12 @@ final class SeekMailUndoToast: UIView {
             removeFromSuperview()
             translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(self)
+            let bottom = bottomAnchor.constraint(equalTo: container.safeAreaLayoutGuide.bottomAnchor, constant: -bottomOffset)
+            bottomConstraint = bottom
             NSLayoutConstraint.activate([
                 leadingAnchor.constraint(equalTo: container.safeAreaLayoutGuide.leadingAnchor, constant: 16),
                 trailingAnchor.constraint(equalTo: container.safeAreaLayoutGuide.trailingAnchor, constant: -16),
-                bottomAnchor.constraint(equalTo: container.safeAreaLayoutGuide.bottomAnchor, constant: -bottomOffset)
+                bottom
             ])
         }
         layer.removeAllAnimations()
