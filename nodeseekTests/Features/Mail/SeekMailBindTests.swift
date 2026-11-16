@@ -163,6 +163,7 @@ final class InMemorySeekMailKeyStore: SeekMailAPIKeyStoring {
 
     var failsToSave = false
 
+    @discardableResult
     func save(apiKey: String) -> Bool {
         guard failsToSave == false else { return false }
         key = SeekMailAPIKeyStore.normalized(apiKey)
@@ -196,6 +197,8 @@ final class SeekMailRouteTransport {
     var mailPages: [String] = [
         #"{"data":[{"id":11,"mailboxId":1,"fromAddress":"noreply@example.com","subject":"Hi","bodyText":"a","isRead":false},{"id":12,"mailboxId":2,"fromAddress":"bill@example.com","subject":"Bill","bodyText":"b","isRead":true}],"pagination":{"total":2,"limit":20,"offset":0}}"#
     ]
+    /// 按完整路径返回的内容，例如详情和附件列表。
+    var details: [String: String] = [:]
     /// 模拟网络耗时，用来看到加载中的骨架行。
     var delayNanoseconds: UInt64 = 0
     private(set) var requests: [URLRequest] = []
@@ -212,6 +215,8 @@ final class SeekMailRouteTransport {
             body = mailboxes
         } else if path.hasSuffix("/folders") {
             body = #"{"data":null}"#
+        } else if let detail = details[path] {
+            body = detail
         } else if path.hasSuffix("/mails") {
             let index = min(requests.filter { $0.url?.path.hasSuffix("/mails") == true }.count - 1, mailPages.count - 1)
             body = mailPages[index]

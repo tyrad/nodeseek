@@ -300,7 +300,10 @@ final class SeekMailInboxViewController: UIViewController {
     }
 
     private func openMail(_ mail: SeekMail) {
-        model.setRead(mail.id, read: true, silent: true)
+        let detail = SeekMailDetailViewController(mailID: mail.id, model: model) { [weak self] id in
+            self?.scheduleDelete(id)
+        }
+        navigationController?.pushViewController(detail, animated: true)
     }
 
     private func moveMenu(for mail: SeekMail) -> UIMenu {

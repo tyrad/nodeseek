@@ -366,6 +366,15 @@ final class SeekMailInboxModel {
         }
     }
 
+    /// 打开详情时标已读，失败不提示；不在列表里的邮件直接发请求。
+    func markOpened(_ id: Int64) {
+        if let mail = mail(id: id) {
+            if mail.isRead == false { setRead(id, read: true, silent: true) }
+            return
+        }
+        Task { [provider] in try? await provider.markRead(id: id, read: true) }
+    }
+
     func setFlagged(_ id: Int64, flagged: Bool) {
         guard let original = mail(id: id), original.isFlagged != flagged else { return }
         update(id) { $0.isFlagged = flagged }
