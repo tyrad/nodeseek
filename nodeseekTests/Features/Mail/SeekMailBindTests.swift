@@ -114,7 +114,8 @@ struct SeekMailBindTests {
         let inbox = try #require(home.children.first as? SeekMailInboxViewController)
         #expect(home.children.count == 1)
         #expect(home.navigationItem.rightBarButtonItems?.first?.accessibilityIdentifier == "seek-mail-more")
-        #expect(home.navigationItem.titleView === inbox.titleButton)
+        // 邮箱用页面顶部的标签切换，导航栏只显示标题
+        #expect(home.navigationItem.titleView == nil)
         // 搜索框在页面底部，不挂到导航栏，避免返回时底部 Tab 跳动
         #expect(home.navigationItem.searchController == nil)
         #expect(inbox.view.mailTestView(id: "seek-mail-search") is UITextField)

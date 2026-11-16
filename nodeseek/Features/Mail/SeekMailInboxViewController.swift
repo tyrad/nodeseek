@@ -6,19 +6,19 @@
 import SafariServices
 import UIKit
 
-/// 已绑定时的邮件列表。导航栏的标题按钮由入口页挂到自己的导航栏上；搜索框悬浮在本页底部。
+/// 已绑定时的邮件列表。顶部平铺邮箱标签，搜索框悬浮在本页底部。
 final class SeekMailInboxViewController: UIViewController {
     let model: SeekMailInboxModel
     /// 401 时回调，由入口页清掉 Key 并回到绑定页。
     var onUnauthorized: (() -> Void)?
-    /// 标题变化后，入口页要重新同步导航栏。
+    /// 邮箱列表变化后（例如能否写信），入口页要重新同步导航栏。
     var onNavigationChange: (() -> Void)?
 
-    private(set) lazy var titleButton = makeTitleButton()
     /// 不用系统 searchController：iOS 26 会把它放到底部并占用导航栈的底部安全区，返回时底部 Tab 会跳一下。
     let searchBar = ProbeSearchBarView()
 
     private let tableView = UITableView(frame: .zero, style: .plain)
+    private let mailboxTags = SeekMailMailboxTagsView()
     private let folderTabs = SeekMailFolderTabsView()
     private let noticeLabel = UILabel()
     private let noticeBar = UIView()
@@ -61,6 +61,12 @@ final class SeekMailInboxViewController: UIViewController {
         model.onUnauthorized = { [weak self] in self?.onUnauthorized?() }
         model.onMessage = { [weak self] message in self?.undoToast.showMessage(message, in: self?.view) }
         folderTabs.onSelect = { [weak self] scope in self?.model.selectScope(scope) }
+        mailboxTags.onSelect = { [weak self] id in self?.model.selectMailbox(id) }
+        mailboxTags.onToggle = { [weak self] expanded in self?.model.selectionStore.tagsExpanded = expanded }
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(unreadCountsDidChange(_:)),
+            name: SeekMailUnreadMonitor.didChangeNotification, object: nil
+        )
         NotificationCenter.default.addObserver(
             self, selector: #selector(appWillResignActive),
             name: UIApplication.willResignActiveNotification, object: nil
@@ -71,6 +77,12 @@ final class SeekMailInboxViewController: UIViewController {
         )
         render()
         model.start()
+    }
+
+    /// 回到前台检查到的未读数直接用在标签上，不再单独请求。
+    @objc private func unreadCountsDidChange(_ notification: Notification) {
+        guard let counts = (notification.object as? SeekMailUnreadMonitor)?.latestCounts else { return }
+        model.applyUnreadCounts(counts)
     }
 
     /// 回到前台时发现新邮件，列表正停在这里就直接刷新。
@@ -140,10 +152,13 @@ final class SeekMailInboxViewController: UIViewController {
         tableView.accessibilityIdentifier = "seek-mail-list"
         tableView.keyboardDismissMode = .onDrag
         let refresh = UIRefreshControl()
-        refresh.addAction(UIAction { [weak self] _ in self?.model.reload() }, for: .valueChanged)
+        refresh.addAction(UIAction { [weak self] _ in
+            self?.model.reload()
+            self?.model.refreshUnreadCounts()
+        }, for: .valueChanged)
         tableView.refreshControl = refresh
 
-        let stack = UIStackView(arrangedSubviews: [folderTabs, noticeBar, tableView])
+        let stack = UIStackView(arrangedSubviews: [mailboxTags, folderTabs, noticeBar, tableView])
         stack.axis = .vertical
         stack.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(stack)
@@ -194,25 +209,12 @@ final class SeekMailInboxViewController: UIViewController {
         }
     }
 
-    private func makeTitleButton() -> UIButton {
-        var configuration = UIButton.Configuration.plain()
-        configuration.baseForegroundColor = .label
-        configuration.image = UIImage(systemName: "chevron.down")
-        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
-        configuration.imagePlacement = .trailing
-        configuration.imagePadding = 4
-        configuration.titleLineBreakMode = .byTruncatingMiddle
-        let button = UIButton(configuration: configuration)
-        button.accessibilityIdentifier = "seek-mail-title"
-        button.addAction(UIAction { [weak self] _ in self?.presentMailboxPickerIfNeeded() }, for: .touchUpInside)
-        return button
-    }
-
     // MARK: - 渲染
 
     private func render() {
         tableView.refreshControl?.endRefreshing()
-        updateTitle()
+        updateTags()
+        onNavigationChange?()
         folderTabs.update(scopes: model.scopes, titles: model.scopes.map(model.title(for:)), selected: model.scope)
         searchBar.textField.placeholder = "搜索 \(model.selectionTitle) · \(model.scopeTitle)"
         updateNotice()
@@ -224,27 +226,10 @@ final class SeekMailInboxViewController: UIViewController {
         }
     }
 
-    private func updateTitle() {
-        var title = AttributedString(model.selectionTitle)
-        title.font = UIFont.systemFont(ofSize: 17, weight: .semibold)
-        if model.selectedMailboxID == nil, model.mailboxes.isEmpty == false {
-            var count = AttributedString(" \(model.mailboxes.count)")
-            count.font = UIFont.systemFont(ofSize: 13, weight: .regular)
-            count.foregroundColor = .secondaryLabel
-            title += count
-        }
-        titleButton.configuration?.attributedTitle = title
-        titleButton.accessibilityLabel = "\(model.selectionTitle)，切换邮箱"
-        // 5 个及以内直接用系统菜单；更多时弹出可搜索的面板
-        if model.mailboxes.count <= 5, model.mailboxes.isEmpty == false {
-            titleButton.menu = makeMailboxMenu()
-            titleButton.showsMenuAsPrimaryAction = true
-        } else {
-            titleButton.menu = nil
-            titleButton.showsMenuAsPrimaryAction = false
-        }
-        titleButton.sizeToFit()
-        onNavigationChange?()
+    private func updateTags() {
+        mailboxTags.isHidden = model.mailboxes.isEmpty
+        mailboxTags.update(tags: model.mailboxTags, selectedID: model.selectedMailboxID,
+                           expanded: model.selectionStore.tagsExpanded)
     }
 
     private func updateNotice() {
@@ -293,37 +278,6 @@ final class SeekMailInboxViewController: UIViewController {
         case .trash: return "回收站是空的"
         case .custom: return "这个文件夹里还没有邮件"
         }
-    }
-
-    // MARK: - 切换邮箱
-
-    private func makeMailboxMenu() -> UIMenu {
-        let all = UIAction(title: "全部邮箱", state: model.selectedMailboxID == nil ? .on : .off) { [weak self] _ in
-            self?.model.selectMailbox(nil)
-        }
-        let items = model.mailboxes.map { mailbox in
-            let display = model.names[mailbox.id]
-            return UIAction(title: display?.title ?? mailbox.address,
-                            subtitle: display?.domainSuffix == nil ? (display?.hasAlias == true ? mailbox.address : nil) : display?.domainSuffix,
-                            state: model.selectedMailboxID == mailbox.id ? .on : .off) { [weak self] _ in
-                self?.model.selectMailbox(mailbox.id)
-            }
-        }
-        return UIMenu(children: [UIMenu(options: .displayInline, children: [all]), UIMenu(options: .displayInline, children: items)])
-    }
-
-    private func presentMailboxPickerIfNeeded() {
-        guard model.mailboxes.count > 5 else { return }
-        let picker = SeekMailboxPickerViewController(model: model) { [weak self] id in
-            self?.model.selectMailbox(id)
-        }
-        let navigation = UINavigationController(rootViewController: picker)
-        if let sheet = navigation.sheetPresentationController {
-            sheet.detents = [.medium(), .large()]
-            sheet.prefersGrabberVisible = true
-            sheet.prefersScrollingExpandsWhenScrolledToEdge = true
-        }
-        present(navigation, animated: true)
     }
 
     // MARK: - 操作
@@ -489,6 +443,9 @@ final class SeekMailFolderTabsView: UIView {
     private let stack = UIStackView()
     private var scopes: [SeekMailFolderScope] = []
     private var buttons: [UIButton] = []
+    private var selectedIndex: Int?
+    /// 选中下划线：邮箱标签已经用了反色胶囊，文件夹用文字加下划线区分层级。
+    private let indicator = UIView()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -496,10 +453,12 @@ final class SeekMailFolderTabsView: UIView {
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         stack.spacing = 6
-        stack.alignment = .center
+        stack.alignment = .fill
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(scrollView)
         scrollView.addSubview(stack)
+        indicator.backgroundColor = .label
+        scrollView.addSubview(indicator)
         let separator = UIView()
         separator.backgroundColor = .separator
         separator.translatesAutoresizingMaskIntoConstraints = false
@@ -511,7 +470,8 @@ final class SeekMailFolderTabsView: UIView {
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 12),
             stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -12),
-            stack.centerYAnchor.constraint(equalTo: scrollView.frameLayoutGuide.centerYAnchor),
+            stack.topAnchor.constraint(equalTo: scrollView.frameLayoutGuide.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: scrollView.frameLayoutGuide.bottomAnchor),
             separator.leadingAnchor.constraint(equalTo: leadingAnchor),
             separator.trailingAnchor.constraint(equalTo: trailingAnchor),
             separator.bottomAnchor.constraint(equalTo: bottomAnchor),
@@ -534,19 +494,31 @@ final class SeekMailFolderTabsView: UIView {
             }
             buttons.forEach(stack.addArrangedSubview)
         }
+        selectedIndex = scopes.firstIndex(of: selected)
+        setNeedsLayout()
         for (index, button) in buttons.enumerated() {
             let isSelected = scopes[index] == selected
-            var configuration = isSelected ? UIButton.Configuration.filled() : UIButton.Configuration.plain()
-            configuration.cornerStyle = .capsule
-            configuration.baseBackgroundColor = .label
-            configuration.baseForegroundColor = isSelected ? .systemBackground : .secondaryLabel
-            configuration.contentInsets = NSDirectionalEdgeInsets(top: 5, leading: 12, bottom: 5, trailing: 12)
+            var configuration = UIButton.Configuration.plain()
+            configuration.baseForegroundColor = isSelected ? .label : .secondaryLabel
+            configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
             var title = AttributedString(titles[index])
             title.font = UIFont.systemFont(ofSize: 15, weight: isSelected ? .semibold : .regular)
             configuration.attributedTitle = title
             button.configuration = configuration
             button.accessibilityTraits = isSelected ? [.button, .selected] : .button
         }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard let selectedIndex, buttons.indices.contains(selectedIndex) else {
+            indicator.isHidden = true
+            return
+        }
+        scrollView.layoutIfNeeded()
+        let frame = buttons[selectedIndex].convert(buttons[selectedIndex].bounds, to: scrollView)
+        indicator.isHidden = false
+        indicator.frame = CGRect(x: frame.minX + 8, y: bounds.height - 2, width: max(frame.width - 16, 0), height: 2)
     }
 }
 

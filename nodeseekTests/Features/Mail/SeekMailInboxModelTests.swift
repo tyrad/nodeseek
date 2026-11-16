@@ -108,6 +108,31 @@ struct SeekMailInboxModelTests {
         #expect(model.showsRecipientMailbox)
     }
 
+    @Test func unreadCountsDriveTagsAndFollowLocalReadChanges() async throws {
+        let transport = SeekMailRouteTransport()
+        transport.details["/openapi/v1/mails/counts"] = #"{"data":{"mailboxes":{"1":3},"total":3}}"#
+        let model = SeekMailInboxModel(
+            provider: SeekMailProvider(apiKey: { "sk_live_ok" }, transport: transport.load),
+            selectionStore: makeSelectionStore()
+        )
+        model.start()
+        await mailWaitUntil { model.phase == .loaded && model.unreadTotal == 3 }
+
+        // 账单（2 号）有别名但没有未读，排在有未读的 1 号后面
+        #expect(model.mailboxTags.map(\.id) == [nil, 1, 2])
+        #expect(model.mailboxTags.map(\.countText) == [" (3)", " (3)", nil])
+
+        // 本地标已读就地减一，不重排，也不再请求未读数
+        let countRequests = transport.requests.filter { $0.url?.path.hasSuffix("/counts") == true }.count
+        model.setRead(11, read: true)
+        #expect(model.unreadTotal == 2)
+        #expect(model.unreadByMailbox[1] == 2)
+        #expect(model.mailboxTags.map(\.id) == [nil, 1, 2])
+        try await Task.sleep(nanoseconds: 100_000_000)
+        #expect(transport.requests.filter { $0.url?.path.hasSuffix("/counts") == true }.count == countRequests)
+        #expect(SeekMailMailboxTag(id: 1, title: "a", unread: 120).countText == " (99+)")
+    }
+
     @Test func searchAndScopeChangesQueryCurrentRange() async throws {
         let transport = SeekMailRouteTransport()
         let model = makeModel(transport)

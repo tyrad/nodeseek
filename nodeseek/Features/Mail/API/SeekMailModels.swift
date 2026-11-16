@@ -174,6 +174,11 @@ nonisolated struct SeekMailUnreadCounts: Decodable, Equatable, Sendable {
         case mailboxes, total
     }
 
+    init(byMailbox: [Int64: Int], total: Int) {
+        self.byMailbox = byMailbox
+        self.total = total
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let raw = try container.decodeIfPresent([String: Int].self, forKey: .mailboxes) ?? [:]

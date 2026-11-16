@@ -29,6 +29,8 @@ final class SeekMailUnreadMonitor {
 
     /// nil 表示没绑定 Key 或还没查过，入口不显示数字。
     private(set) var totalUnread: Int?
+    /// 最近一次拿到的各邮箱未读数，邮箱页的标签直接复用。
+    private(set) var latestCounts: SeekMailUnreadCounts?
 
     private enum Key {
         static let maxID = "seekMail.unread.maxID"
@@ -93,7 +95,14 @@ final class SeekMailUnreadMonitor {
         do {
             let counts = try await provider.unreadCounts()
             let previous = totalUnread
-            setTotal(counts.total)
+            let countsChanged = counts != latestCounts
+            latestCounts = counts
+            if counts.total != totalUnread {
+                setTotal(counts.total)
+            } else if countsChanged {
+                // 总数没变但各邮箱分布变了，邮箱页的标签也要更新
+                notificationCenter.post(name: Self.didChangeNotification, object: self)
+            }
             // 未读总数没涨就不会有要提醒的新邮件，省掉一次请求；每天的完整同步照常做
             let increased = previous.map { counts.total > $0 } ?? true
             if increased || needsFullSync(at: date) {
@@ -102,7 +111,10 @@ final class SeekMailUnreadMonitor {
         } catch is CancellationError {
         } catch {
             // 检查失败不打扰用户，保留上次的数字；Key 失效时清掉
-            if case .unauthorized? = error as? SeekMailError { setTotal(nil) }
+            if case .unauthorized? = error as? SeekMailError {
+                latestCounts = nil
+                setTotal(nil)
+            }
         }
     }
 

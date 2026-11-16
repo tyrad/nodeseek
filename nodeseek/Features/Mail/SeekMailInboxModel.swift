@@ -49,6 +49,7 @@ final class SeekMailSelectionStore {
         static let mailbox = "seekMail.selectedMailboxID"
         static let scope = "seekMail.selectedScope"
         static let recents = "seekMail.recentMailboxIDs"
+        static let tagsExpanded = "seekMail.mailboxTagsExpanded"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -65,6 +66,12 @@ final class SeekMailSelectionStore {
         set { defaults.set(newValue.storageValue, forKey: Key.scope) }
     }
 
+    /// 邮箱标签区是否展开；默认折叠。
+    var tagsExpanded: Bool {
+        get { defaults.bool(forKey: Key.tagsExpanded) }
+        set { defaults.set(newValue, forKey: Key.tagsExpanded) }
+    }
+
     var recentMailboxIDs: [Int64] {
         (defaults.array(forKey: Key.recents) as? [NSNumber])?.map(\.int64Value) ?? []
     }
@@ -76,7 +83,7 @@ final class SeekMailSelectionStore {
     }
 
     func clear() {
-        [Key.mailbox, Key.scope, Key.recents].forEach(defaults.removeObject(forKey:))
+        [Key.mailbox, Key.scope, Key.recents, Key.tagsExpanded].forEach(defaults.removeObject(forKey:))
     }
 }
 
@@ -111,6 +118,11 @@ final class SeekMailInboxModel {
     private(set) var isLoadingMore = false
     private(set) var hasMore = false
     private(set) var rateLimitedUntil: Date?
+    /// 各邮箱未读数；没拿到之前为空，总数为 nil。
+    private(set) var unreadByMailbox: [Int64: Int] = [:]
+    private(set) var unreadTotal: Int?
+    /// 标签顺序：置顶 → 有未读 → 其他。只在拿到新数字时重排，本地标已读不重排，免得标签跳来跳去。
+    private(set) var mailboxOrder: [Int64] = []
 
     private var allMails: [SeekMail] = []
     private var pendingDeletes: [Int64: Task<Void, Never>] = [:]
@@ -210,6 +222,7 @@ final class SeekMailInboxModel {
         phase = .loading
         restoreSnapshot()
         onChange?()
+        refreshUnreadCounts()
         generation += 1
         let token = generation
         loadTask?.cancel()
@@ -338,6 +351,7 @@ final class SeekMailInboxModel {
         self.mailboxes = mailboxes
         self.folders = folders.sorted { ($0.sortOrder ?? 0) < ($1.sortOrder ?? 0) }
         names = SeekMailboxNaming.displays(for: mailboxes)
+        sortMailboxes()
         // 记住的邮箱或文件夹已被删掉，回到默认
         if let id = selectedMailboxID, mailboxes.contains(where: { $0.id == id }) == false {
             selectedMailboxID = nil
@@ -402,12 +416,14 @@ final class SeekMailInboxModel {
 
     func setRead(_ id: Int64, read: Bool, silent: Bool = false) {
         guard let original = mail(id: id), original.isRead != read else { return }
+        adjustUnread(mailboxID: original.mailboxId, by: read ? -1 : 1)
         update(id) { $0.isRead = read }
         Task { [weak self] in
             guard let self else { return }
             do {
                 try await provider.markRead(id: id, read: read)
             } catch {
+                adjustUnread(mailboxID: original.mailboxId, by: read ? 1 : -1)
                 update(id) { $0.isRead = original.isRead }
                 if silent == false { report(error) }
             }
@@ -513,6 +529,9 @@ final class SeekMailInboxModel {
         do {
             try await provider.deleteMail(id: id)
             pendingDeletes[id] = nil
+            if let removed = allMails.first(where: { $0.id == id }), removed.isRead == false {
+                adjustUnread(mailboxID: removed.mailboxId, by: -1)
+            }
             allMails.removeAll { $0.id == id }
             onChange?()
         } catch {
@@ -521,6 +540,38 @@ final class SeekMailInboxModel {
             onChange?()
             report(error)
         }
+    }
+
+    // MARK: - 未读数
+
+    /// 进入邮箱和下拉刷新时请求一次；失败不提示，标签只是不显示数字。
+    func refreshUnreadCounts() {
+        Task { [weak self] in
+            guard let self, let counts = try? await provider.unreadCounts() else { return }
+            applyUnreadCounts(counts)
+        }
+    }
+
+    /// 也用于复用回到前台时检查到的数字，不再单独请求。
+    func applyUnreadCounts(_ counts: SeekMailUnreadCounts) {
+        unreadByMailbox = counts.byMailbox
+        unreadTotal = counts.total
+        sortMailboxes()
+        onChange?()
+    }
+
+    private func sortMailboxes() {
+        let sections = SeekMailboxPickerSections.make(
+            mailboxes: mailboxes, names: names, counts: unreadByMailbox, recentIDs: [], query: ""
+        )
+        mailboxOrder = (sections.pinned + sections.unread + sections.others).map(\.mailboxID)
+    }
+
+    /// 本地标已读、删除时就地加减，不再请求；还没拿到数字时不动。
+    private func adjustUnread(mailboxID: Int64, by delta: Int) {
+        guard let total = unreadTotal else { return }
+        unreadTotal = max(total + delta, 0)
+        unreadByMailbox[mailboxID] = max((unreadByMailbox[mailboxID] ?? 0) + delta, 0)
     }
 
     private func update(_ id: Int64, _ change: (inout SeekMail) -> Void) {
