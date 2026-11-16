@@ -42,6 +42,8 @@ extension PostDetailViewProtocol {
 protocol PostDetailPresenterProtocol: AnyObject {
     func viewDidLoad()
     func refreshInitialPage()
+    /// 页码面板选中某页：清空已加载评论，从该页重新加载。
+    func didSelectCommentPage(_ page: Int)
     func didTapLogin()
     func didApproachCommentEnd()
     func didTapRefreshCommentsAtEnd()

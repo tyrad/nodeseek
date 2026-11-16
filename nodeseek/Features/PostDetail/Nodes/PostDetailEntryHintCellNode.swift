@@ -17,14 +17,17 @@ final class PostDetailEntryHintCellNode: ASCellNode, ThemeRefreshableNode {
     }
 
     private let page: Int
+    /// 跳页后列表从中间页开始：文案说明起始页，按钮改为原地回到第 1 页。
+    private let isAfterPageJump: Bool
     private let onOpenFullPost: () -> Void
     private let containerNode = ASDisplayNode()
     private let textNode = ASTextNode()
     private let buttonNode = ASButtonNode()
     private let themeTraitObserver = ThemeTraitObserver()
 
-    init(page: Int, onOpenFullPost: @escaping () -> Void) {
+    init(page: Int, isAfterPageJump: Bool = false, onOpenFullPost: @escaping () -> Void) {
         self.page = max(1, page)
+        self.isAfterPageJump = isAfterPageJump
         self.onOpenFullPost = onOpenFullPost
         super.init()
         automaticallyManagesSubnodes = true
@@ -41,7 +44,7 @@ final class PostDetailEntryHintCellNode: ASCellNode, ThemeRefreshableNode {
 
         buttonNode.cornerRadius = 8
         buttonNode.contentEdgeInsets = UIEdgeInsets(top: 7, left: 10, bottom: 7, right: 10)
-        buttonNode.accessibilityLabel = "查看完整帖子"
+        buttonNode.accessibilityLabel = buttonTitle
         buttonNode.addTarget(self, action: #selector(openFullPostTapped), forControlEvents: .touchUpInside)
     }
 
@@ -54,7 +57,7 @@ final class PostDetailEntryHintCellNode: ASCellNode, ThemeRefreshableNode {
         backgroundColor = UIColor.systemBackground
         containerNode.backgroundColor = .secondarySystemBackground
         textNode.attributedText = NSAttributedString(
-            string: "当前从第 \(page) 页进入",
+            string: isAfterPageJump ? "当前从第 \(page) 页开始" : "当前从第 \(page) 页进入",
             attributes: [
                 .font: UIFont.preferredFont(forTextStyle: .footnote),
                 .foregroundColor: UIColor.secondaryLabel
@@ -65,7 +68,7 @@ final class PostDetailEntryHintCellNode: ASCellNode, ThemeRefreshableNode {
         buttonNode.backgroundColor = .label
         buttonNode.setAttributedTitle(
             NSAttributedString(
-                string: "查看完整帖子",
+                string: buttonTitle,
                 attributes: [
                     .font: buttonFont,
                     .foregroundColor: UIColor.systemBackground
@@ -89,6 +92,10 @@ final class PostDetailEntryHintCellNode: ASCellNode, ThemeRefreshableNode {
         let content = ASInsetLayoutSpec(insets: Layout.contentInset, child: row)
         let background = ASBackgroundLayoutSpec(child: content, background: containerNode)
         return ASInsetLayoutSpec(insets: Layout.containerInset, child: background)
+    }
+
+    private var buttonTitle: String {
+        isAfterPageJump ? "回到第 1 页" : "查看完整帖子"
     }
 
     @objc

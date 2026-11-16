@@ -172,8 +172,11 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
     private let visitedStore: VisitedPostStoreProtocol
     private let discussionEditor: NodeSeekDiscussionEditing
     private var isLoadingEditablePost = false
-    private let initialPage: Int
+    /// 右上角刷新回到的页码：默认是进入详情时的页码，跳页后改为跳到的页。
+    private var reloadPage: Int
     private var currentPage: Int
+    /// 跳页时仍在途的加载更多请求页码，它晚到的结果要丢掉，免得覆盖跳页结果。
+    private var staleInFlightPage: Int?
     private var nextCommentPage: Int?
     private var activeCommentPageRequest: CommentPageRequest?
     private var commentPageTracker = CommentPageTracker()
@@ -202,8 +205,8 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         self.router = router
         self.visitedStore = visitedStore
         self.discussionEditor = discussionEditor
-        self.initialPage = max(1, initialPage)
-        self.currentPage = self.initialPage
+        self.reloadPage = max(1, initialPage)
+        self.currentPage = self.reloadPage
     }
     
     // MARK: - Setup
@@ -222,14 +225,32 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
     }
 
     func refreshInitialPage() {
-        // currentPage 会随着加载更多变化；右上角刷新要回到进入详情时的页码。
+        // currentPage 会随着加载更多变化；右上角刷新要回到进入详情（或最近一次跳页）时的页码。
+        reloadFromPage(reloadPage)
+    }
+
+    func didSelectCommentPage(_ page: Int) {
+        guard currentDetail != nil else {
+            AppLog.debug(.postDetail, "忽略详情跳页: 详情尚未完成首屏加载")
+            return
+        }
+        let targetPage = max(1, page)
+        AppLog.info(.postDetail, "详情跳页: from=\(currentPage), to=\(targetPage)")
+        if let activeCommentPageRequest, activeCommentPageRequest.requestedPage != targetPage {
+            staleInFlightPage = activeCommentPageRequest.requestedPage
+        }
+        reloadPage = targetPage
+        reloadFromPage(targetPage)
+    }
+
+    private func reloadFromPage(_ page: Int) {
         view?.showLoading()
         activeCommentPageRequest = nil
         nextCommentPage = nil
         commentPageTracker.reset()
         currentDetail = nil
-        currentPage = initialPage
-        interactor.loadPostDetail(page: currentPage)
+        currentPage = page
+        interactor.loadPostDetail(page: page)
     }
 
     func didTapLogin() {
@@ -630,6 +651,17 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
     }
 
     func didLoadPostDetail(_ response: PostDetailResponse) {
+        if let stalePage = staleInFlightPage, activeCommentPageRequest == nil {
+            let loaded = max(1, response.detail.page)
+            if loaded == stalePage, loaded != currentPage {
+                staleInFlightPage = nil
+                AppLog.info(.postDetail, "丢弃跳页前的在途评论页结果: page=\(loaded), target=\(currentPage)")
+                return
+            }
+            if loaded == currentPage {
+                staleInFlightPage = nil
+            }
+        }
         favoriteRollbackDetail = nil
         favoriteRollbackCollectedState = nil
         let commentRequest = activeCommentPageRequest

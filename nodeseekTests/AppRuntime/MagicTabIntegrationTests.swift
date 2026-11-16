@@ -493,6 +493,7 @@ final class MagicTabIntegrationTests: XCTestCase {
 private final class TerminalTestPresenter: PostDetailPresenterProtocol {
     func viewDidLoad() {}
     func refreshInitialPage() {}
+    func didSelectCommentPage(_ page: Int) {}
     func didTapLogin() {}
     func didApproachCommentEnd() {}
     func didTapRefreshCommentsAtEnd() {}
