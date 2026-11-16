@@ -6,23 +6,23 @@
 import SafariServices
 import UIKit
 
-/// 已绑定时的邮件列表。导航栏的标题按钮和搜索框由入口页挂到自己的导航栏上。
+/// 已绑定时的邮件列表。导航栏的标题按钮由入口页挂到自己的导航栏上；搜索框悬浮在本页底部。
 final class SeekMailInboxViewController: UIViewController {
     let model: SeekMailInboxModel
     /// 401 时回调，由入口页清掉 Key 并回到绑定页。
     var onUnauthorized: (() -> Void)?
-    /// 标题或搜索框变化后，入口页要重新同步导航栏。
+    /// 标题变化后，入口页要重新同步导航栏。
     var onNavigationChange: (() -> Void)?
 
     private(set) lazy var titleButton = makeTitleButton()
-    private(set) lazy var searchController = makeSearchController()
+    /// 不用系统 searchController：iOS 26 会把它放到底部并占用导航栈的底部安全区，返回时底部 Tab 会跳一下。
+    let searchBar = ProbeSearchBarView()
 
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let folderTabs = SeekMailFolderTabsView()
     private let noticeLabel = UILabel()
     private let noticeBar = UIView()
     private let undoToast = SeekMailUndoToast()
-    private var searchDebounce: DispatchWorkItem?
     private var noticeTimer: Timer?
     private var lastDeletedID: Int64?
 
@@ -158,10 +158,39 @@ final class SeekMailInboxViewController: UIViewController {
             noticeLabel.topAnchor.constraint(equalTo: noticeBar.topAnchor, constant: 7),
             noticeLabel.bottomAnchor.constraint(equalTo: noticeBar.bottomAnchor, constant: -7)
         ])
+        configureSearch()
         undoToast.onUndo = { [weak self] in
             guard let self, let id = lastDeletedID else { return }
             model.undoDelete(id)
             lastDeletedID = nil
+        }
+    }
+
+    /// 搜索要请求接口，所以点键盘「搜索」才发；清空或取消时立即回到普通列表。
+    private func configureSearch() {
+        searchBar.textField.accessibilityIdentifier = "seek-mail-search"
+        searchBar.onSubmit = { [weak self] text in self?.model.setSearchText(text) }
+        searchBar.onChange = { [weak self] text in
+            if text.isEmpty { self?.model.setSearchText("") }
+        }
+        searchBar.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(searchBar)
+        NSLayoutConstraint.activate([
+            searchBar.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
+            searchBar.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
+            searchBar.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -8),
+        ])
+        // 提示条放在搜索框上方，避免挡住它
+        undoToast.bottomOffset = ProbeSearchBarView.height + 8 + 12
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // 列表底部让出搜索框的位置；安全区由系统自动加，这里只补高出的部分
+        let bottom = max(view.bounds.maxY - searchBar.frame.minY + 8 - view.safeAreaInsets.bottom, 0)
+        if tableView.contentInset.bottom != bottom {
+            tableView.contentInset.bottom = bottom
+            tableView.verticalScrollIndicatorInsets.bottom = bottom
         }
     }
 
@@ -179,21 +208,13 @@ final class SeekMailInboxViewController: UIViewController {
         return button
     }
 
-    private func makeSearchController() -> UISearchController {
-        let controller = UISearchController(searchResultsController: nil)
-        controller.obscuresBackgroundDuringPresentation = false
-        controller.searchResultsUpdater = self
-        controller.searchBar.accessibilityIdentifier = "seek-mail-search"
-        return controller
-    }
-
     // MARK: - 渲染
 
     private func render() {
         tableView.refreshControl?.endRefreshing()
         updateTitle()
         folderTabs.update(scopes: model.scopes, titles: model.scopes.map(model.title(for:)), selected: model.scope)
-        searchController.searchBar.placeholder = "搜索 \(model.selectionTitle) · \(model.scopeTitle)"
+        searchBar.textField.placeholder = "搜索 \(model.selectionTitle) · \(model.scopeTitle)"
         updateNotice()
         updateBackground()
         tableView.reloadData()
@@ -459,19 +480,6 @@ extension SeekMailInboxViewController: UITableViewDataSource, UITableViewDelegat
     }
 }
 
-// MARK: - 搜索
-
-extension SeekMailInboxViewController: UISearchResultsUpdating {
-    /// 停顿 400ms 再请求，避免每输入一个字就打一次接口。
-    func updateSearchResults(for searchController: UISearchController) {
-        let text = searchController.searchBar.text ?? ""
-        searchDebounce?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.model.setSearchText(text) }
-        searchDebounce = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + (text.isEmpty ? 0 : 0.4), execute: work)
-    }
-}
-
 // MARK: - 小组件
 
 /// 横向文件夹 tab，选中态用 .label 反色胶囊。
@@ -583,6 +591,8 @@ final class SeekMailStateView: UIView {
 /// 底部 toast：删除后倒计时可撤销，或者显示一句错误提示。
 final class SeekMailUndoToast: UIView {
     var onUndo: (() -> Void)?
+    /// 距离安全区底部的距离，第一次显示前设置才生效。
+    var bottomOffset: CGFloat = 12
     private let label = UILabel()
     private let undoButton = UIButton(type: .system)
     private var timer: Timer?
@@ -670,7 +680,7 @@ final class SeekMailUndoToast: UIView {
             NSLayoutConstraint.activate([
                 leadingAnchor.constraint(equalTo: container.safeAreaLayoutGuide.leadingAnchor, constant: 16),
                 trailingAnchor.constraint(equalTo: container.safeAreaLayoutGuide.trailingAnchor, constant: -16),
-                bottomAnchor.constraint(equalTo: container.safeAreaLayoutGuide.bottomAnchor, constant: -12)
+                bottomAnchor.constraint(equalTo: container.safeAreaLayoutGuide.bottomAnchor, constant: -bottomOffset)
             ])
         }
         layer.removeAllAnimations()

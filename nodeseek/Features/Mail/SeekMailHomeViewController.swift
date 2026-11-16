@@ -111,13 +111,10 @@ final class SeekMailHomeViewController: UIViewController {
         guard bound else {
             navigationItem.rightBarButtonItems = []
             navigationItem.titleView = nil
-            navigationItem.searchController = nil
             return
         }
         if let inbox = content as? SeekMailInboxViewController {
             navigationItem.titleView = inbox.titleButton
-            navigationItem.searchController = inbox.searchController
-            navigationItem.hidesSearchBarWhenScrolling = true
         }
         let more = UIBarButtonItem(image: UIImage(systemName: "ellipsis"), menu: makeMoreMenu())
         more.accessibilityLabel = "更多"

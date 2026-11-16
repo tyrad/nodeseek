@@ -109,14 +109,15 @@ struct SeekMailBindTests {
 
         #expect(home.children.first is SeekMailBindViewController)
         #expect(home.navigationItem.rightBarButtonItems?.isEmpty ?? true)
-        #expect(home.navigationItem.searchController == nil)
 
         store.save(apiKey: "sk_live_ok")
         let inbox = try #require(home.children.first as? SeekMailInboxViewController)
         #expect(home.children.count == 1)
         #expect(home.navigationItem.rightBarButtonItems?.first?.accessibilityIdentifier == "seek-mail-more")
         #expect(home.navigationItem.titleView === inbox.titleButton)
-        #expect(home.navigationItem.searchController === inbox.searchController)
+        // 搜索框在页面底部，不挂到导航栏，避免返回时底部 Tab 跳动
+        #expect(home.navigationItem.searchController == nil)
+        #expect(inbox.view.mailTestView(id: "seek-mail-search") is UITextField)
 
         await mailWaitUntil { inbox.model.phase == .loaded }
         #expect(inbox.model.mails.map(\.id) == [11, 12])

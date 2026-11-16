@@ -56,4 +56,39 @@ struct SeekMailInboxViewTests {
         #expect((inbox.view.mailTestView(id: "seek-mail-notice") as? UILabel)?.text == "回收站只能查看 · 网页中恢复")
         #expect((inbox.view.mailTestView(id: "seek-mail-state-message") as? UILabel)?.text == "回收站是空的")
     }
+
+    @Test func bottomSearchRequestsOnlyOnSubmitAndClearsOnCancel() async throws {
+        let transport = SeekMailRouteTransport()
+        let inbox = SeekMailInboxViewController(
+            keyStore: InMemorySeekMailKeyStore(key: "sk_live_ok"), transport: transport.load, selectionStore: makeSelectionStore()
+        )
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = inbox
+        window.isHidden = false
+        defer { window.isHidden = true }
+        await mailWaitUntil { inbox.model.phase == .loaded }
+        inbox.view.layoutIfNeeded()
+
+        let field = try #require(inbox.view.mailTestView(id: "seek-mail-search") as? UITextField)
+        let table = try #require(inbox.view.mailTestView(id: "seek-mail-list") as? UITableView)
+        #expect(table.contentInset.bottom > 0)
+        let before = transport.requests.count
+
+        // 输入时不发请求
+        field.text = "invoice"
+        field.sendActions(for: .editingChanged)
+        try await Task.sleep(nanoseconds: 600_000_000)
+        #expect(transport.requests.count == before)
+        #expect(inbox.model.isSearching == false)
+
+        // 点键盘「搜索」才请求
+        _ = field.delegate?.textFieldShouldReturn?(field)
+        await mailWaitUntil { transport.requests.last?.url?.query?.contains("search=invoice") == true }
+        #expect(inbox.model.isSearching)
+
+        // 取消后回到普通列表
+        inbox.searchBar.cancel()
+        #expect(inbox.model.isSearching == false)
+        #expect(field.text?.isEmpty ?? true)
+    }
 }

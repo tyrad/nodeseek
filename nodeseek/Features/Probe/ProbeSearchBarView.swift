@@ -4,6 +4,8 @@ import UIKit
 /// 返回时底栏会跟着上移一下。
 final class ProbeSearchBarView: UIView, UITextFieldDelegate {
     var onChange: ((String) -> Void)?
+    /// 点键盘「搜索」时回调；需要发请求的页面用它，避免每输入一个字就请求一次。
+    var onSubmit: ((String) -> Void)?
     var text: String { textField.text ?? "" }
 
     let textField = UITextField()
@@ -105,6 +107,7 @@ final class ProbeSearchBarView: UIView, UITextFieldDelegate {
     }
 
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        onSubmit?(text)
         textField.resignFirstResponder()
         return true
     }
