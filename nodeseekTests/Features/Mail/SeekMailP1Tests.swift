@@ -239,6 +239,9 @@ struct SeekMailMarkAllReadTests {
         #expect(puts == ["/openapi/v1/mails/31/read", "/openapi/v1/mails/33/read"])
         // 两封之间主动间隔，最后一封后不再等
         #expect(sleeps == [SeekMailMarkAllReadJob.interval])
+        // 预计耗时算上请求本身：6 封约 11 秒，100 封约 3 分钟
+        #expect(SeekMailMarkAllReadJob.estimatedSeconds(count: 6) == 11)
+        #expect(SeekMailMarkAllReadJob.estimatedSeconds(count: 100) == 180)
         #expect(states.contains(.running(done: 1, total: 2)))
     }
 

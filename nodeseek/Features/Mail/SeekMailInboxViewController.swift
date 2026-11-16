@@ -197,7 +197,7 @@ final class SeekMailInboxViewController: UIViewController {
     }
 
     private func confirmMarkAllRead(_ mails: [SeekUnreadMail], hasMore: Bool, scopeTitle: String) {
-        let seconds = Int((Double(mails.count) * SeekMailMarkAllReadJob.interval).rounded(.up))
+        let seconds = SeekMailMarkAllReadJob.estimatedSeconds(count: mails.count)
         let duration = seconds < 60
             ? SeekMailL10n.format("%@ 秒", String(max(seconds, 1)))
             : SeekMailL10n.format("%@ 分钟", String(Int((Double(seconds) / 60).rounded(.up))))

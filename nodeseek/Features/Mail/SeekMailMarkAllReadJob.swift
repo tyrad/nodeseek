@@ -19,8 +19,15 @@ final class SeekMailMarkAllReadJob {
 
     /// 一次最多处理这么多封，避免长时间占满额度。
     static let maxPerRun = 200
-    /// 每封之间的间隔：约 24 次/分钟，seek.li 每次扣 2，留出余量。
-    static let interval: TimeInterval = 2.5
+    /// 每封之间的间隔。单次请求实测约 1.3 秒，加上间隔约每秒 0.56 次，
+    /// 低于账号共享限流（约 20 秒 17～20 次），给手动操作留余量。并发会很快撞上共享限流，所以逐封串行。
+    static let interval: TimeInterval = 0.5
+    /// 单次标记请求的实测耗时，只用来估算总时长。
+    static let estimatedRequestTime: TimeInterval = 1.3
+
+    static func estimatedSeconds(count: Int) -> Int {
+        Int((Double(count) * (estimatedRequestTime + interval)).rounded(.up))
+    }
     /// 剩余额度低于这个数就先等窗口重置。
     static let quotaReserve = 12
     static let rateLimitWait: TimeInterval = 40
