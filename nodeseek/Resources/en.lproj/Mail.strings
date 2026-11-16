@@ -152,3 +152,6 @@
 "这个地址不可用" = "This address is not available";
 "已创建并复制 %@" = "Created and copied %@";
 "新建邮箱（可选）" = "Create mailboxes (optional)";
+"检查" = "Check";
+"只能使用 seek.li 或 nodeseek.org" = "Only seek.li or nodeseek.org can be used";
+"地址已修改，请重新检查" = "Address changed. Check it again.";

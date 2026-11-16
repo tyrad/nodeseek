@@ -153,7 +153,8 @@ final class SeekMailInboxViewController: UIViewController {
         autoRefreshTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(seconds), repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 // 逐封标已读时额度留给它，不自动刷新
-                guard let self, self.markJob.isActive == false else { return }
+                // 弹出新建邮箱等页面时不刷新，把额度留给用户正在做的事
+                guard let self, self.markJob.isActive == false, self.presentedViewController == nil else { return }
                 self.model.autoRefresh()
             }
         }

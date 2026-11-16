@@ -5,18 +5,18 @@
 
 import UIKit
 
-/// 新建邮箱：输入前缀、选域名，停顿后检查地址是否可用，可用才能创建。
+/// 新建邮箱：输入前缀、选域名，点「检查」确认地址可用后才能创建。
+/// 只在用户点检查时请求，不随输入自动检查：seek.li 额度很紧，逐字检查容易被限流。
 /// 注册新网站时给它单独建一个地址，创建成功由列表页复制地址并切过去。
-final class SeekMailCreateMailboxViewController: UIViewController {
+final class SeekMailCreateMailboxViewController: UIViewController, UITextFieldDelegate {
     /// OpenAPI 没有域名列表接口，这两个域名实测可创建；nodeseek.org 不能发信。
     static let domains = ["seek.li", "nodeseek.org"]
-    /// 停顿多久再检查，避免每输入一个字就发一次请求。
-    var checkDelay: TimeInterval = 0.6
 
     private let provider: SeekMailProvider<SeekMailAPI>
     private let onCreated: (SeekMailbox) -> Void
 
     private let prefixField = UITextField()
+    private let checkButton = UIButton(type: .system)
     private let domainControl = UISegmentedControl(items: SeekMailCreateMailboxViewController.domains.map { "@\($0)" })
     private let statusLabel = UILabel()
     private let noteLabel = UILabel()
@@ -27,6 +27,8 @@ final class SeekMailCreateMailboxViewController: UIViewController {
     private var createTask: Task<Void, Never>?
     /// 最近一次检查通过的地址；输入变了就作废。
     private var availableAddress: String?
+    /// 显示的是检查结果（而不是格式提示）时，改输入才提示重新检查。
+    private var showsCheckResult = false
 
     init(provider: SeekMailProvider<SeekMailAPI>, onCreated: @escaping (SeekMailbox) -> Void) {
         self.provider = provider
@@ -64,8 +66,16 @@ final class SeekMailCreateMailboxViewController: UIViewController {
 
     var address: String? {
         let prefix = (prefixField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard prefix.isEmpty == false else { return nil }
+        guard prefix.isEmpty == false, prefix.contains("@") == false else { return nil }
         return "\(prefix)@\(Self.domains[max(domainControl.selectedSegmentIndex, 0)])"
+    }
+
+    /// 粘贴完整地址时拆成前缀和域名；域名不在可选范围内返回 nil 域名。
+    static func split(_ text: String) -> (prefix: String, domainIndex: Int?)? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let at = trimmed.firstIndex(of: "@") else { return nil }
+        let domain = trimmed[trimmed.index(after: at)...].lowercased()
+        return (String(trimmed[..<at]), domains.firstIndex(of: domain))
     }
 
     // MARK: - 布局
@@ -79,8 +89,21 @@ final class SeekMailCreateMailboxViewController: UIViewController {
         prefixField.keyboardType = .asciiCapable
         prefixField.clearButtonMode = .whileEditing
         prefixField.returnKeyType = .done
+        prefixField.delegate = self
         prefixField.accessibilityIdentifier = "seek-mail-create-prefix"
         prefixField.addAction(UIAction { [weak self] _ in self?.inputChanged() }, for: .editingChanged)
+
+        var checkConfiguration = UIButton.Configuration.plain()
+        checkConfiguration.baseForegroundColor = .label
+        var checkTitle = AttributedString(SeekMailL10n.text("检查"))
+        checkTitle.font = SeekMailFont.of(.body, weight: .semibold)
+        checkConfiguration.attributedTitle = checkTitle
+        checkButton.configuration = checkConfiguration
+        checkButton.isEnabled = false
+        checkButton.accessibilityIdentifier = "seek-mail-create-check"
+        checkButton.setContentHuggingPriority(.required, for: .horizontal)
+        checkButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        checkButton.addAction(UIAction { [weak self] _ in self?.check() }, for: .touchUpInside)
 
         domainControl.selectedSegmentIndex = 0
         domainControl.selectedSegmentTintColor = .label
@@ -96,7 +119,9 @@ final class SeekMailCreateMailboxViewController: UIViewController {
         card.layer.cornerRadius = 12
         card.layer.cornerCurve = .continuous
         prefixField.translatesAutoresizingMaskIntoConstraints = false
+        checkButton.translatesAutoresizingMaskIntoConstraints = false
         card.addSubview(prefixField)
+        card.addSubview(checkButton)
 
         statusLabel.font = SeekMailFont.of(.footnote)
         statusLabel.numberOfLines = 0
@@ -116,7 +141,9 @@ final class SeekMailCreateMailboxViewController: UIViewController {
             stack.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
             prefixField.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
-            prefixField.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -12),
+            checkButton.leadingAnchor.constraint(equalTo: prefixField.trailingAnchor, constant: 4),
+            checkButton.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -4),
+            checkButton.centerYAnchor.constraint(equalTo: card.centerYAnchor),
             prefixField.topAnchor.constraint(equalTo: card.topAnchor),
             prefixField.bottomAnchor.constraint(equalTo: card.bottomAnchor),
             prefixField.heightAnchor.constraint(greaterThanOrEqualToConstant: 48),
@@ -133,39 +160,58 @@ final class SeekMailCreateMailboxViewController: UIViewController {
 
     // MARK: - 检查与创建
 
-    private func inputChanged() {
-        checkTask?.cancel()
-        availableAddress = nil
-        updateCreateButton()
-        guard let address else {
-            showStatus(nil)
-            return
-        }
-        showStatus(SeekMailL10n.text("正在检查…"), color: .secondaryLabel)
-        let delay = checkDelay
-        checkTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-            guard Task.isCancelled == false, let self else { return }
-            await check(address)
-        }
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        check()
+        return false
     }
 
-    private func check(_ address: String) async {
-        do {
-            let result = try await provider.checkMailbox(address: address)
-            guard Task.isCancelled == false, address == self.address else { return }
-            if result.available {
-                availableAddress = address
-                showStatus(SeekMailL10n.format("%@ 可以使用", address), color: .label)
-            } else {
-                showStatus(result.message ?? SeekMailL10n.text("这个地址不可用"), color: .systemRed)
+    /// 输入变了只作废上次的检查结果，不发请求。
+    private func inputChanged() {
+        checkTask?.cancel()
+        checkTask = nil
+        let hadResult = showsCheckResult
+        showsCheckResult = false
+        availableAddress = nil
+        if let parts = Self.split(prefixField.text ?? "") {
+            guard let index = parts.domainIndex else {
+                showStatus(SeekMailL10n.text("只能使用 seek.li 或 nodeseek.org"), color: .systemRed)
+                updateButtons()
+                return
             }
-        } catch is CancellationError {
-        } catch {
-            guard address == self.address else { return }
-            showStatus(SeekMailBindViewController.message(for: error), color: .systemRed)
+            prefixField.text = parts.prefix
+            if domainControl.selectedSegmentIndex != index {
+                domainControl.selectedSegmentIndex = index
+                updateNote()
+            }
         }
-        updateCreateButton()
+        showStatus(hadResult && address != nil ? SeekMailL10n.text("地址已修改，请重新检查") : nil)
+        updateButtons()
+    }
+
+    private func check() {
+        guard let address, checkTask == nil, createTask == nil else { return }
+        showStatus(SeekMailL10n.text("正在检查…"), color: .secondaryLabel)
+        checkTask = Task { [weak self] in
+            guard let self else { return }
+            updateButtons()
+            do {
+                let result = try await provider.checkMailbox(address: address)
+                guard Task.isCancelled == false, address == self.address else { return }
+                showsCheckResult = true
+                if result.available {
+                    availableAddress = address
+                    showStatus(SeekMailL10n.format("%@ 可以使用", address), color: .label)
+                } else {
+                    showStatus(result.message ?? SeekMailL10n.text("这个地址不可用"), color: .systemRed)
+                }
+            } catch {
+                guard Task.isCancelled == false, address == self.address else { return }
+                // 被限流也只提示，不自动重试，免得偷偷耗掉额度
+                showStatus(SeekMailBindViewController.message(for: error), color: .systemRed)
+            }
+            checkTask = nil
+            updateButtons()
+        }
     }
 
     private func create() {
@@ -189,6 +235,7 @@ final class SeekMailCreateMailboxViewController: UIViewController {
     private func setBusy(_ busy: Bool) {
         prefixField.isEnabled = busy == false
         domainControl.isEnabled = busy == false
+        checkButton.isEnabled = busy == false && address != nil
         isModalInPresentation = busy
         if busy {
             let spinner = UIActivityIndicatorView(style: .medium)
@@ -196,12 +243,13 @@ final class SeekMailCreateMailboxViewController: UIViewController {
             navigationItem.rightBarButtonItem = UIBarButtonItem(customView: spinner)
         } else {
             navigationItem.rightBarButtonItem = createItem
-            updateCreateButton()
+            updateButtons()
         }
     }
 
-    private func updateCreateButton() {
+    private func updateButtons() {
         createItem.isEnabled = availableAddress != nil && availableAddress == address
+        checkButton.isEnabled = address != nil && checkTask == nil && createTask == nil
     }
 
     private func showStatus(_ text: String?, color: UIColor = .secondaryLabel) {

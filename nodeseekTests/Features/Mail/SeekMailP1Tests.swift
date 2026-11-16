@@ -293,32 +293,59 @@ struct SeekMailCreateMailboxTests {
         #expect(create.requiredScope == "mailbox:write")
     }
 
-    @Test func checksThenCreates() async throws {
+    private static func makeController(_ transport: SeekMailRouteTransport, onCreated: @escaping (SeekMailbox) -> Void = { _ in }) throws
+        -> (SeekMailCreateMailboxViewController, UITextField, UIButton, UILabel) {
+        let controller = SeekMailCreateMailboxViewController(
+            provider: SeekMailProvider(apiKey: { "sk_live_test" }, transport: transport.load), onCreated: onCreated
+        )
+        controller.loadViewIfNeeded()
+        let field = try #require(controller.view.mailTestView(id: "seek-mail-create-prefix") as? UITextField)
+        let check = try #require(controller.view.mailTestView(id: "seek-mail-create-check") as? UIButton)
+        let status = try #require(controller.view.mailTestView(id: "seek-mail-create-status") as? UILabel)
+        return (controller, field, check, status)
+    }
+
+    private static func type(_ text: String, into field: UITextField) {
+        field.text = text
+        field.sendActions(for: .editingChanged)
+    }
+
+    private static func checkRequests(_ transport: SeekMailRouteTransport) -> Int {
+        transport.requests.filter { $0.url?.path == "/openapi/v1/mailboxes/check" }.count
+    }
+
+    @Test func checksOnlyWhenTappedThenCreates() async throws {
         let transport = SeekMailRouteTransport()
         transport.posts["/openapi/v1/mailboxes/check"] = #"{"data":{"available":true}}"#
         transport.posts["/openapi/v1/mailboxes"] = #"{"data":{"id":9,"address":"shop@seek.li"}}"#
-        let provider = SeekMailProvider<SeekMailAPI>(apiKey: { "sk_live_test" }, transport: transport.load)
         var created: SeekMailbox?
-        let controller = SeekMailCreateMailboxViewController(provider: provider) { created = $0 }
-        controller.checkDelay = 0
-        controller.loadViewIfNeeded()
+        let (controller, field, check, status) = try Self.makeController(transport) { created = $0 }
         let submit = try #require(controller.navigationItem.rightBarButtonItem)
+        #expect(check.isEnabled == false)
+
+        Self.type("shop", into: field)
+        try await Task.sleep(nanoseconds: 300_000_000)
+        // 输入不自动检查，省额度
+        #expect(Self.checkRequests(transport) == 0)
+        #expect(check.isEnabled)
         #expect(submit.isEnabled == false)
 
-        let field = try #require(controller.view.mailTestView(id: "seek-mail-create-prefix") as? UITextField)
-        field.text = "shop"
-        field.sendActions(for: .editingChanged)
+        check.sendActions(for: .touchUpInside)
         await mailWaitUntil { submit.isEnabled }
+        #expect(Self.checkRequests(transport) == 1)
         let checkRequest = try #require(transport.requests.first { $0.url?.path == "/openapi/v1/mailboxes/check" })
         #expect(checkRequest.url?.query?.contains("address=shop@seek.li") == true)
 
-        // 改了前缀，之前的检查结果作废
-        field.text = "shop2"
-        field.sendActions(for: .editingChanged)
+        // 改了前缀，结果作废并提示重新检查，但不发请求
+        Self.type("shop2", into: field)
         #expect(submit.isEnabled == false)
-        field.text = "shop"
-        field.sendActions(for: .editingChanged)
+        #expect(status.text == SeekMailL10n.text("地址已修改，请重新检查"))
+        Self.type("shop", into: field)
+        #expect(Self.checkRequests(transport) == 1)
+        // 回车也能检查
+        _ = controller.textFieldShouldReturn(field)
         await mailWaitUntil { submit.isEnabled }
+        #expect(Self.checkRequests(transport) == 2)
 
         let action = try #require(submit.primaryAction)
         // 测试 target 的最低版本比 App 低
@@ -331,20 +358,49 @@ struct SeekMailCreateMailboxTests {
         #expect(try JSONSerialization.jsonObject(with: body) as? [String: String] == ["address": "shop@seek.li"])
     }
 
+    @Test func pastedFullAddressIsSplit() throws {
+        let transport = SeekMailRouteTransport()
+        let (controller, field, check, status) = try Self.makeController(transport)
+        let domain = try #require(controller.view.mailTestView(id: "seek-mail-create-domain") as? UISegmentedControl)
+
+        Self.type("Shop@NodeSeek.org", into: field)
+        #expect(field.text == "Shop")
+        #expect(domain.selectedSegmentIndex == 1)
+        #expect(controller.address == "Shop@nodeseek.org")
+
+        Self.type("shop@gmail.com", into: field)
+        #expect(status.text == SeekMailL10n.text("只能使用 seek.li 或 nodeseek.org"))
+        #expect(check.isEnabled == false)
+        // 格式提示不算检查结果，补全成可用域名后不提示「重新检查」
+        Self.type("shop@seek.li", into: field)
+        #expect(status.text == nil)
+        #expect(domain.selectedSegmentIndex == 0)
+        #expect(transport.requests.isEmpty)
+    }
+
     @Test func showsServerReasonWhenTaken() async throws {
         let transport = SeekMailRouteTransport()
         transport.posts["/openapi/v1/mailboxes/check"] = #"{"data":{"available":false,"message":"该地址已被使用","reason":"address_taken"}}"#
-        let controller = SeekMailCreateMailboxViewController(
-            provider: SeekMailProvider(apiKey: { "sk_live_test" }, transport: transport.load)
-        ) { _ in }
-        controller.checkDelay = 0
-        controller.loadViewIfNeeded()
-        let field = try #require(controller.view.mailTestView(id: "seek-mail-create-prefix") as? UITextField)
-        let status = try #require(controller.view.mailTestView(id: "seek-mail-create-status") as? UILabel)
-        field.text = "taken"
-        field.sendActions(for: .editingChanged)
+        let (controller, field, check, status) = try Self.makeController(transport)
+        Self.type("taken", into: field)
+        check.sendActions(for: .touchUpInside)
         await mailWaitUntil { status.text == "该地址已被使用" }
         #expect(controller.navigationItem.rightBarButtonItem?.isEnabled == false)
+    }
+
+    @Test func rateLimitedCheckDoesNotRetry() async throws {
+        let transport = SeekMailRouteTransport()
+        transport.status = 429
+        transport.override = #"{"error":{"code":"AUTH_RATE_LIMITED","message":"认证失败次数过多，请稍后再试"}}"#
+        // 持有页面，否则检查任务里的 weak self 会提前失效
+        let (controller, field, check, status) = try Self.makeController(transport)
+        Self.type("shop", into: field)
+        check.sendActions(for: .touchUpInside)
+        await mailWaitUntil { status.text == SeekMailL10n.text("请求太频繁，请稍后再试") }
+        try await Task.sleep(nanoseconds: 300_000_000)
+        #expect(Self.checkRequests(transport) == 1)
+        #expect(check.isEnabled)
+        withExtendedLifetime(controller) {}
     }
 
     @Test func modelAddsAndSelectsCreatedMailbox() async {
