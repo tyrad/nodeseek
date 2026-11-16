@@ -115,7 +115,7 @@ struct AppNavigationLayoutTests {
 
         let loginButton = try #require(view.layoutTestButton(identifier: "me-login-button"))
         #expect(loginButton.isHidden == false)
-        for identifier in ["me-discussions-row", "me-comments-row", "me-collections-row", "me-check-in-row", "me-recent-row", "me-probe-row"] {
+        for identifier in ["me-discussions-row", "me-comments-row", "me-collections-row", "me-check-in-row", "me-recent-row", "me-probe-row", "me-mail-row"] {
             #expect(view.layoutTestView(identifier: identifier) != nil)
         }
         #expect(view.layoutTestView(identifier: "me-probe-row")?.accessibilityLabel == "探针")
@@ -131,6 +131,33 @@ struct AppNavigationLayoutTests {
         row.sendActions(for: .touchUpInside)
         #expect(navigation.viewControllers.last is ProbeMonitorViewController)
         #expect(navigation.viewControllers.last?.title == "探针")
+    }
+
+    @Test func meMailRowOpensMailHome() throws {
+        let me = MeViewController()
+        let navigation = UINavigationController(rootViewController: me)
+        me.loadViewIfNeeded()
+        #expect(me.view.layoutTestView(identifier: "me-mail-row")?.accessibilityLabel == "邮箱")
+        let row = try #require(me.view.layoutTestView(identifier: "me-mail-row") as? UIControl)
+        row.sendActions(for: .touchUpInside)
+        #expect(navigation.viewControllers.last is SeekMailHomeViewController)
+        #expect(navigation.viewControllers.last?.title == "邮箱")
+    }
+
+    @Test func mailTabCanBeAddedToTabBar() throws {
+        let suite = "mail-tab-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppNavigationLayoutSettings(userDefaults: defaults)
+        #expect(settings.tabItems.contains(.mail) == false)
+        settings.setTabItems([.home, .mail, .notification, .me])
+
+        let tabs = MainTabBarController(layoutSettings: AppNavigationLayoutSettings(userDefaults: defaults))
+        _ = UINavigationController(rootViewController: tabs)
+        tabs.select(.mail)
+        let mail = try #require(tabs.selectedViewController as? SeekMailHomeViewController)
+        #expect(tabs.navigationItem.title == "邮箱")
+        #expect(mail.tabBarItem.image != nil)
     }
 
     @Test func meProfileCardHandlesTapsAnywhereExceptLoginButton() throws {

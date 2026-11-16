@@ -104,6 +104,10 @@ class PostListRouter: PostListRouterProtocol {
         show(ProbeMonitorViewController())
     }
 
+    func navigateToMail() {
+        show(SeekMailHomeViewController())
+    }
+
     func navigateToPostCategoryPreferences() {
         show(PostCategoryPreferencesViewController())
     }

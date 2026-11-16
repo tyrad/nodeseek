@@ -575,6 +575,7 @@ private final class SpyPostListRouter: PostListRouterProtocol {
     var navigateToNewDiscussionCount = 0
     var navigateToSearchCount = 0
     var navigateToProbeMonitorCount = 0
+    var navigateToMailCount = 0
     var navigateToSettingsCount = 0
     var navigateToPostCategoryPreferencesCount = 0
     var navigateToLogFileCount = 0
@@ -644,6 +645,10 @@ private final class SpyPostListRouter: PostListRouterProtocol {
 
     func navigateToProbeMonitor() {
         navigateToProbeMonitorCount += 1
+    }
+
+    func navigateToMail() {
+        navigateToMailCount += 1
     }
 
     func navigateToSettings(

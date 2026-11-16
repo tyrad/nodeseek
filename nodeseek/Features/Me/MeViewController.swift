@@ -5,7 +5,7 @@
 
 import UIKit
 
-/// 多 Tab 模式的“我的”页：资料卡（账号 + 五格数字 + 升级进度）、我的内容、签到与最近浏览、探针，设置在右上角。
+/// 多 Tab 模式的“我的”页：资料卡（账号 + 五格数字 + 升级进度）、我的内容、签到与最近浏览、工具（探针、邮箱），设置在右上角。
 final class MeViewController: UIViewController {
     private enum Layout {
         static let horizontalInset: CGFloat = 16
@@ -36,6 +36,7 @@ final class MeViewController: UIViewController {
     private let checkInRow = MeListRowView(symbolName: "checkmark.seal", title: "每日签到")
     private let recentRow = MeListRowView(symbolName: "clock.arrow.circlepath", title: "最近浏览")
     private let probeRow = MeListRowView(symbolName: "server.rack", title: "探针")
+    private let mailRow = MeListRowView(symbolName: "envelope", title: "邮箱")
 
     init(
         accountController: PostListSideMenuAccountController? = nil,
@@ -91,7 +92,7 @@ final class MeViewController: UIViewController {
 
     @objc private func appTextSizeDidChange() {
         profileCard.updateTextSize()
-        [checkInRow, discussionsRow, commentsRow, collectionsRow, recentRow, probeRow].forEach { $0.updateTextSize() }
+        [checkInRow, discussionsRow, commentsRow, collectionsRow, recentRow, probeRow, mailRow].forEach { $0.updateTextSize() }
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -139,10 +140,10 @@ final class MeViewController: UIViewController {
         contentStack.setCustomSpacing(7, after: contentHeader)
         contentStack.addArrangedSubview(Self.makeGroup([discussionsRow, commentsRow, collectionsRow]))
         contentStack.addArrangedSubview(Self.makeGroup([checkInRow, recentRow]))
-        let probeHeader = Self.makeSectionHeader("探针")
-        contentStack.addArrangedSubview(probeHeader)
-        contentStack.setCustomSpacing(7, after: probeHeader)
-        contentStack.addArrangedSubview(Self.makeGroup([probeRow]))
+        let toolsHeader = Self.makeSectionHeader("工具")
+        contentStack.addArrangedSubview(toolsHeader)
+        contentStack.setCustomSpacing(7, after: toolsHeader)
+        contentStack.addArrangedSubview(Self.makeGroup([probeRow, mailRow]))
 
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -166,12 +167,14 @@ final class MeViewController: UIViewController {
         checkInRow.addTarget(self, action: #selector(checkInTapped), for: .touchUpInside)
         recentRow.addTarget(self, action: #selector(recentTapped), for: .touchUpInside)
         probeRow.addTarget(self, action: #selector(probeTapped), for: .touchUpInside)
+        mailRow.addTarget(self, action: #selector(mailTapped), for: .touchUpInside)
         discussionsRow.accessibilityIdentifier = "me-discussions-row"
         commentsRow.accessibilityIdentifier = "me-comments-row"
         collectionsRow.accessibilityIdentifier = "me-collections-row"
         checkInRow.accessibilityIdentifier = "me-check-in-row"
         recentRow.accessibilityIdentifier = "me-recent-row"
         probeRow.accessibilityIdentifier = "me-probe-row"
+        mailRow.accessibilityIdentifier = "me-mail-row"
     }
 
     // MARK: - Data
@@ -298,6 +301,10 @@ final class MeViewController: UIViewController {
 
     @objc private func probeTapped() {
         router.navigateToProbeMonitor()
+    }
+
+    @objc private func mailTapped() {
+        router.navigateToMail()
     }
 
     /// 未登录时转去登录，返回是否可继续。

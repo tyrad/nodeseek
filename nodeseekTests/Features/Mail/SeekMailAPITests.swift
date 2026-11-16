@@ -143,6 +143,7 @@ struct SeekMailAPITests {
         (400, #"{"error":"无效的ID"}"#, SeekMailError.badRequest(message: "无效的ID")),
         (500, #"{"error":{"code":"SEND_FAILED","message":"该域名已禁止发信"}}"#, SeekMailError.sendFailed(message: "该域名已禁止发信")),
         (401, #"{"error":{"code":"AUTH_RATE_LIMITED","message":"认证失败次数过多"}}"#, SeekMailError.rateLimited(resetAt: nil)),
+        (403, #"{"error":{"code":"FORBIDDEN","message":"权限不足"}}"#, SeekMailError.forbidden(scope: "mailbox:read", message: "权限不足")),
         (502, "<html>Bad Gateway</html>", SeekMailError.server(statusCode: 502, code: nil, message: nil))
     ])
     func mapsErrorResponses(status: Int, body: String, expected: SeekMailError) async {

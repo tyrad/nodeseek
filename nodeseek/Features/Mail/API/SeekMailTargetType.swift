@@ -15,11 +15,14 @@ protocol SeekMailTargetType {
     var headers: [String: String]? { get }
     /// 是否需要带 Bearer Key，默认需要。
     var requiresAuthorization: Bool { get }
+    /// 接口需要的 Key 权限，403 时用来提示用户缺哪一项。
+    var requiredScope: String? { get }
 }
 
 extension SeekMailTargetType {
     var headers: [String: String]? { nil }
     var requiresAuthorization: Bool { true }
+    var requiredScope: String? { nil }
 }
 
 enum SeekMailHTTPMethod: String {

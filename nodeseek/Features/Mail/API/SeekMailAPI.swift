@@ -71,6 +71,18 @@ extension SeekMailAPI: SeekMailTargetType {
         }
     }
 
+    var requiredScope: String? {
+        switch self {
+        case .mailboxes, .mailbox: return "mailbox:read"
+        case .mails, .unreadMails, .mail, .mailCounts, .rawMail: return "mail:read"
+        case .markRead, .markFlagged, .moveMail, .deleteMail: return "mail:manage"
+        case .attachments, .downloadAttachment: return "attachment:read"
+        case .folders: return "folder:read"
+        case .quotas: return "storage:read"
+        case .send: return "mail:send"
+        }
+    }
+
     var task: SeekMailTask {
         switch self {
         case .mails(let query):

@@ -152,6 +152,8 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
             return MeViewController()
         case .probe:
             return ProbeMonitorViewController()
+        case .mail:
+            return SeekMailHomeViewController()
         case .search:
             return SearchViewController()
         case .recent:

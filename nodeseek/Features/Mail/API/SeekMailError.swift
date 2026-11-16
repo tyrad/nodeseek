@@ -8,8 +8,10 @@ import Foundation
 nonisolated enum SeekMailError: Error, Equatable, Sendable {
     /// 本机还没有保存 API Key。
     case missingAPIKey
-    /// Key 无效、已失效或权限不足（401/403）。
+    /// Key 无效或已失效（401）。
     case unauthorized(message: String?)
+    /// Key 有效但没勾选这个接口需要的权限（403）；scope 为接口对应的权限名。
+    case forbidden(scope: String?, message: String?)
     /// 429 或认证限流；resetAt 来自 x-ratelimit-reset。
     case rateLimited(resetAt: Date?)
     case notFound(message: String?)
@@ -25,6 +27,8 @@ nonisolated enum SeekMailError: Error, Equatable, Sendable {
         switch self {
         case .missingAPIKey: return "请先绑定 seek.li API Key"
         case .unauthorized: return "API Key 无效或已失效，请重新绑定"
+        case .forbidden(let scope, _):
+            return scope.map { "API Key 缺少 \($0) 权限，请在 seek.li 重新创建 Key" } ?? "API Key 权限不足"
         case .rateLimited: return "请求太频繁，请稍后再试"
         case .notFound(let message): return message ?? "邮件不存在或已被删除"
         case .badRequest(let message): return message ?? "请求参数有误"
@@ -37,7 +41,7 @@ nonisolated enum SeekMailError: Error, Equatable, Sendable {
     }
 
     /// 服务端错误体有两种：`{"error":{"code","message"}}` 和 `{"error":"文本"}`。
-    static func from(statusCode: Int, data: Data, resetAt: Date?) -> SeekMailError {
+    static func from(statusCode: Int, data: Data, resetAt: Date?, scope: String? = nil) -> SeekMailError {
         let body = try? JSONDecoder().decode(SeekMailErrorBody.self, from: data)
         let code = body?.code
         let message = body?.message
@@ -47,7 +51,8 @@ nonisolated enum SeekMailError: Error, Equatable, Sendable {
         }
         if code == "SEND_FAILED" { return .sendFailed(message: message) }
         switch statusCode {
-        case 401, 403: return .unauthorized(message: message)
+        case 401: return .unauthorized(message: message)
+        case 403: return .forbidden(scope: scope, message: message)
         case 404: return .notFound(message: message)
         case 400: return .badRequest(message: message)
         default: return .server(statusCode: statusCode, code: code, message: message)

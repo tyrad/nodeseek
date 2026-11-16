@@ -445,6 +445,26 @@ struct PostListViewControllerTests {
         #expect(presenter.submittedDetailTestURL == "https://www.nodeseek.com/post-717963-6#52")
     }
 
+    @Test func sideMenuButtonsDoNotOverlapAccountHeaderOnSmallScreen() throws {
+        let presenter = SpyPostListPresenter()
+        let viewController = makePostListViewController(presenter: presenter)
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 320, height: 568)
+        viewController.view.layoutIfNeeded()
+
+        let root = try #require(viewController.view)
+        let statsLabel = try #require(root.firstLabel(accessibilityIdentifier: "post-list-side-menu-stats-label"))
+        let topButton = try #require(root.firstButton(accessibilityIdentifier: "post-list-side-menu-new-discussion-button"))
+        let settingsButton = try #require(root.firstButton(accessibilityIdentifier: "post-list-side-menu-settings-button"))
+        let statsFrame = statsLabel.convert(statsLabel.bounds, to: root)
+        let topFrame = topButton.convert(topButton.bounds, to: root)
+
+        // 4 英寸屏上按钮会被压矮，但最上面的按钮不能压到账号区
+        #expect(topFrame.minY >= statsFrame.maxY)
+        #expect(topButton.bounds.height >= 40)
+        #expect(settingsButton.bounds.height >= 40)
+    }
+
     @Test func menuButtonPresentsSideMenuWithAccountHeaderSettingsAndMovesDebugEntriesToSettings() throws {
         let presenter = SpyPostListPresenter()
         let viewController = makePostListViewController(presenter: presenter)
@@ -468,6 +488,7 @@ struct PostListViewControllerTests {
         let searchButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-search-button"))
         let recentVisitedButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-recent-visited-button"))
         let probeButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-probe-button"))
+        let mailButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-mail-button"))
         let settingsButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-settings-button"))
         let sideMenuHost = viewController.children.first {
             $0.view.firstView(accessibilityIdentifier: "post-list-side-menu") != nil
@@ -500,6 +521,8 @@ struct PostListViewControllerTests {
         #expect(recentVisitedButton.configuration?.image != nil)
         #expect(probeButton.configuration?.title == "探针")
         #expect(probeButton.configuration?.image != nil)
+        #expect(mailButton.configuration?.title == "邮箱")
+        #expect(mailButton.configuration?.image != nil)
         #expect(settingsButton.configuration?.title == "设置")
         #expect(settingsButton.configuration?.image != nil)
 
@@ -582,6 +605,16 @@ struct PostListViewControllerTests {
         UIView.setAnimationsEnabled(animationsWereEnabled)
 
         #expect(presenter.didTapProbeCount == 1)
+        #expect(sideMenu.frame.maxX <= 0.5)
+
+        UIView.setAnimationsEnabled(false)
+        menuButton.sendActions(for: .touchUpInside)
+        viewController.view.layoutIfNeeded()
+        mailButton.sendActions(for: .touchUpInside)
+        viewController.view.layoutIfNeeded()
+        UIView.setAnimationsEnabled(animationsWereEnabled)
+
+        #expect(presenter.didTapMailCount == 1)
         #expect(sideMenu.frame.maxX <= 0.5)
 
         UIView.setAnimationsEnabled(false)
@@ -1011,6 +1044,7 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
     private(set) var notificationURLs: [URL] = []
     private(set) var didTapSettingsCount = 0
     private(set) var didTapProbeCount = 0
+    private(set) var didTapMailCount = 0
     private(set) var didTapCategoryPreferencesCount = 0
     private(set) var accountProfileURLs: [URL] = []
     private(set) var didTapLogFileCount = 0
@@ -1065,6 +1099,10 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
 
     func didTapProbe() {
         didTapProbeCount += 1
+    }
+
+    func didTapMail() {
+        didTapMailCount += 1
     }
 
     func didTapCategoryPreferences() {

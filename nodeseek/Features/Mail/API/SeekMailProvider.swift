@@ -134,7 +134,10 @@ final class SeekMailProvider<Target: SeekMailTargetType> {
         }
         if let limit = SeekMailRateLimit(response: http) { rateLimit = limit }
         guard (200..<300).contains(http.statusCode) else {
-            throw SeekMailError.from(statusCode: http.statusCode, data: data, resetAt: SeekMailRateLimit.resetDate(http))
+            throw SeekMailError.from(
+                statusCode: http.statusCode, data: data,
+                resetAt: SeekMailRateLimit.resetDate(http), scope: target.requiredScope
+            )
         }
         return SeekMailResponse(statusCode: http.statusCode, data: data, response: http)
     }
