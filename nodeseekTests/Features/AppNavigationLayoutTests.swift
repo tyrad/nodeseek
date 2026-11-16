@@ -301,6 +301,33 @@ struct AppNavigationLayoutTests {
         #expect(row.accessibilityLabel == "底部栏，首页、通知、最近浏览、我的")
     }
 
+    @Test func probeTabPersistsAndReusesRootAfterReordering() throws {
+        let suite = "probe-tab-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppNavigationLayoutSettings(userDefaults: defaults)
+        #expect(settings.tabItems.contains(.probe) == false)
+        settings.setTabItems([.home, .probe, .notification, .me])
+        let restored = AppNavigationLayoutSettings(userDefaults: defaults)
+        #expect(restored.tabItems == [.home, .probe, .notification, .me])
+
+        let tabs = MainTabBarController(layoutSettings: restored)
+        let navigation = UINavigationController(rootViewController: tabs)
+        tabs.select(.probe)
+        let probe = try #require(tabs.selectedViewController as? ProbeMonitorViewController)
+        #expect(probe.navigationController === navigation)
+        #expect(tabs.navigationItem.title == "探针")
+        #expect(probe.tabBarItem.image != nil)
+        // 数据刷新后，外层导航栏必须拿到新菜单，而不是停留在旧按钮上。
+        tabs.navigationItem.rightBarButtonItems = [UIBarButtonItem(title: "旧菜单", style: .plain, target: nil, action: nil)]
+        probe.viewModel.onChange?()
+        #expect(tabs.navigationItem.rightBarButtonItems == probe.navigationItem.rightBarButtonItems)
+        restored.setTabItems([.home, .notification, .probe, .me])
+        #expect(tabs.selectedViewController === probe)
+        restored.setTabItems([.home, .notification, .me])
+        #expect(tabs.viewControllers?.contains(where: { $0 is ProbeMonitorViewController }) == false)
+    }
+
     private func makeSettings() -> AppNavigationLayoutSettings {
         let defaults = UserDefaults(suiteName: "app-navigation-layout-\(UUID().uuidString)")!
         return AppNavigationLayoutSettings(userDefaults: defaults)

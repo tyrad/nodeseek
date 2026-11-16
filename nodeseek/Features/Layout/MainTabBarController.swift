@@ -116,7 +116,7 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
 
     /// 外层导航条显示的是本控制器的 navigationItem；各 Tab 根页面仍按原样配置自己的 navigationItem，
     /// 切 Tab 时搬过来，页面代码不用区分两种布局。
-    private func syncNavigationItemWithSelectedTab() {
+    func syncNavigationItemWithSelectedTab() {
         guard let selected = selectedViewController else { return }
         selected.loadViewIfNeeded()
         let source = selected.navigationItem
@@ -150,6 +150,8 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
             return NotificationViewController()
         case .me:
             return MeViewController()
+        case .probe:
+            return ProbeMonitorViewController()
         case .search:
             return SearchViewController()
         case .recent:

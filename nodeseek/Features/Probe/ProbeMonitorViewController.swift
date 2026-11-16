@@ -189,6 +189,12 @@ final class ProbeMonitorViewController: UIViewController {
     }
 
     private func configureNavigationItems() {
+        // 探针状态变化会重建菜单，作为 Tab 根页面时同步到外层导航栏。
+        defer {
+            if let tabs = parent as? MainTabBarController, tabs.selectedViewController === self {
+                tabs.syncNavigationItemWithSelectedTab()
+            }
+        }
         guard !viewModel.instances.isEmpty else {
             navigationItem.rightBarButtonItems = []
             return
