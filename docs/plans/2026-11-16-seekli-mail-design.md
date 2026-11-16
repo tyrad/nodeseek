@@ -19,8 +19,10 @@
   - P0 需要：`mailbox:read`、`mail:read`、`mail:manage`、`attachment:read`、`folder:read`、`storage:read`
   - P1 另需：`mail:send`
 - 文档页 `seek.li/manage/developer/docs` 有 WAF 人机校验，命令行访问返回 468；**`/openapi/v1` 不受影响**，curl 和 CFNetwork 风格的 UA 都能正常访问。
-- 限流：响应头 `x-ratelimit-limit: 60`、`x-ratelimit-remaining`、`x-ratelimit-reset`（Unix 秒），即每分钟 60 次。超限返回 429。
-  - 另外，短时间内连续请求十几次会触发 `AUTH_RATE_LIMITED`（“认证失败次数过多，请稍后再试”），约 2 分钟后恢复。即使 Key 有效也会触发。
+- 限流有两层（2026-11-16 用两个 Key 交替实测）：
+  - **按 Key 计**：响应头 `x-ratelimit-limit: 60`、`x-ratelimit-remaining`、`x-ratelimit-reset`（Unix 秒），每分钟 60 次，滑动窗口（每次请求 reset 都往后推），每次请求扣 1。一个 Key 的消耗不影响另一个 Key 的 remaining。
+  - **账号或 IP 共享**：约 20 秒内 17～20 次请求（不论用哪个 Key）就返回 429 + `AUTH_RATE_LIMITED`（“认证失败次数过多，请稍后再试”），此时所有 Key 同时被拒，约 20 秒后恢复。Key 有效也会触发，响应里没有限流头。
+  - 结论：多申请 Key 不能提高可用频率，实际上限约每秒 1 次。会产生请求的交互（如新建邮箱的地址检查）只在用户点击时触发，不随输入自动请求。
 - 时间格式：ISO 8601，部分字段带 9 位纳秒，例如 `2026-11-16T01:02:01.785362836Z`。新建对象的 `createdAt` 可能是 `0001-01-01T00:00:00Z`，按缺失处理。
 
 ### 错误格式
