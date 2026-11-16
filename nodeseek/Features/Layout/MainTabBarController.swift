@@ -53,6 +53,17 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         tabBar.tintColor = .label
         tabBar.unselectedItemTintColor = .secondaryLabel
         observeNotificationUnreadCount()
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(applyMailUnreadCount),
+            name: SeekMailUnreadMonitor.didChangeNotification, object: nil
+        )
+        SeekMailUnreadMonitor.shared.start()
+        applyMailUnreadCount()
+    }
+
+    /// 邮箱 Tab 的角标：全部邮箱的未读数，回到前台时更新。
+    @objc private func applyMailUnreadCount() {
+        rootViewControllersByItem[.mail]?.tabBarItem.badgeValue = SeekMailUnreadMonitor.badgeText(SeekMailUnreadMonitor.shared.totalUnread)
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -96,6 +107,7 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         if let latestUnreadCount {
             applyNotificationUnreadCount(latestUnreadCount)
         }
+        applyMailUnreadCount()
     }
 
     // MARK: - UITabBarControllerDelegate

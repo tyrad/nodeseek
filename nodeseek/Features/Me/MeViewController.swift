@@ -61,6 +61,11 @@ final class MeViewController: UIViewController {
         unreadCountTask?.cancel()
     }
 
+    /// 邮箱行右侧显示全部邮箱的未读数。
+    @objc private func mailUnreadDidChange() {
+        mailRow.setValue(SeekMailUnreadMonitor.badgeText(SeekMailUnreadMonitor.shared.totalUnread))
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         router.viewController = self
@@ -76,6 +81,12 @@ final class MeViewController: UIViewController {
             object: nil
         )
         appTextSizeDidChange()
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(mailUnreadDidChange),
+            name: SeekMailUnreadMonitor.didChangeNotification, object: nil
+        )
+        SeekMailUnreadMonitor.shared.start()
+        mailUnreadDidChange()
         render()
 
         // 刷新只由本页出现和登录关闭触发；不能用 view.window 判断，

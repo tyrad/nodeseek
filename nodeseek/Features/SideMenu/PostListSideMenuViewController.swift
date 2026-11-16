@@ -217,6 +217,23 @@ final class PostListSideMenuViewController: UIViewController {
         configureAccountController()
         observeNotificationUnreadCount()
         accountController.start()
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(applyMailUnreadCount),
+            name: SeekMailUnreadMonitor.didChangeNotification, object: nil
+        )
+        SeekMailUnreadMonitor.shared.start()
+        applyMailUnreadCount()
+    }
+
+    /// 和通知一样有未读时图标变红，标题后面带上未读数。
+    @objc private func applyMailUnreadCount() {
+        let badge = SeekMailUnreadMonitor.badgeText(SeekMailUnreadMonitor.shared.totalUnread)
+        var configuration = mailButton.configuration
+        configuration?.title = badge.map { "邮箱 \($0)" } ?? "邮箱"
+        let iconColor: UIColor = badge == nil ? .label : .systemRed
+        configuration?.imageColorTransformer = UIConfigurationColorTransformer { _ in iconColor }
+        mailButton.configuration = configuration
+        mailButton.accessibilityValue = badge.map { "\($0) 封未读" }
     }
 
     override func viewDidLayoutSubviews() {
