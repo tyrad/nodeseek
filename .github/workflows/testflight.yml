@@ -250,6 +250,15 @@ jobs:
 
           echo "Uploaded IPA and release metadata to GitHub Release ${release_tag}." >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Upload failed build logs
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: build-logs
+          path: ~/Library/Logs/gym/*.log
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Upload build provenance
         if: always()
         uses: actions/upload-artifact@v5
