@@ -23,6 +23,26 @@ enum WhatsNewModule {
     /// ])
     /// ```
     static let catalog: [WhatsNew] = [
+        release("1.3.2", features: [
+            feature(
+                systemName: "envelope.fill",
+                tint: .systemBlue,
+                title: "邮箱收发",
+                subtitle: "接入 seek.li，收信写信和看附件"
+            ),
+            feature(
+                systemName: "key.fill",
+                tint: .systemOrange,
+                title: "一键复制验证码",
+                subtitle: "列表直接复制，等待新邮件自动刷新"
+            ),
+            feature(
+                systemName: "tray.2.fill",
+                tint: .systemIndigo,
+                title: "多邮箱切换",
+                subtitle: "标签显示未读数，长按复制邮箱地址"
+            )
+        ]),
         release("1.3.0", features: [
             feature(
                 systemName: "server.rack",
