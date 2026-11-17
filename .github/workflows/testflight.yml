@@ -6,6 +6,10 @@ on:
       - "ios/v*"
   workflow_dispatch:
     inputs:
+      version:
+        description: "Optional build version override, e.g. 1.4.1 for TestFlight while App Store stays on 1.4.0. Source version is unchanged."
+        required: false
+        type: string
       build_number:
         description: "Optional App Store build number override. Defaults to Asia/Shanghai yyyyMMddHHmmss."
         required: false
@@ -59,13 +63,14 @@ jobs:
       - name: Prepare release inputs
         id: release
         env:
+          MANUAL_VERSION: ${{ inputs.version }}
           MANUAL_BUILD_NUMBER: ${{ inputs.build_number }}
         run: |
           set -euo pipefail
 
           generated_build_number="$(TZ=Asia/Shanghai date +%Y%m%d%H%M%S)"
 
-          # 版本号只认工程里的 MARKETING_VERSION：Info.plist 由它生成，构建时外部传入的版本会被覆盖
+          # 默认使用工程版本；手动覆盖由 Fastlane 在 CI 工作区写入工程，确保 Info.plist 和扩展版本一致。
           project_versions="$(grep -o 'MARKETING_VERSION = [^;]*' nodeseek.xcodeproj/project.pbxproj | sed 's/MARKETING_VERSION = //' | sort -u)"
           if [[ -z "${project_versions}" || "$(printf '%s\n' "${project_versions}" | wc -l | tr -d ' ')" != "1" ]]; then
             echo "MARKETING_VERSION must be set to exactly one value in project.pbxproj, got:" >&2
@@ -94,7 +99,13 @@ jobs:
             fi
             build_number="${generated_build_number}"
           else
+            version="${MANUAL_VERSION:-${version}}"
             build_number="${MANUAL_BUILD_NUMBER:-${generated_build_number}}"
+          fi
+
+          if [[ ! "${version}" =~ ^[0-9]+(\.[0-9]+){1,2}$ ]]; then
+            echo "version must contain two or three numeric components, got: ${version}" >&2
+            exit 1
           fi
 
           if [[ -z "${version}" || -z "${build_number}" ]]; then
@@ -112,7 +123,7 @@ jobs:
           echo "Release version=${version} build_number=${build_number}"
 
       - name: Build and upload to TestFlight
-        run: bundle exec fastlane beta build_number:${{ steps.release.outputs.build_number }}
+        run: bundle exec fastlane beta version:${{ steps.release.outputs.version }} build_number:${{ steps.release.outputs.build_number }}
         env:
           APP_IDENTIFIER: ${{ vars.APP_IDENTIFIER || 'com.mistj.nodeseek' }}
           APP_STORE_CONNECT_APP_ID: ${{ vars.APP_STORE_CONNECT_APP_ID }}
