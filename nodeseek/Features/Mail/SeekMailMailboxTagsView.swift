@@ -36,6 +36,8 @@ final class SeekMailMailboxTagsView: UIView {
     var onToggle: ((Bool) -> Void)?
     /// 注册网站时要填自己的地址，长按标签直接复制。
     var onCopyAddress: ((String) -> Void)?
+    /// 行尾的邮箱设置入口，固定在第一行右侧，不随标签折叠或滚动。
+    var onSettings: (() -> Void)?
     private(set) var isExpanded = false
 
     static let collapsedRows = 2
@@ -46,9 +48,14 @@ final class SeekMailMailboxTagsView: UIView {
 
     private let scrollView = UIScrollView()
     private let toggleButton = UIButton(type: .system)
+    private let settingsButton = UIButton(type: .system)
+    private let settingsDivider = UIView()
+    private static let settingsWidth: CGFloat = 44
     private var tags: [SeekMailMailboxTag] = []
     private var selectedID: Int64?
     private var buttons: [UIButton] = []
+    private var stableWidths: [CGFloat] = []
+    private var measuredFontSize: CGFloat = 0
     private lazy var heightConstraint: NSLayoutConstraint = {
         let constraint = heightAnchor.constraint(equalToConstant: Self.insets.top + Self.rowHeight + Self.insets.bottom)
         constraint.priority = .defaultHigh
@@ -65,6 +72,7 @@ final class SeekMailMailboxTagsView: UIView {
         toggleButton.accessibilityIdentifier = "seek-mail-tags-toggle"
         toggleButton.addAction(UIAction { [weak self] _ in self?.toggle() }, for: .touchUpInside)
         scrollView.addSubview(toggleButton)
+        configureSettingsButton()
         let separator = UIView()
         separator.backgroundColor = .separator
         separator.translatesAutoresizingMaskIntoConstraints = false
@@ -82,6 +90,7 @@ final class SeekMailMailboxTagsView: UIView {
 
     func update(tags: [SeekMailMailboxTag], selectedID: Int64?, expanded: Bool) {
         if tags.map(\.id) != self.tags.map(\.id) {
+            stableWidths = []
             buttons.forEach { $0.removeFromSuperview() }
             buttons = tags.map { tag in
                 let button = UIButton(type: .system)
@@ -94,8 +103,11 @@ final class SeekMailMailboxTagsView: UIView {
         self.tags = tags
         self.selectedID = selectedID
         isExpanded = expanded
+        styleSettingsButton()
         for (tag, button) in zip(tags, buttons) {
-            style(button, tag: tag, selected: tag.id == selectedID)
+            UIView.performWithoutAnimation {
+                style(button, tag: tag, selected: tag.id == selectedID)
+            }
             button.menu = tag.address.map { address in
                 UIMenu(title: address, children: [
                     UIAction(title: SeekMailL10n.text("复制地址"), image: UIImage(systemName: "doc.on.doc")) { [weak self] _ in
@@ -108,14 +120,51 @@ final class SeekMailMailboxTagsView: UIView {
         setNeedsLayout()
     }
 
+    private func configureSettingsButton() {
+        settingsDivider.backgroundColor = .separator
+        addSubview(settingsDivider)
+        settingsButton.accessibilityLabel = SeekMailL10n.text("邮箱设置")
+        settingsButton.accessibilityIdentifier = "seek-mail-settings"
+        settingsButton.addAction(UIAction { [weak self] _ in self?.onSettings?() }, for: .touchUpInside)
+        addSubview(settingsButton)
+        styleSettingsButton()
+    }
+
+    /// 和「全部已读」一样用次级文字色的图标，不抢标签的视觉重心。
+    private func styleSettingsButton() {
+        var configuration = UIButton.Configuration.plain()
+        configuration.baseForegroundColor = .secondaryLabel
+        configuration.image = UIImage(systemName: "gearshape")
+        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(font: SeekMailFont.system(16))
+        configuration.contentInsets = .zero
+        settingsButton.configuration = configuration
+    }
+
     // MARK: - 布局
 
     override func layoutSubviews() {
         super.layoutSubviews()
         scrollView.frame = bounds
         guard bounds.width > 0 else { return }
-        let available = bounds.width - Self.insets.left - Self.insets.right
-        let widths = buttons.map { min(ceil($0.sizeThatFits(CGSize(width: available, height: Self.rowHeight)).width), available) }
+        // 设置按钮占住右侧一列，标签只在左侧排布
+        let settingsX = bounds.width - 6 - Self.settingsWidth
+        settingsButton.frame = CGRect(x: settingsX, y: max(Self.insets.top - 7, 0), width: Self.settingsWidth, height: Self.rowHeight + 14)
+        let dividerHeight = min(18, Self.rowHeight - 8)
+        settingsDivider.frame = CGRect(x: settingsX - 1 / UIScreen.main.scale, y: Self.insets.top + (Self.rowHeight - dividerHeight) / 2,
+                                       width: 1 / UIScreen.main.scale, height: dividerHeight)
+        settingsDivider.isHidden = buttons.isEmpty
+        let available = settingsDivider.frame.minX - 8 - Self.insets.left
+        let fontSize = SeekMailFont.system(14).pointSize
+        if measuredFontSize != fontSize {
+            stableWidths = []
+            measuredFontSize = fontSize
+        }
+        // 数字减少或归零时保留已占用宽度，避免标签反复换行、推动整张列表。
+        let measured = buttons.map { ceil($0.sizeThatFits(CGSize(width: available, height: Self.rowHeight)).width) }
+        stableWidths = measured.enumerated().map { index, width in
+            max(width, stableWidths.indices.contains(index) ? stableWidths[index] : 0)
+        }
+        let widths = stableWidths.map { min($0, available) }
 
         var visible = Array(buttons.indices)
         var toggleTitle: String?
@@ -141,8 +190,10 @@ final class SeekMailMailboxTagsView: UIView {
         toggleButton.isHidden = toggleTitle == nil
         if toggleTitle != nil, let frame = plan.frames.last { toggleButton.frame = frame }
 
-        let contentHeight = Self.insets.top + CGFloat(plan.rows) * Self.rowHeight
-            + CGFloat(max(plan.rows - 1, 0)) * Self.spacing + Self.insets.bottom
+        // 还没有邮箱时也保留一行，让设置入口可用
+        let rows = max(plan.rows, 1)
+        let contentHeight = Self.insets.top + CGFloat(rows) * Self.rowHeight
+            + CGFloat(rows - 1) * Self.spacing + Self.insets.bottom
         scrollView.contentSize = CGSize(width: bounds.width, height: contentHeight)
         let maxHeight = (window?.bounds.height ?? UIScreen.main.bounds.height) * 0.5
         let height = min(contentHeight, maxHeight)

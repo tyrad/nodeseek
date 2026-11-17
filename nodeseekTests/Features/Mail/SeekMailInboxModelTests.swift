@@ -5,6 +5,18 @@ import Testing
 /// 地址都是假值。
 @MainActor
 struct SeekMailInboxModelTests {
+    @Test func identicalUnreadSnapshotDoesNotRenderAgain() {
+        let model = makeModel(SeekMailRouteTransport())
+        var updates = 0
+        model.onChange = { updates += 1 }
+        let counts = SeekMailUnreadCounts(byMailbox: [1: 3], total: 3)
+        model.applyUnreadCounts(counts)
+        model.applyUnreadCounts(counts)
+        #expect(updates == 1)
+        model.applyUnreadCounts(SeekMailUnreadCounts(byMailbox: [1: 2], total: 2))
+        #expect(updates == 2)
+    }
+
     // MARK: - 显示名
 
     @Test func displayNamesUseLocalPartUnlessAliasOrCollision() throws {

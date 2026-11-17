@@ -3,7 +3,6 @@
 //  nodeseek
 //
 
-import SafariServices
 import UIKit
 
 /// 邮箱入口：没有 Key 时显示绑定页，有 Key 时显示邮件页；Key 变化时自动切换。
@@ -72,6 +71,7 @@ final class SeekMailHomeViewController: UIViewController {
             let inbox = SeekMailInboxViewController(keyStore: keyStore, transport: transport,
                                                     selectionStore: selectionStore, cache: cache, memoryCache: memoryCache)
             inbox.onNavigationChange = { [weak self] in self?.configureNavigationItems(bound: true) }
+            inbox.onOpenSettings = { [weak self] in self?.showSettings() }
             inbox.onUnauthorized = { [weak self] in
                 self?.pendingBindMessage = SeekMailL10n.text("之前保存的 Key 已失效，请重新粘贴")
                 self?.keyStore.clear()
@@ -101,7 +101,16 @@ final class SeekMailHomeViewController: UIViewController {
         content = next
     }
 
+    private weak var navigationInbox: SeekMailInboxViewController?
+    private var navigationCanCompose: Bool?
+
     private func configureNavigationItems(bound: Bool) {
+        let inbox = content as? SeekMailInboxViewController
+        let canCompose = inbox?.model.canCompose
+        // 未读数变化不影响导航操作，复用按钮以免系统重复过渡。
+        if bound, let inbox, navigationInbox === inbox, navigationCanCompose == canCompose { return }
+        navigationInbox = bound ? inbox : nil
+        navigationCanCompose = bound ? canCompose : nil
         // 作为 Tab 根页面时，导航栏按钮要同步到外层导航栏
         defer {
             if let tabs = parent as? MainTabBarController, tabs.selectedViewController === self {
@@ -112,10 +121,8 @@ final class SeekMailHomeViewController: UIViewController {
             navigationItem.rightBarButtonItems = []
             return
         }
-        let more = UIBarButtonItem(image: UIImage(systemName: "ellipsis"), menu: makeMoreMenu())
-        more.accessibilityLabel = SeekMailL10n.text("更多")
-        more.accessibilityIdentifier = "seek-mail-more"
-        var items = [more]
+        // 设置入口在邮箱标签行，导航栏保留搜索和写信
+        var items: [UIBarButtonItem] = []
         if let inbox = content as? SeekMailInboxViewController, inbox.model.canCompose {
             let compose = UIBarButtonItem(image: UIImage(systemName: "square.and.pencil"), primaryAction: UIAction { [weak inbox] _ in
                 inbox?.presentCompose()
@@ -124,26 +131,28 @@ final class SeekMailHomeViewController: UIViewController {
             compose.accessibilityIdentifier = "seek-mail-compose"
             items.append(compose)
         }
+        if let inbox = content as? SeekMailInboxViewController {
+            let search = UIBarButtonItem(image: UIImage(systemName: "magnifyingglass"), primaryAction: UIAction { [weak inbox] _ in
+                inbox?.showSearch()
+            })
+            search.accessibilityLabel = NSLocalizedString("搜索", tableName: "Search", comment: "")
+            search.accessibilityIdentifier = "seek-mail-search-button"
+            items.append(search)
+        }
         navigationItem.rightBarButtonItems = items
     }
 
-    private func makeMoreMenu() -> UIMenu {
-        let manage = UIAction(title: SeekMailL10n.text("在网页中管理"), image: UIImage(systemName: "safari")) { [weak self] _ in
-            self?.present(SFSafariViewController(url: SeekMailLinks.manage), animated: true)
-        }
-        let replace = UIAction(title: SeekMailL10n.text("更换 API Key"), image: UIImage(systemName: "key")) { [weak self] _ in
-            self?.showReplaceKey()
-        }
-        let remove = UIAction(title: SeekMailL10n.text("移除 Key 并退出"), image: UIImage(systemName: "rectangle.portrait.and.arrow.right"),
-                              attributes: .destructive) { [weak self] _ in
-            self?.confirmRemoveKey()
-        }
-        let inboxItems = (content as? SeekMailInboxViewController)?.menuElements() ?? []
-        return UIMenu(children: [
-            UIMenu(options: .displayInline, children: inboxItems),
-            UIMenu(options: .displayInline, children: [manage]),
-            UIMenu(options: .displayInline, children: [replace, remove])
-        ])
+    private func showSettings() {
+        guard let inbox = content as? SeekMailInboxViewController else { return }
+        let actions = SeekMailSettingsViewController.Actions(
+            makeCreateMailbox: { [weak inbox] onCreated in
+                inbox?.makeCreateMailboxController(onCreated: onCreated) ?? UIViewController()
+            },
+            replaceKey: { [weak self] in self?.showReplaceKey() },
+            removeKey: { [weak self] in self?.removeKey() }
+        )
+        let settings = SeekMailSettingsViewController(selectionStore: selectionStore, provider: inbox.model.provider, actions: actions)
+        navigationController?.pushViewController(settings, animated: true)
     }
 
     /// 新 Key 验证通过才替换旧 Key，验证失败时旧 Key 继续可用。
@@ -161,20 +170,12 @@ final class SeekMailHomeViewController: UIViewController {
         parent is MainTabBarController ? parent! : self
     }
 
-    private func confirmRemoveKey() {
-        let alert = UIAlertController(
-            title: SeekMailL10n.text("移除 API Key？"),
-            message: SeekMailL10n.text("本机保存的 Key 会被删除，邮箱数据不受影响。之后需要重新粘贴 Key 才能查看邮件。"),
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: SeekMailL10n.text("取消"), style: .cancel))
-        alert.addAction(UIAlertAction(title: SeekMailL10n.text("移除"), style: .destructive) { [weak self] _ in
-            // 记住的邮箱属于旧账号，一起清掉
-            self?.selectionStore.clear()
-            self?.cache?.clear()
-            self?.memoryCache?.clear()
-            self?.keyStore.clear()
-        })
-        present(alert, animated: true)
+    /// 设置页确认后调用：记住的邮箱属于旧账号，一起清掉，再回到邮箱页显示绑定页。
+    private func removeKey() {
+        navigationController?.popToViewController(navigationAnchor, animated: true)
+        selectionStore.clear()
+        cache?.clear()
+        memoryCache?.clear()
+        keyStore.clear()
     }
 }

@@ -169,6 +169,19 @@ struct SeekMailP1Tests {
         #expect(SeekMailUnreadMonitor.badgeText(120) == "99+")
     }
 
+    @Test func localUnreadChangesUpdateBadgeAndClearSnapshot() {
+        let monitor = SeekMailUnreadMonitor(keyStore: InMemorySeekMailKeyStore(),
+                                            defaults: makeDefaults(), notificationCenter: NotificationCenter())
+        monitor.applyCounts(SeekMailUnreadCounts(byMailbox: [1: 3], total: 3))
+        #expect(SeekMailUnreadMonitor.badgeText(monitor.totalUnread) == "3")
+        monitor.applyCounts(SeekMailUnreadCounts(byMailbox: [1: 2], total: 2))
+        #expect(SeekMailUnreadMonitor.badgeText(monitor.totalUnread) == "2")
+        monitor.applyCounts(SeekMailUnreadCounts(byMailbox: [1: 0], total: 0))
+        #expect(SeekMailUnreadMonitor.badgeText(monitor.totalUnread) == nil)
+        monitor.check(force: true)
+        #expect(monitor.latestCounts == nil)
+    }
+
     @Test func monitorClearsCountWithoutKey() {
         let center = NotificationCenter()
         let monitor = SeekMailUnreadMonitor(keyStore: InMemorySeekMailKeyStore(), transport: SeekMailRouteTransport().load,

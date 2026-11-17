@@ -463,7 +463,15 @@ final class SeekMailInboxModel {
             if mail.isRead == false { setRead(id, read: true, silent: true) }
             return
         }
-        Task { [provider] in try? await provider.markRead(id: id, read: true) }
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await provider.markRead(id: id, read: true)
+                refreshUnreadCounts()
+            } catch {
+                // 打开详情的隐式已读操作保持静默。
+            }
+        }
     }
 
     func setFlagged(_ id: Int64, flagged: Bool) {
@@ -596,6 +604,8 @@ final class SeekMailInboxModel {
 
     /// 也用于复用回到前台时检查到的数字，不再单独请求。
     func applyUnreadCounts(_ counts: SeekMailUnreadCounts) {
+        // 列表发布的统计会经监控器回传，不能再次触发排序和整页刷新。
+        guard unreadTotal != counts.total || unreadByMailbox != counts.byMailbox else { return }
         unreadByMailbox = counts.byMailbox
         unreadTotal = counts.total
         sortMailboxes()

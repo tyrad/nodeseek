@@ -3,6 +3,7 @@ import UIKit
 /// 底部悬浮搜索框。不用系统的 searchController：iOS 26 把它放到底部后会占用导航栈的底部安全区，
 /// 返回时底栏会跟着上移一下。
 final class ProbeSearchBarView: UIView, UITextFieldDelegate {
+    var onCancel: (() -> Void)?
     var onChange: ((String) -> Void)?
     /// 点键盘「搜索」时回调；需要发请求的页面用它，避免每输入一个字就请求一次。
     var onSubmit: ((String) -> Void)?
@@ -95,6 +96,7 @@ final class ProbeSearchBarView: UIView, UITextFieldDelegate {
         textField.text = nil
         textField.resignFirstResponder()
         if hadText { notifyChange() }
+        onCancel?()
     }
 
     // MARK: - UITextFieldDelegate

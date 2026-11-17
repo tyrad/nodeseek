@@ -6,6 +6,30 @@ import UIKit
 /// 在有尺寸的界面里真正生成单元格，覆盖骨架行、邮件行和验证码卡片的布局。
 @MainActor
 struct SeekMailInboxViewTests {
+    @Test func unreadDecreaseKeepsTagFramesStable() throws {
+        let tags = SeekMailMailboxTagsView()
+        tags.frame = CGRect(x: 0, y: 0, width: 390, height: 100)
+        func update(_ count: Int) {
+            tags.update(tags: [
+                SeekMailMailboxTag(id: nil, title: "全部", unread: count),
+                SeekMailMailboxTag(id: 1, title: "hi@seek.li", unread: count),
+                SeekMailMailboxTag(id: 2, title: "work@seek.li", unread: 0)
+            ], selectedID: nil, expanded: false)
+            tags.layoutIfNeeded()
+        }
+        update(10)
+        let all = try #require(tags.mailTestView(id: "seek-mail-tag-all") as? UIButton)
+        let mailbox = try #require(tags.mailTestView(id: "seek-mail-tag-1"))
+        let allFrame = all.frame
+        let mailboxFrame = mailbox.frame
+        for count in [9, 0] {
+            update(count)
+            #expect(all.frame == allFrame)
+            #expect(mailbox.frame == mailboxFrame)
+        }
+        #expect(all.configuration?.attributedTitle.map { String($0.characters) } == "全部")
+    }
+
     @Test func rendersSkeletonThenRowsAndCodeCard() async throws {
         let transport = SeekMailRouteTransport()
         transport.delayNanoseconds = 150_000_000
@@ -73,7 +97,10 @@ struct SeekMailInboxViewTests {
 
         let field = try #require(inbox.view.mailTestView(id: "seek-mail-search") as? UITextField)
         let table = try #require(inbox.view.mailTestView(id: "seek-mail-list") as? UITableView)
-        #expect(table.contentInset.bottom > 0)
+        #expect(inbox.searchBar.superview?.isHidden == true)
+        inbox.showSearch()
+        #expect(inbox.searchBar.superview?.isHidden == false)
+        #expect(inbox.searchBar.convert(inbox.searchBar.bounds, to: inbox.view).maxY <= table.frame.minY)
         let before = transport.requests.count
 
         // 输入时不发请求
@@ -92,6 +119,7 @@ struct SeekMailInboxViewTests {
         inbox.searchBar.cancel()
         #expect(inbox.model.isSearching == false)
         #expect(field.text?.isEmpty ?? true)
+        #expect(inbox.searchBar.superview?.isHidden == true)
     }
 
     @Test func mailboxTagsCollapseToTwoRowsAndKeepSelectionVisible() async throws {
@@ -126,6 +154,12 @@ struct SeekMailInboxViewTests {
         #expect(title(toggle)?.hasPrefix("展开") == true)
         #expect(visibleTags().allSatisfy { $0.frame.maxY <= 8 + 30 * 2 + 8 })
         #expect(visibleTags().contains { $0.accessibilityIdentifier == "seek-mail-tag-12" })
+        // 设置入口固定在行尾，标签不压到它
+        let settings = try #require(tagsView.mailTestView(id: "seek-mail-settings") as? UIButton)
+        #expect(visibleTags().allSatisfy { $0.frame.maxX <= settings.frame.minX })
+        // 当前邮箱没有未读时不显示「全部已读」
+        let markAll = try #require(inbox.view.mailTestView(id: "seek-mail-mark-all-read"))
+        #expect(markAll.isHidden)
         // 有未读的邮箱排在前面，标签带未读数
         #expect(title(tagsView.mailTestView(id: "seek-mail-tag-3") as? UIButton) == "box3 (4)")
         #expect(title(tagsView.mailTestView(id: "seek-mail-tag-all") as? UIButton) == "全部 (4)")
@@ -143,6 +177,9 @@ struct SeekMailInboxViewTests {
         // 点标签切换邮箱
         (tagsView.mailTestView(id: "seek-mail-tag-3") as? UIButton)?.sendActions(for: .touchUpInside)
         #expect(inbox.model.selectedMailboxID == 3)
+        // 切到有未读的邮箱后出现「全部已读」
+        await mailWaitUntil { inbox.model.phase == .loaded }
+        #expect(markAll.isHidden == false)
     }
 
     @Test func progressFloatsAboveSearchWithoutTakingListHeight() async throws {
@@ -169,8 +206,7 @@ struct SeekMailInboxViewTests {
         // 列表位置不变，只加大底部留白
         #expect(table.frame == tableFrame)
         #expect(table.contentInset.bottom > insetBefore)
-        let search = try #require(inbox.view.mailTestView(id: "seek-mail-search"))
-        #expect(bar.frame.maxY <= search.convert(search.bounds, to: inbox.view).minY)
+        #expect(bar.frame.maxY <= inbox.view.keyboardLayoutGuide.layoutFrame.minY)
         (bar.mailTestView(id: "seek-mail-progress-action") as? UIButton)?.sendActions(for: .touchUpInside)
         #expect(stopped)
 

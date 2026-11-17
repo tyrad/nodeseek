@@ -79,6 +79,7 @@ final class SeekMailUnreadMonitor {
     func check(force: Bool = false) {
         guard keyStore.hasAPIKey else {
             task?.cancel()
+            latestCounts = nil
             setTotal(nil)
             return
         }
@@ -91,9 +92,19 @@ final class SeekMailUnreadMonitor {
         }
     }
 
+    /// 列表的即时变更同步到入口，避免角标一直等到下次前台检查。
+    func applyCounts(_ counts: SeekMailUnreadCounts) {
+        guard counts != latestCounts else { return }
+        task?.cancel()
+        latestCounts = counts
+        totalUnread = counts.total
+        notificationCenter.post(name: Self.didChangeNotification, object: self)
+    }
+
     private func performCheck(at date: Date) async {
         do {
             let counts = try await provider.unreadCounts()
+            try Task.checkCancellation()
             let previous = totalUnread
             let countsChanged = counts != latestCounts
             latestCounts = counts

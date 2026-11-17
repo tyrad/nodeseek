@@ -142,7 +142,9 @@ struct SeekMailBindTests {
         store.save(apiKey: "sk_live_ok")
         let inbox = try #require(home.children.first as? SeekMailInboxViewController)
         #expect(home.children.count == 1)
-        #expect(home.navigationItem.rightBarButtonItems?.first?.accessibilityIdentifier == "seek-mail-more")
+        // 原「更多」菜单收进邮箱设置页，入口在邮箱标签行；导航栏只留写信
+        #expect(home.navigationItem.rightBarButtonItems?.contains { $0.accessibilityIdentifier == "seek-mail-more" } == false)
+        #expect(inbox.view.mailTestView(id: "seek-mail-settings") is UIButton)
         // 邮箱用页面顶部的标签切换，导航栏只显示标题
         #expect(home.navigationItem.titleView == nil)
         // 搜索框在页面底部，不挂到导航栏，避免返回时底部 Tab 跳动

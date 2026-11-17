@@ -57,13 +57,23 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
             self, selector: #selector(applyMailUnreadCount),
             name: SeekMailUnreadMonitor.didChangeNotification, object: nil
         )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(mailBadgeSettingChanged),
+            name: SeekMailTabBadgeSetting.didChangeNotification, object: nil
+        )
         SeekMailUnreadMonitor.shared.start()
         applyMailUnreadCount()
     }
 
-    /// 邮箱 Tab 的角标：全部邮箱的未读数，回到前台时更新。
+    @objc private func mailBadgeSettingChanged() {
+        applyMailUnreadCount()
+        if SeekMailTabBadgeSetting.isEnabled() { SeekMailUnreadMonitor.shared.check(force: true) }
+    }
+
+    /// 邮箱 Tab 的角标：全部邮箱的未读数，回到前台时更新；邮箱设置里可关闭。
     @objc private func applyMailUnreadCount() {
-        rootViewControllersByItem[.mail]?.tabBarItem.badgeValue = SeekMailUnreadMonitor.badgeText(SeekMailUnreadMonitor.shared.totalUnread)
+        let count = SeekMailTabBadgeSetting.isEnabled() ? SeekMailUnreadMonitor.shared.totalUnread : nil
+        rootViewControllersByItem[.mail]?.tabBarItem.badgeValue = SeekMailUnreadMonitor.badgeText(count)
     }
 
     override func viewWillAppear(_ animated: Bool) {

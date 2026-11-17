@@ -3,10 +3,9 @@
 //  nodeseek
 //
 
-import SafariServices
 import UIKit
 
-/// 已绑定时的邮件列表。顶部平铺邮箱标签，搜索框悬浮在本页底部。
+/// 已绑定时的邮件列表。顶部平铺邮箱标签，搜索框由导航栏入口展开。
 final class SeekMailInboxViewController: UIViewController {
     private var keyboardDismissCoordinator: KeyboardDismissCoordinator?
     let model: SeekMailInboxModel
@@ -14,9 +13,12 @@ final class SeekMailInboxViewController: UIViewController {
     var onUnauthorized: (() -> Void)?
     /// 邮箱列表变化后（例如能否写信），入口页要重新同步导航栏。
     var onNavigationChange: (() -> Void)?
+    /// 邮箱标签行的设置按钮，由入口页推入设置页。
+    var onOpenSettings: (() -> Void)?
 
     /// 不用系统 searchController：iOS 26 会把它放到底部并占用导航栈的底部安全区，返回时底部 Tab 会跳一下。
     let searchBar = ProbeSearchBarView()
+    private let searchContainer = UIView()
 
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let mailboxTags = SeekMailMailboxTagsView()
@@ -27,7 +29,11 @@ final class SeekMailInboxViewController: UIViewController {
     private var noticeTimer: Timer?
     private var lastDeletedID: Int64?
     private var autoRefreshTimer: Timer?
-    /// 悬浮在搜索框上方，不占列表高度。
+    /// 正在统计未读、等待确认时隐藏「全部已读」，避免重复点击。
+    private var isPreparingMarkAll = false {
+        didSet { updateMarkAllButton() }
+    }
+    /// 悬浮在键盘或底部安全区上方，不占列表高度。
     let progressBar = SeekMailProgressBar()
     private lazy var markJob: SeekMailMarkAllReadJob = {
         let job = SeekMailMarkAllReadJob(provider: model.provider)
@@ -68,13 +74,21 @@ final class SeekMailInboxViewController: UIViewController {
         keyboardDismissCoordinator = KeyboardDismissCoordinator(rootView: view, backgrounds: [view, tableView])
         view.backgroundColor = .systemBackground
         setupLayout()
-        model.onChange = { [weak self] in self?.render() }
+        model.onChange = { [weak self] in
+            guard let self else { return }
+            if let total = model.unreadTotal {
+                SeekMailUnreadMonitor.shared.applyCounts(SeekMailUnreadCounts(byMailbox: model.unreadByMailbox, total: total))
+            }
+            render()
+        }
         model.onUnauthorized = { [weak self] in self?.onUnauthorized?() }
         model.onMessage = { [weak self] message in self?.undoToast.showMessage(message, in: self?.view) }
         folderTabs.onSelect = { [weak self] scope in self?.model.selectScope(scope) }
+        folderTabs.onMarkAllRead = { [weak self] in self?.markAllRead() }
         mailboxTags.onSelect = { [weak self] id in self?.model.selectMailbox(id) }
         mailboxTags.onToggle = { [weak self] expanded in self?.model.selectionStore.tagsExpanded = expanded }
         mailboxTags.onCopyAddress = { [weak self] address in self?.copyAddress(address) }
+        mailboxTags.onSettings = { [weak self] in self?.onOpenSettings?() }
         NotificationCenter.default.addObserver(
             self, selector: #selector(appDidBecomeActive),
             name: UIApplication.didBecomeActiveNotification, object: nil
@@ -168,15 +182,12 @@ final class SeekMailInboxViewController: UIViewController {
         autoRefreshTimer = nil
     }
 
-    private static func autoRefreshTitle(_ seconds: Int) -> String {
-        seconds == 0 ? SeekMailL10n.text("关闭") : SeekMailL10n.format("每 %@ 秒", String(seconds))
-    }
-
     // MARK: - 全部标为已读
 
     /// 先只取未读 ID 算出数量，确认时写清楚要逐封处理、大概多久，避免用户以为卡住。
     private func markAllRead() {
-        guard markJob.isActive == false else { return }
+        guard markJob.isActive == false, isPreparingMarkAll == false else { return }
+        isPreparingMarkAll = true
         let mailboxID = model.selectedMailboxID
         let scopeTitle = model.selectionTitle
         progressBar.show(text: SeekMailL10n.text("正在统计未读…"), progress: nil)
@@ -186,12 +197,14 @@ final class SeekMailInboxViewController: UIViewController {
                 let result = try await markJob.collect(mailboxID: mailboxID)
                 progressBar.hide()
                 guard result.mails.isEmpty == false else {
+                    isPreparingMarkAll = false
                     undoToast.showMessage(SeekMailL10n.text("没有未读邮件"), in: view)
                     model.refreshUnreadCounts()
                     return
                 }
                 confirmMarkAllRead(result.mails, hasMore: result.total > result.mails.count, scopeTitle: scopeTitle)
             } catch {
+                isPreparingMarkAll = false
                 progressBar.hide()
                 undoToast.showMessage((error as? SeekMailError)?.userMessage ?? SeekMailL10n.text("加载失败，请稍后重试"), in: view)
             }
@@ -212,9 +225,12 @@ final class SeekMailInboxViewController: UIViewController {
                                              String(SeekMailMarkAllReadJob.maxPerRun), String(mails.count)))
         }
         let alert = UIAlertController(title: SeekMailL10n.text("全部标为已读"), message: lines.joined(separator: "\n"), preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: SeekMailL10n.text("取消"), style: .cancel))
+        alert.addAction(UIAlertAction(title: SeekMailL10n.text("取消"), style: .cancel) { [weak self] _ in
+            self?.isPreparingMarkAll = false
+        })
         alert.addAction(UIAlertAction(title: SeekMailL10n.text("开始"), style: .default) { [weak self] _ in
             self?.markJob.start(mails)
+            self?.isPreparingMarkAll = false
         })
         present(alert, animated: true)
     }
@@ -248,72 +264,32 @@ final class SeekMailInboxViewController: UIViewController {
                 undoToast.showMessage(SeekMailL10n.format("已停止，已处理 %@/%@", String(done), String(total)), in: view)
             }
         }
+        updateMarkAllButton()
         onNavigationChange?()
     }
 
-    private func presentCreateMailbox() {
+    /// 设置页弹出新建邮箱；创建后更新标签并复制地址，提示由设置页显示。
+    func makeCreateMailboxController(onCreated: @escaping (SeekMailbox) -> Void) -> UIViewController {
         let create = SeekMailCreateMailboxViewController(provider: model.provider) { [weak self] mailbox in
             guard let self else { return }
             model.addCreatedMailbox(mailbox)
             UIPasteboard.general.string = mailbox.address
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            undoToast.showMessage(SeekMailL10n.format("已创建并复制 %@", mailbox.address), in: view)
             onNavigationChange?()
+            onCreated(mailbox)
         }
         let navigation = UINavigationController(rootViewController: create)
         if let sheet = navigation.sheetPresentationController {
             sheet.detents = [.medium(), .large()]
             sheet.prefersGrabberVisible = true
         }
-        present(navigation, animated: true)
+        return navigation
     }
 
     private func copyAddress(_ address: String) {
         UIPasteboard.general.string = address
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         undoToast.showMessage(SeekMailL10n.format("已复制 %@", address), in: view)
-    }
-
-    /// 入口页「更多」菜单里属于列表的部分。
-    func menuElements() -> [UIMenuElement] {
-        let refresh = UIAction(title: SeekMailL10n.text("刷新"), image: UIImage(systemName: "arrow.clockwise")) { [weak self] _ in
-            self?.model.reload()
-        }
-        let storage = UIDeferredMenuElement.uncached { [weak self] completion in
-            guard let self else { return completion([]) }
-            Task {
-                let item: UIAction
-                if let quota = try? await self.model.provider.quota(), let storage = quota.storage {
-                    let percent = storage.usagePercent ?? Int(Double(storage.used) / Double(max(storage.quota, 1)) * 100)
-                    item = UIAction(title: SeekMailL10n.text("存储用量"), subtitle: "\(SeekMailFormat.bytes(storage.used)) / \(SeekMailFormat.bytes(storage.quota)) · \(percent)%",
-                                    image: UIImage(systemName: "internaldrive")) { _ in }
-                } else {
-                    item = UIAction(title: SeekMailL10n.text("存储用量"), subtitle: SeekMailL10n.text("暂时无法获取"), image: UIImage(systemName: "internaldrive"),
-                                    attributes: .disabled) { _ in }
-                }
-                completion([item])
-            }
-        }
-        let current = model.selectionStore.autoRefreshSeconds
-        let intervals = SeekMailSelectionStore.autoRefreshOptions.map { seconds in
-            UIAction(title: Self.autoRefreshTitle(seconds), state: seconds == current ? .on : .off) { [weak self] _ in
-                guard let self else { return }
-                model.selectionStore.autoRefreshSeconds = seconds
-                if viewIfLoaded?.window != nil { startAutoRefresh() }
-                // 让入口页重建菜单，显示新的勾选
-                onNavigationChange?()
-            }
-        }
-        let autoRefresh = UIMenu(title: SeekMailL10n.text("自动刷新"), subtitle: Self.autoRefreshTitle(current),
-                                 image: UIImage(systemName: "timer"), children: intervals)
-        let markAll = UIAction(title: SeekMailL10n.text("全部标为已读"), image: UIImage(systemName: "envelope.open"),
-                               attributes: model.unreadTotal == 0 || markJob.isActive ? .disabled : []) { [weak self] _ in
-            self?.markAllRead()
-        }
-        let create = UIAction(title: SeekMailL10n.text("新建邮箱"), image: UIImage(systemName: "plus")) { [weak self] _ in
-            self?.presentCreateMailbox()
-        }
-        return [refresh, markAll, create, autoRefresh, storage]
     }
 
     // MARK: - 布局
@@ -346,7 +322,7 @@ final class SeekMailInboxViewController: UIViewController {
         }, for: .valueChanged)
         tableView.refreshControl = refresh
 
-        let stack = UIStackView(arrangedSubviews: [mailboxTags, folderTabs, noticeBar, tableView])
+        let stack = UIStackView(arrangedSubviews: [searchContainer, mailboxTags, folderTabs, noticeBar, tableView])
         stack.axis = .vertical
         stack.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(stack)
@@ -370,21 +346,33 @@ final class SeekMailInboxViewController: UIViewController {
     }
 
     /// 搜索要请求接口，所以点键盘「搜索」才发；清空或取消时立即回到普通列表。
+    func showSearch() {
+        loadViewIfNeeded()
+        searchContainer.isHidden = false
+        view.layoutIfNeeded()
+        searchBar.textField.becomeFirstResponder()
+    }
+
     private func configureSearch() {
         searchBar.textField.accessibilityIdentifier = "seek-mail-search"
+        searchBar.onCancel = { [weak self] in self?.searchContainer.isHidden = true }
         searchBar.onSubmit = { [weak self] text in self?.model.setSearchText(text) }
         searchBar.onChange = { [weak self] text in
             if text.isEmpty { self?.model.setSearchText("") }
         }
         searchBar.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(searchBar)
+        searchContainer.isHidden = true
+        searchContainer.addSubview(searchBar)
+        let searchBottom = searchBar.bottomAnchor.constraint(equalTo: searchContainer.bottomAnchor, constant: -8)
+        searchBottom.priority = .defaultHigh
         NSLayoutConstraint.activate([
-            searchBar.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
-            searchBar.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
-            searchBar.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -8),
+            searchBar.leadingAnchor.constraint(equalTo: searchContainer.layoutMarginsGuide.leadingAnchor),
+            searchBar.trailingAnchor.constraint(equalTo: searchContainer.layoutMarginsGuide.trailingAnchor),
+            searchBar.topAnchor.constraint(equalTo: searchContainer.topAnchor, constant: 8),
+            searchBottom,
         ])
-        // 提示条放在搜索框上方，避免挡住它
-        undoToast.bottomOffset = ProbeSearchBarView.height + 8 + 12
+        // 撤销提示与批量操作进度在底部避让。
+        undoToast.bottomOffset = 12
 
         progressBar.translatesAutoresizingMaskIntoConstraints = false
         progressBar.onVisibilityChange = { [weak self] in
@@ -394,17 +382,17 @@ final class SeekMailInboxViewController: UIViewController {
         NSLayoutConstraint.activate([
             progressBar.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
             progressBar.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
-            progressBar.bottomAnchor.constraint(equalTo: searchBar.topAnchor, constant: -8)
+            progressBar.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -8)
         ])
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        // 列表底部让出搜索框（和进度条）的位置；安全区由系统自动加，这里只补高出的部分
-        let floatingTop = progressBar.isShowing ? min(progressBar.frame.minY, searchBar.frame.minY) : searchBar.frame.minY
+        // 列表底部避让键盘和进度条；安全区由系统自动加入。
+        let floatingTop = progressBar.isShowing ? progressBar.frame.minY : view.keyboardLayoutGuide.layoutFrame.minY
         let bottom = max(view.bounds.maxY - floatingTop + 8 - view.safeAreaInsets.bottom, 0)
         // 进度条显示时提示往上让开，不叠在一起
-        undoToast.updateBottomOffset(ProbeSearchBarView.height + 8 + 12 + (progressBar.isShowing ? progressBar.bounds.height + 8 : 0))
+        undoToast.updateBottomOffset(12 + (progressBar.isShowing ? progressBar.bounds.height + 8 : 0))
         if tableView.contentInset.bottom != bottom {
             tableView.contentInset.bottom = bottom
             tableView.verticalScrollIndicatorInsets.bottom = bottom
@@ -418,6 +406,7 @@ final class SeekMailInboxViewController: UIViewController {
         updateTags()
         onNavigationChange?()
         folderTabs.update(scopes: model.scopes, titles: model.scopes.map(model.title(for:)), selected: model.scope)
+        updateMarkAllButton()
         searchBar.textField.placeholder = SeekMailL10n.format("搜索 %@ · %@", model.selectionTitle, model.scopeTitle)
         updateNotice()
         updateBackground()
@@ -428,8 +417,15 @@ final class SeekMailInboxViewController: UIViewController {
         }
     }
 
+    /// 「全部已读」作用于当前邮箱（不含垃圾邮件和回收站），所以只在当前邮箱有未读、且不在这两个文件夹或搜索结果里时显示。
+    private func updateMarkAllButton() {
+        let unread = model.selectedMailboxID.map { model.unreadByMailbox[$0] ?? 0 } ?? (model.unreadTotal ?? 0)
+        let visible = unread > 0 && markJob.isActive == false && isPreparingMarkAll == false && model.isSearching == false
+            && model.scope != .spam && model.scope != .trash
+        folderTabs.setMarkAllVisible(visible)
+    }
+
     private func updateTags() {
-        mailboxTags.isHidden = model.mailboxes.isEmpty
         mailboxTags.update(tags: model.mailboxTags, selectedID: model.selectedMailboxID,
                            expanded: model.selectionStore.tagsExpanded)
     }
@@ -753,7 +749,11 @@ final class SeekMailProgressBar: UIView {
 /// 横向文件夹 tab，选中态用 .label 反色胶囊。
 final class SeekMailFolderTabsView: UIView {
     var onSelect: ((SeekMailFolderScope) -> Void)?
+    var onMarkAllRead: (() -> Void)?
     private let scrollView = UIScrollView()
+    /// 「全部已读」图标固定在右侧，不随文件夹横向滚动；隐藏时文件夹占满整行。
+    private let markAllButton = UIButton(type: .system)
+    private let row = UIStackView()
     private let stack = UIStackView()
     private var scopes: [SeekMailFolderScope] = []
     private var buttons: [UIButton] = []
@@ -765,12 +765,16 @@ final class SeekMailFolderTabsView: UIView {
         super.init(frame: frame)
         backgroundColor = .systemBackground
         scrollView.showsHorizontalScrollIndicator = false
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
         stack.spacing = 6
         stack.alignment = .fill
         stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(scrollView)
         scrollView.addSubview(stack)
+        configureMarkAllButton()
+        row.addArrangedSubview(scrollView)
+        row.addArrangedSubview(markAllButton)
+        row.alignment = .fill
+        row.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(row)
         indicator.backgroundColor = .label
         scrollView.addSubview(indicator)
         let separator = UIView()
@@ -778,10 +782,10 @@ final class SeekMailFolderTabsView: UIView {
         separator.translatesAutoresizingMaskIntoConstraints = false
         addSubview(separator)
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            row.topAnchor.constraint(equalTo: topAnchor),
+            row.bottomAnchor.constraint(equalTo: bottomAnchor),
+            row.leadingAnchor.constraint(equalTo: leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: trailingAnchor),
             stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 12),
             stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -12),
             stack.topAnchor.constraint(equalTo: scrollView.frameLayoutGuide.topAnchor),
@@ -809,6 +813,7 @@ final class SeekMailFolderTabsView: UIView {
             buttons.forEach(stack.addArrangedSubview)
         }
         selectedIndex = scopes.firstIndex(of: selected)
+        applyMarkAllStyle()
         setNeedsLayout()
         for (index, button) in buttons.enumerated() {
             let isSelected = scopes[index] == selected
@@ -821,6 +826,43 @@ final class SeekMailFolderTabsView: UIView {
             button.configuration = configuration
             button.accessibilityTraits = isSelected ? [.button, .selected] : .button
         }
+    }
+
+    func setMarkAllVisible(_ visible: Bool) {
+        guard markAllButton.isHidden == visible else { return }
+        let changes = {
+            self.markAllButton.isHidden = !visible
+            self.markAllButton.alpha = visible ? 1 : 0
+            self.row.layoutIfNeeded()
+        }
+        if window == nil {
+            changes()
+        } else {
+            UIView.animate(withDuration: 0.2, delay: 0, options: [.beginFromCurrentState, .curveEaseOut], animations: changes)
+        }
+        setNeedsLayout()
+    }
+
+    private func configureMarkAllButton() {
+        markAllButton.accessibilityLabel = SeekMailL10n.text("全部标为已读")
+        markAllButton.accessibilityIdentifier = "seek-mail-mark-all-read"
+        markAllButton.setContentHuggingPriority(.required, for: .horizontal)
+        markAllButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        markAllButton.isHidden = true
+        markAllButton.alpha = 0
+        markAllButton.addAction(UIAction { [weak self] _ in self?.onMarkAllRead?() }, for: .touchUpInside)
+        applyMarkAllStyle()
+    }
+
+    /// 只用图标，和邮箱行的设置按钮同一风格；点后有确认框说明数量和耗时，不怕误解。
+    /// 跟随 App 字号；update 每次刷新都会调用，字号变化后自动更新。
+    private func applyMarkAllStyle() {
+        var configuration = UIButton.Configuration.plain()
+        configuration.baseForegroundColor = .secondaryLabel
+        configuration.image = UIImage(systemName: "envelope.open")
+        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(font: SeekMailFont.system(16))
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 18)
+        markAllButton.configuration = configuration
     }
 
     override func layoutSubviews() {
