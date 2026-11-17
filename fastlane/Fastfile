@@ -3,6 +3,7 @@ require "fileutils"
 require "json"
 require "shellwords"
 require "time"
+require "tmpdir"
 
 default_platform(:ios)
 
@@ -68,7 +69,15 @@ def write_build_metadata(options)
   version = options[:version]
   build_number = options[:build_number]
 
-  increment_version_number(version_number: version, xcodeproj: PROJECT) if version && !version.empty?
+  if version && !version.empty?
+    UI.user_error!("Invalid release version: #{version}") unless version.match?(/\A\d+(?:\.\d+){1,2}\z/)
+    # agvtool 只修改 plist；工程的 MARKETING_VERSION 会在构建时覆盖它。
+    project_file = File.join(PROJECT, "project.pbxproj")
+    project_text = File.read(project_file)
+    UI.user_error!("MARKETING_VERSION is missing") unless project_text.include?("MARKETING_VERSION =")
+    File.write(project_file, project_text.gsub(/MARKETING_VERSION = [^;]+;/, "MARKETING_VERSION = #{version};"))
+    increment_version_number(version_number: version, xcodeproj: PROJECT)
+  end
   increment_build_number(build_number: build_number, xcodeproj: PROJECT) if build_number && !build_number.empty?
 
   run_id = ci_value("GITHUB_RUN_ID")
@@ -214,6 +223,20 @@ def app_privacy_auth_options
   options
 end
 
+# 上传前检查最终 IPA，避免版本参数与实际产物不一致。
+def verify_ipa_version(expected)
+  return if expected.nil? || expected.empty?
+
+  ipa_path = lane_context[SharedValues::IPA_OUTPUT_PATH]
+  Dir.mktmpdir("nodeseek-version") do |directory|
+    sh("unzip -q #{Shellwords.escape(ipa_path)} 'Payload/*.app/Info.plist' -d #{Shellwords.escape(directory)}")
+    plist = Dir.glob(File.join(directory, "Payload", "*.app", "Info.plist")).first
+    UI.user_error!("IPA Info.plist is missing") unless plist
+    actual = sh("/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' #{Shellwords.escape(plist)}", log: false).strip
+    UI.user_error!("IPA version #{actual} does not match requested #{expected}") unless actual == expected
+  end
+end
+
 def write_build_provenance
   FileUtils.mkdir_p(BUILD_DIR)
 
@@ -333,6 +356,7 @@ platform :ios do
         provisioningProfiles: app_store_export_profiles
       }
     )
+    verify_ipa_version(options[:version])
     write_build_provenance
     upload_to_testflight(
       **testflight_upload_options,
