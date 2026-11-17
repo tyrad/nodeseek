@@ -156,3 +156,5 @@
 "只能使用 seek.li 或 nodeseek.org" = "Only seek.li or nodeseek.org can be used";
 "地址已修改，请重新检查" = "Address changed. Check it again.";
 "目前 seek.li 接口查不到已发送的邮件，App 里只能收信和写信，看不到发件记录。" = "Sent mail is not available from the seek.li API, so the app can receive and send but cannot show sent messages.";
+
+"收起键盘" = "Dismiss keyboard";

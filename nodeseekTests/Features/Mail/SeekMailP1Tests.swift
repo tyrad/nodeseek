@@ -84,6 +84,41 @@ struct SeekMailP1Tests {
         #expect(compose.navigationItem.rightBarButtonItem?.accessibilityIdentifier == "seek-mail-compose-send")
     }
 
+    @Test func composeKeyboardToolbarPreservesInput() throws {
+        let compose = try makeCompose(SeekMailRouteTransport()) {}
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = UINavigationController(rootViewController: compose)
+        window.makeKeyAndVisible()
+        window.layoutIfNeeded()
+        compose.view.layoutIfNeeded()
+        defer { window.endEditing(true); window.isHidden = true }
+        let to = try #require(compose.view.mailTestView(id: "seek-mail-compose-to") as? UITextField)
+        let cc = try #require(compose.view.mailTestView(id: "seek-mail-compose-cc") as? UITextField)
+        let subject = try #require(compose.view.mailTestView(id: "seek-mail-compose-subject") as? UITextField)
+        let body = try #require(compose.view.mailTestView(id: "seek-mail-compose-body") as? UITextView)
+        let toolbar = try #require(to.inputAccessoryView as? UIToolbar)
+        #expect(cc.inputAccessoryView === toolbar)
+        #expect(subject.inputAccessoryView === toolbar)
+        #expect(body.inputAccessoryView === toolbar)
+        let dismiss = try #require(toolbar.items?.last)
+        let action = try #require(dismiss.action)
+        to.text = "a@example.com"
+        #expect(subject.becomeFirstResponder())
+        subject.setMarkedText("主题", selectedRange: NSRange(location: 2, length: 0))
+        #expect(UIApplication.shared.sendAction(action, to: dismiss.target, from: dismiss, for: nil))
+        #expect(!subject.isFirstResponder)
+        #expect(subject.markedTextRange == nil)
+        #expect(subject.text == "主题")
+        #expect(body.becomeFirstResponder())
+        body.setMarkedText("正文", selectedRange: NSRange(location: 2, length: 0))
+        #expect(UIApplication.shared.sendAction(action, to: dismiss.target, from: dismiss, for: nil))
+        #expect(!body.isFirstResponder)
+        #expect(body.markedTextRange == nil)
+        #expect(body.text == "正文")
+        #expect(to.text == "a@example.com")
+        #expect(compose.navigationItem.rightBarButtonItem?.isEnabled == true)
+    }
+
     // MARK: - 新邮件提醒
 
     @Test func monitorReadsCountsThrottlesAndDetectsNewMail() async throws {

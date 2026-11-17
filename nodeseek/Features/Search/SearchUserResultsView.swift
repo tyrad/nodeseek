@@ -34,6 +34,8 @@ final class SearchUserResultsView: UIView, UITableViewDataSource, UITableViewDel
         return []
     }
 
+    var keyboardDismissBackgrounds: [UIView] { [self, tableView] }
+
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let messageLabel = UILabel()
     private let activityIndicator = UIActivityIndicatorView(style: .medium)

@@ -2,6 +2,7 @@ import UIKit
 
 /// 添加 / 编辑探针：填写地址后自动测试连接，确认能读到服务器后才能保存。
 final class ProbeInstanceEditorViewController: UITableViewController {
+    private var keyboardDismissCoordinator: KeyboardDismissCoordinator?
     private enum Section: Int, CaseIterable {
         case panel, connection, servers, delete
     }
@@ -57,6 +58,7 @@ final class ProbeInstanceEditorViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        keyboardDismissCoordinator = KeyboardDismissCoordinator(rootView: view, backgrounds: [view])
         tableView.register(ProbeTextFieldCell.self, forCellReuseIdentifier: ProbeTextFieldCell.reuseIdentifier)
         tableView.keyboardDismissMode = .onDrag
         // 服务器分组始终可拖动排序。

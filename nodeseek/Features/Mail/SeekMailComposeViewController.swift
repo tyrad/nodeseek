@@ -7,6 +7,7 @@ import UIKit
 
 /// 写信和回复。只支持纯文本，接口不支持附件，所以不放附件按钮。
 final class SeekMailComposeViewController: UIViewController {
+    private var keyboardDismissCoordinator: KeyboardDismissCoordinator?
     private let provider: SeekMailProvider<SeekMailAPI>
     private let mailboxes: [SeekMailbox]
     private let names: [Int64: SeekMailboxDisplay]
@@ -25,6 +26,19 @@ final class SeekMailComposeViewController: UIViewController {
     private let subjectField = UITextField()
     private let bodyView = UITextView()
     private let errorLabel = UILabel()
+    private lazy var keyboardToolbar: UIToolbar = {
+        let toolbar = UIToolbar()
+        toolbar.tintColor = .label
+        let dismiss = UIBarButtonItem(
+            image: UIImage(systemName: "keyboard.chevron.compact.down"),
+            style: .plain, target: self, action: #selector(dismissComposeKeyboard)
+        )
+        dismiss.accessibilityLabel = SeekMailL10n.text("收起键盘")
+        dismiss.accessibilityIdentifier = "seek-mail-compose-dismiss-keyboard"
+        toolbar.items = [UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil), dismiss]
+        toolbar.sizeToFit()
+        return toolbar
+    }()
     private lazy var sendItem = UIBarButtonItem(title: SeekMailL10n.text("发送"), primaryAction: UIAction { [weak self] _ in self?.send() })
 
     init(provider: SeekMailProvider<SeekMailAPI>, mailboxes: [SeekMailbox], names: [Int64: SeekMailboxDisplay],
@@ -47,6 +61,7 @@ final class SeekMailComposeViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        keyboardDismissCoordinator = KeyboardDismissCoordinator(rootView: view, backgrounds: [view, scrollView])
         view.backgroundColor = .systemBackground
         navigationItem.leftBarButtonItem = UIBarButtonItem(systemItem: .cancel, primaryAction: UIAction { [weak self] _ in
             self?.cancelTapped()
@@ -105,6 +120,7 @@ final class SeekMailComposeViewController: UIViewController {
         ccToggle.setContentHuggingPriority(.required, for: .horizontal)
         ccToggle.addAction(UIAction { [weak self] _ in self?.showCC() }, for: .touchUpInside)
 
+        bodyView.inputAccessoryView = keyboardToolbar
         bodyView.font = SeekMailFont.of(.body)
         bodyView.textColor = .label
         bodyView.backgroundColor = .clear
@@ -154,6 +170,7 @@ final class SeekMailComposeViewController: UIViewController {
     }
 
     private func configure(_ field: UITextField, placeholder: String, identifier: String, keyboard: UIKeyboardType) {
+        field.inputAccessoryView = keyboardToolbar
         field.placeholder = placeholder
         field.font = SeekMailFont.of(.body)
         field.keyboardType = keyboard
@@ -190,6 +207,16 @@ final class SeekMailComposeViewController: UIViewController {
             row.heightAnchor.constraint(greaterThanOrEqualToConstant: 44)
         ])
         return row
+    }
+
+    @objc private func dismissComposeKeyboard() {
+        // 明确点击收起时先确认组合文字；点背景仍保留选字保护。
+        for field in [toField, ccField, subjectField] where field.isFirstResponder {
+            field.unmarkText()
+        }
+        if bodyView.isFirstResponder { bodyView.unmarkText() }
+        view.endEditing(false)
+        fieldsChanged()
     }
 
     private func fill() {

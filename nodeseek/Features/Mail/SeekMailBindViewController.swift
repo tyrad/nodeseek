@@ -12,6 +12,7 @@ enum SeekMailLinks {
 
 /// 绑定 seek.li API Key：粘贴后先请求一次邮箱列表验证，成功才写入钥匙串。
 final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
+    private var keyboardDismissCoordinator: KeyboardDismissCoordinator?
     typealias Verifier = @MainActor (String) async throws -> [SeekMailbox]
 
     private let keyStore: SeekMailAPIKeyStoring
@@ -65,6 +66,7 @@ final class SeekMailBindViewController: UIViewController, UITextFieldDelegate {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        keyboardDismissCoordinator = KeyboardDismissCoordinator(rootView: view, backgrounds: [view, scrollView, contentStack])
         view.backgroundColor = .systemGroupedBackground
         setupContent()
         setupBottomBar()

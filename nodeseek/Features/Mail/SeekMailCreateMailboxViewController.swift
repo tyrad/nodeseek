@@ -9,6 +9,7 @@ import UIKit
 /// 只在用户点检查时请求，不随输入自动检查：seek.li 额度很紧，逐字检查容易被限流。
 /// 注册新网站时给它单独建一个地址，创建成功由列表页复制地址并切过去。
 final class SeekMailCreateMailboxViewController: UIViewController, UITextFieldDelegate {
+    private var keyboardDismissCoordinator: KeyboardDismissCoordinator?
     /// OpenAPI 没有域名列表接口，这两个域名实测可创建；nodeseek.org 不能发信。
     static let domains = ["seek.li", "nodeseek.org"]
 
@@ -46,6 +47,7 @@ final class SeekMailCreateMailboxViewController: UIViewController, UITextFieldDe
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        keyboardDismissCoordinator = KeyboardDismissCoordinator(rootView: view, backgrounds: [view])
         view.backgroundColor = .systemGroupedBackground
         navigationItem.leftBarButtonItem = UIBarButtonItem(systemItem: .cancel, primaryAction: UIAction { [weak self] _ in
             self?.dismiss(animated: true)

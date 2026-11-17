@@ -25,6 +25,8 @@ final class PostTextureListView: UIView {
     weak var delegate: PostTextureListViewDelegate?
     var onScroll: ((UIScrollView) -> Void)?
 
+    var keyboardDismissBackgrounds: [UIView] { [self, tableView, errorStackView] }
+
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let refreshControl = UIRefreshControl()
     private var displayMode: DisplayMode = .content

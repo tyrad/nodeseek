@@ -9,6 +9,7 @@ import SafariServices
 import UIKit
 
 final class SearchViewController: UIViewController {
+    private var keyboardDismissCoordinator: KeyboardDismissCoordinator?
     private struct SearchRequest: Equatable {
         let query: String
         let category: PostListCategory
@@ -348,6 +349,7 @@ final class SearchViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        keyboardDismissCoordinator = KeyboardDismissCoordinator(rootView: view, backgrounds: [view] + listView.keyboardDismissBackgrounds + userResultsView.keyboardDismissBackgrounds)
         setupUI()
         NotificationCenter.default.addObserver(self, selector: #selector(refreshTextSize), name: AppTextSizeSettings.didChangeNotification, object: nil)
         let rememberedCategory = searchPreferenceStore.category()

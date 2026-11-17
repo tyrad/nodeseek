@@ -8,6 +8,7 @@ import UIKit
 
 /// 已绑定时的邮件列表。顶部平铺邮箱标签，搜索框悬浮在本页底部。
 final class SeekMailInboxViewController: UIViewController {
+    private var keyboardDismissCoordinator: KeyboardDismissCoordinator?
     let model: SeekMailInboxModel
     /// 401 时回调，由入口页清掉 Key 并回到绑定页。
     var onUnauthorized: (() -> Void)?
@@ -64,6 +65,7 @@ final class SeekMailInboxViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        keyboardDismissCoordinator = KeyboardDismissCoordinator(rootView: view, backgrounds: [view, tableView])
         view.backgroundColor = .systemBackground
         setupLayout()
         model.onChange = { [weak self] in self?.render() }
@@ -452,6 +454,10 @@ final class SeekMailInboxViewController: UIViewController {
     }
 
     private func updateBackground() {
+        if let old = tableView.backgroundView { keyboardDismissCoordinator?.unregister(old) }
+        defer {
+            if let background = tableView.backgroundView { keyboardDismissCoordinator?.register(background) }
+        }
         switch model.phase {
         case .loading:
             tableView.backgroundView = nil
