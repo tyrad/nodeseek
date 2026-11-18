@@ -29,6 +29,29 @@ nonisolated struct UserCommentRecord: Equatable, Sendable {
     }
 }
 
+/// 保留主题首次出现的顺序，以及各主题内接口返回的回复顺序。
+nonisolated struct UserCommentGroup: Equatable, Sendable {
+    let postID: Int
+    let title: String
+    var comments: [UserCommentRecord]
+
+    static func grouped(_ records: [UserCommentRecord]) -> [Self] {
+        var groups: [Self] = []
+        var indices: [Int: Int] = [:]
+        for record in records {
+            if let index = indices[record.postID] {
+                if !groups[index].comments.contains(where: { $0.floorID == record.floorID }) {
+                    groups[index].comments.append(record)
+                }
+            } else {
+                indices[record.postID] = groups.count
+                groups.append(Self(postID: record.postID, title: record.title, comments: [record]))
+            }
+        }
+        return groups
+    }
+}
+
 nonisolated struct UserCollectionRecord: Equatable, Sendable {
     let title: String
     let postID: Int

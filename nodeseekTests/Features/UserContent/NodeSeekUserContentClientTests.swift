@@ -68,6 +68,37 @@ struct NodeSeekUserContentClientTests {
         ])
     }
 
+    @Test func preservesMultipleCommentsInSameDiscussion() async throws {
+        let client = makeClient(responseBody: """
+        {"success":true,"comments":[
+          {"post_id":1047721,"title":"同一主题","rank":0,"floor_id":30,"text":"回复一"},
+          {"post_id":1047721,"title":"同一主题","rank":0,"floor_id":28,"text":"回复二"},
+          {"post_id":1047721,"title":"同一主题","rank":0,"floor_id":25,"text":"回复三"},
+          {"post_id":1047720,"title":"另一主题","rank":0,"floor_id":1,"text":"回复四"}
+        ]}
+        """)
+
+        let records = try await client.loadComments(uid: 31037, page: 1)
+
+        #expect(records.map(\.floorID) == [30, 28, 25, 1])
+        #expect(records.map(\.text) == ["回复一", "回复二", "回复三", "回复四"])
+        #expect(records.map(\.commentPage) == [3, 3, 3, 1])
+        #expect(records.map(\.anchorID) == ["30", "28", "25", "1"])
+    }
+
+    @Test func groupsCommentsAcrossPagesWithoutLosingFloors() {
+        let first = UserCommentRecord(postID: 1, title: "主题一", rank: 0, floorID: 30, text: "第一条")
+        let other = UserCommentRecord(postID: 2, title: "主题二", rank: 0, floorID: 30, text: "另一主题")
+        let older = UserCommentRecord(postID: 1, title: "主题一", rank: 0, floorID: 10, text: "下一页")
+        let groups = UserCommentGroup.grouped([first, other, first, older])
+        #expect(groups.map(\.postID) == [1, 2])
+        #expect(groups[0].comments == [first, older])
+        #expect(groups[1].comments == [other])
+        #expect(groups[0].comments.map(\.commentPage) == [3, 1])
+        #expect(groups[0].comments.map(\.anchorID) == ["30", "10"])
+        #expect(UserCommentGroup.grouped([]).isEmpty)
+    }
+
     @Test func loadsDiscussionsFromJSONAPI() async throws {
         let client = makeClient(
             responseBody: """

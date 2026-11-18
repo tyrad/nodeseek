@@ -16,7 +16,10 @@ final class UserCommentsViewController: UIViewController {
     private let errorView = UserContentErrorView(accessibilityIdentifier: "user-comments-error-view")
     private let client: NodeSeekUserContentClient
     private let currentAccountStore: CurrentAccountStore
-    private var records: [UserCommentRecord] = []
+    private var records: [UserCommentRecord] = [] {
+        didSet { groups = UserCommentGroup.grouped(records) }
+    }
+    private var groups: [UserCommentGroup] = []
     private var displayMode: UserContentDisplayMode = .content
     private let targetUID: Int?
     private var uid: Int?
@@ -25,6 +28,7 @@ final class UserCommentsViewController: UIViewController {
     private var requestGeneration = 0
     private var isLoadingFirstPage = false
     private var isLoadingMore = false
+    private var hasUserStartedScrolling = false
     private var lastBatchFetchRequestedCount: Int?
     private let skeletonRowCount = 9
     var onSelectPost: ((PostSummary, Int, String?) -> Void)?
@@ -52,6 +56,14 @@ final class UserCommentsViewController: UIViewController {
         setupUI()
         observeTextSizeChanges()
         loadFirstPage()
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        if traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection),
+           isViewLoaded, displayMode == .content {
+            tableNode.reloadData()
+        }
     }
 
     deinit {
@@ -97,6 +109,7 @@ final class UserCommentsViewController: UIViewController {
         hasMorePages = true
         nextPage = 2
         lastBatchFetchRequestedCount = nil
+        hasUserStartedScrolling = false
         showSkeleton()
 
         Task { [weak self] in
@@ -164,15 +177,21 @@ final class UserCommentsViewController: UIViewController {
             return
         }
         nextPage = page + 1
+        let oldGroups = groups
         let oldCount = records.count
         records.append(contentsOf: loaded.filter { item in
             records.contains { $0.postID == item.postID && $0.floorID == item.floorID } == false
         })
         let newCount = records.count
         guard newCount > oldCount else { return }
-        let indexPaths = (oldCount..<newCount).map { IndexPath(row: $0, section: 0) }
+        // 保留未变化的节点，避免分页时重建整张列表导致可见内容跳动。
+        let changed = oldGroups.indices.compactMap { index -> IndexPath? in
+            oldGroups[index] != groups[index] ? IndexPath(row: index, section: 0) : nil
+        }
+        let inserted = (oldGroups.count..<groups.count).map { IndexPath(row: $0, section: 0) }
         tableNode.performBatch(animated: false) { [weak self] in
-            self?.tableNode.insertRows(at: indexPaths, with: .none)
+            self?.tableNode.reloadRows(at: changed, with: .none)
+            self?.tableNode.insertRows(at: inserted, with: .none)
         }
     }
 
@@ -230,7 +249,7 @@ extension UserCommentsViewController: ASTableDataSource {
     func tableNode(_ tableNode: ASTableNode, numberOfRowsInSection section: Int) -> Int {
         switch displayMode {
         case .content:
-            return records.count
+            return groups.count
         case .skeleton:
             return skeletonRowCount
         case .firstPageError:
@@ -241,11 +260,13 @@ extension UserCommentsViewController: ASTableDataSource {
     func tableNode(_ tableNode: ASTableNode, nodeBlockForRowAt indexPath: IndexPath) -> ASCellNodeBlock {
         switch displayMode {
         case .content:
-            let record = records[indexPath.row]
+            let group = groups[indexPath.row]
+            let traits = traitCollection
             return { [weak self] in
-                UserCommentCellNode(
-                    record: record,
-                    onOpenComment: { [weak self] in self?.openComment(record) }
+                UserCommentGroupCellNode(
+                    group: group,
+                    traits: traits,
+                    onOpenComment: { [weak self] record in self?.openComment(record) }
                 )
             }
         case .skeleton:
@@ -262,13 +283,23 @@ extension UserCommentsViewController: ASTableDataSource {
 
 extension UserCommentsViewController: ASTableDelegate {
     func tableNode(_ tableNode: ASTableNode, didSelectRowAt indexPath: IndexPath) {
-        guard displayMode == .content, records.indices.contains(indexPath.row) else { return }
+        guard displayMode == .content, groups.indices.contains(indexPath.row) else { return }
         tableNode.deselectRow(at: indexPath, animated: true)
-        openPost(records[indexPath.row])
+        if let record = groups[indexPath.row].comments.first {
+            openPost(record)
+        }
+    }
+
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        hasUserStartedScrolling = true
     }
 
     func shouldBatchFetch(for tableNode: ASTableNode) -> Bool {
         displayMode == .content
+            && hasUserStartedScrolling
+            && hasMorePages
+            && !isLoadingFirstPage
+            && !isLoadingMore
             && !records.isEmpty
             && lastBatchFetchRequestedCount != records.count
     }
