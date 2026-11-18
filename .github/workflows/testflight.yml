@@ -147,6 +147,23 @@ jobs:
           TESTFLIGHT_NOTIFY_EXTERNAL_TESTERS: ${{ vars.TESTFLIGHT_NOTIFY_EXTERNAL_TESTERS || 'false' }}
           TESTFLIGHT_USES_NON_EXEMPT_ENCRYPTION: ${{ vars.TESTFLIGHT_USES_NON_EXEMPT_ENCRYPTION || 'false' }}
 
+      # 即使 TestFlight 上传失败，只要已经生成符号也补传；直接调用同步工具，检查退出码。
+      - name: Upload symbols to Firebase Crashlytics
+        if: ${{ !cancelled() && (success() || hashFiles('build/*.dSYM.zip') != '') }}
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          symbols=(build/*.dSYM.zip)
+          if (( ${#symbols[@]} == 0 )); then
+            echo "::error::No dSYM archive was generated."
+            exit 1
+          fi
+          .build/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols \
+            -gsp nodeseek/Resources/GoogleService-Info.plist \
+            -p ios "${symbols[@]}"
+          echo "Crashlytics dSYM upload completed; server-side symbolication may take additional time." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Write manual Public Beta checklist
         if: success()
         env:

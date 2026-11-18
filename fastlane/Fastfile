@@ -331,6 +331,7 @@ platform :ios do
       output_directory: BUILD_DIR,
       output_name: "nodeseek.ipa",
       include_symbols: true,
+      cloned_source_packages_path: File.join(ROOT, ".build/SourcePackages"),
       export_options: {
         provisioningProfiles: app_store_export_profiles
       }
@@ -352,6 +353,7 @@ platform :ios do
       output_directory: BUILD_DIR,
       output_name: "nodeseek.ipa",
       include_symbols: true,
+      cloned_source_packages_path: File.join(ROOT, ".build/SourcePackages"),
       export_options: {
         provisioningProfiles: app_store_export_profiles
       }

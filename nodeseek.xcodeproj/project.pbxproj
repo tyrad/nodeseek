@@ -16,6 +16,7 @@
 		7A10001C2FA0000000000001 /* SVGKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7A10001D2FA0000000000001 /* SVGKit */; };
 		7A1000202FA0000000000001 /* FramePlay in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000212FA0000000000001 /* FramePlay */; };
 		7A1000232FA0000000000001 /* WhatsNewKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000242FA0000000000001 /* WhatsNewKit */; };
+		FA1000010000000000000001 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = FA1000020000000000000001 /* FirebaseCrashlytics */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -139,6 +140,7 @@
 				7A10001C2FA0000000000001 /* SVGKit in Frameworks */,
 				7A1000202FA0000000000001 /* FramePlay in Frameworks */,
 				7A1000232FA0000000000001 /* WhatsNewKit in Frameworks */,
+				FA1000010000000000000001 /* FirebaseCrashlytics in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -205,6 +207,7 @@
 				5CD3D94E2F9EFACE008DB075 /* Frameworks */,
 				5CD3D94F2F9EFACE008DB075 /* Resources */,
 				7A2000052FA0000000000001 /* Embed Foundation Extensions */,
+				FA1000040000000000000001 /* Upload Crashlytics symbols */,
 			);
 			buildRules = (
 			);
@@ -224,6 +227,7 @@
 				7A10001D2FA0000000000001 /* SVGKit */,
 				7A1000212FA0000000000001 /* FramePlay */,
 				7A1000242FA0000000000001 /* WhatsNewKit */,
+				FA1000020000000000000001 /* FirebaseCrashlytics */,
 			);
 			productName = nodeseek;
 			productReference = 5CD3D9512F9EFACE008DB075 /* nodeseek.app */;
@@ -294,6 +298,7 @@
 				7A10001B2FA0000000000001 /* XCRemoteSwiftPackageReference "SVGKit" */,
 				7A1000222FA0000000000001 /* XCLocalSwiftPackageReference "Packages/FramePlay" */,
 				7A1000252FA0000000000001 /* XCRemoteSwiftPackageReference "WhatsNewKit" */,
+				FA1000030000000000000001 /* Firebase */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5CD3D9522F9EFACE008DB075 /* Products */;
@@ -330,6 +335,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		FA1000040000000000000001 /* Upload Crashlytics symbols */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = (
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}",
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${PRODUCT_NAME}",
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Info.plist",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist",
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+				"$(SRCROOT)/scripts/upload-crashlytics-symbols.sh",
+			);
+			name = "Upload Crashlytics symbols";
+			outputPaths = ();
+			runOnlyForDeploymentPostprocessing = 1;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/upload-crashlytics-symbols.sh\"";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		7A20000A2FA0000000000001 /* Sources */ = {
@@ -386,7 +412,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.0;
+				MARKETING_VERSION = 1.4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mistj.nodeseek.ProbeWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -416,7 +442,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.0;
+				MARKETING_VERSION = 1.4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mistj.nodeseek.ProbeWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "match AppStore com.mistj.nodeseek.ProbeWidget";
@@ -447,10 +473,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4.0;
+				MARKETING_VERSION = 1.4.1;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-lsqlite3",
+					"-ObjC",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.mistj.nodeseek;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -483,10 +510,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4.0;
+				MARKETING_VERSION = 1.4.1;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-lsqlite3",
+					"-ObjC",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.mistj.nodeseek;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -631,7 +659,7 @@
 				DEVELOPMENT_TEAM = Z9K94479DQ;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.4.0;
+				MARKETING_VERSION = 1.4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mistj.nodeseekTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -653,7 +681,7 @@
 				DEVELOPMENT_TEAM = Z9K94479DQ;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.4.0;
+				MARKETING_VERSION = 1.4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mistj.nodeseekTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -771,6 +799,12 @@
 				minimumVersion = 2.2.1;
 			};
 		};
+		FA1000030000000000000001 /* Firebase */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			traits = ();
+			requirement = {kind = upToNextMajorVersion; minimumVersion = 13.2.0; };
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -814,6 +848,7 @@
 			package = 7A10001B2FA0000000000001 /* XCRemoteSwiftPackageReference "SVGKit" */;
 			productName = SVGKit;
 		};
+		FA1000020000000000000001 /* FirebaseCrashlytics */ = {isa = XCSwiftPackageProductDependency; package = FA1000030000000000000001 /* Firebase */; productName = FirebaseCrashlytics; };
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 5CD3D9492F9EFACE008DB075 /* Project object */;

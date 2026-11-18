@@ -17,6 +17,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             UINavigationBar.appearance().tintColor = .label
         }
         UNUserNotificationCenter.current().delegate = self
+        CrashReportService.configure()
         ProbeSharedStorage.prepareAtLaunch()
         return true
     }
