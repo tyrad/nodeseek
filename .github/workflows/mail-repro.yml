@@ -26,6 +26,7 @@ jobs:
               echo "CASE $variant $mode"
               swiftc -parse-as-library -swift-version 5 -"$mode" -default-isolation MainActor -enable-upcoming-feature NonisolatedNonsendingByDefault "$source" -o /tmp/repro
               set +e
+              if [ "$variant" = original ]; then lldb -b -o run -o "thread backtrace" /tmp/repro; fi
               /tmp/repro
               result=$?
               set -e

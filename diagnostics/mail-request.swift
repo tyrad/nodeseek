@@ -1,6 +1,8 @@
 import Foundation
 final class Provider<T> {
     typealias Transport = (URLRequest) async throws -> (Data, URLResponse)
+    @_optimize(none)
+    deinit {}
     let transport: Transport
     init(transport: @escaping Transport = { try await URLSession.shared.data(for: $0) }) { self.transport = transport }
     func run() async throws {
