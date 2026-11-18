@@ -6,6 +6,8 @@
 
 不转发普通文件日志、论坛账号或邮箱凭据。单测宿主不启动 Firebase；`make xcode-test-class TEST=CrashReportServiceTests` 验证打包后的自动上传开关及配置匹配。
 
+App Store 隐私申报维护在 `fastlane/app-privacy.json`：崩溃数据用于应用功能，其他诊断数据用于应用功能和分析，均不关联用户身份、不用于跟踪。依据当前 SDK 隐私清单及未设置用户 ID/自定义日志的集成方式；更改集成时重新核对。2026-11-18 已通过 `asc web privacy` 更新并核验发布状态。中英文公开政策位于 `docs/privacy.md`。Fastlane 的隐私上传从同一份声明转换，不再读取旧的本地声明文件。
+
 以下历史验证记录来自此前手动发送版本，不能作为当前自动上传链路的端到端验证结果。
 
 ## 发布与真机验证

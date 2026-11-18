@@ -209,10 +209,19 @@ def app_privacy_auth_options
   username = ENV["APPLE_ID"] if username.nil? || username.empty?
   UI.user_error!("Missing App Store Connect login for App Privacy upload. Set FASTLANE_USER or APPLE_ID.") if username.nil? || username.empty?
 
+  # 与 asc 共用一份申报，避免旧的本地“不收集数据”配置覆盖线上声明。
+  declaration = JSON.parse(File.read(File.join(ROOT, "fastlane/app-privacy.json")))
+  privacy_path = File.join(BUILD_DIR, "app_privacy_details.json")
+  FileUtils.mkdir_p(BUILD_DIR)
+  details = declaration.fetch("dataUsages").map do |usage|
+    { category: usage.fetch("category"), purposes: usage.fetch("purposes"), data_protections: usage.fetch("dataProtections") }
+  end
+  File.write(privacy_path, JSON.pretty_generate(details))
+
   options = {
     username: username,
     app_identifier: APP_IDENTIFIER,
-    json_path: File.join(ROOT, "fastlane/app_privacy_details.json"),
+    json_path: privacy_path,
     skip_publish: env_bool("APP_PRIVACY_SKIP_PUBLISH", default: false)
   }
 

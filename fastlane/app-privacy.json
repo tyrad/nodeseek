@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "dataUsages": [
+    {
+      "category": "CRASH_DATA",
+      "purposes": [
+        "APP_FUNCTIONALITY"
+      ],
+      "dataProtections": [
+        "DATA_NOT_LINKED_TO_YOU"
+      ]
+    },
+    {
+      "category": "OTHER_DIAGNOSTIC_DATA",
+      "purposes": [
+        "APP_FUNCTIONALITY",
+        "ANALYTICS"
+      ],
+      "dataProtections": [
+        "DATA_NOT_LINKED_TO_YOU"
+      ]
+    }
+  ]
+}
