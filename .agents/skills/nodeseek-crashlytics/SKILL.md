@@ -25,6 +25,21 @@ Actions 构建步骤设置 `CRASHLYTICS_SKIP_BUILD_PHASE_UPLOAD=1`，跳过归�
 
 上传使用仓库中的 GoogleService 配置，无需额外 Firebase CLI 登录 token。不要把服务账号私钥写进 skill 或仓库。既有 Actions `dSYM` artifact 和成功发布的 Release 附件保留符号；下载时确认对应 run、版本和构建号。artifact 有保留期限。
 
+### 核验与排错
+
+- 用 `gh run view RUN_ID --json status,conclusion,jobs` 分别检查 TestFlight、Firebase 符号上传及产物保存步骤。任务完成后用 `gh run view RUN_ID --log` 核对版本、构建号、符号 UUID 与上传成功信息。构建步骤合并了编译、上传和部分 Apple 处理等待，仅凭步骤运行中无法判断当前阶段。
+- TestFlight 上传成功后，再检查 App Store Connect 中对应构建的处理状态；`VALID` 表示构建处理成功，不等于已经分发给外部测试者或通过 Beta App Review。项目默认保留手动外部提测流程。
+- 若出现 `Sandbox ... deny ... firebase-ios-sdk/Crashlytics/run`，检查 CI 的跳过变量是否传入构建步骤，以及后续同步上传步骤是否保留。不能仅跳过全部符号上传后就认定修复完成。本地归档若遇到同类错误，需要另查脚本输入路径；CI 跳过方案不证明本地归档已验证。
+- `latest-stable` 选择的是当前 runner 镜像可用的 Xcode，不保证是 Apple 最新版本。收到 SDK 版本警告时，核对实际 `xcodebuild -version`、邮件中的 SDK 与生效日期，再决定升级 runner 和 Xcode；打包 SDK 与 App 最低系统版本是不同设置。
+
+已完成的 CI 实测和构建标识维护在 `docs/crash-reporting.md`，不要把历史成功记录当成新一次构建的结果。
+
+## 自动崩溃上报验证
+
+符号上传成功不代表运行时崩溃上报已验证。主 App 自动收集，崩溃报告通常在下次启动时发送；日志页没有手动上传按钮。单测宿主不初始化 Firebase。
+
+需要端到端验证时，按 `docs/crash-reporting.md` 的步骤在脱离调试器的测试构建中触发崩溃并重启，核对后台对应版本的事件及可读堆栈。临时触发代码不得进入正式发布包；无法观察后台结果时明确报告未验证。
+
 ## 补传缺失符号
 
 官方 MCP 当前没有直接上传 dSYM 的工具，使用 SDK 自带的命令。优先取原始 Actions 产物或原始 `.xcarchive/dSYMs`；不要用重新编译的新包代替旧包符号。
