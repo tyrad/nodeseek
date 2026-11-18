@@ -43,13 +43,18 @@ final class SeekMailInboxViewController: UIViewController {
     }()
 
     private enum Section: Int, CaseIterable { case code, mails }
+    // 行数与 cell 使用同一刷新快照，避免验证码在两次回调之间过期。
+    private var renderedCodeMail: SeekMail?
+    private let now: () -> Date
 
     init(keyStore: SeekMailAPIKeyStoring,
          transport: SeekMailProvider<SeekMailAPI>.Transport? = nil,
          selectionStore: SeekMailSelectionStore = SeekMailSelectionStore(),
          deleteDelay: TimeInterval = 4,
          cache: SeekMailListCache? = nil,
-         memoryCache: SeekMailMemoryCache? = nil) {
+         memoryCache: SeekMailMemoryCache? = nil,
+         now: @escaping () -> Date = Date.init) {
+        self.now = now
         let provider: SeekMailProvider<SeekMailAPI>
         if let transport {
             provider = SeekMailProvider(apiKey: { [keyStore] in keyStore.apiKey() }, transport: transport)
@@ -402,6 +407,7 @@ final class SeekMailInboxViewController: UIViewController {
     // MARK: - 渲染
 
     private func render() {
+        renderedCodeMail = model.phase == .loaded ? model.latestCodeMail(now: now()) : nil
         tableView.refreshControl?.endRefreshing()
         updateTags()
         onNavigationChange?()
@@ -563,14 +569,15 @@ extension SeekMailInboxViewController: UITableViewDataSource, UITableViewDelegat
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         switch Section(rawValue: section) {
-        case .code: return model.phase == .loaded && model.latestCodeMail() != nil ? 1 : 0
+        case .code: return renderedCodeMail != nil ? 1 : 0
         case .mails: return model.phase == .loading ? 6 : model.mails.count
         case nil: return 0
         }
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        if indexPath.section == Section.code.rawValue, let mail = model.latestCodeMail() {
+        if indexPath.section == Section.code.rawValue {
+            guard let mail = renderedCodeMail else { return UITableViewCell() }
             let cell = tableView.dequeueReusableCell(withIdentifier: SeekMailCodeCell.reuseIdentifier, for: indexPath) as! SeekMailCodeCell
             cell.configure(mail: mail, recipient: model.showsRecipientMailbox ? model.names[mail.mailboxId] : nil)
             return cell
@@ -578,7 +585,12 @@ extension SeekMailInboxViewController: UITableViewDataSource, UITableViewDelegat
         if model.phase == .loading {
             return tableView.dequeueReusableCell(withIdentifier: SeekMailSkeletonCell.reuseIdentifier, for: indexPath)
         }
-        let mail = model.mails[indexPath.row]
+        let mails = model.mails
+        // 刷新后若仍收到旧行号，返回空行，避免越界或显示其他邮件。
+        guard indexPath.section == Section.mails.rawValue, mails.indices.contains(indexPath.row) else {
+            return UITableViewCell()
+        }
+        let mail = mails[indexPath.row]
         let cell = tableView.dequeueReusableCell(withIdentifier: SeekMailCell.reuseIdentifier, for: indexPath) as! SeekMailCell
         cell.configure(mail: mail,
                        recipient: model.showsRecipientMailbox ? model.names[mail.mailboxId] : nil,

@@ -35,6 +35,27 @@ struct SeekMailInboxModelTests {
         #expect(names[4] == SeekMailboxDisplay(title: "VMISS 账单", domainSuffix: nil, address: "billing@seek.li", hasAlias: true))
     }
 
+    @Test func duplicateMailboxIDsKeepFirstRecordAndProduceOneRow() throws {
+        let mailboxes = try decodeMailboxes(#"""
+        [{"id":1,"address":"first@seek.li"},
+         {"id":1,"address":"conflicting@seek.li","isPinned":true},
+         {"id":2,"address":"second@seek.li"},
+         {"id":2,"address":"second@seek.li"}]
+        """#)
+        let names = SeekMailboxNaming.displays(for: mailboxes)
+        #expect(names[1]?.title == "first")
+        #expect(names[2]?.title == "second")
+        for query in ["", "seek.li"] {
+            let sections = SeekMailboxPickerSections.make(
+                mailboxes: mailboxes, names: names, counts: [1: 2], recentIDs: [1], query: query
+            )
+            #expect(sections.pinned.isEmpty)
+            #expect(sections.unread.map(\.mailboxID) == [1])
+            #expect(sections.others.map(\.mailboxID) == [2])
+            #expect(sections.recents.map(\.mailboxID) == (query.isEmpty ? [1] : []))
+        }
+    }
+
     @Test func pickerGroupsPinnedThenUnreadThenOthers() throws {
         let mailboxes = try decodeMailboxes(#"""
         [{"id":1,"address":"zeta@seek.li"},{"id":2,"address":"alpha@seek.li"},

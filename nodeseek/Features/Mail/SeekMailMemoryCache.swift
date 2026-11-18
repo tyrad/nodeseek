@@ -14,6 +14,8 @@ final class SeekMailMemoryCache {
 
     static let mailboxLifetime: TimeInterval = 5 * 60
     static let detailLifetime: TimeInterval = 2 * 60
+    static let maxEntryCount = 32
+    static let maxBodyBytes = 4 * 1024 * 1024
 
     private struct Stamped<Value> {
         let value: Value
@@ -50,7 +52,13 @@ final class SeekMailMemoryCache {
 
     func saveDetail(_ detail: SeekMailDetail, for key: String) {
         prepare(for: key)
+        details[detail.mail.id] = nil
+        guard bodyBytes(detail) <= Self.maxBodyBytes else { return }
         details[detail.mail.id] = Stamped(value: detail, savedAt: now())
+        while details.count > Self.maxEntryCount || details.values.reduce(0, { $0 + bodyBytes($1.value) }) > Self.maxBodyBytes {
+            guard let oldest = details.min(by: { $0.value.savedAt < $1.value.savedAt })?.key else { break }
+            details[oldest] = nil
+        }
     }
 
     func attachments(mailID: Int64, for key: String) -> [SeekMailAttachment]? {
@@ -61,6 +69,10 @@ final class SeekMailMemoryCache {
     func saveAttachments(_ list: [SeekMailAttachment], mailID: Int64, for key: String) {
         prepare(for: key)
         attachments[mailID] = Stamped(value: list, savedAt: now())
+        while attachments.count > Self.maxEntryCount {
+            guard let oldest = attachments.min(by: { $0.value.savedAt < $1.value.savedAt })?.key else { break }
+            attachments[oldest] = nil
+        }
     }
 
     /// 邮件删除或移走后不再从缓存打开。
@@ -84,7 +96,16 @@ final class SeekMailMemoryCache {
             owner = fingerprint
             return false
         }
+        // 每次读写清理整份过期数据，避免只返回 nil 却一直保留正文。
+        let date = now()
+        details = details.filter { date.timeIntervalSince($0.value.savedAt) < Self.detailLifetime }
+        attachments = attachments.filter { date.timeIntervalSince($0.value.savedAt) < Self.detailLifetime }
+        if let entry = mailboxes, date.timeIntervalSince(entry.savedAt) >= Self.mailboxLifetime { mailboxes = nil }
         return true
+    }
+
+    private func bodyBytes(_ detail: SeekMailDetail) -> Int {
+        detail.mail.bodyHtml.utf8.count + detail.mail.bodyText.utf8.count
     }
 
     private func isFresh(_ date: Date, lifetime: TimeInterval) -> Bool {

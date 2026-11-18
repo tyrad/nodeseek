@@ -262,6 +262,81 @@ struct SeekMailP1Tests {
 /// 全部标为已读：逐封处理、限速和额度等待。
 @MainActor
 struct SeekMailMarkAllReadTests {
+    @Test func skipsWaitWhenQuotaExpiresDuringStateCallback() async throws {
+        let transport = SeekMailRouteTransport()
+        transport.details["/openapi/v1/mails/unread"] = Self.unread
+        transport.headers = ["x-ratelimit-limit": "60", "x-ratelimit-remaining": "4"]
+        let provider = SeekMailProvider<SeekMailAPI>(apiKey: { "sk_live_test" }, transport: transport.load)
+        var clock = Date()
+        var sleeps: [TimeInterval] = []
+        let job = SeekMailMarkAllReadJob(provider: provider, sleep: { sleeps.append($0) }, now: { clock })
+        let mails = try await job.collect(mailboxID: nil).mails
+        let deadline = try #require(provider.rateLimit).observedAt.addingTimeInterval(60)
+        clock = deadline.addingTimeInterval(-0.001)
+        job.onChange = { state in
+            if case .waiting = state { clock = deadline.addingTimeInterval(0.001) }
+        }
+        job.start(Array(mails.prefix(1)))
+        await mailWaitUntil { if case .finished = job.state { return true }; return false }
+        #expect(sleeps.isEmpty)
+        #expect(job.state == .finished(succeeded: 1, failed: 0))
+    }
+
+    @Test func boundsCacheAndRemovesExpiredMailBodies() throws {
+        var clock = Date()
+        let cache = SeekMailMemoryCache(now: { clock })
+        for id in 1...100 {
+            clock = clock.addingTimeInterval(0.001)
+            let json: [String: Any] = ["mail": ["id": id, "mailboxId": 1, "bodyHtml": String(repeating: "x", count: 100_000)]]
+            let detail = try SeekMailJSON.decoder.decode(SeekMailDetail.self, from: JSONSerialization.data(withJSONObject: json))
+            cache.saveDetail(detail, for: "test-key")
+        }
+        let retained = try #require(Mirror(reflecting: cache).children.first { $0.label == "details" })
+        #expect(Mirror(reflecting: retained.value).children.count == SeekMailMemoryCache.maxEntryCount)
+        #expect(cache.detail(id: 100, for: "test-key") != nil)
+        clock = clock.addingTimeInterval(SeekMailMemoryCache.detailLifetime + 1)
+        for id in 1...100 { #expect(cache.detail(id: Int64(id), for: "test-key") == nil) }
+        let entries = try #require(Mirror(reflecting: cache).children.first { $0.label == "details" })
+        #expect(Mirror(reflecting: entries.value).children.isEmpty)
+        cache.clear()
+        let cleared = try #require(Mirror(reflecting: cache).children.first { $0.label == "details" })
+        #expect(Mirror(reflecting: cleared.value).children.isEmpty)
+    }
+
+    @Test func cacheEvictsOldBodiesAndSkipsOversizedDetails() throws {
+        var clock = Date()
+        let cache = SeekMailMemoryCache(now: { clock })
+        func save(_ id: Int, bytes: Int) throws {
+            clock = clock.addingTimeInterval(1)
+            let json: [String: Any] = ["mail": ["id": id, "mailboxId": 1, "bodyHtml": String(repeating: "x", count: bytes)]]
+            let detail = try SeekMailJSON.decoder.decode(SeekMailDetail.self, from: JSONSerialization.data(withJSONObject: json))
+            cache.saveDetail(detail, for: "key")
+        }
+        try save(1, bytes: 3 * 1024 * 1024)
+        try save(2, bytes: 3 * 1024 * 1024)
+        #expect(cache.detail(id: 1, for: "key") == nil)
+        #expect(cache.detail(id: 2, for: "key") != nil)
+        try save(3, bytes: SeekMailMemoryCache.maxBodyBytes + 1)
+        #expect(cache.detail(id: 3, for: "key") == nil)
+        #expect(cache.detail(id: 2, for: "key") != nil)
+        #expect(cache.detail(id: 2, for: "different-key") == nil)
+    }
+
+    @Test func attachmentCacheIsBoundedAndExpires() {
+        var clock = Date()
+        let cache = SeekMailMemoryCache(now: { clock })
+        for id in 1...40 {
+            clock = clock.addingTimeInterval(1)
+            cache.saveAttachments([], mailID: Int64(id), for: "key")
+        }
+        #expect(cache.attachments(mailID: 1, for: "key") == nil)
+        #expect(cache.attachments(mailID: 40, for: "key") != nil)
+        clock = clock.addingTimeInterval(SeekMailMemoryCache.detailLifetime + 1)
+        #expect(cache.attachments(mailID: 40, for: "key") == nil)
+        let entries = Mirror(reflecting: cache).children.first { $0.label == "attachments" }
+        #expect(entries.map { Mirror(reflecting: $0.value).children.isEmpty } == true)
+    }
+
     private static let unread = #"{"data":[{"id":31,"mailboxId":1,"fromAddress":"a@x.com"},{"id":32,"mailboxId":2,"fromAddress":"b@x.com"},{"id":33,"mailboxId":1,"fromAddress":"c@x.com"}],"page":{"limit":50,"hasMore":false,"nextCursor":""}}"#
 
     @Test func collectsCurrentMailboxAndMarksOneByOne() async throws {

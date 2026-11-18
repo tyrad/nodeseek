@@ -6,6 +6,46 @@ import UIKit
 /// 在有尺寸的界面里真正生成单元格，覆盖骨架行、邮件行和验证码卡片的布局。
 @MainActor
 struct SeekMailInboxViewTests {
+    @Test func staleMailRowIndexesReturnEmptyCells() async throws {
+        let transport = SeekMailRouteTransport()
+        transport.mailPages = [#"{"data":[{"id":21,"mailboxId":1,"subject":"Test"}],"pagination":{"total":1,"limit":20,"offset":0}}"#]
+        let inbox = SeekMailInboxViewController(keyStore: InMemorySeekMailKeyStore(key: "test-key"), transport: transport.load, selectionStore: makeSelectionStore())
+        inbox.loadViewIfNeeded()
+        await mailWaitUntil { inbox.model.phase == .loaded }
+        let table = try #require(inbox.view.mailTestView(id: "seek-mail-list") as? UITableView)
+        let valid = inbox.tableView(table, cellForRowAt: IndexPath(row: 0, section: 1))
+        #expect(valid.accessibilityIdentifier == "seek-mail-row-21")
+        for row in [-1, 1, 5] {
+            let cell = inbox.tableView(table, cellForRowAt: IndexPath(row: row, section: 1))
+            #expect(cell is SeekMailCell == false)
+            #expect(cell.accessibilityIdentifier == nil)
+        }
+        inbox.model.scheduleDelete(21)
+        #expect(inbox.model.mails.isEmpty)
+        let stale = inbox.tableView(table, cellForRowAt: IndexPath(row: 0, section: 1))
+        #expect(stale is SeekMailCell == false)
+        inbox.model.undoDelete(21)
+    }
+
+    // 表格先取得行数、稍后才创建 cell 时，仍应使用同一份验证码快照。
+    @Test func expiredCodeRowKeepsSnapshotUntilNextRender() async throws {
+        let transport = SeekMailRouteTransport()
+        var clock = Date(timeIntervalSince1970: 1_800_000_000)
+        let received = ISO8601DateFormatter().string(from: clock.addingTimeInterval(-895))
+        transport.mailPages = [#"{"data":[{"id":21,"mailboxId":1,"verificationCode":"123456","receivedAt":"\#(received)"}],"pagination":{"total":1,"limit":20,"offset":0}}"#]
+        let inbox = SeekMailInboxViewController(keyStore: InMemorySeekMailKeyStore(key: "test-key"), transport: transport.load, selectionStore: makeSelectionStore(), now: { clock })
+        inbox.loadViewIfNeeded()
+        await mailWaitUntil { inbox.model.phase == .loaded }
+        let table = try #require(inbox.view.mailTestView(id: "seek-mail-list") as? UITableView)
+        #expect(inbox.tableView(table, numberOfRowsInSection: 0) == 1)
+        clock = clock.addingTimeInterval(6)
+        #expect(inbox.model.latestCodeMail(now: clock) == nil)
+        let cell = inbox.tableView(table, cellForRowAt: IndexPath(row: 0, section: 0))
+        #expect(cell is SeekMailCodeCell)
+        inbox.model.onChange?()
+        #expect(inbox.tableView(table, numberOfRowsInSection: 0) == 0)
+    }
+
     @Test func unreadDecreaseKeepsTagFramesStable() throws {
         let tags = SeekMailMailboxTagsView()
         tags.frame = CGRect(x: 0, y: 0, width: 390, height: 100)

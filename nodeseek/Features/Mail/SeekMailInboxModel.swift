@@ -353,6 +353,7 @@ final class SeekMailInboxModel {
     }
 
     private func applyMailboxes(_ mailboxes: [SeekMailbox], folders: [SeekMailFolder]) {
+        let mailboxes = SeekMailboxNaming.uniqueMailboxes(mailboxes)
         self.mailboxes = mailboxes
         self.folders = folders.sorted { ($0.sortOrder ?? 0) < ($1.sortOrder ?? 0) }
         names = SeekMailboxNaming.displays(for: mailboxes)
@@ -516,7 +517,7 @@ final class SeekMailInboxModel {
         let delay = deleteDelay
         memoryCache?.removeMail(id: id)
         pendingDeletes[id] = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: UInt64(max(0, delay) * 1_000_000_000))
             guard Task.isCancelled == false else { return }
             await self?.performDelete(id)
         }

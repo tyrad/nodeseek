@@ -46,7 +46,7 @@ final class SeekMailMarkAllReadJob {
     private var failed: [SeekUnreadMail] = []
 
     init(provider: SeekMailProvider<SeekMailAPI>,
-         sleep: @escaping (TimeInterval) async throws -> Void = { try await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000)) },
+         sleep: @escaping (TimeInterval) async throws -> Void = { try await Task.sleep(nanoseconds: UInt64(max(0, $0) * 1_000_000_000)) },
          now: @escaping () -> Date = Date.init) {
         self.provider = provider
         self.sleep = sleep
@@ -125,7 +125,9 @@ final class SeekMailMarkAllReadJob {
         let resumeAt = limit.observedAt.addingTimeInterval(60)
         guard resumeAt > now() else { return }
         state = .waiting(until: resumeAt, done: done, total: total)
-        try await sleep(resumeAt.timeIntervalSince(now()))
+        // 状态回调可能跨过截止时间，不能把负数秒数转换成无符号纳秒。
+        let remaining = resumeAt.timeIntervalSince(now())
+        if remaining > 0 { try await sleep(remaining) }
         state = .running(done: done, total: total)
     }
 

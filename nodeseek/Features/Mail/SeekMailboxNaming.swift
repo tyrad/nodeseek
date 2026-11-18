@@ -16,8 +16,15 @@ struct SeekMailboxDisplay: Equatable {
 }
 
 enum SeekMailboxNaming {
+    /// 异常响应或旧缓存可能重复返回同一邮箱，保留首次记录以稳定名称和排序。
+    static func uniqueMailboxes(_ mailboxes: [SeekMailbox]) -> [SeekMailbox] {
+        var seen = Set<Int64>()
+        return mailboxes.filter { seen.insert($0.id).inserted }
+    }
+
     /// 是否重名要和全部邮箱比较，所以输入是整个列表。
     static func displays(for mailboxes: [SeekMailbox]) -> [Int64: SeekMailboxDisplay] {
+        let mailboxes = uniqueMailboxes(mailboxes)
         var localCounts: [String: Int] = [:]
         for mailbox in mailboxes where alias(of: mailbox) == nil {
             localCounts[localPart(of: mailbox.address).lowercased(), default: 0] += 1
@@ -79,6 +86,7 @@ struct SeekMailboxPickerSections: Equatable {
         recentIDs: [Int64],
         query: String
     ) -> SeekMailboxPickerSections {
+        let mailboxes = SeekMailboxNaming.uniqueMailboxes(mailboxes)
         let keyword = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let matched = mailboxes.filter { mailbox in
             guard keyword.isEmpty == false else { return true }
