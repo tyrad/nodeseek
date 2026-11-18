@@ -60,3 +60,9 @@ GitHub Actions 构建时设置 `CRASHLYTICS_SKIP_BUILD_PHASE_UPLOAD=1`，跳过�
 ### dSYM zip 实际上传验证
 
 2026-11-18：将保留的 `test-20261118.dSYM` 压缩为 `.dSYM.zip`，使用 SDK 官方 `upload-symbols -gsp nodeseek/Resources/GoogleService-Info.plist -p ios` 实际上传。工具对上述主程序与 debug.dylib 两个 UUID 均返回 `Successfully submitted symbols`，最终返回 `Successfully uploaded Crashlytics symbols`，退出码为 0。未新增 Firebase 登录 token 或服务账号私钥。该结果验证本机 zip 上传路径；尚未执行 GitHub Actions 真实构建，也未核验后台符号化完成状态。
+
+### GitHub Actions 发布验证
+
+2026-11-18：[工作流 44278543353](https://github.com/tyrad/nodeseek/actions/runs/44278543353) 全部通过，发布版本 `1.4.1`、构建号 `20261118174337`，App Store Connect 返回 `VALID`。独立上传步骤确认主 App dSYM UUID `FF007936-B3B1-3B59-BDC5-935401A2E5E3` 和 Widget UUID `35298189-E31D-3224-AD3D-7FFBD666798D` 上传成功；IPA、dSYM 和构建来源信息已保存至 GitHub Release。该验证不代表新版本已触发真实崩溃或完成报告符号化核验。
+
+该次 Intel runner 选择 Xcode 26.3，Apple 提示包使用 iOS 26.2 SDK（ITMS-90725），此次上传和处理成功；邮件要求从 2027 年 4 月起使用 Xcode 27 / iOS 27 SDK 或更高版本，后续需升级 CI 工具链。
