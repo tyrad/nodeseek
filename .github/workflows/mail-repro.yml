@@ -24,9 +24,9 @@ jobs:
               source=diagnostics/mail-request.swift
               if [ "$variant" = fixed ]; then source=/tmp/fixed.swift; fi
               echo "CASE $variant $mode"
-              swiftc -parse-as-library -swift-version 5 -"$mode" -default-isolation MainActor -enable-upcoming-feature NonisolatedNonsendingByDefault "$source" -o /tmp/repro
+              if ! swiftc -whole-module-optimization -g -parse-as-library -swift-version 5 -"$mode" -default-isolation MainActor -enable-upcoming-feature NonisolatedNonsendingByDefault "$source" -o /tmp/repro; then echo "COMPILE_FAILED $variant $mode"; continue; fi
               set +e
-              if [ "$variant" = original ]; then lldb -b -o run -o "thread backtrace" /tmp/repro; fi
+              if [ "$variant" = original ]; then lldb -b -o run -k "thread backtrace" /tmp/repro; fi
               /tmp/repro
               result=$?
               set -e
