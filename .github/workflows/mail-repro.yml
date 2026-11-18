@@ -1,0 +1,34 @@
+name: Mail request reproduction
+on:
+  push:
+    branches: [diagnose/mail-141-repro]
+jobs:
+  reproduce:
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v5
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.3'
+      - name: Reproduce closure conversion
+        shell: bash
+        run: |
+          swiftc --version
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('diagnostics/mail-request.swift')
+          Path('/tmp/fixed.swift').write_text(p.read_text().replace('typealias Transport = (URLRequest)', 'typealias Transport = @MainActor (URLRequest)'))
+          PY
+          for mode in Onone O; do
+            for variant in original fixed; do
+              source=diagnostics/mail-request.swift
+              if [ "$variant" = fixed ]; then source=/tmp/fixed.swift; fi
+              echo "CASE $variant $mode"
+              swiftc -parse-as-library -swift-version 5 -"$mode" -default-isolation MainActor -enable-upcoming-feature NonisolatedNonsendingByDefault "$source" -o /tmp/repro
+              set +e
+              /tmp/repro
+              result=$?
+              set -e
+              echo "RESULT $variant $mode exit=$result"
+            done
+          done
