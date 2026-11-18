@@ -34,7 +34,7 @@ concurrency:
 jobs:
   testflight:
     name: Build and upload TestFlight
-    runs-on: macos-15-intel
+    runs-on: xcode-27
     environment: app-store
 
     steps:
@@ -46,7 +46,21 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: '27.2'
+
+      - name: Verify release toolchain
+        run: |
+          set -euo pipefail
+          # 与本地验证环境一致，镜像更新后也不能静默切换工具链。
+          expected_xcode=$'Xcode 27.2\nBuild version 27B52'
+          actual_xcode="$(xcodebuild -version)"
+          printf '%s\n' "$actual_xcode"
+          test "$actual_xcode" = "$expected_xcode"
+          swift_version="$(xcrun swift --version)"
+          printf '%s\n' "$swift_version"
+          [[ "$swift_version" == *'Apple Swift version 6.4.2 (swiftlang-6.4.2.1.9 clang-2100.4.1.1)'* ]]
+          test "$(uname -m)" = arm64
+          xcrun --sdk iphoneos --show-sdk-version
 
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
