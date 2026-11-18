@@ -61,7 +61,8 @@ struct SeekMailLoggerPlugin: SeekMailPlugin {
 }
 
 final class SeekMailProvider<Target: SeekMailTargetType> {
-    typealias Transport = (URLRequest) async throws -> (Data, URLResponse)
+    // 显式隔离避免旧版 Swift 转换异步闭包时破坏 URLRequest 参数。
+    typealias Transport = @MainActor (URLRequest) async throws -> (Data, URLResponse)
 
     private let apiKey: () -> String?
     private let transport: Transport
