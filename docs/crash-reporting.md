@@ -26,6 +26,8 @@ GitHub Actions 还会在 Fastlane 步骤之后同步上传 `build/*.dSYM.zip`，
 
 ## 本次验证
 
+GitHub Actions 构建时设置 `CRASHLYTICS_SKIP_BUILD_PHASE_UPLOAD=1`，跳过归档内的后台上传，由后续独立步骤同步上传。首次 CI 验证发现 Xcode 沙盒拒绝读取仓库内 Firebase `run` 脚本，采用此方式避免符号上传阻断归档。
+
 2026-11-18：Xcode 27.2、iPhone 15 / iOS 17.5 模拟器，使用 `make xcode-test-class TEST=CrashReportServiceTests`（独立构建/依赖目录、arm64、并发 2）完成构建，4 项测试通过。检查构建产物确认主 App 包含 Firebase 配置、Widget 不包含，自动上传开关为 false。
 
 尚未验证真机崩溃上传到 Firebase、归档符号实际送达、界面在不同字号/语言下的视觉表现，以及接入前后的包体和启动耗时差异。

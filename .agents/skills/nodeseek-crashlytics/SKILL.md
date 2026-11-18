@@ -21,6 +21,8 @@ description: 排查 NodeSeek 的 Firebase Crashlytics 崩溃、使用 MCP 查询
 
 Xcode 归档还有 `scripts/upload-crashlytics-symbols.sh` 调用官方 `run`，其实际上传在后台执行，不能仅凭归档成功认定上传成功。Actions 的独立步骤用于检查同步上传结果。
 
+Actions 构建步骤设置 `CRASHLYTICS_SKIP_BUILD_PHASE_UPLOAD=1`，跳过归档内的后台上传，避免 Xcode 沙盒阻止读取仓库内的 SDK 工具；符号统一在归档完成后的独立步骤上传。本地归档不设置该变量。
+
 上传使用仓库中的 GoogleService 配置，无需额外 Firebase CLI 登录 token。不要把服务账号私钥写进 skill 或仓库。既有 Actions `dSYM` artifact 和成功发布的 Release 附件保留符号；下载时确认对应 run、版本和构建号。artifact 有保留期限。
 
 ## 补传缺失符号
