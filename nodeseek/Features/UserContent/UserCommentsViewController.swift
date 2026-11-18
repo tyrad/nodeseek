@@ -22,6 +22,7 @@ final class UserCommentsViewController: UIViewController {
     private var uid: Int?
     private var nextPage = 2
     private var hasMorePages = true
+    private var requestGeneration = 0
     private var isLoadingFirstPage = false
     private var isLoadingMore = false
     private var lastBatchFetchRequestedCount: Int?
@@ -89,6 +90,9 @@ final class UserCommentsViewController: UIViewController {
 
     private func loadFirstPage() {
         guard !isLoadingFirstPage else { return }
+        requestGeneration += 1
+        let generation = requestGeneration
+        isLoadingMore = false
         isLoadingFirstPage = true
         hasMorePages = true
         nextPage = 2
@@ -100,9 +104,11 @@ final class UserCommentsViewController: UIViewController {
             do {
                 let uid = try await resolveUID()
                 let loaded = try await client.loadComments(uid: uid, page: 1)
+                guard generation == requestGeneration else { return }
                 self.uid = uid
                 finishFirstPage(records: loaded)
             } catch {
+                guard generation == requestGeneration else { return }
                 showFirstPageError(error.localizedDescription)
             }
         }
@@ -113,13 +119,16 @@ final class UserCommentsViewController: UIViewController {
         guard !records.isEmpty, hasMorePages, !isLoadingMore, !isLoadingFirstPage else { return }
         isLoadingMore = true
         footerView.startAnimating()
+        let generation = requestGeneration
         let page = nextPage
         Task { [weak self] in
             guard let self else { return }
             do {
                 let loaded = try await client.loadComments(uid: uid, page: page)
+                guard generation == requestGeneration else { return }
                 finishLoadMore(records: loaded, page: page)
             } catch {
+                guard generation == requestGeneration else { return }
                 isLoadingMore = false
                 footerView.stopAnimating()
             }

@@ -22,6 +22,7 @@ final class UserCollectionsViewController: UIViewController {
     private var uid: Int?
     private var nextPage = 2
     private var hasMorePages = true
+    private var requestGeneration = 0
     private var isLoadingFirstPage = false
     private var isLoadingMore = false
     private var lastBatchFetchRequestedCount: Int?
@@ -89,6 +90,9 @@ final class UserCollectionsViewController: UIViewController {
 
     private func loadFirstPage() {
         guard !isLoadingFirstPage else { return }
+        requestGeneration += 1
+        let generation = requestGeneration
+        isLoadingMore = false
         isLoadingFirstPage = true
         hasMorePages = true
         nextPage = 2
@@ -100,9 +104,11 @@ final class UserCollectionsViewController: UIViewController {
             do {
                 let uid = try await resolveUID()
                 let loaded = try await client.loadCollections(page: 1, uid: uid)
+                guard generation == requestGeneration else { return }
                 self.uid = uid
                 finishFirstPage(records: loaded)
             } catch {
+                guard generation == requestGeneration else { return }
                 showFirstPageError(error.localizedDescription)
             }
         }
@@ -113,13 +119,16 @@ final class UserCollectionsViewController: UIViewController {
         guard !records.isEmpty, hasMorePages, !isLoadingMore, !isLoadingFirstPage else { return }
         isLoadingMore = true
         footerView.startAnimating()
+        let generation = requestGeneration
         let page = nextPage
         Task { [weak self] in
             guard let self else { return }
             do {
                 let loaded = try await client.loadCollections(page: page, uid: uid)
+                guard generation == requestGeneration else { return }
                 finishLoadMore(records: loaded, page: page)
             } catch {
+                guard generation == requestGeneration else { return }
                 isLoadingMore = false
                 footerView.stopAnimating()
             }

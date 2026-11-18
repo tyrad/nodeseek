@@ -135,13 +135,15 @@ final class PostTextureListView: UIView {
         }
 
         if let appendIndexPaths = makeAppendIndexPaths(from: self.items, to: items) {
-            self.items = items
+            // 先完成上次 reload 的布局，批量插入开始前数据源仍须保持旧行数。
+            tableView.layoutIfNeeded()
             let appendedItems = Array(items[appendIndexPaths[0].row...])
             prefetchLayouts(for: appendedItems)
             prefetchAvatars(for: appendedItems)
             // 分页追加发生在滚动底部，关闭 row 插入动画可以避免调整 contentOffset 时牵动上方内容。
             UIView.performWithoutAnimation {
                 tableView.performBatchUpdates {
+                    self.items = items
                     tableView.insertRows(at: appendIndexPaths, with: .none)
                 }
             }
