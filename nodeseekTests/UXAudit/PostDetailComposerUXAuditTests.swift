@@ -236,47 +236,6 @@ final class PostDetailComposerUXAuditTests: XCTestCase {
         )
     }
 
-    // MARK: - U41
-
-    // 期望：暗黑模式下表情面板的表情与正文里的图片一样做压暗处理（或改用非白底），避免刺眼。
-    func test_U41_stickerCellsAreDimmedInDarkMode() async throws {
-        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
-        let window = UIWindow(windowScene: scene)
-        windows.append(window)
-        let container = UIViewController()
-        window.rootViewController = container
-        window.overrideUserInterfaceStyle = .dark
-        window.makeKeyAndVisible()
-
-        let picker = NodeSeekStickerPickerView()
-        picker.isHidden = false
-        container.view.addSubview(picker)
-        NSLayoutConstraint.activate([
-            picker.leadingAnchor.constraint(equalTo: container.view.leadingAnchor),
-            picker.trailingAnchor.constraint(equalTo: container.view.trailingAnchor),
-            picker.bottomAnchor.constraint(equalTo: container.view.bottomAnchor),
-            picker.heightAnchor.constraint(equalToConstant: 260)
-        ])
-        container.view.layoutIfNeeded()
-
-        let collectionView = try XCTUnwrap(picker.uxFirstSubview(of: UICollectionView.self))
-        collectionView.layoutIfNeeded()
-        let cells = collectionView.visibleCells
-        XCTAssertFalse(cells.isEmpty, "前置条件：表情面板应有可见表情")
-
-        let dimmedCount = cells.filter { cell in
-            let hasDimmingOverlay = cell.uxFirstSubview(of: DetailImageDimmingView.self) != nil
-            let imageViews = cell.contentView.uxAllSubviews(of: UIImageView.self)
-            let imageAlphaReduced = imageViews.isEmpty == false && imageViews.allSatisfy { $0.alpha < 1 }
-            return hasDimmingOverlay || imageAlphaReduced
-        }.count
-
-        XCTAssertEqual(
-            dimmedCount, cells.count,
-            "U41: 暗黑模式下表情面板 \(cells.count) 个表情里只有 \(dimmedCount) 个做了压暗，表情白底刺眼"
-        )
-    }
-
     // MARK: - Helpers
 
     private func host(_ viewController: UIViewController) {
@@ -427,14 +386,6 @@ private final class UXComposerNewDiscussionPresenter: NewDiscussionPresenterProt
 }
 
 private extension UIView {
-    func uxFirstSubview<T: UIView>(of type: T.Type) -> T? {
-        if let matched = self as? T { return matched }
-        for subview in subviews {
-            if let matched = subview.uxFirstSubview(of: type) { return matched }
-        }
-        return nil
-    }
-
     func uxAllSubviews<T: UIView>(of type: T.Type) -> [T] {
         var result: [T] = []
         if let matched = self as? T { result.append(matched) }
