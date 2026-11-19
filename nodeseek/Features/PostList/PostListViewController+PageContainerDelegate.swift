@@ -58,5 +58,6 @@ extension PostListViewController: PostPageContainerViewControllerDelegate {
         selectedCategory = category
         applySelectedCategory(category, syncPage: false, pageAnimated: false)
         presenter.didSelectCategory(category)
+        setComposeButtonDimmed(false, animated: true)
     }
 }

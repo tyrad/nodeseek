@@ -36,6 +36,10 @@ class PostListViewController: UIViewController {
         static let composeToggleScrollDelta: CGFloat = 6
         /// 同一次拖动中累计超过这个距离才切换，过滤手指抖动和松手时的回带。
         static let composeToggleDragDistance: CGFloat = 24
+        /// 静止时略透，与底部玻璃 Tab 栏一样隐约透出列表。
+        static let composeRestingAlpha: CGFloat = 0.9
+        /// 上推浏览时变淡让出内容，但仍可见、可点。
+        static let composeDimmedAlpha: CGFloat = 0.5
     }
 
     // MARK: - Properties
@@ -58,7 +62,7 @@ class PostListViewController: UIViewController {
     private var tabScrollTrailingToSafeAreaConstraint: NSLayoutConstraint?
     private var tabScrollTrailingToSearchButtonConstraint: NSLayoutConstraint?
     var isSortToggleExpanded = false
-    private var isComposeButtonHidden = false
+    private var isComposeButtonDimmed = false
     /// 本次拖动中上一次切换发帖按钮时的手指位置。
     private var composeDragAnchorY: CGFloat?
     let sideMenuViewController: PostListSideMenuViewController
@@ -469,6 +473,7 @@ class PostListViewController: UIViewController {
         applySelectedCategory(category, syncPage: true, pageAnimated: true)
         renderSortMode(pageContainerViewController.sortMode(for: category))
         presenter.didSelectCategory(category)
+        setComposeButtonDimmed(false, animated: true)
     }
 
     func rebuildCategoryButtons() {
@@ -636,6 +641,7 @@ class PostListViewController: UIViewController {
 
     private func installComposeButton() {
         composeButton.addTarget(self, action: #selector(composeButtonTapped), for: .touchUpInside)
+        composeButton.alpha = FloatingControlLayout.composeRestingAlpha
         view.addSubview(composeButton)
         NSLayoutConstraint.activate([
             composeButton.trailingAnchor.constraint(
@@ -653,13 +659,13 @@ class PostListViewController: UIViewController {
         }
     }
 
-    /// 向下滚动收起发帖按钮，向上滚动或回到顶部时再出现。
+    /// 向下滚动时发帖按钮变淡，向上滚动或回到顶部时恢复。
     /// 方向只看手指拖动的累计距离：行高校正、回弹会改动 contentOffset，按逐帧位移判断会让按钮来回闪。
     private func handleListScroll(_ scrollView: UIScrollView) {
         let offsetY = scrollView.contentOffset.y + scrollView.adjustedContentInset.top
         if offsetY <= FloatingControlLayout.composeToggleScrollDelta {
             composeDragAnchorY = nil
-            setComposeButtonHidden(false, animated: true)
+            setComposeButtonDimmed(false, animated: true)
             return
         }
         guard scrollView.isTracking else {
@@ -674,24 +680,21 @@ class PostListViewController: UIViewController {
         }
         let distance = translationY - anchorY
         if distance < -FloatingControlLayout.composeToggleDragDistance {
-            // 手指上推：内容向下，收起
+            // 手指上推：内容向下，变淡
             composeDragAnchorY = translationY
-            setComposeButtonHidden(true, animated: true)
+            setComposeButtonDimmed(true, animated: true)
         } else if distance > FloatingControlLayout.composeToggleDragDistance {
             composeDragAnchorY = translationY
-            setComposeButtonHidden(false, animated: true)
+            setComposeButtonDimmed(false, animated: true)
         }
     }
 
-    private func setComposeButtonHidden(_ hidden: Bool, animated: Bool) {
-        guard isComposeButtonHidden != hidden else { return }
-        isComposeButtonHidden = hidden
-        composeButton.isUserInteractionEnabled = !hidden
+    func setComposeButtonDimmed(_ dimmed: Bool, animated: Bool) {
+        guard isComposeButtonDimmed != dimmed else { return }
+        isComposeButtonDimmed = dimmed
+        let alpha = dimmed ? FloatingControlLayout.composeDimmedAlpha : FloatingControlLayout.composeRestingAlpha
         let animations = { [composeButton] in
-            composeButton.alpha = hidden ? 0 : 1
-            composeButton.transform = hidden
-                ? CGAffineTransform(translationX: 0, y: 24).scaledBy(x: 0.6, y: 0.6)
-                : .identity
+            composeButton.alpha = alpha
         }
         guard animated else {
             animations()
@@ -761,10 +764,10 @@ class PostListViewController: UIViewController {
 }
 
 extension PostListViewController: TabReselectHandling {
-    /// 已在首页时再点“首页”Tab：回到顶部、刷新当前分类，并重新显示发帖按钮。
+    /// 已在首页时再点“首页”Tab：回到顶部、刷新当前分类，并恢复发帖按钮。
     func handleTabReselect() {
         pageContainerViewController.refreshFromTabReselect(for: selectedCategory)
-        setComposeButtonHidden(false, animated: true)
+        setComposeButtonDimmed(false, animated: true)
     }
 }
 

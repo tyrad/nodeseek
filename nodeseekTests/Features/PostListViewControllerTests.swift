@@ -23,6 +23,21 @@ struct PostListViewControllerTests {
         #expect(composeButton.accessibilityLabel == "发帖")
     }
 
+    @Test func composeButtonDimsInsteadOfHidingAndStaysTappable() throws {
+        let viewController = makePostListViewController(presenter: SpyPostListPresenter(), layout: .tabs)
+        viewController.loadViewIfNeeded()
+        let composeButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-compose-button"))
+        #expect(abs(composeButton.alpha - 0.9) < 0.01)
+
+        viewController.setComposeButtonDimmed(true, animated: false)
+        #expect(abs(composeButton.alpha - 0.5) < 0.01)
+        #expect(composeButton.isUserInteractionEnabled)
+        #expect(composeButton.transform == .identity)
+
+        viewController.setComposeButtonDimmed(false, animated: false)
+        #expect(abs(composeButton.alpha - 0.9) < 0.01)
+    }
+
     @Test func readingLayoutKeepsSideMenuWithoutComposeButton() throws {
         let presenter = SpyPostListPresenter()
         let viewController = makePostListViewController(presenter: presenter)
