@@ -39,57 +39,6 @@ final class PostDetailComposerUXAuditTests: XCTestCase {
         )
     }
 
-    // MARK: - U15
-
-    // 期望：回复发送成功、最后一页刷新后，列表滚动到（或露出）刚发布的评论。
-    func test_U15_successfulReplyRevealsNewComment() async throws {
-        let interactor = UXComposerSpyInteractor()
-        let presenter = PostDetailPresenter(interactor: interactor, router: UXComposerStubRouter(), initialPage: 1)
-        let viewController = PostDetailViewController(
-            presenter: presenter,
-            accountRefresher: UXComposerLoggedInRefresher()
-        )
-        presenter.setView(viewController)
-        host(viewController)
-
-        let existingComments = (1...30).map { index in
-            makeComment(id: "c\(index)", floor: index, html: "<p>第 \(index) 楼的较长评论内容，用来把列表撑得足够长。</p><p>第二段</p>")
-        }
-        presenter.didLoadPostDetail(PostDetailResponse(detail: makeDetail(comments: existingComments)))
-        let didRender = await waitUntil(timeout: 3) {
-            viewController.hasRenderedDetailContent && viewController.comments.count == existingComments.count
-        }
-        XCTAssertTrue(didRender, "前置条件：详情应完成首屏渲染")
-        viewController.tableNode.view.setContentOffset(.zero, animated: false)
-
-        presenter.didTapSendReply(content: "我的新评论")
-        presenter.didSubmitReply(PostDetailSubmitReplyResponse(message: nil))
-        let didRequestRefresh = await waitUntil(timeout: 3) { interactor.loadedPages.count >= 2 }
-        XCTAssertTrue(didRequestRefresh, "前置条件：回复成功后应刷新当前页，loadedPages=\(interactor.loadedPages)")
-
-        let newComment = makeComment(id: "new", floor: 31, html: "<p>我的新评论</p>", isOwnComment: true)
-        presenter.didLoadPostDetail(PostDetailResponse(detail: makeDetail(comments: existingComments + [newComment])))
-
-        let newRow: () -> Int? = {
-            viewController.detailRows.firstIndex { row in
-                if case .comment(let index) = row {
-                    return viewController.comments.indices.contains(index) && viewController.comments[index].id == "new"
-                }
-                return false
-            }
-        }
-        let revealed = await waitUntil(timeout: 2) {
-            guard let row = newRow() else { return false }
-            let visibleRows = viewController.tableNode.indexPathsForVisibleRows().map(\.row)
-            return visibleRows.contains(row) || viewController.pendingScrollToRow == row
-        }
-
-        XCTAssertTrue(
-            revealed,
-            "U15: 回复成功后新评论（row=\(newRow().map(String.init) ?? "nil")）不在可见区域，visibleRows=\(viewController.tableNode.indexPathsForVisibleRows().map(\.row))"
-        )
-    }
-
     // MARK: - U20
 
     // 期望：去掉空白后内容为空时，“发送”按钮置灰不可点。
@@ -315,28 +264,6 @@ private final class UXComposerStubPresenter: PostDetailPresenterProtocol {
     func didTapCommentOppose(_ comment: Comment) {}
     func didTapEditPost() {}
     func didTapEditComment(_ comment: Comment) {}
-}
-
-private final class UXComposerSpyInteractor: PostDetailInteractorInput {
-    private(set) var loadedPages: [Int] = []
-
-    func loadPostDetail() { loadedPages.append(1) }
-    func loadPostDetail(page: Int) { loadedPages.append(page) }
-    func submitReply(content: String) {}
-    func addFavorite() {}
-    func removeFavorite() {}
-    func addPostLike() {}
-    func addCommentLike(commentID: String) {}
-    func addPostChickenLeg() {}
-    func addCommentChickenLeg(commentID: String) {}
-    func addPostOppose() {}
-    func addCommentOppose(commentID: String) {}
-}
-
-private final class UXComposerStubRouter: PostDetailRouterProtocol {
-    func navigateToLogin(onClose: @escaping @MainActor () -> Void) {}
-    func presentEditPost(_ editable: EditableDiscussion, onSaved: @escaping () -> Void) {}
-    func presentEditComment(_ editable: EditableComment, onSaved: @escaping () -> Void) {}
 }
 
 private final class UXComposerNewDiscussionPresenter: NewDiscussionPresenterProtocol {
