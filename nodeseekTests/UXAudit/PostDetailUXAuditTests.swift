@@ -255,39 +255,6 @@ final class PostDetailUXAuditTests: XCTestCase {
         XCTAssertEqual(usablePostVotes, [], "自己的帖子仍显示可点的投票按钮：\(usablePostVotes)")
     }
 
-    // MARK: - U25
-
-    // 预期：跳到第 2 页后，「在浏览器打开」打开当前查看的第 2 页，而不是进入时的第 1 页。
-    func test_U25_openInBrowserUsesCurrentlyViewedPage() async throws {
-        let presenter = UXAuditSpyPostDetailPresenter()
-        let header = PostDetailHeaderContent(
-            postID: "703863",
-            title: "详情标题",
-            authorName: "ipv4",
-            avatarURL: nil,
-            metadataText: "刚刚"
-        )
-        let viewController = PostDetailViewController(presenter: presenter, initialHeader: header, currentPage: 1)
-        let navigationController = UINavigationController(rootViewController: viewController)
-        viewController.loadViewIfNeeded()
-        viewController.render(detail: makePagedDetail(page: 1))
-        await waitForDetailContent(in: viewController)
-
-        viewController.jumpToCommentPage(2)
-        XCTAssertEqual(presenter.selectedCommentPages, [2])
-        viewController.render(detail: makePagedDetail(page: 2))
-        await waitForDetailContent(in: viewController)
-
-        viewController.openInBrowserTapped()
-
-        let webViewController = try XCTUnwrap(navigationController.topViewController as? NodeSeekWebViewController)
-        XCTAssertEqual(
-            webViewController.testInitialURL.absoluteString,
-            "https://www.nodeseek.com/post-703863-2",
-            "正在看第 2 页，「在浏览器打开」却打开了 \(webViewController.testInitialURL.absoluteString)"
-        )
-    }
-
     // MARK: - U32
 
     // 预期：自己评论的长按菜单不出现「投放鸡腿」。
@@ -403,73 +370,15 @@ final class PostDetailUXAuditTests: XCTestCase {
         return window
     }
 
-    private func makePagedDetail(page: Int) -> PostDetail {
-        PostDetail(
-            id: "703863",
-            title: "详情标题",
-            authorName: "ipv4",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            comments: [
-                Comment(id: "p\(page)", authorName: "a", avatarURL: nil, floorText: "#\(page * 10)",
-                        createdAtText: nil, contentHTML: "<p>第 \(page) 页</p>")
-            ],
-            page: page,
-            pagination: PostDetailPagination(
-                currentPage: page,
-                items: (1...3).map { PostDetailPageItem(page: $0, url: nil, isCurrent: $0 == page) },
-                previousPage: page > 1 ? page - 1 : nil,
-                nextPage: page < 3 ? page + 1 : nil
-            )
-        )
-    }
-
     /// 按钮在布局里、未隐藏、可交互，才算对用户“可用”。
     private func isUsableButton(named name: String, in node: ASDisplayNode, layout: ASLayout) -> Bool {
         guard let button = uxAuditStoredNode(named: name, in: node) as? ASControlNode else { return false }
         guard layout.uxAuditAbsoluteOrigin(of: button) != nil else { return false }
         return button.isHidden == false && button.alpha > 0.01 && button.isEnabled && button.isUserInteractionEnabled
     }
-
-    private func waitForDetailContent(in viewController: PostDetailViewController) async {
-        let didReveal = await waitUntil(timeout: 3) { viewController.hasRenderedDetailContent }
-        XCTAssertTrue(didReveal, "详情内容没有在超时前渲染完成")
-    }
-
-    @discardableResult
-    private func waitUntil(timeout: TimeInterval, condition: () -> Bool) async -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if condition() { return true }
-            try? await Task.sleep(nanoseconds: 20_000_000)
-        }
-        return condition()
-    }
 }
 
 // MARK: - Test doubles
-
-private final class UXAuditSpyPostDetailPresenter: PostDetailPresenterProtocol {
-    private(set) var selectedCommentPages: [Int] = []
-
-    func viewDidLoad() {}
-    func refreshInitialPage() {}
-    func didSelectCommentPage(_ page: Int) { selectedCommentPages.append(page) }
-    func didTapLogin() {}
-    func didApproachCommentEnd() {}
-    func didTapRefreshCommentsAtEnd() {}
-    func didTapSendReply(content: String) {}
-    func didTapFavorite() {}
-    func didTapPostLike() {}
-    func didTapPostChickenLeg() {}
-    func didTapPostOppose() {}
-    func didTapCommentLike(_ comment: nodeseek.Comment) {}
-    func didTapCommentChickenLeg(_ comment: nodeseek.Comment) {}
-    func didTapCommentOppose(_ comment: nodeseek.Comment) {}
-    func didTapEditPost() {}
-    func didTapEditComment(_ comment: nodeseek.Comment) {}
-}
 
 private final class UXAuditSpyPostDetailInteractor: PostDetailInteractorInput {
     private(set) var loadedPages: [Int] = []

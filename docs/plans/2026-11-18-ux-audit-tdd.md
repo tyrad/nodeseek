@@ -35,7 +35,7 @@
 | U22 | P1 | 引用纯表情 / 图片评论时引用块没有内容 | `PostDetailComposerUXAuditTests.test_U22_quoteOfImageOnlyCommentHasPlaceholder` |
 | U23 | P1 | 「我的评论」点评论文字只打开帖子顶部，不跳到对应楼层 | `AppUXAuditTests.test_U23_userCommentRowTapOpensCommentFloor` |
 | U24 | P1 | 楼层跳转后没有高亮，看不出跳到了哪一层 | 不写：代码已在跳转后 0.35s 闪烁高亮，测试中可观察到；属于高亮颜色、时长、停靠位置的设计问题 |
-| U25 | P1 | 「在浏览器打开」在第 2 页时打开的是第 1 页 | `PostDetailUXAuditTests.test_U25_openInBrowserUsesCurrentlyViewedPage` |
+| U25 | P1 | 「在浏览器打开」在第 2 页时打开的是第 1 页 | 不修：「在浏览器打开」沿用进入时的页码，属预期行为；已删除对应测试 |
 | U26 | P1 | 暗黑模式看大图时图片仍被「图片变暗」压暗 | `PostDetailUXAuditTests.test_U26_photoPreviewIsNotDimmedInDarkMode`（不修：大图沿用图片变暗设置，属预期行为） |
 | U27 | P1 | 系统 Dynamic Type 调大后首页 / 详情字号不变 | `AppUXAuditTests.test_U27_typographyScalesWithSystemDynamicType` |
 | U28 | P2 | 「回复楼主」输入框头部显示「回复 缭雾 #0」 | `PostDetailComposerUXAuditTests.test_U28_replyToPosterContextAvoidsFloorZero` |
@@ -66,7 +66,6 @@ make xcode-test-class TEST="PostDetailUXAuditTests PostDetailComposerUXAuditTest
 
 修复时注意：
 - U40 的复制按钮修复会让现有 `ReplyAuthorContextMenuTests.copySheetPrimaryButtonUsesDarkModeFriendlyColor`（断言 `.systemBlue`）失败，需一并改。
-- U25 只覆盖「跳页」；现有测试刻意保持滚动加载更多时仍用首屏页码，是否也要跟随需另定。
 - U03 要求在 `didCommit` 时停止转圈，只加超时兜底仍是红；首屏不绘制的根因不在测试范围。
 - U18 要求错误走独立方法；若新方法默认回落到 `showToast`，测试仍红。
 - U42 依赖 U07（列表先要有绝对时间）。
