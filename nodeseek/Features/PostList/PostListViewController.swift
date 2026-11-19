@@ -684,7 +684,7 @@ class PostListViewController: UIViewController {
         }
     }
 
-    func setComposeButtonHidden(_ hidden: Bool, animated: Bool) {
+    private func setComposeButtonHidden(_ hidden: Bool, animated: Bool) {
         guard isComposeButtonHidden != hidden else { return }
         isComposeButtonHidden = hidden
         composeButton.isUserInteractionEnabled = !hidden
