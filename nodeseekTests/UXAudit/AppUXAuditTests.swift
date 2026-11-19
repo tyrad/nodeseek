@@ -123,9 +123,9 @@ final class AppUXAuditTests: XCTestCase {
         )
     }
 
-    // MARK: - U11 切换分类后发帖按钮恢复
+    // MARK: - U11 切换分类后发帖按钮仍隐藏
 
-    /// 期望：滚动让发帖按钮变淡后切换分类，按钮恢复静止透明度。
+    /// 期望：滚动收起发帖按钮后切换分类，按钮重新出现。
     func test_U11_composeButtonReappearsAfterSwitchingCategory() throws {
         let viewController = PostListViewController(
             presenter: UXAuditPostListPresenter(),
@@ -156,8 +156,7 @@ final class AppUXAuditTests: XCTestCase {
         onListScroll(scrollView)
         scrollView.fakePan.fakeTranslation = CGPoint(x: 0, y: -80)
         onListScroll(scrollView)
-        XCTAssertEqual(composeButton.alpha, 0.5, accuracy: 0.01, "前置条件：上推后发帖按钮应已变淡")
-        XCTAssertTrue(composeButton.isUserInteractionEnabled, "变淡后发帖按钮仍应可点")
+        XCTAssertEqual(composeButton.alpha, 0, accuracy: 0.01, "前置条件：上推后发帖按钮应已收起")
 
         let other = try XCTUnwrap(
             uxDescendants(of: viewController.view).compactMap { $0 as? CategoryTabButton }.first { $0.category == .daily }
@@ -165,8 +164,8 @@ final class AppUXAuditTests: XCTestCase {
         other.sendActions(for: .touchUpInside)
 
         XCTAssertEqual(
-            composeButton.alpha, 0.9, accuracy: 0.01,
-            "U11: 切换分类后发帖按钮仍保持变淡（alpha=\(composeButton.alpha)），要在新分类里下拉才恢复"
+            composeButton.alpha, 1, accuracy: 0.01,
+            "U11: 切换分类后发帖按钮仍保持隐藏（alpha=\(composeButton.alpha)），要在新分类里上滑才出现"
         )
         XCTAssertTrue(composeButton.isUserInteractionEnabled, "U11: 切换分类后发帖按钮仍不可点")
     }
