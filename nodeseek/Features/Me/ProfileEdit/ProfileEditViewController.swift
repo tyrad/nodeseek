@@ -42,7 +42,7 @@ final class ProfileEditViewController: UIViewController {
         self.uid = uid
         self.account = account
         self.client = client ?? NodeSeekProfileEditClient()
-        self.avatarUploader = avatarUploader ?? WebViewProfileAvatarUploader()
+        self.avatarUploader = avatarUploader ?? NodeSeekProfileAvatarUploader()
         super.init(nibName: nil, bundle: nil)
         title = Self.text("编辑资料")
     }
@@ -61,7 +61,6 @@ final class ProfileEditViewController: UIViewController {
         view.accessibilityIdentifier = "profile-edit-page"
         setupNavigationItem()
         setupTableView()
-        client.prepareForSaving()
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(appTextSizeDidChange),

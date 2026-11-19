@@ -8,24 +8,22 @@ import Foundation
 protocol ProfileEditClienting: AnyObject {
     func loadIntroduction(uid: Int) async throws -> ProfileIntroduction
     func saveIntroduction(_ introduction: ProfileIntroduction) async throws
-    /// 提前在隐藏 WebView 里打开首页，保存和上传头像时不用再等页面加载。
-    func prepareForSaving()
 }
 
 /// 读写个人信息设置页的 Bio、签名、Readme，接口与网页 /setting#introduction 一致。
 final class NodeSeekProfileEditClient: ProfileEditClienting {
     private let session: URLSession
     private let baseURL: URL
-    private let submitter: UserFollowSubmitting
+    private let fallbackSubmitter: UserFollowSubmitting
 
     init(
         session: URLSession = .shared,
         baseURL: URL = NodeSeekSite.baseURL,
-        submitter: UserFollowSubmitting? = nil
+        fallbackSubmitter: UserFollowSubmitting? = nil
     ) {
         self.session = session
         self.baseURL = baseURL
-        self.submitter = submitter ?? WebViewUserFollowSubmitter(actionName: "保存个人信息")
+        self.fallbackSubmitter = fallbackSubmitter ?? WebViewUserFollowSubmitter(actionName: "保存个人信息")
     }
 
     func loadIntroduction(uid: Int) async throws -> ProfileIntroduction {
@@ -46,31 +44,50 @@ final class NodeSeekProfileEditClient: ProfileEditClienting {
         return ProfileIntroduction(bio: detail.bio ?? "", signature: detail.signatureMarkdown ?? "", readme: detail.readme ?? "")
     }
 
-    func prepareForSaving() {
-        let pageURL = baseURL
-        Task { @MainActor in
-            do {
-                try await withHiddenWebViewPageActionLoader(logMessage: "预热编辑资料保存页") { loader in
-                    try await loader.prepareAutomationPage(pageURL: pageURL, timeoutInterval: 20, reason: "编辑资料打开预热")
-                }
-            } catch {
-                AppLog.warning(.webView, "编辑资料保存页预热失败: error=\(error.localizedDescription)")
-            }
-        }
-    }
-
+    /// 直接调接口；被站点拦下（403 或验证页）时退回隐藏 WebView 里的同源请求再试一次。
     func saveIntroduction(_ introduction: ProfileIntroduction) async throws {
         let body = try JSONEncoder().encode([
             "bio": introduction.bio,
             "signature": introduction.signature,
             "readme": introduction.readme
         ])
-        // App 直接 POST 会被站点 403，和关注一样在隐藏 WebView 的首页里发同源请求。
-        try await submitter.submit(
-            apiPath: "/api/account/introduction",
-            bodyJSON: String(decoding: body, as: UTF8.self),
-            referer: baseURL
-        )
+        var request = URLRequest(url: baseURL.appendingPathComponent("api/account/introduction"))
+        request.httpMethod = "POST"
+        WebRequestFingerprint.applyJSONHeaders(to: &request, referer: NodeSeekSite.profileSettingsURL)
+        request.setValue(baseURL.absoluteString, forHTTPHeaderField: "Origin")
+        request.httpBody = body
+
+        let (data, response) = try await session.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard let result = ProfileWriteResult(status: status, data: data) else {
+            AppLog.warning(.webView, "保存个人信息直接请求被拦截，改用隐藏 WebView: status=\(status)")
+            try await fallbackSubmitter.submit(
+                apiPath: "/api/account/introduction",
+                bodyJSON: String(decoding: body, as: UTF8.self),
+                referer: baseURL
+            )
+            return
+        }
+        guard result.success else {
+            throw result.message.map(UserContentClientError.rejected)
+                ?? UserContentClientError.httpStatus(status)
+        }
+    }
+}
+
+/// 写接口的返回：站点正常处理时总是 JSON；拿不到 JSON（403、验证页）说明请求被拦，返回 nil 让调用方兜底。
+nonisolated struct ProfileWriteResult: Equatable {
+    let success: Bool
+    let message: String?
+
+    init?(status: Int, data: Data) {
+        guard status != 403,
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        // 限流等错误可能不带 success 字段，按状态码判断。
+        success = (200..<300).contains(status) && (object["success"] as? Bool ?? true)
+        message = object["message"] as? String
     }
 }
 

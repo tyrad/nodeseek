@@ -109,11 +109,19 @@ struct ProfileFieldEditorPresenterTests {
 
 @Suite(.serialized)
 struct NodeSeekProfileEditClientTests {
-    @Test func loadReadsSignatureMarkdown() async throws {
-        ProfileEditMockURLProtocol.body = ##"{"success":true,"detail":{"member_id":1,"bio":"hi","signature":"<p>html</p>","signature_markdown":"**md**","readme":"# r"}}"##
+    private func mockSession(status: Int, body: String) -> URLSession {
+        ProfileEditMockURLProtocol.statusCode = status
+        ProfileEditMockURLProtocol.body = body
+        ProfileEditMockURLProtocol.lastRequest = nil
+        ProfileEditMockURLProtocol.lastBody = nil
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ProfileEditMockURLProtocol.self]
-        let client = NodeSeekProfileEditClient(session: URLSession(configuration: configuration), submitter: ProfileSubmitterStub())
+        return URLSession(configuration: configuration)
+    }
+
+    @Test func loadReadsSignatureMarkdown() async throws {
+        let session = mockSession(status: 200, body: ##"{"success":true,"detail":{"member_id":1,"bio":"hi","signature":"<p>html</p>","signature_markdown":"**md**","readme":"# r"}}"##)
+        let client = NodeSeekProfileEditClient(session: session, fallbackSubmitter: ProfileSubmitterStub())
 
         let introduction = try await client.loadIntroduction(uid: 31037)
 
@@ -121,17 +129,75 @@ struct NodeSeekProfileEditClientTests {
         #expect(ProfileEditMockURLProtocol.lastRequest?.url?.absoluteString == "https://www.nodeseek.com/api/account/getInfo/31037?readme=1&signature=1")
     }
 
-    @Test func saveSubmitsAllThreeFields() async throws {
-        let submitter = ProfileSubmitterStub()
-        let client = NodeSeekProfileEditClient(submitter: submitter)
+    @Test func saveCallsAPIDirectlyWithAllThreeFields() async throws {
+        let fallback = ProfileSubmitterStub()
+        let client = NodeSeekProfileEditClient(session: mockSession(status: 200, body: #"{"success":true}"#), fallbackSubmitter: fallback)
 
         try await client.saveIntroduction(ProfileIntroduction(bio: "b", signature: "s", readme: "r"))
 
-        let call = try #require(submitter.calls.first)
+        let request = try #require(ProfileEditMockURLProtocol.lastRequest)
+        #expect(request.httpMethod == "POST")
+        #expect(request.url?.absoluteString == "https://www.nodeseek.com/api/account/introduction")
+        let body = try JSONSerialization.jsonObject(with: try #require(ProfileEditMockURLProtocol.lastBody)) as? [String: String]
+        #expect(body == ["bio": "b", "signature": "s", "readme": "r"])
+        #expect(fallback.calls.isEmpty)
+    }
+
+    @Test func blockedSaveFallsBackToWebView() async throws {
+        let fallback = ProfileSubmitterStub()
+        let client = NodeSeekProfileEditClient(session: mockSession(status: 403, body: "<html>Just a moment...</html>"), fallbackSubmitter: fallback)
+
+        try await client.saveIntroduction(ProfileIntroduction(bio: "b", signature: "s", readme: "r"))
+
+        let call = try #require(fallback.calls.first)
         #expect(call.apiPath == "/api/account/introduction")
         let body = try JSONSerialization.jsonObject(with: Data(call.bodyJSON.utf8)) as? [String: String]
         #expect(body == ["bio": "b", "signature": "s", "readme": "r"])
     }
+
+    @Test func rejectedSaveShowsServerMessageWithoutFallback() async throws {
+        let fallback = ProfileSubmitterStub()
+        let client = NodeSeekProfileEditClient(session: mockSession(status: 200, body: #"{"success":false,"message":"签名过长"}"#), fallbackSubmitter: fallback)
+
+        await #expect(throws: UserContentClientError.self) {
+            try await client.saveIntroduction(ProfileIntroduction(signature: "很长"))
+        }
+        #expect(fallback.calls.isEmpty)
+    }
+
+    @Test @MainActor func avatarUploadsDirectlyAsWebForm() async throws {
+        let fallback = ProfileAvatarUploaderStub()
+        let uploader = NodeSeekProfileAvatarUploader(session: mockSession(status: 200, body: #"{"success":true,"uid":1}"#), fallback: fallback)
+
+        try await uploader.upload(pngData: Data([0x89, 0x50, 0x4E, 0x47]))
+
+        let request = try #require(ProfileEditMockURLProtocol.lastRequest)
+        #expect(request.url?.path == "/api/avatar/upload")
+        #expect(request.value(forHTTPHeaderField: "x-csrf-challenge") == "simple-token")
+        #expect(request.value(forHTTPHeaderField: "Content-Type")?.hasPrefix("multipart/form-data; boundary=") == true)
+        let body = String(decoding: try #require(ProfileEditMockURLProtocol.lastBody), as: UTF8.self)
+        #expect(body.contains(#"name="token""#) && body.contains("123456798"))
+        #expect(body.contains(#"name="img"; filename="img.png""#))
+        #expect(fallback.uploads == 0)
+    }
+
+    @Test @MainActor func blockedAvatarUploadFallsBackButRateLimitDoesNot() async throws {
+        let fallback = ProfileAvatarUploaderStub()
+        try await NodeSeekProfileAvatarUploader(session: mockSession(status: 403, body: "blocked"), fallback: fallback)
+            .upload(pngData: Data([1]))
+        #expect(fallback.uploads == 1)
+
+        await #expect(throws: UserContentClientError.self) {
+            try await NodeSeekProfileAvatarUploader(session: mockSession(status: 429, body: "Too Many Requests"), fallback: fallback)
+                .upload(pngData: Data([1]))
+        }
+        #expect(fallback.uploads == 1)
+    }
+}
+
+private final class ProfileAvatarUploaderStub: ProfileAvatarUploading {
+    var uploads = 0
+    func upload(pngData: Data) async throws { uploads += 1 }
 }
 
 private final class ProfileEditClientStub: ProfileEditClienting {
@@ -139,7 +205,6 @@ private final class ProfileEditClientStub: ProfileEditClienting {
     var error: Error?
 
     func loadIntroduction(uid: Int) async throws -> ProfileIntroduction { ProfileIntroduction() }
-    func prepareForSaving() {}
 
     func saveIntroduction(_ introduction: ProfileIntroduction) async throws {
         if let error { throw error }
@@ -171,20 +236,37 @@ private final class ProfileSpyEditorView: NewDiscussionViewProtocol {
 
 private final class ProfileEditMockURLProtocol: URLProtocol {
     nonisolated(unsafe) static var body = ""
+    nonisolated(unsafe) static var statusCode = 200
     nonisolated(unsafe) static var lastRequest: URLRequest?
+    nonisolated(unsafe) static var lastBody: Data?
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
         Self.lastRequest = request
-        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+        // URLSession 把 httpBody 转成了流，要从流里读回来。
+        Self.lastBody = request.httpBody ?? request.httpBodyStream.map(Self.read)
+        let response = HTTPURLResponse(url: request.url!, statusCode: Self.statusCode, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data(Self.body.utf8))
         client?.urlProtocolDidFinishLoading(self)
     }
 
     override func stopLoading() {}
+
+    private static func read(_ stream: InputStream) -> Data {
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        while stream.hasBytesAvailable {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            guard count > 0 else { break }
+            data.append(buffer, count: count)
+        }
+        return data
+    }
 }
 
 @MainActor

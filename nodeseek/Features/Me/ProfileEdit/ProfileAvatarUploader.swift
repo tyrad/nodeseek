@@ -11,7 +11,65 @@ protocol ProfileAvatarUploading: AnyObject {
 }
 
 /// 上传头像，表单字段与网页设置页的裁剪上传组件一致。
-/// 和保存资料一样，App 直接 POST 会被站点拒绝，所以在隐藏 WebView 的首页里发同源请求。
+/// 直接调接口；被站点拦下（403 或验证页）时退回隐藏 WebView 再试一次。
+final class NodeSeekProfileAvatarUploader: ProfileAvatarUploading {
+    private let session: URLSession
+    private let baseURL: URL
+    private let fallback: ProfileAvatarUploading
+
+    init(
+        session: URLSession = .shared,
+        baseURL: URL = NodeSeekSite.baseURL,
+        fallback: ProfileAvatarUploading? = nil
+    ) {
+        self.session = session
+        self.baseURL = baseURL
+        self.fallback = fallback ?? WebViewProfileAvatarUploader()
+    }
+
+    @MainActor
+    func upload(pngData: Data) async throws {
+        let boundary = "NodeSeekBoundary-\(UUID().uuidString)"
+        var request = URLRequest(url: baseURL.appendingPathComponent("api/avatar/upload"))
+        request.httpMethod = "POST"
+        WebRequestFingerprint.applyJSONHeaders(to: &request, referer: NodeSeekSite.profileSettingsURL)
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue(baseURL.absoluteString, forHTTPHeaderField: "Origin")
+        request.setValue("simple-token", forHTTPHeaderField: "x-csrf-challenge")
+        request.httpBody = Self.formBody(pngData: pngData, boundary: boundary)
+
+        let (data, response) = try await session.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        // 限流时 WebView 兜底也一样会被拒，直接提示。
+        if status == 429 {
+            throw UserContentClientError.rejected(WebViewProfileAvatarUploader.failureMessage(status: status, message: nil))
+        }
+        guard let result = ProfileWriteResult(status: status, data: data) else {
+            AppLog.warning(.webView, "上传头像直接请求被拦截，改用隐藏 WebView: status=\(status)")
+            try await fallback.upload(pngData: pngData)
+            return
+        }
+        guard result.success else {
+            throw UserContentClientError.rejected(
+                WebViewProfileAvatarUploader.failureMessage(status: status, message: result.message)
+            )
+        }
+    }
+
+    /// 字段顺序和名称照搬网页组件：token、name，再是文件字段 img。
+    static func formBody(pngData: Data, boundary: String) -> Data {
+        var body = Data()
+        for (name, value) in [("token", "123456798"), ("name", "avatar")] {
+            body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n".utf8))
+        }
+        body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"img\"; filename=\"img.png\"\r\nContent-Type: image/png\r\n\r\n".utf8))
+        body.append(pngData)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
+        return body
+    }
+}
+
+/// 兜底：在隐藏 WebView 的首页里用页面 fetch 上传。
 final class WebViewProfileAvatarUploader: ProfileAvatarUploading {
     private let timeoutInterval: TimeInterval
 
