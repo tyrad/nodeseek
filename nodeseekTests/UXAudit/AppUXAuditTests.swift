@@ -342,6 +342,25 @@ final class AppUXAuditTests: XCTestCase {
         XCTAssertEqual(context.navigationController.viewControllers.count, 2)
     }
 
+    func testMeLevelProgressRowPresentsTodayProgressCard() async throws {
+        let context = try await makeLoggedInMePage()
+        defer { context.window.isHidden = true }
+        let me = context.viewController
+        let views = uxDescendants(of: me.view)
+        let row = try XCTUnwrap(views.first { $0.accessibilityIdentifier == "me-today-progress" } as? UIControl)
+        let card = try XCTUnwrap(views.first { $0.accessibilityIdentifier == "me-profile-card" })
+        let point = row.convert(CGPoint(x: row.bounds.midX, y: row.bounds.maxY - 3), to: card)
+        XCTAssertTrue(card.hitTest(point, with: nil) === row)
+        row.sendActions(for: .touchUpInside)
+
+        let sheet = try XCTUnwrap(me.presentedViewController as? UINavigationController)
+        let detail = try XCTUnwrap(sheet.topViewController as? MeTodayProgressViewController)
+        let progress = try XCTUnwrap(uxDescendants(of: detail.view).compactMap { $0 as? UserProfileProgressCardView }.first)
+        XCTAssertFalse(progress.isHidden)
+        XCTAssertTrue(uxDescendants(of: progress).contains { ($0 as? UILabel)?.text == "7 / 20" })
+        XCTAssertTrue(context.navigationController.topViewController === me)
+    }
+
     // MARK: - U34 「添加探针」填写后关闭不确认
 
     /// 期望：添加探针已填写内容时点取消，先弹放弃确认，不直接关闭。

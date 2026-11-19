@@ -23,6 +23,7 @@ final class MeViewController: UIViewController {
     private var progress: UserTodayProgressRecord?
     private var loadTask: Task<Void, Never>?
     private var loadingUID: Int?
+    private weak var progressSheet: MeTodayProgressViewController?
     private var unreadCountTask: Task<Void, Never>?
     /// 登录页是 push 进来的，关闭时本页还不在 window 上，所以用出现/消失自己记可见状态
     private var isPageVisible = false
@@ -173,6 +174,7 @@ final class MeViewController: UIViewController {
 
     private func setupActions() {
         profileCard.onTap = { [weak self] in self?.profileCardTapped() }
+        profileCard.onProgressTap = { [weak self] in self?.showTodayProgress() }
         profileCard.onLoginTap = { [weak self] in self?.showLogin() }
         discussionsRow.addTarget(self, action: #selector(discussionsTapped), for: .touchUpInside)
         commentsRow.addTarget(self, action: #selector(commentsTapped), for: .touchUpInside)
@@ -196,6 +198,8 @@ final class MeViewController: UIViewController {
         let uidChanged = account.nodeSeekUID != self.account.nodeSeekUID
         self.account = account
         if uidChanged || account.isLoggedIn == false {
+            progressSheet?.dismiss(animated: false)
+            progressSheet = nil
             profile = nil
             progress = nil
         }
@@ -217,9 +221,13 @@ final class MeViewController: UIViewController {
         guard loadingUID != uid else { return }
         loadTask?.cancel()
         loadingUID = uid
+        updateProgressSheet()
         loadTask = Task { [weak self, client] in
             defer {
-                if Task.isCancelled == false { self?.loadingUID = nil }
+                if !Task.isCancelled {
+                    self?.loadingUID = nil
+                    self?.updateProgressSheet()
+                }
             }
             // 资料和今日进度并行请求；进度失败不影响资料展示，只是不显示今日摘要
             async let progressResult = try? client.loadTodayProgress(uid: uid)
@@ -256,6 +264,7 @@ final class MeViewController: UIViewController {
 
     private func render() {
         guard isViewLoaded else { return }
+        updateProgressSheet()
         if account.isLoggedIn {
             profileCard.renderLoggedIn(account: account, profile: profile, progress: progress)
         } else {
@@ -285,6 +294,31 @@ final class MeViewController: UIViewController {
         if let profileURL = account.profileURL {
             router.navigateToUserProfile(profileURL: profileURL)
         }
+    }
+
+    private func showTodayProgress() {
+        guard profile != nil, presentedViewController == nil else { return }
+        let sheet = MeTodayProgressViewController()
+        sheet.onRetry = { [weak self] in self?.loadProfile() }
+        progressSheet = sheet
+        updateProgressSheet()
+        if progress == nil { loadProfile() }
+        let navigation = UINavigationController(rootViewController: sheet)
+        navigation.modalPresentationStyle = .pageSheet
+        if let presentation = navigation.sheetPresentationController {
+            if #available(iOS 16.0, *) {
+                presentation.detents = [.custom { _ in 320 }, .large()]
+            } else {
+                presentation.detents = [.medium(), .large()]
+            }
+            presentation.prefersGrabberVisible = true
+        }
+        present(navigation, animated: true)
+    }
+
+    private func updateProgressSheet() {
+        guard let progressSheet, let profile else { return }
+        progressSheet.render(level: profile.levelProgress, progress: progress, isLoading: loadingUID != nil)
     }
 
     private func openStat(_ destination: MeStatDestination) {
@@ -425,6 +459,7 @@ private enum MeStatDestination {
 /// 头像和昵称通往个人主页，可操作的统计项直达明细。
 private final class MeProfileCardView: UIControl {
     var onTap: (() -> Void)?
+    var onProgressTap: (() -> Void)?
     var onLoginTap: (() -> Void)?
 
     private static let defaultAvatarImage = UIImage(
@@ -444,7 +479,7 @@ private final class MeProfileCardView: UIControl {
     private let statViews: [UserProfileStatView]
 
     private let levelSeparator = MeSeparatorView()
-    private let levelContainer = UIView()
+    private let levelContainer = UIControl()
     private let levelTitleLabel = UILabel()
     private let todayLabel = UILabel()
     private let levelBar = MeProgressBar()
@@ -500,6 +535,7 @@ private final class MeProfileCardView: UIControl {
         if !loginButton.isHidden {
             return hitView.isDescendant(of: loginButton) ? hitView : self
         }
+        if hitView.isDescendant(of: levelContainer) { return levelContainer }
         if hitView.isDescendant(of: headerView) { return headerView }
         return hitView.isDescendant(of: statsStack) ? hitView : self
     }
@@ -537,6 +573,7 @@ private final class MeProfileCardView: UIControl {
             todayLabel.text = progress.map {
                 "今日 评论 \($0.commentBonusCount)/\($0.maxCommentBonusCount) · 发帖 \($0.postBonusCount)/\($0.maxPostBonusCount)"
             }
+            levelContainer.accessibilityValue = [levelTitleLabel.text, todayLabel.text].compactMap { $0 }.joined(separator: "，")
             levelSeparator.isHidden = false
             levelContainer.isHidden = false
         } else {
@@ -639,6 +676,11 @@ private final class MeProfileCardView: UIControl {
     }
 
     private func setupLevel() {
+        levelContainer.isAccessibilityElement = true
+        levelContainer.accessibilityTraits = .button
+        levelContainer.accessibilityLabel = MeTodayProgressViewController.localizedTitle
+        levelContainer.accessibilityIdentifier = "me-today-progress"
+        levelContainer.addAction(UIAction { [weak self] _ in self?.onProgressTap?() }, for: .touchUpInside)
         levelTitleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
         levelTitleLabel.textColor = ReadingColors.text
         todayLabel.font = .systemFont(ofSize: 12.5)
@@ -648,7 +690,13 @@ private final class MeProfileCardView: UIControl {
         todayLabel.minimumScaleFactor = 0.85
         levelTitleLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        let titleRow = UIStackView(arrangedSubviews: [levelTitleLabel, todayLabel])
+        let chevron = UIImageView(image: UIImage(
+            systemName: "chevron.forward",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
+        ))
+        chevron.tintColor = .tertiaryLabel
+        chevron.setContentHuggingPriority(.required, for: .horizontal)
+        let titleRow = UIStackView(arrangedSubviews: [levelTitleLabel, todayLabel, chevron])
         titleRow.axis = .horizontal
         titleRow.spacing = 8
         titleRow.alignment = .firstBaseline
