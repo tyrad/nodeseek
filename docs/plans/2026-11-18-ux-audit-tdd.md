@@ -24,7 +24,7 @@
 | U11 | P1 | 发帖按钮被滑动隐藏后，切换分类它仍保持隐藏 | `AppUXAuditTests.test_U11_composeButtonReappearsAfterSwitchingCategory`（已修复：切换分类后发帖按钮重新出现） |
 | U12 | P1 | 「我的」页发帖上限 0/4 与个人主页 0/20 不一致 | `AppUXAuditTests.test_U12_mePageAndProfileShowSamePostLimit` |
 | U13 | P1 | 特别关注说明写「右滑删除」，实际是左滑 | `AppUXAuditTests.test_U13_specialFollowFooterSaysSwipeToDelete`（已修复：文案改为滑动删除） |
-| U14 | P1 | App 内字号 +8 时首页元信息行的时间被截断 | `AppUXAuditTests.test_U14_listMetadataNotTruncatedAtLargestAppTextSize` |
+| U14 | P1 | App 内字号 +8 时首页元信息行的时间被截断 | 不修。保留首页元信息的单行布局。 |
 | U15 | P1 | 回复成功后停在原位，看不到自己刚发的评论 | `PostDetailComposerUXAuditTests.test_U15_successfulReplyRevealsNewComment` |
 | U16 | P1 | 表情面板打开时点输入框，面板不收起，与键盘同时出现 | `PostDetailComposerUXAuditTests.test_U16_stickerPanelHidesWhenTextViewBecomesFirstResponder` |
 | U17 | P1 | 「发帖时间优先」排序下仍显示最后回复时间，看起来没排好 | 不写：列表 HTML 只有最后回复时间，没有发帖时间可解析，需先定产品方案（如标注「最后回复」） |

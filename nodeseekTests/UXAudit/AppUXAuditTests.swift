@@ -214,54 +214,6 @@ final class AppUXAuditTests: XCTestCase {
         )
     }
 
-    // MARK: - U14 字号 +8 时首页元信息行被截断
-
-    /// 期望：App 字号 +8 时，首页元信息行（作者 · 浏览 · 回复 · 时间）要么一行放得下，要么允许换行且行高够用，不截断时间。
-    func test_U14_listMetadataNotTruncatedAtLargestAppTextSize() throws {
-        let previousOffset = AppTextSizeSettings.shared.pointOffset
-        AppTextSizeSettings.shared.setPointOffset(AppTextSizeSettings.maximumPointOffset)
-        defer { AppTextSizeSettings.shared.setPointOffset(previousOffset) }
-
-        let post = PostSummary(
-            id: "703692",
-            title: "【问】115非VIP账号海外上传速度如何",
-            url: URL(string: "https://www.nodeseek.com/post-703692-1")!,
-            authorName: "harunoyuki",
-            nodeName: "日常",
-            replyCount: 961,
-            viewCount: 47545,
-            lastActivityText: "1h 58min ago"
-        )
-        let item = PostListItem(post: post, isVisited: false)
-        let context = PostSummaryLayout.Context(
-            width: 402,
-            pointOffset: AppTextSizeSettings.maximumPointOffset,
-            userInterfaceStyle: .light,
-            displayScale: 3,
-            specialFollowRules: []
-        )
-        let layout = PostSummaryLayout.make(item: item, context: context)
-
-        let singleLineWidth = layout.metadata.boundingRect(
-            with: CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            context: nil
-        ).width
-        let wrappedHeight = layout.metadata.boundingRect(
-            with: CGSize(width: layout.metadataFrame.width, height: CGFloat.greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            context: nil
-        ).height
-        let fitsOneLine = singleLineWidth <= layout.metadataFrame.width
-        let wrapsWithoutClipping = PostListCellStyle.Typography.metadataMaximumNumberOfLines != 1
-            && layout.metadataFrame.height + 0.5 >= wrappedHeight
-
-        XCTAssertTrue(
-            fitsOneLine || wrapsWithoutClipping,
-            "U14: 字号 +8 时元信息需要 \(Int(singleLineWidth))pt，只给了 \(Int(layout.metadataFrame.width))pt 且限制 \(PostListCellStyle.Typography.metadataMaximumNumberOfLines) 行，时间会被截断"
-        )
-    }
-
     // MARK: - U23 「我的评论」点行只打开帖子顶部
 
     /// 期望：点评论行打开该评论所在页并定位到对应楼层。
