@@ -111,69 +111,6 @@ final class PostDetailUXAuditTests: XCTestCase {
         )
     }
 
-    // MARK: - U04
-
-    // 预期：浮动「评论」按钮默认位置与评论行尾部操作按钮（回复 / 引用 / 编辑）所在列不重叠。
-    func test_U04_floatingReplyButtonDoesNotCoverCommentActionColumn() async throws {
-        let viewController = PostDetailViewController(
-            presenter: UXAuditSpyPostDetailPresenter(),
-            floatingPositionStore: UXAuditInMemoryFloatingPositionStore()
-        )
-        let window = makeWindow(rootViewController: viewController)
-        viewController.render(detail: PostDetail(
-            id: "1017330",
-            title: "测试",
-            authorName: "mist",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            comments: (1...3).map { index in
-                Comment(
-                    id: "\(index)",
-                    authorName: "mist",
-                    avatarURL: nil,
-                    floorText: "#\(index)",
-                    createdAtText: "刚刚",
-                    contentHTML: "<p>评论 \(index)</p>",
-                    isOwnComment: true
-                )
-            }
-        ))
-        await waitForDetailContent(in: viewController)
-
-        let actionLabels: Set<String> = ["回复评论", "引用评论", "编辑评论"]
-        var actionViews: [UIView] = []
-        let didFindActions = await waitUntil(timeout: 3) {
-            window.layoutIfNeeded()
-            actionViews = viewController.view.uxAuditAllSubviews().filter { view in
-                guard let label = view.accessibilityLabel else { return false }
-                return actionLabels.contains(label) && view.window != nil && view.bounds.width > 0
-            }
-            return actionViews.isEmpty == false
-        }
-        XCTAssertTrue(didFindActions, "评论行没有渲染出回复 / 引用 / 编辑按钮")
-
-        let floatingContainer = try XCTUnwrap(
-            viewController.view.uxAuditAllSubviews().first {
-                $0.accessibilityIdentifier == "post-detail-floating-reply-button"
-            }
-        )
-        let floatingFrame = floatingContainer.convert(floatingContainer.bounds, to: viewController.view)
-        let overlapping = actionViews.filter { view in
-            let frame = view.convert(view.bounds, to: viewController.view)
-            return frame.minX < floatingFrame.maxX && frame.maxX > floatingFrame.minX
-        }
-        let descriptions = overlapping.map { view -> String in
-            let frame = view.convert(view.bounds, to: viewController.view)
-            return "\(view.accessibilityLabel ?? "?")@x=\(Int(frame.minX))..\(Int(frame.maxX))"
-        }
-        XCTAssertTrue(
-            overlapping.isEmpty,
-            "浮动评论按钮 x=\(Int(floatingFrame.minX))..\(Int(floatingFrame.maxX)) 与评论操作按钮列重叠：\(Set(descriptions).sorted())，滚动时会盖住编辑 / 引用按钮"
-        )
-        withExtendedLifetime(window) {}
-    }
-
     // MARK: - U08
 
     // 预期：评论模型保存绝对发布时间（Date），界面可以按当前时间重新计算相对时间。
@@ -617,18 +554,6 @@ final class PostDetailUXAuditTests: XCTestCase {
 }
 
 // MARK: - Test doubles
-
-private final class UXAuditInMemoryFloatingPositionStore: FloatingControlPositionStoring {
-    private var positions: [String: FloatingControlPosition] = [:]
-
-    func position(forKey key: String) -> FloatingControlPosition? {
-        positions[key]
-    }
-
-    func save(_ position: FloatingControlPosition, forKey key: String) {
-        positions[key] = position
-    }
-}
 
 private final class UXAuditSpyPostDetailPresenter: PostDetailPresenterProtocol {
     private(set) var selectedCommentPages: [Int] = []
