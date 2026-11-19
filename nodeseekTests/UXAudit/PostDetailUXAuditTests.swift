@@ -189,6 +189,7 @@ final class PostDetailUXAuditTests: XCTestCase {
             view.successToastMessages.contains("更多评论加载失败"),
             "加载更多失败走了 showToast（带绿色成功勾）：successToasts=\(view.successToastMessages)"
         )
+        XCTAssertEqual(view.failureToastMessages, ["更多评论加载失败"])
     }
 
     // MARK: - U19
@@ -602,6 +603,7 @@ private final class UXAuditSpyPostDetailView: PostDetailViewProtocol {
     /// 通过 showToast 显示的提示，带绿色成功勾。
     private(set) var successToastMessages: [String] = []
     private(set) var progressToastMessages: [String] = []
+    private(set) var failureToastMessages: [String] = []
     private(set) var errorMessages: [String] = []
 
     func showLoading() {}
@@ -611,6 +613,7 @@ private final class UXAuditSpyPostDetailView: PostDetailViewProtocol {
     func showError(message: String) { errorMessages.append(message) }
     func showToast(message: String) { successToastMessages.append(message) }
     func showProgressToast(message: String) { progressToastMessages.append(message) }
+    func showFailureToast(message: String) { failureToastMessages.append(message) }
     func setReplySubmitting(_ isSubmitting: Bool) {}
     func setFavoriteSubmitting(_ isSubmitting: Bool) {}
     func finishReplySubmission() {}
