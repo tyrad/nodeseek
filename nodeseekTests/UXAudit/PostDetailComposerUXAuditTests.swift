@@ -18,29 +18,6 @@ final class PostDetailComposerUXAuditTests: XCTestCase {
         try await super.tearDown()
     }
 
-    // MARK: - U05
-
-    // 期望：输入法仍有组合文字（markedText）时，点编辑器外的遮罩不关闭编辑器、不打断选字。
-    func test_U05_backdropTapKeepsComposerWhileMarkedTextExists() async throws {
-        let viewController = try await makeHostedDetailViewController()
-        viewController.presentCommentEditor()
-        let textView = viewController.replyTextView
-        let becameFirstResponder = await waitUntil { textView.isFirstResponder }
-        XCTAssertTrue(becameFirstResponder, "前置条件：回复输入框应成为第一响应者")
-
-        textView.setMarkedText("ce shi", selectedRange: NSRange(location: 6, length: 0))
-        XCTAssertNotNil(textView.markedTextRange, "前置条件：应存在组合文字")
-
-        // 模拟一次点击遮罩：背景收起手势 + 遮罩 UIControl 的 touchUpInside 都会触发。
-        viewController.dismissKeyboardFromBackgroundTap(UITapGestureRecognizer())
-        viewController.replyEditorBackdrop.sendActions(for: .touchUpInside)
-
-        XCTAssertFalse(
-            viewController.replyEditorContainer.isHidden || textView.markedTextRange == nil || textView.isFirstResponder == false,
-            "U05: 组合文字未上屏时点遮罩仍关闭了回复编辑器/打断输入法（editorHidden=\(viewController.replyEditorContainer.isHidden), markedText=\(textView.markedTextRange != nil), firstResponder=\(textView.isFirstResponder)）"
-        )
-    }
-
     // MARK: - U10
 
     // 期望：表情面板展开时，面板（或其容器）贴到视图底边，不在下方露出后面的内容。

@@ -15,7 +15,7 @@
 | U02 | P0 | 未授权 NodeImage 时授权页堆满十几个「加载API密钥失败」提示 | `AppUXAuditTests.test_U02_nodeImageExtractionDoesNotClickAPIButtonInsidePollingTimer`<br>`AppUXAuditTests.test_U02_nodeImageClicksAPIButtonOnceAfterSignInAndReturnsKey`（已修复，模拟器真实授权通过） |
 | U03 | P0 | 「每日签到」网页已加载完，但一直白屏 + 转圈，要滑一下才显示 | `AppUXAuditTests.test_U03_webPageStopsSpinnerOnceNavigationCommits` |
 | U04 | P0 | 详情页浮动「评论」按钮盖住评论行的操作按钮（编辑 / 引用） | 不修：浮动评论按钮支持拖拽，用户可自行移开；已删除对应测试 |
-| U05 | P0 | 拼音组字中点评论框外部，评论框收起、组字被打断 | `PostDetailComposerUXAuditTests.test_U05_backdropTapKeepsComposerWhileMarkedTextExists` |
+| U05 | P0 | 拼音组字中点评论框外部，评论框收起、组字被打断 | 不修：点外部收起以用户意图为准，组合文字由系统上屏；已删除对应测试 |
 | U06 | P0 | 私信列表的系统通知预览显示 Markdown 原文 | `AppUXAuditTests.test_U06_messagePreviewRendersMarkdownLinksAsPlainText` |
 | U07 | P1 | 首页相对时间（「2s ago」）不会随时间刷新 | `AppUXAuditTests.test_U07_postSummaryKeepsAbsoluteLastActivityDate` |
 | U08 | P1 | 详情页评论相对时间不会刷新 | `PostDetailUXAuditTests.test_U08_commentCarriesAbsoluteCreatedDate` |
