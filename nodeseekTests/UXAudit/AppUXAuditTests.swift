@@ -233,7 +233,11 @@ final class AppUXAuditTests: XCTestCase {
         }
         XCTAssertTrue(loaded, "前置条件：评论列表应加载出 1 组")
 
-        controller.tableNode(probeTable, didSelectRowAt: IndexPath(row: 0, section: 0))
+        // 点回复文字所在的整行（不是右侧气泡）
+        let cell = controller.tableNode(probeTable, nodeBlockForRowAt: IndexPath(row: 0, section: 0))()
+        let replies = try XCTUnwrap(uxChild(of: cell, named: "replies") as [ASControlNode]?)
+        XCTAssertEqual(replies.count, 1)
+        replies[0].sendActions(forControlEvents: .touchUpInside, with: nil)
 
         XCTAssertEqual(opened.count, 1)
         XCTAssertEqual(opened.first?.page, 2, "U23: 点评论行打开的是第 \(opened.first?.page ?? 0) 页，不是 #15 所在的第 2 页")

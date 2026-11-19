@@ -166,7 +166,8 @@ final class UserCommentGroupCellNode: ASCellNode {
     }
 }
 
-private final class UserCommentReplyNode: ASDisplayNode {
+/// 整行可点：点回复文字和点右侧气泡一样跳到对应楼层，点标题仍打开帖子开头。
+private final class UserCommentReplyNode: ASControlNode {
     private let textNode = ASTextNode()
     private let commentJumpButton = ASButtonNode()
     private let onOpenComment: () -> Void
@@ -183,11 +184,21 @@ private final class UserCommentReplyNode: ASDisplayNode {
         textNode.maximumNumberOfLines = 2
         textNode.attributedText = Self.commentText(record.text, traits: traits)
         configureCommentJumpButton(floorID: record.floorID, traits: traits)
+        addTarget(self, action: #selector(openCommentTapped), forControlEvents: .touchUpInside)
+        // 整行合并成一个按钮元素，旁白读出楼层和回复内容
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+        accessibilityLabel = "打开评论 #\(record.floorID)"
+        accessibilityValue = textNode.attributedText?.string
     }
 
     override func didLoad() {
         super.didLoad()
         commentJumpButton.addTarget(self, action: #selector(openCommentTapped), forControlEvents: .touchUpInside)
+    }
+
+    override var isHighlighted: Bool {
+        didSet { textNode.alpha = isHighlighted ? 0.5 : 1 }
     }
 
     override func layoutSpecThatFits(_ constrainedSize: ASSizeRange) -> ASLayoutSpec {

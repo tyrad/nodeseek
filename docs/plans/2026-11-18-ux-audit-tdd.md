@@ -33,7 +33,7 @@
 | U20 | P1 | 评论框内容为空时「发送」仍可点，点了弹错误框 | `PostDetailComposerUXAuditTests.test_U20_sendButtonDisabledWhenContentIsEmpty` |
 | U21 | P1 | 引用多行评论时换行被压成一行 | `PostDetailComposerUXAuditTests.test_U21_quotePreservesLineBreaks` |
 | U22 | P1 | 引用纯表情 / 图片评论时引用块没有内容 | `PostDetailComposerUXAuditTests.test_U22_quoteOfImageOnlyCommentHasPlaceholder` |
-| U23 | P1 | 「我的评论」点评论文字只打开帖子顶部，不跳到对应楼层 | `AppUXAuditTests.test_U23_userCommentRowTapOpensCommentFloor` |
+| U23 | P1 | 「我的评论」点评论文字只打开帖子顶部，不跳到对应楼层 | `AppUXAuditTests.test_U23_userCommentRowTapOpensCommentFloor`（已修复：点回复文字整行跳到对应楼层，点标题仍打开帖子开头） |
 | U24 | P1 | 楼层跳转后没有高亮，看不出跳到了哪一层 | 不写：代码已在跳转后 0.35s 闪烁高亮，测试中可观察到；属于高亮颜色、时长、停靠位置的设计问题 |
 | U25 | P1 | 「在浏览器打开」在第 2 页时打开的是第 1 页 | 不修：「在浏览器打开」沿用进入时的页码，属预期行为；已删除对应测试 |
 | U26 | P1 | 暗黑模式看大图时图片仍被「图片变暗」压暗 | `PostDetailUXAuditTests.test_U26_photoPreviewIsNotDimmedInDarkMode`（不修：大图沿用图片变暗设置，属预期行为） |
