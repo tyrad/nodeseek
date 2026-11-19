@@ -23,7 +23,7 @@
 | U10 | P1 | 表情面板展开时，面板下方露出后面的内容 | `PostDetailComposerUXAuditTests.test_U10_stickerPanelExtendsToViewBottomEdge` |
 | U11 | P1 | 发帖按钮被滑动隐藏后，切换分类它仍保持隐藏 | `AppUXAuditTests.test_U11_composeButtonReappearsAfterSwitchingCategory`（已修复：切换分类后发帖按钮重新出现） |
 | U12 | P1 | 「我的」页发帖上限 0/4 与个人主页 0/20 不一致 | `AppUXAuditTests.test_U12_mePageAndProfileShowSamePostLimit` |
-| U13 | P1 | 特别关注说明写「右滑删除」，实际是左滑 | `AppUXAuditTests.test_U13_specialFollowFooterSaysSwipeLeftToDelete` |
+| U13 | P1 | 特别关注说明写「右滑删除」，实际是左滑 | `AppUXAuditTests.test_U13_specialFollowFooterSaysSwipeToDelete`（已修复：文案改为滑动删除） |
 | U14 | P1 | App 内字号 +8 时首页元信息行的时间被截断 | `AppUXAuditTests.test_U14_listMetadataNotTruncatedAtLargestAppTextSize` |
 | U15 | P1 | 回复成功后停在原位，看不到自己刚发的评论 | `PostDetailComposerUXAuditTests.test_U15_successfulReplyRevealsNewComment` |
 | U16 | P1 | 表情面板打开时点输入框，面板不收起，与键盘同时出现 | `PostDetailComposerUXAuditTests.test_U16_stickerPanelHidesWhenTextViewBecomesFirstResponder` |

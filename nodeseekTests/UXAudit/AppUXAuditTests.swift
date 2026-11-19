@@ -200,8 +200,8 @@ final class AppUXAuditTests: XCTestCase {
 
     // MARK: - U13 特别关注删除方向文案写反
 
-    /// 期望：说明文字写「左滑删除」，与实际的尾部删除操作一致。
-    func test_U13_specialFollowFooterSaysSwipeLeftToDelete() {
+    /// 期望：说明文字写「滑动删除」，不写具体方向，避免与手指方向理解冲突。
+    func test_U13_specialFollowFooterSaysSwipeToDelete() {
         let defaults = UserDefaults(suiteName: "ux-audit-special-follow-\(UUID().uuidString)")!
         let viewController = SpecialFollowKeywordsViewController(store: SpecialFollowKeywordStore(userDefaults: defaults))
         viewController.loadViewIfNeeded()
@@ -209,8 +209,8 @@ final class AppUXAuditTests: XCTestCase {
         let footer = viewController.tableView(viewController.tableView, titleForFooterInSection: 0) ?? ""
 
         XCTAssertTrue(
-            footer.contains("左滑") && !footer.contains("右滑"),
-            "U13: 特别关注说明写的是「\(footer)」，实际删除是左滑（尾部操作）"
+            footer.contains("滑动删除") && !footer.contains("左滑") && !footer.contains("右滑"),
+            "U13: 特别关注说明写的是「\(footer)」，应写「滑动删除」"
         )
     }
 

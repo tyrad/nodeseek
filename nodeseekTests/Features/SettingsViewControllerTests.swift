@@ -635,7 +635,7 @@ struct SettingsViewControllerTests {
             viewController.tableView,
             titleForFooterInSection: 0
         )
-        #expect(footerText?.contains("右滑删除") == true)
+        #expect(footerText?.contains("滑动删除") == true)
 
         try viewController.saveKeywordForTesting(keyword: "nodeimage", colorHex: "#007AFF")
         #expect(store.keywords == [
