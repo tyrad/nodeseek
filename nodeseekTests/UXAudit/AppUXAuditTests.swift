@@ -59,6 +59,39 @@ final class AppUXAuditTests: XCTestCase {
         )
     }
 
+    /// 期望：未登录 NodeImage 时不点「API」；页面稍后变为已登录，只点一次「API」并拿到 API Key。
+    func test_U02_nodeImageClicksAPIButtonOnceAfterSignInAndReturnsKey() async throws {
+        var receivedKeys: [String] = []
+        let viewController = NodeImageAuthViewController(onAPIKey: { receivedKeys.append($0) })
+        viewController.loadViewIfNeeded()
+        let webView = try XCTUnwrap(uxChild(of: viewController, named: "webView") as WKWebView?)
+
+        // 模拟 NodeImage：未登录时用户区隐藏，点「API」失败；1.5 秒后完成登录。
+        let html = """
+        <html><body>
+        <button id="startAuthBtn" onclick="return false;">start</button>
+        <div id="userControls" style="display: none;">user</div>
+        <button id="apiBtn" onclick="
+          const signedIn = document.getElementById('userControls').style.display !== 'none';
+          if (signedIn) { window.__signedInClicks = (window.__signedInClicks || 0) + 1; document.getElementById('apiKeyInput').value = 'ux-audit-api-key'; }
+          else { window.__signedOutClicks = (window.__signedOutClicks || 0) + 1; }
+        ">api</button>
+        <input id="apiKeyInput" value="">
+        <script>setTimeout(() => { document.getElementById('userControls').style.display = 'flex'; }, 1500);</script>
+        </body></html>
+        """
+        webView.loadHTMLString(html, baseURL: URL(string: "https://www.nodeimage.com/")!)
+
+        let received = await uxWaitUntil(timeout: 10) { receivedKeys.isEmpty == false }
+        XCTAssertTrue(received, "U02: 登录后没有拿到 API Key")
+        XCTAssertEqual(receivedKeys, ["ux-audit-api-key"])
+
+        let signedOutClicks = (try? await webView.evaluateJavaScript("window.__signedOutClicks || 0")) as? Int ?? -1
+        let signedInClicks = (try? await webView.evaluateJavaScript("window.__signedInClicks || 0")) as? Int ?? -1
+        XCTAssertEqual(signedOutClicks, 0, "U02: 未登录时点了「API」，会弹「加载API密钥失败」")
+        XCTAssertEqual(signedInClicks, 1, "U02: 登录后应只点一次「API」")
+    }
+
     // MARK: - U03 每日签到网页一直转圈
 
     /// 期望：主框架内容已提交（didCommit）后停止转圈，不等所有子资源 didFinish。
