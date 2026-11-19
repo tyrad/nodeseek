@@ -294,6 +294,20 @@ final class AppUXAuditTests: XCTestCase {
         XCTAssertEqual(context.navigationController.viewControllers.count, 2)
     }
 
+    func testMeProfileHeaderOpensIntroductionSettings() async throws {
+        let context = try await makeLoggedInMePage()
+        defer { context.window.isHidden = true }
+        let views = uxDescendants(of: context.viewController.view)
+        let card = try XCTUnwrap(views.first { $0.accessibilityIdentifier == "me-profile-card" })
+        let header = try XCTUnwrap(views.first { $0.accessibilityIdentifier == "me-profile-header" } as? UIControl)
+        let point = header.convert(CGPoint(x: header.bounds.midX, y: header.bounds.midY), to: card)
+        XCTAssertTrue(card.hitTest(point, with: nil) === header)
+        header.sendActions(for: .touchUpInside)
+
+        let web = try XCTUnwrap(context.navigationController.topViewController as? NodeSeekWebViewController)
+        XCTAssertEqual(web.testInitialURL.absoluteString, "https://www.nodeseek.com/setting#introduction")
+    }
+
     func testMeLevelProgressRowExpandsAndCollapsesInPlace() async throws {
         let context = try await makeLoggedInMePage()
         defer { context.window.isHidden = true }

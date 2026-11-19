@@ -292,9 +292,7 @@ final class MeViewController: UIViewController {
             showLogin()
             return
         }
-        if let profileURL = account.profileURL {
-            router.navigateToUserProfile(profileURL: profileURL)
-        }
+        navigationController?.pushViewController(NodeSeekWebViewController(url: NodeSeekSite.profileSettingsURL), animated: true)
     }
 
     private func toggleTodayProgress() {
@@ -445,7 +443,7 @@ private enum MeStatDestination {
     case credit, stardust, followers, following
 }
 
-/// 头像和昵称通往个人主页，可操作的统计项直达明细。
+/// 头像和昵称通往个人信息设置，可操作的统计项直达明细。
 private final class MeProfileCardView: UIControl {
     var onTap: (() -> Void)?
     var onProgressRetry: (() -> Void)?
@@ -494,6 +492,7 @@ private final class MeProfileCardView: UIControl {
         accessibilityIdentifier = "me-profile-card"
         isAccessibilityElement = true
         addTarget(self, action: #selector(cardTapped), for: .touchUpInside)
+        headerView.accessibilityIdentifier = "me-profile-header"
         headerView.addTarget(self, action: #selector(cardTapped), for: .touchUpInside)
         setupHeader()
         setupStats()
@@ -754,7 +753,7 @@ private final class MeProfileCardView: UIControl {
         accessibilityLabel = nil
         accessibilityHint = nil
         headerView.accessibilityLabel = [nameLabel.text, metaLabel.text].compactMap { $0 }.joined(separator: "，")
-        headerView.accessibilityHint = "点按查看个人主页"
+        headerView.accessibilityHint = NSLocalizedString("编辑个人资料", tableName: "Me", comment: "")
     }
 
     @objc private func cardTapped() {
