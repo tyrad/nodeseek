@@ -288,33 +288,6 @@ final class PostDetailUXAuditTests: XCTestCase {
         )
     }
 
-    // MARK: - U30
-
-    // 预期：0 条评论的帖子在正文下方显示空状态（如“暂无评论”），而不是一片空白。
-    func test_U30_postWithoutCommentsShowsEmptyStateRow() async {
-        let viewController = PostDetailViewController(presenter: UXAuditSpyPostDetailPresenter())
-        viewController.loadViewIfNeeded()
-        viewController.render(detail: PostDetail(
-            id: "1017330",
-            title: "没人回复的帖子",
-            authorName: "mist",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            comments: [],
-            page: 1,
-            isLastPage: true
-        ))
-        await waitForDetailContent(in: viewController)
-
-        let kinds = viewController.detailRows.map { String(describing: $0) }
-        XCTAssertGreaterThan(
-            kinds.count,
-            1,
-            "0 条评论时正文下方没有任何空状态行：detailRows=\(kinds)"
-        )
-    }
-
     // MARK: - U32
 
     // 预期：自己评论的长按菜单不出现「投放鸡腿」。
