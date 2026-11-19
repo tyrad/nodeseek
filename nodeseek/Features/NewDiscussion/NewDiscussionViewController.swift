@@ -114,7 +114,8 @@ final class NewDiscussionViewController: UIViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         if titleTextView.text.isEmpty && bodyTextView.text.isEmpty {
-            titleTextView.becomeFirstResponder()
+            // 没有标题的模式（编辑资料字段）直接从正文开始写。
+            (titleTextView.isHidden ? bodyTextView : titleTextView).becomeFirstResponder()
         }
     }
 
@@ -259,7 +260,7 @@ final class NewDiscussionViewController: UIViewController {
         bodyTextView.accessibilityIdentifier = "new-discussion-body"
         bodyTextView.accessibilityLabel = "正文"
 
-        bodyPlaceholder.text = "鼓励友善发言，禁止人身攻击"
+        bodyPlaceholder.text = Self.defaultBodyPlaceholder
         bodyPlaceholder.font = bodyTextView.font
         bodyPlaceholder.adjustsFontForContentSizeCategory = true
         bodyPlaceholder.textColor = MarkdownEditorStyler.secondaryTextColor
@@ -660,7 +661,7 @@ final class NewDiscussionViewController: UIViewController {
         let state = presenter.state
         let draft = NewDiscussionDraft(
             // 评论没有标题，预览标题栏标出是哪一楼。
-            title: state.editingCommentFloor.map { "#\($0) 评论" } ?? titleTextView.text,
+            title: state.fieldTitle ?? state.editingCommentFloor.map { "#\($0) 评论" } ?? titleTextView.text,
             content: bodyTextView.text,
             category: state.category,
             rank: state.rank
@@ -732,6 +733,16 @@ final class NewDiscussionViewController: UIViewController {
             })
             sheet.addAction(closeAction(in: sheet, title: "留着下次继续", style: .default) { [weak self] _ in
                 self?.presenter.close(savingDraft: true)
+            })
+            sheet.addAction(closeAction(in: sheet, title: "放弃修改", style: .destructive) { [weak self] _ in
+                self?.presenter.close(savingDraft: false)
+            })
+            sheet.addAction(closeAction(in: sheet, title: "继续编辑", style: .cancel))
+            presentActionSheet(sheet)
+        case .askSaveOrDiscardEdit:
+            let sheet = UIAlertController(title: nil, message: "修改还没有保存", preferredStyle: .actionSheet)
+            sheet.addAction(closeAction(in: sheet, title: "保存修改", style: .default) { [weak self] _ in
+                self?.presenter.didTapPublish()
             })
             sheet.addAction(closeAction(in: sheet, title: "放弃修改", style: .destructive) { [weak self] _ in
                 self?.presenter.close(savingDraft: false)
@@ -897,10 +908,21 @@ extension NewDiscussionViewController: NewDiscussionViewProtocol {
             settingsConfiguration?.image = nil
             settingsConfiguration?.background.backgroundColor = .clear
         }
+        if let fieldTitle = state.fieldTitle {
+            var title = AttributedString(fieldTitle)
+            title.font = UIFont.preferredFont(forTextStyle: .subheadline).withWeight(.semibold)
+            settingsConfiguration?.attributedTitle = title
+            settingsConfiguration?.image = nil
+            settingsConfiguration?.background.backgroundColor = .clear
+        }
         settingsButton.configuration = settingsConfiguration
         settingsButton.isEnabled = !state.isSubmitting
-        settingsButton.isUserInteractionEnabled = state.editingCommentFloor == nil
-        titleTextView.isHidden = state.editingCommentFloor != nil
+        let hasNoTitle = state.editingCommentFloor != nil || state.fieldTitle != nil
+        settingsButton.isUserInteractionEnabled = !hasNoTitle
+        titleTextView.isHidden = hasNoTitle
+        bodyPlaceholder.text = state.bodyPlaceholder ?? Self.defaultBodyPlaceholder
+        toolbar.setHiddenItems(state.hiddenToolbarItems)
+        formatPanel.setAllowsQuote(state.allowsQuote)
 
         var publishConfiguration = publishButton.configuration
         publishConfiguration?.showsActivityIndicator = state.isSubmitting
@@ -1009,6 +1031,8 @@ extension NewDiscussionViewController: NewDiscussionViewProtocol {
         }
         present(alert, animated: true)
     }
+
+    private static let defaultBodyPlaceholder = "鼓励友善发言，禁止人身攻击"
 
     private static let relativeFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()

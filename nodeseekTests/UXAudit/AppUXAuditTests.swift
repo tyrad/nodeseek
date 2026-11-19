@@ -294,7 +294,7 @@ final class AppUXAuditTests: XCTestCase {
         XCTAssertEqual(context.navigationController.viewControllers.count, 2)
     }
 
-    func testMeProfileHeaderOpensIntroductionSettings() async throws {
+    func testMeProfileHeaderOpensNativeProfileEditor() async throws {
         let context = try await makeLoggedInMePage()
         defer { context.window.isHidden = true }
         let views = uxDescendants(of: context.viewController.view)
@@ -304,8 +304,7 @@ final class AppUXAuditTests: XCTestCase {
         XCTAssertTrue(card.hitTest(point, with: nil) === header)
         header.sendActions(for: .touchUpInside)
 
-        let web = try XCTUnwrap(context.navigationController.topViewController as? NodeSeekWebViewController)
-        XCTAssertEqual(web.testInitialURL.absoluteString, "https://www.nodeseek.com/setting#introduction")
+        XCTAssertTrue(context.navigationController.topViewController is ProfileEditViewController)
     }
 
     func testMeLevelProgressRowExpandsAndCollapsesInPlace() async throws {

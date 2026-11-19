@@ -17,15 +17,18 @@ nonisolated protocol UserFollowSubmitting {
 @MainActor
 struct WebViewUserFollowSubmitter: UserFollowSubmitting {
     private let timeoutInterval: TimeInterval
+    /// 同一个页面内 POST 也用于保存个人信息，日志里按动作区分。
+    private let actionName: String
 
-    init(timeoutInterval: TimeInterval = 20) {
+    init(timeoutInterval: TimeInterval = 20, actionName: String = "关注变更") {
         self.timeoutInterval = timeoutInterval
+        self.actionName = actionName
     }
 
     func submit(apiPath: String, bodyJSON: String, referer: URL) async throws {
         let startedAt = Date()
         let object = try await withHiddenWebViewPageActionLoader(
-            logMessage: "准备通过隐藏 WebView 提交关注变更: path=\(apiPath), referer=\(referer.absoluteString)"
+            logMessage: "准备通过隐藏 WebView 提交\(actionName): path=\(apiPath), referer=\(referer.absoluteString)"
         ) { loader in
             // 通知标记已读的脚本就是通用的「页面内 POST JSON」，这里直接复用
             try await loader.runPageAutomationScript(
@@ -33,7 +36,7 @@ struct WebViewUserFollowSubmitter: UserFollowSubmitting {
                 source: NotificationMarkViewedAutomationScript.source,
                 arguments: ["apiPath": apiPath, "bodyJSON": bodyJSON],
                 timeoutInterval: timeoutInterval,
-                actionName: "关注变更"
+                actionName: actionName
             )
         }
         let ok = object["ok"] as? Bool ?? false
@@ -41,7 +44,7 @@ struct WebViewUserFollowSubmitter: UserFollowSubmitting {
         let status = (object["statusCode"] as? NSNumber)?.intValue
         AppLog.info(
             .webView,
-            "关注变更 WebView 请求结束: path=\(apiPath), ok=\(ok), status=\(status.map(String.init) ?? "nil"), message=\(message ?? "nil"), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))"
+            "\(actionName) WebView 请求结束: path=\(apiPath), ok=\(ok), status=\(status.map(String.init) ?? "nil"), message=\(message ?? "nil"), elapsedMs=\(AppLog.elapsedMilliseconds(since: startedAt))"
         )
         guard ok else {
             // 带上状态码，方便区分是打开页面被拦截还是接口拒绝

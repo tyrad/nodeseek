@@ -23,6 +23,10 @@ final class NewDiscussionFormatPanelView: UIInputView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    func setAllowsQuote(_ allowsQuote: Bool) {
+        blockButtons[.quote]?.isHidden = !allowsQuote
+    }
+
     func setCurrentBlockStyle(_ style: MarkdownBlockStyle) {
         for (candidate, button) in blockButtons {
             button.isSelected = candidate == style

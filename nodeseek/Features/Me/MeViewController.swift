@@ -292,7 +292,11 @@ final class MeViewController: UIViewController {
             showLogin()
             return
         }
-        navigationController?.pushViewController(NodeSeekWebViewController(url: NodeSeekSite.profileSettingsURL), animated: true)
+        guard let uid = account.nodeSeekUID else {
+            navigationController?.pushViewController(NodeSeekWebViewController(url: NodeSeekSite.profileSettingsURL), animated: true)
+            return
+        }
+        navigationController?.pushViewController(ProfileEditViewController(uid: uid, account: account), animated: true)
     }
 
     private func toggleTodayProgress() {
