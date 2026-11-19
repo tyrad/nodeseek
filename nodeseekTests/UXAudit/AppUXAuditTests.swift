@@ -342,7 +342,7 @@ final class AppUXAuditTests: XCTestCase {
         XCTAssertEqual(context.navigationController.viewControllers.count, 2)
     }
 
-    func testMeLevelProgressRowPresentsTodayProgressCard() async throws {
+    func testMeLevelProgressRowExpandsAndCollapsesInPlace() async throws {
         let context = try await makeLoggedInMePage()
         defer { context.window.isHidden = true }
         let me = context.viewController
@@ -351,18 +351,22 @@ final class AppUXAuditTests: XCTestCase {
         let card = try XCTUnwrap(views.first { $0.accessibilityIdentifier == "me-profile-card" })
         let point = row.convert(CGPoint(x: row.bounds.midX, y: row.bounds.maxY - 3), to: card)
         XCTAssertTrue(card.hitTest(point, with: nil) === row)
-        row.sendActions(for: .touchUpInside)
+        let details = try XCTUnwrap(views.first { $0.accessibilityIdentifier == "me-progress-details" })
+        let collapsedHeight = card.bounds.height
+        XCTAssertTrue(details.isHidden)
 
-        let detail = try XCTUnwrap(me.presentedViewController as? MeTodayProgressViewController)
-        XCTAssertEqual(detail.modalPresentationStyle, .overFullScreen)
-        detail.view.layoutIfNeeded()
-        let panel = try XCTUnwrap(uxDescendants(of: detail.view).first { $0.accessibilityIdentifier == "me-progress-dialog" })
-        XCTAssertEqual(panel.center.x, detail.view.bounds.midX, accuracy: 1)
-        XCTAssertEqual(panel.center.y, detail.view.bounds.midY, accuracy: 1)
-        let progress = try XCTUnwrap(uxDescendants(of: detail.view).compactMap { $0 as? UserProfileProgressCardView }.first)
-        XCTAssertFalse(progress.isHidden)
-        XCTAssertTrue(uxDescendants(of: progress).contains { ($0 as? UILabel)?.text == "7 / 20" })
+        row.sendActions(for: .touchUpInside)
+        context.window.layoutIfNeeded()
+        XCTAssertFalse(details.isHidden)
+        XCTAssertGreaterThan(card.bounds.height, collapsedHeight)
+        XCTAssertTrue(uxDescendants(of: details).contains { ($0 as? UILabel)?.text == "7 / 20" })
+        XCTAssertNil(me.presentedViewController)
         XCTAssertTrue(context.navigationController.topViewController === me)
+
+        row.sendActions(for: .touchUpInside)
+        context.window.layoutIfNeeded()
+        XCTAssertTrue(details.isHidden)
+        XCTAssertEqual(card.bounds.height, collapsedHeight, accuracy: 1)
     }
 
     // MARK: - U34 「添加探针」填写后关闭不确认
