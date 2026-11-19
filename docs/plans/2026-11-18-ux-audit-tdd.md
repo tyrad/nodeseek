@@ -21,7 +21,7 @@
 | U08 | P1 | 详情页评论相对时间不会刷新 | `PostDetailUXAuditTests.test_U08_commentCarriesAbsoluteCreatedDate` |
 | U09 | P1 | 浅色模式看大图时状态栏是深色字，黑底上看不见 | `PostDetailUXAuditTests.test_U09_photoBrowserUsesLightStatusBarInLightMode` |
 | U10 | P1 | 表情面板展开时，面板下方露出后面的内容 | `PostDetailComposerUXAuditTests.test_U10_stickerPanelExtendsToViewBottomEdge` |
-| U11 | P1 | 发帖按钮被滑动隐藏后，切换分类它仍保持隐藏 | `AppUXAuditTests.test_U11_composeButtonReappearsAfterSwitchingCategory`（不修：保持滑动隐藏，改为调整排序按钮透明度） |
+| U11 | P1 | 发帖按钮被滑动隐藏后，切换分类它仍保持隐藏 | `AppUXAuditTests.test_U11_composeButtonReappearsAfterSwitchingCategory`（已修复：切换分类后发帖按钮重新出现） |
 | U12 | P1 | 「我的」页发帖上限 0/4 与个人主页 0/20 不一致 | `AppUXAuditTests.test_U12_mePageAndProfileShowSamePostLimit` |
 | U13 | P1 | 特别关注说明写「右滑删除」，实际是左滑 | `AppUXAuditTests.test_U13_specialFollowFooterSaysSwipeLeftToDelete` |
 | U14 | P1 | App 内字号 +8 时首页元信息行的时间被截断 | `AppUXAuditTests.test_U14_listMetadataNotTruncatedAtLargestAppTextSize` |

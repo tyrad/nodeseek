@@ -469,6 +469,7 @@ class PostListViewController: UIViewController {
         applySelectedCategory(category, syncPage: true, pageAnimated: true)
         renderSortMode(pageContainerViewController.sortMode(for: category))
         presenter.didSelectCategory(category)
+        setComposeButtonHidden(false, animated: true)
     }
 
     func rebuildCategoryButtons() {
@@ -683,7 +684,7 @@ class PostListViewController: UIViewController {
         }
     }
 
-    private func setComposeButtonHidden(_ hidden: Bool, animated: Bool) {
+    func setComposeButtonHidden(_ hidden: Bool, animated: Bool) {
         guard isComposeButtonHidden != hidden else { return }
         isComposeButtonHidden = hidden
         composeButton.isUserInteractionEnabled = !hidden

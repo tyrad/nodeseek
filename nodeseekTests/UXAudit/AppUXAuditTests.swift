@@ -123,6 +123,53 @@ final class AppUXAuditTests: XCTestCase {
         )
     }
 
+    // MARK: - U11 切换分类后发帖按钮仍隐藏
+
+    /// 期望：滚动收起发帖按钮后切换分类，按钮重新出现。
+    func test_U11_composeButtonReappearsAfterSwitchingCategory() throws {
+        let viewController = PostListViewController(
+            presenter: UXAuditPostListPresenter(),
+            layout: .tabs,
+            floatingPositionStore: UXAuditFloatingPositionStore(),
+            searchEntrySettings: PostListSearchEntrySettings(
+                userDefaults: UserDefaults(suiteName: "ux-audit-search-entry-\(UUID().uuidString)")!,
+                storageKey: "shows-top-search-entry"
+            ),
+            autoCheckInRunner: { _, _ in }
+        )
+        let window = uxMakeWindow(root: viewController)
+        defer { window.isHidden = true }
+        viewController.renderCategories([.all, .daily, .tech], selected: .all)
+        viewController.view.layoutIfNeeded()
+
+        let composeButton = try XCTUnwrap(
+            uxDescendants(of: viewController.view).compactMap { $0 as? UIButton }
+                .first { $0.accessibilityIdentifier == "post-list-compose-button" }
+        )
+        let onListScroll = try XCTUnwrap(viewController.pageContainerViewController.onListScroll)
+
+        // 模拟手指上推：第一次记录锚点，第二次位移超过阈值后收起
+        let scrollView = UXAuditTrackingScrollView(frame: CGRect(x: 0, y: 0, width: 402, height: 700))
+        scrollView.contentSize = CGSize(width: 402, height: 5000)
+        scrollView.contentOffset = CGPoint(x: 0, y: 600)
+        scrollView.fakePan.fakeTranslation = CGPoint(x: 0, y: 0)
+        onListScroll(scrollView)
+        scrollView.fakePan.fakeTranslation = CGPoint(x: 0, y: -80)
+        onListScroll(scrollView)
+        XCTAssertEqual(composeButton.alpha, 0, accuracy: 0.01, "前置条件：上推后发帖按钮应已收起")
+
+        let other = try XCTUnwrap(
+            uxDescendants(of: viewController.view).compactMap { $0 as? CategoryTabButton }.first { $0.category == .daily }
+        )
+        other.sendActions(for: .touchUpInside)
+
+        XCTAssertEqual(
+            composeButton.alpha, 1, accuracy: 0.01,
+            "U11: 切换分类后发帖按钮仍保持隐藏（alpha=\(composeButton.alpha)），要在新分类里上滑才出现"
+        )
+        XCTAssertTrue(composeButton.isUserInteractionEnabled, "U11: 切换分类后发帖按钮仍不可点")
+    }
+
     // MARK: - U12 「我的」发帖上限与个人主页不一致
 
     /// 期望：「我的」页与个人主页「今日进度」对同一指标（发帖）显示相同的 当前/上限。
@@ -649,6 +696,64 @@ private final class UXAuditWebViewController: BaseWebViewController {
     }
 
     override func loadInitialPage() {}
+}
+
+private final class UXAuditFakePan: UIPanGestureRecognizer {
+    var fakeTranslation: CGPoint = .zero
+
+    override func translation(in view: UIView?) -> CGPoint {
+        fakeTranslation
+    }
+}
+
+/// 模拟手指正在拖动的列表。
+private final class UXAuditTrackingScrollView: UIScrollView {
+    let fakePan = UXAuditFakePan()
+
+    override var isTracking: Bool { true }
+    override var panGestureRecognizer: UIPanGestureRecognizer { fakePan }
+}
+
+private final class UXAuditFloatingPositionStore: FloatingControlPositionStoring {
+    private var positions: [String: FloatingControlPosition] = [:]
+
+    func position(forKey key: String) -> FloatingControlPosition? {
+        positions[key]
+    }
+
+    func save(_ position: FloatingControlPosition, forKey key: String) {
+        positions[key] = position
+    }
+}
+
+private final class UXAuditPostListPresenter: PostListPresenterProtocol {
+    func viewDidLoad() {}
+    func viewWillAppear() {}
+    func didEnterForeground() {}
+    func didReceiveNotificationReadStateChange() {}
+    func didReceiveNotificationUnreadCountUpdate(_ unreadCount: NodeSeekNotificationUnreadCount) {}
+    func didSelectCategory(_ category: PostListCategoryItem) {}
+    func didReselectCategory(_ category: PostListCategoryItem) {}
+    func didTapLogin() {}
+    func didTapAccountProfile(profileURL: URL) {}
+    func didTapNewDiscussion() {}
+    func didTapCheckIn() {}
+    func didTapNotification(url: URL) {}
+    func didTapRecentVisited() {}
+    func didTapUserDiscussions() {}
+    func didTapUserComments() {}
+    func didTapUserCollections() {}
+    func didTapSearch() {}
+    func didTapProbe() {}
+    func didTapMail() {}
+    func didTapSettings() {}
+    func didTapCategoryPreferences() {}
+    func didTapLogFile() {}
+    #if DEBUG
+    func didTapDetailTest() {}
+    func didSubmitDetailTestURL(_ rawURL: String) {}
+    #endif
+    func didSelectPost(_ post: PostSummary) {}
 }
 
 private final class UXAuditAccountRefresher: CurrentAccountRefreshing, @unchecked Sendable {
