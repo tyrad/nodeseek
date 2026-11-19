@@ -36,7 +36,7 @@
 | U23 | P1 | 「我的评论」点评论文字只打开帖子顶部，不跳到对应楼层 | `AppUXAuditTests.test_U23_userCommentRowTapOpensCommentFloor` |
 | U24 | P1 | 楼层跳转后没有高亮，看不出跳到了哪一层 | 不写：代码已在跳转后 0.35s 闪烁高亮，测试中可观察到；属于高亮颜色、时长、停靠位置的设计问题 |
 | U25 | P1 | 「在浏览器打开」在第 2 页时打开的是第 1 页 | `PostDetailUXAuditTests.test_U25_openInBrowserUsesCurrentlyViewedPage` |
-| U26 | P1 | 暗黑模式看大图时图片仍被「图片变暗」压暗 | `PostDetailUXAuditTests.test_U26_photoPreviewIsNotDimmedInDarkMode` |
+| U26 | P1 | 暗黑模式看大图时图片仍被「图片变暗」压暗 | `PostDetailUXAuditTests.test_U26_photoPreviewIsNotDimmedInDarkMode`（不修：大图沿用图片变暗设置，属预期行为） |
 | U27 | P1 | 系统 Dynamic Type 调大后首页 / 详情字号不变 | `AppUXAuditTests.test_U27_typographyScalesWithSystemDynamicType` |
 | U28 | P2 | 「回复楼主」输入框头部显示「回复 缭雾 #0」 | `PostDetailComposerUXAuditTests.test_U28_replyToPosterContextAvoidsFloorZero` |
 | U29 | P2 | 多页帖子的热评和正常楼层重复出现，没有分区标题 | `PostDetailUXAuditTests.test_U29_hotCommentsHaveSectionHeaderRow` |

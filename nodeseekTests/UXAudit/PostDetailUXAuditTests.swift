@@ -288,35 +288,6 @@ final class PostDetailUXAuditTests: XCTestCase {
         )
     }
 
-    // MARK: - U26
-
-    // 预期：深色模式下全屏大图不再叠加“图片变暗”遮罩，显示原始亮度。
-    func test_U26_photoPreviewIsNotDimmedInDarkMode() throws {
-        let settings = DetailImageDimmingSettings.shared
-        let wasEnabled = settings.isEnabled
-        settings.setEnabled(true)
-        defer { settings.setEnabled(wasEnabled) }
-
-        let url = try XCTUnwrap(URL(string: "https://example.invalid/ux-audit-u26.png"))
-        let presenter = DetailPhotoBrowserPresenter(imageURLs: [url])
-        let browser = DetailPhotoBrowserController()
-        let cell = JXZoomImageCell(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
-        cell.overrideUserInterfaceStyle = .dark
-
-        presenter.photoBrowser(browser, willDisplay: cell, at: 0)
-
-        let darkTrait = UITraitCollection(userInterfaceStyle: .dark)
-        let activeOverlays = cell.imageView.subviews.compactMap { $0 as? DetailImageDimmingView }.filter { overlay in
-            let alpha = overlay.backgroundColor?.resolvedColor(with: darkTrait).cgColor.alpha ?? 0
-            return overlay.isHidden == false && overlay.alpha > 0 && alpha > 0
-        }
-        let opacities = activeOverlays.map { $0.backgroundColor?.resolvedColor(with: darkTrait).cgColor.alpha ?? 0 }
-        XCTAssertTrue(
-            activeOverlays.isEmpty,
-            "深色模式大图预览仍装有生效的变暗遮罩，遮罩不透明度=\(opacities)"
-        )
-    }
-
     // MARK: - U29
 
     // 预期：有热门评论时，热评区和正常楼层之间有分区标题行（如「热门评论」），不会被看成楼层乱序。
