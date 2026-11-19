@@ -36,8 +36,6 @@ class PostListViewController: UIViewController {
         static let composeToggleScrollDelta: CGFloat = 6
         /// 同一次拖动中累计超过这个距离才切换，过滤手指抖动和松手时的回带。
         static let composeToggleDragDistance: CGFloat = 24
-        /// 最后一次滚动后等待这么久，视为停止并恢复排序按钮透明度。
-        static let sortToggleScrollRestoreDelay: TimeInterval = 0.4
     }
 
     // MARK: - Properties
@@ -53,7 +51,6 @@ class PostListViewController: UIViewController {
     var sortToggleWidthConstraint: NSLayoutConstraint?
     private var sortToggleTrailingConstraint: NSLayoutConstraint?
     private var sortToggleCollapseWorkItem: DispatchWorkItem?
-    private var sortToggleScrollRestoreWorkItem: DispatchWorkItem?
     private var searchEntryObserver: NSObjectProtocol?
     private var notificationReadStateObserver: NSObjectProtocol?
     private var notificationUnreadCountObserver: NSObjectProtocol?
@@ -417,13 +414,6 @@ class PostListViewController: UIViewController {
         observeAppForeground()
         sortToggleButton.apply(sortMode: currentSortMode, expanded: false)
         sortToggleButton.applyAlpha(expanded: false)
-        pageContainerViewController.onListScroll = { [weak self] scrollView in
-            guard let self else { return }
-            handleSortToggleScroll(scrollView)
-            if layout == .tabs {
-                handleListScroll(scrollView)
-            }
-        }
         applySearchEntryVisibility(animated: false)
     }
     
@@ -527,10 +517,6 @@ class PostListViewController: UIViewController {
     private func setSortToggleExpanded(_ expanded: Bool, animated: Bool) {
         sortToggleCollapseWorkItem?.cancel()
         sortToggleCollapseWorkItem = nil
-        if expanded {
-            sortToggleScrollRestoreWorkItem?.cancel()
-            sortToggleScrollRestoreWorkItem = nil
-        }
         isSortToggleExpanded = expanded
         sortToggleButton.apply(sortMode: currentSortMode, expanded: expanded)
         sortToggleWidthConstraint?.constant = expanded
@@ -662,20 +648,9 @@ class PostListViewController: UIViewController {
             ),
             composeButton.heightAnchor.constraint(equalToConstant: PostListComposeButton.height)
         ])
-    }
-
-    /// 用户滚动列表时排序按钮变淡，停下片刻后恢复。
-    /// 只认拖动和惯性，刷新、加载更多等程序改动 contentOffset 不触发。
-    private func handleSortToggleScroll(_ scrollView: UIScrollView) {
-        guard !isSortToggleExpanded,
-              scrollView.isTracking || scrollView.isDragging || scrollView.isDecelerating else { return }
-        sortToggleButton.setDimmedForScrolling(true, animated: true)
-        sortToggleScrollRestoreWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [weak self] in
-            self?.sortToggleButton.setDimmedForScrolling(false, animated: true)
+        pageContainerViewController.onListScroll = { [weak self] scrollView in
+            self?.handleListScroll(scrollView)
         }
-        sortToggleScrollRestoreWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + FloatingControlLayout.sortToggleScrollRestoreDelay, execute: workItem)
     }
 
     /// 向下滚动收起发帖按钮，向上滚动或回到顶部时再出现。

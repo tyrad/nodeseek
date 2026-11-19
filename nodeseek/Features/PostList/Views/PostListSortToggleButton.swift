@@ -17,11 +17,8 @@ final class PostListSortToggleButton: UIButton {
     private enum Layout {
         static let minimumExpandedWidth: CGFloat = 168
         static let cornerRadius: CGFloat = 14
-        static let collapsedAlpha: CGFloat = 0.5
-        /// 列表滚动时进一步让出内容，仍保留可见位置。
-        static let scrollingAlpha: CGFloat = 0.25
+        static let collapsedAlpha: CGFloat = 0.3
         static let expandedAlpha: CGFloat = 1
-        static let scrollingFadeDuration: TimeInterval = 0.2
         static let jellyAnimationKey = "sortToggleJelly"
         static let jellyDuration: TimeInterval = 0.42
         static let jellyKeyTimes: [NSNumber] = [0, 0.28, 0.58, 0.82, 1]
@@ -43,8 +40,6 @@ final class PostListSortToggleButton: UIButton {
     }
 
     private var dockedEdge: FloatingAdsorbableEdges = .right
-    private var isExpanded = false
-    private(set) var isDimmedForScrolling = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -70,10 +65,6 @@ final class PostListSortToggleButton: UIButton {
         let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
         let image = UIImage(systemName: sortMode.symbolName, withConfiguration: symbolConfiguration)
         let title = sortMode.accessibilityTitle
-        isExpanded = expanded
-        if expanded {
-            isDimmedForScrolling = false
-        }
         setImage(image, for: .normal)
         setTitle(expanded ? title : nil, for: .normal)
         configureTitleLabel()
@@ -101,30 +92,7 @@ final class PostListSortToggleButton: UIButton {
     }
 
     func applyAlpha(expanded: Bool) {
-        if expanded {
-            alpha = Layout.expandedAlpha
-        } else {
-            alpha = isDimmedForScrolling ? Layout.scrollingAlpha : Layout.collapsedAlpha
-        }
-    }
-
-    /// 展开时保持不透明，不参与滚动变淡。
-    func setDimmedForScrolling(_ dimmed: Bool, animated: Bool) {
-        guard !isExpanded, isDimmedForScrolling != dimmed else { return }
-        isDimmedForScrolling = dimmed
-        let animations: () -> Void = { [weak self] in
-            self?.applyAlpha(expanded: false)
-        }
-        guard animated else {
-            animations()
-            return
-        }
-        UIView.animate(
-            withDuration: Layout.scrollingFadeDuration,
-            delay: 0,
-            options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseOut],
-            animations: animations
-        )
+        alpha = expanded ? Layout.expandedAlpha : Layout.collapsedAlpha
     }
 
     func applyJellyAnimation(expanded: Bool) {

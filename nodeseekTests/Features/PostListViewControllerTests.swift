@@ -23,34 +23,6 @@ struct PostListViewControllerTests {
         #expect(composeButton.accessibilityLabel == "发帖")
     }
 
-    @Test func sortToggleDimsWhileListScrollsAndRestoresAfterStop() async throws {
-        let viewController = makePostListViewController(presenter: SpyPostListPresenter())
-        viewController.loadViewIfNeeded()
-        let button = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-sort-toggle"))
-        let onListScroll = try #require(viewController.pageContainerViewController.onListScroll)
-        let restingAlpha = button.alpha
-        let animationsWereEnabled = UIView.areAnimationsEnabled
-        UIView.setAnimationsEnabled(false)
-        defer { UIView.setAnimationsEnabled(animationsWereEnabled) }
-
-        // 程序改动 contentOffset（刷新、加载更多）不应变淡
-        onListScroll(UIScrollView())
-        #expect(button.alpha == restingAlpha)
-
-        onListScroll(DraggingScrollView())
-        #expect(button.alpha < restingAlpha)
-        #expect(button.alpha >= 0.2)
-        #expect(button.isUserInteractionEnabled)
-
-        try await Task.sleep(nanoseconds: 700_000_000)
-        #expect(abs(button.alpha - restingAlpha) < 0.01)
-
-        // 展开时滚动保持不透明
-        button.sendActions(for: .touchUpInside)
-        onListScroll(DraggingScrollView())
-        #expect(button.alpha == 1)
-    }
-
     @Test func readingLayoutKeepsSideMenuWithoutComposeButton() throws {
         let presenter = SpyPostListPresenter()
         let viewController = makePostListViewController(presenter: presenter)
@@ -78,7 +50,7 @@ struct PostListViewControllerTests {
         #expect(button.bounds.width >= 56)
         #expect(button.bounds.width <= 60)
         #expect(button.alpha < 1)
-        #expect(button.alpha >= 0.4)
+        #expect(button.alpha >= 0.2)
         #expect(button.titleLabel?.font.pointSize ?? 0 >= 13)
         #expect(button.titleLabel?.numberOfLines == 1)
         #expect(button.titleLabel?.lineBreakMode == .byTruncatingTail)
@@ -1289,9 +1261,4 @@ private func waitUntil(
         try await Task.sleep(nanoseconds: step)
         waited += step
     }
-}
-
-/// 模拟用户正在拖动的列表。
-private final class DraggingScrollView: UIScrollView {
-    override var isDragging: Bool { true }
 }
