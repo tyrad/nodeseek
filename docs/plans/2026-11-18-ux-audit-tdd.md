@@ -50,7 +50,7 @@
 | U37 | P2 | 搜索切到「用户」tab 时不自动用已有关键字搜索 | `AppUXAuditTests.test_U37_switchingToUserScopeSearchesExistingKeyword` |
 | U38 | P2 | 通知只显示帖子标题，看不到对方说了什么 | 不写：@我 / 回复主题接口不含评论内容，要显示摘要需每条额外请求 |
 | U39 | P2 | 收藏后帖子操作栏图标整体左移（布局跳动） | `PostDetailUXAuditTests.test_U39_postActionRowStaysStableWhenFavoriteCountAppears` |
-| U40 | P2 | 字号滑块、复制面板「复制」按钮使用系统蓝，不符合黑白主题 | `AppUXAuditTests.test_U40_textSizeSliderUsesMonochromeTint`<br>`PostDetailUXAuditTests.test_U40_copySheetPrimaryButtonIsNotSystemBlue` |
+| U40 | P2 | 字号滑块、复制面板「复制」按钮使用系统蓝，不符合黑白主题 | `AppUXAuditTests.test_U40_textSizeSliderUsesMonochromeTint`<br>`PostDetailUXAuditTests.test_U40_copySheetPrimaryButtonIsNotSystemBlue`（已修复：滑块已选轨道与复制按钮改用 .label 反色） |
 | U41 | P2 | 暗黑模式下表情面板的表情是刺眼白底 | `PostDetailComposerUXAuditTests.test_U41_stickerCellsAreDimmedInDarkMode`（不修：白底来自表情图片本身，非界面问题） |
 | U42 | P2 | 全 App 时间格式不统一（「2s ago」/「2分钟前」/「刚刚」/ 绝对时间） | `AppUXAuditTests.test_U42_listTimeUsesLocalizedRelativeFormat` |
 

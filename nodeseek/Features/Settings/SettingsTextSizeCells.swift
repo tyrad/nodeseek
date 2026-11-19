@@ -33,6 +33,8 @@ final class SettingsTextSizeAdjustmentCell: UITableViewCell {
         slider.minimumValue = Float(AppTextSizeSettings.minimumPointOffset)
         slider.maximumValue = Float(AppTextSizeSettings.maximumPointOffset)
         slider.isContinuous = true
+        // 黑白主题：已选轨道用 .label，不用系统蓝
+        slider.minimumTrackTintColor = .label
         slider.accessibilityIdentifier = "settings-text-size-slider"
         slider.translatesAutoresizingMaskIntoConstraints = false
         return slider
