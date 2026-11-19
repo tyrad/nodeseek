@@ -27,7 +27,7 @@
 | U14 | P1 | App 内字号 +8 时首页元信息行的时间被截断 | 不修。保留首页元信息的单行布局。 |
 | U15 | P1 | 回复成功后停在原位，看不到自己刚发的评论 | 不修：回复后停在原位属预期行为；已删除对应测试 |
 | U16 | P1 | 表情面板打开时点输入框，面板不收起，与键盘同时出现 | 不修：表情面板与键盘同时显示属预期行为；已删除对应测试 |
-| U17 | P1 | 「发帖时间优先」排序下仍显示最后回复时间，看起来没排好 | 不写：列表 HTML 只有最后回复时间，没有发帖时间可解析，需先定产品方案（如标注「最后回复」） |
+| U17 | P1 | 「发帖时间优先」排序下仍显示最后回复时间，看起来没排好 | 不修：「发帖时间优先」下显示最后回复时间属预期行为（列表 HTML 也只有最后回复时间）；未写测试 |
 | U18 | P1 | 错误提示（如「更多评论加载失败」）也带绿色成功勾 | `PostDetailUXAuditTests.test_U18_loadMoreFailureDoesNotUseSuccessToast`（已修复：失败提示改用橙色警示图标） |
 | U19 | P1 | 自己的帖子和评论仍显示点赞 / 鸡腿 / 反对按钮，点了才报错 | `PostDetailUXAuditTests.test_U19_ownContentHidesSelfVoteButtons` |
 | U20 | P1 | 评论框内容为空时「发送」仍可点，点了弹错误框 | `PostDetailComposerUXAuditTests.test_U20_sendButtonDisabledWhenContentIsEmpty` |
