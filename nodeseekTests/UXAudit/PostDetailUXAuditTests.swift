@@ -288,56 +288,6 @@ final class PostDetailUXAuditTests: XCTestCase {
         )
     }
 
-    // MARK: - U29
-
-    // 预期：有热门评论时，热评区和正常楼层之间有分区标题行（如「热门评论」），不会被看成楼层乱序。
-    func test_U29_hotCommentsHaveSectionHeaderRow() async {
-        let viewController = PostDetailViewController(presenter: UXAuditSpyPostDetailPresenter())
-        viewController.loadViewIfNeeded()
-        let hot = [13, 26].map { floor in
-            Comment(id: "hot-\(floor)", authorName: "u\(floor)", avatarURL: nil, floorText: "#\(floor)",
-                    createdAtText: "刚刚", contentHTML: "<p>热评 \(floor)</p>", isHot: true)
-        }
-        let normal = (1...3).map { floor in
-            Comment(id: "\(floor)", authorName: "u\(floor)", avatarURL: nil, floorText: "#\(floor)",
-                    createdAtText: "刚刚", contentHTML: "<p>楼层 \(floor)</p>")
-        }
-        viewController.render(detail: PostDetail(
-            id: "1017330",
-            title: "多页帖子",
-            authorName: "mist",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            comments: hot + normal,
-            page: 1,
-            pagination: PostDetailPagination(
-                currentPage: 1,
-                items: [
-                    PostDetailPageItem(page: 1, url: nil, isCurrent: true),
-                    PostDetailPageItem(page: 2, url: nil, isCurrent: false)
-                ],
-                previousPage: nil,
-                nextPage: 2
-            )
-        ))
-        await waitForDetailContent(in: viewController)
-
-        let kinds = viewController.detailRows.map { String(describing: $0) }
-        // 热评前和热评/正常楼层之间应各有一个非评论的分区行；当前只有通用的“回复”分隔行。
-        let firstHotRow = kinds.firstIndex { $0.hasPrefix("comment") }
-        let commentRows = kinds.enumerated().filter { $0.element.hasPrefix("comment") }.map(\.offset)
-        let firstNormalRow = commentRows.count > hot.count ? commentRows[hot.count] : nil
-        let hasSeparatorBetween: Bool = {
-            guard let firstHotRow, let firstNormalRow else { return false }
-            return kinds[firstHotRow..<firstNormalRow].contains { $0.hasPrefix("comment") == false }
-        }()
-        XCTAssertTrue(
-            hasSeparatorBetween,
-            "热评和正常楼层之间没有分区标题行：detailRows=\(kinds)"
-        )
-    }
-
     // MARK: - U30
 
     // 预期：0 条评论的帖子在正文下方显示空状态（如“暂无评论”），而不是一片空白。

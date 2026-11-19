@@ -39,7 +39,7 @@
 | U26 | P1 | 暗黑模式看大图时图片仍被「图片变暗」压暗 | `PostDetailUXAuditTests.test_U26_photoPreviewIsNotDimmedInDarkMode`（不修：大图沿用图片变暗设置，属预期行为） |
 | U27 | P1 | 系统 Dynamic Type 调大后首页 / 详情字号不变 | `AppUXAuditTests.test_U27_typographyScalesWithSystemDynamicType` |
 | U28 | P2 | 「回复楼主」输入框头部显示「回复 缭雾 #0」 | `PostDetailComposerUXAuditTests.test_U28_replyToPosterContextAvoidsFloorZero` |
-| U29 | P2 | 多页帖子的热评和正常楼层重复出现，没有分区标题 | `PostDetailUXAuditTests.test_U29_hotCommentsHaveSectionHeaderRow` |
+| U29 | P2 | 多页帖子的热评和正常楼层重复出现，没有分区标题 | 不修。沿用网页做法，热评提前展示并用楼号旁的火焰标识，原楼层保留。 |
 | U30 | P2 | 0 条评论的帖子下方空白，没有空状态提示 | `PostDetailUXAuditTests.test_U30_postWithoutCommentsShowsEmptyStateRow` |
 | U31 | P2 | 编辑评论的草稿条写「无标题」 | `PostDetailComposerUXAuditTests.test_U31_commentDraftStripDoesNotShowUntitled` |
 | U32 | P2 | 自己评论的长按菜单里有「投放鸡腿」 | `PostDetailUXAuditTests.test_U32_ownCommentContextMenuHasNoChickenLeg` |
@@ -69,5 +69,5 @@ make xcode-test-class TEST="PostDetailUXAuditTests PostDetailComposerUXAuditTest
 - U25 只覆盖「跳页」；现有测试刻意保持滚动加载更多时仍用首屏页码，是否也要跟随需另定。
 - U03 要求在 `didCommit` 时停止转圈，只加超时兜底仍是红；首屏不绘制的根因不在测试范围。
 - U18 要求错误走独立方法；若新方法默认回落到 `showToast`，测试仍红。
-- U29、U30 假设修复方式是往 `detailRows` 加行；若改用 footer / backgroundView，需要调整测试。
+- U30 假设修复方式是往 `detailRows` 加行；若改用 footer / backgroundView，需要调整测试。
 - U42 依赖 U07（列表先要有绝对时间）。
