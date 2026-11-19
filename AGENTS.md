@@ -77,3 +77,5 @@
 - 本机没有 Simulator.app，模拟器只能在后台运行；用 `axe` 点击时必须加 `--tap-style physical`，默认方式不生效。滑动用 `axe swipe` 正常。
 - `axe describe-ui` 读不到帖子和评论正文（富文本），只能拿到按钮、楼层号等；点正文需截图（`xcrun simctl io <UDID> screenshot`）后按坐标点，屏幕点数 = 截图像素 ÷ 3。
 - 安装最新构建：`make xcode-build-tests` 后 `xcrun simctl install <UDID> .build/XcodeDerivedData/Build/Products/Debug-iphonesimulator/nodeseek.app`。
+- make 构建带 `CODE_SIGNING_ALLOWED=NO`，App 没有 Keychain 权限，写入返回 -34018，Key 存不进去。要验证依赖 Keychain 的流程（如保存 NodeImage Key），改用 `xcodebuild build`（不带该参数，另设 `-derivedDataPath .build/SignedSimDerivedData`）让 Xcode 自动签名后安装；用 `codesign` 手动重签的包模拟器会拒绝启动。
+- 看 App 日志：`xcrun simctl spawn <UDID> log stream --style compact --predicate 'eventMessage CONTAINS "关键字"'`，可配合临时 `NSLog` 观察网页消息和调用顺序，提交前删除。
