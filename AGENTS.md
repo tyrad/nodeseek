@@ -69,3 +69,11 @@
 - 完成前自查语法、依赖、导入、低级错误。
 - 涉及编译、测试、类型检查或接口变更时，应尽量做验证并汇报结果。
 - 模拟器测试用 `make xcode-test-class TEST="类名 ..."` 等 make 目标，不要手写 `xcodebuild test`/`test-without-building`，原因见 `docs/project-overview.md`「常用验证命令」。
+
+### 模拟器操作经验
+- `make xcode-test-class` 默认用 iPhone 16 / iOS 18.0，本机没有时传 `SIMULATOR_ID=<UDID>`（用 `xcrun simctl list devices available` 查）。
+- `TEST` 只接受类名（Makefile 会拒绝 `类名/方法名`），需要看单个方法时按类名跑，再从 `.build/XcodeDerivedData/Logs/Test/` 最新的 `.xcresult` 用 `xcrun xcresulttool get test-results tests --path <路径>` 读失败信息。
+- 构建会自动改动 `Package.resolved`（删掉部分 Google 依赖条目），与本次改动无关时还原，不要提交。
+- 本机没有 Simulator.app，模拟器只能在后台运行；用 `axe` 点击时必须加 `--tap-style physical`，默认方式不生效。滑动用 `axe swipe` 正常。
+- `axe describe-ui` 读不到帖子和评论正文（富文本），只能拿到按钮、楼层号等；点正文需截图（`xcrun simctl io <UDID> screenshot`）后按坐标点，屏幕点数 = 截图像素 ÷ 3。
+- 安装最新构建：`make xcode-build-tests` 后 `xcrun simctl install <UDID> .build/XcodeDerivedData/Build/Products/Debug-iphonesimulator/nodeseek.app`。
