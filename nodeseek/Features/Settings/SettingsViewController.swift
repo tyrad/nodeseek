@@ -237,8 +237,14 @@ class SettingsViewController: UITableViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        tableView.reloadSections(IndexSet(integer: Section.reading.rawValue), with: .none)
-        tableView.reloadSections(IndexSet(integer: Section.features.rawValue), with: .none)
+        // 在转场开始前刷新并布局完；否则新行会按估算高度出现，在推入动画里滑到正位，看起来在跳
+        UIView.performWithoutAnimation {
+            tableView.reloadSections(
+                IndexSet([Section.reading.rawValue, Section.features.rawValue]),
+                with: .none
+            )
+            tableView.layoutIfNeeded()
+        }
         refreshPushAuthorizationStatus()
     }
 
