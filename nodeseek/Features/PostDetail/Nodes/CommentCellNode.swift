@@ -361,6 +361,9 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         likeButtonNode.addTarget(self, action: #selector(likeTapped), forControlEvents: .touchUpInside)
         chickenLegButtonNode.addTarget(self, action: #selector(chickenLegTapped), forControlEvents: .touchUpInside)
         opposeButtonNode.addTarget(self, action: #selector(opposeTapped), forControlEvents: .touchUpInside)
+        if comment.isOwnComment {
+            [likeButtonNode, chickenLegButtonNode, opposeButtonNode].forEach { $0.isEnabled = false }
+        }
         replyButtonNode.addTarget(self, action: #selector(replyTapped), forControlEvents: .touchUpInside)
         quoteButtonNode.addTarget(self, action: #selector(quoteTapped), forControlEvents: .touchUpInside)
         editButtonNode.addTarget(self, action: #selector(editTapped), forControlEvents: .touchUpInside)
@@ -379,6 +382,17 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         }
     }
 
+    /// 不能给自己的评论投票：有计数时只展示数字，没有计数就不占位。
+    private var visibleVoteButtonNodes: [ASButtonNode] {
+        let votes: [(ASButtonNode, Int?)] = [
+            (likeButtonNode, comment.likeCount),
+            (chickenLegButtonNode, comment.chickenLegCount),
+            (opposeButtonNode, comment.opposeCount)
+        ]
+        guard comment.isOwnComment else { return votes.map(\.0) }
+        return votes.filter { ($0.1 ?? 0) > 0 }.map(\.0)
+    }
+
     private func makeFooterActionStack() -> ASLayoutSpec {
         let spacer = ASLayoutSpec()
         spacer.style.flexGrow = 1
@@ -386,14 +400,10 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         let actionStack = ASStackLayoutSpec.horizontal()
         actionStack.spacing = PostDetailContentLayout.reactionActionSpacing
         actionStack.alignItems = .center
-        actionStack.children = [
-            spacer,
-            likeButtonNode,
-            chickenLegButtonNode,
-            opposeButtonNode,
-            replyButtonNode,
-            quoteButtonNode
-        ]
+        var children: [ASLayoutElement] = [spacer]
+        children.append(contentsOf: visibleVoteButtonNodes)
+        children.append(contentsOf: [replyButtonNode, quoteButtonNode])
+        actionStack.children = children
         if onEditTapped != nil {
             actionStack.children?.append(editButtonNode)
         }
@@ -734,11 +744,13 @@ extension CommentCellNode: UIContextMenuInteractionDelegate {
             UIAction(title: "复制", image: UIImage(systemName: "doc.on.doc")) { [weak self] _ in
                 guard let self else { return }
                 self.onAuthorCopyTapped(self.comment)
-            },
-            UIAction(title: "投放鸡腿", image: UIImage(named: "ChickenLeg")) { [weak self] _ in
-                self?.chickenLegTapped()
             }
         ]
+        if comment.isOwnComment == false {
+            actions.append(UIAction(title: "投放鸡腿", image: UIImage(named: "ChickenLeg")) { [weak self] _ in
+                self?.chickenLegTapped()
+            })
+        }
         if let authorFilterMenuTitle, hasDisplayableAuthor {
             actions.append(UIAction(title: authorFilterMenuTitle, image: UIImage(systemName: "person.crop.circle")) { [weak self] _ in
                 guard let self else { return }

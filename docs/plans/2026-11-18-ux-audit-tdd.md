@@ -29,7 +29,7 @@
 | U16 | P1 | 表情面板打开时点输入框，面板不收起，与键盘同时出现 | 不修：表情面板与键盘同时显示属预期行为；已删除对应测试 |
 | U17 | P1 | 「发帖时间优先」排序下仍显示最后回复时间，看起来没排好 | 不修：「发帖时间优先」下显示最后回复时间属预期行为（列表 HTML 也只有最后回复时间）；未写测试 |
 | U18 | P1 | 错误提示（如「更多评论加载失败」）也带绿色成功勾 | `PostDetailUXAuditTests.test_U18_loadMoreFailureDoesNotUseSuccessToast`（已修复：失败提示改用橙色警示图标） |
-| U19 | P1 | 自己的帖子和评论仍显示点赞 / 鸡腿 / 反对按钮，点了才报错 | `PostDetailUXAuditTests.test_U19_ownContentHidesSelfVoteButtons` |
+| U19 | P1 | 自己的帖子和评论仍显示点赞 / 鸡腿 / 反对按钮，点了才报错 | `PostDetailUXAuditTests.test_U19_ownContentHidesSelfVoteButtons`（已修复：自己的内容计数为 0 的投票按钮不显示，已有计数只显示数字不可点） |
 | U20 | P1 | 评论框内容为空时「发送」仍可点，点了弹错误框 | `PostDetailComposerUXAuditTests.test_U20_sendButtonDisabledWhenContentIsEmpty` |
 | U21 | P1 | 引用多行评论时换行被压成一行 | `PostDetailComposerUXAuditTests.test_U21_quotePreservesLineBreaks` |
 | U22 | P1 | 引用纯表情 / 图片评论时引用块没有内容 | `PostDetailComposerUXAuditTests.test_U22_quoteOfImageOnlyCommentHasPlaceholder` |
@@ -42,7 +42,7 @@
 | U29 | P2 | 多页帖子的热评和正常楼层重复出现，没有分区标题 | 不修。沿用网页做法，热评提前展示并用楼号旁的火焰标识，原楼层保留。 |
 | U30 | P2 | 0 条评论的帖子下方空白，没有空状态提示 | 不修。帖子正常加载且没有回复时，正文下方自然留白。 |
 | U31 | P2 | 编辑评论的草稿条写「无标题」 | `PostDetailComposerUXAuditTests.test_U31_commentDraftStripDoesNotShowUntitled` |
-| U32 | P2 | 自己评论的长按菜单里有「投放鸡腿」 | `PostDetailUXAuditTests.test_U32_ownCommentContextMenuHasNoChickenLeg` |
+| U32 | P2 | 自己评论的长按菜单里有「投放鸡腿」 | `PostDetailUXAuditTests.test_U32_ownCommentContextMenuHasNoChickenLeg`（已修复） |
 | U33 | P2 | 「我的」页点「粉丝」进入个人主页而不是粉丝列表 | `AppUXAuditTests.test_U33_meFansStatOpensFollowersList`（已修复：鸡腿、星辰、粉丝、关注均可直接打开对应明细） |
 | U34 | P2 | 「添加探针」填了内容点关闭不确认 | `AppUXAuditTests.test_U34_probeEditorAsksBeforeDiscardingTypedAddress` |
 | U35 | P2 | 侧边栏菜单文字左边缘不齐（73~80pt） | `AppUXAuditTests.test_U35_sideMenuRowTitlesShareLeadingEdge` |

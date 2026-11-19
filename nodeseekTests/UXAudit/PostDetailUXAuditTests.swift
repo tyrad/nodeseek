@@ -255,6 +255,40 @@ final class PostDetailUXAuditTests: XCTestCase {
         XCTAssertEqual(usablePostVotes, [], "自己的帖子仍显示可点的投票按钮：\(usablePostVotes)")
     }
 
+    // 自己的评论已有别人点的赞时保留数字，但按钮不可点；计数为 0 的投票按钮不占位。
+    func test_U19_ownCommentKeepsExistingVoteCountsButNotTappable() throws {
+        let ownComment = Comment(
+            id: "1",
+            authorName: "mist",
+            avatarURL: nil,
+            floorText: "#2",
+            createdAtText: "刚刚",
+            contentHTML: "<p>我的评论</p>",
+            likeCount: 3,
+            chickenLegCount: 0,
+            opposeCount: 0,
+            isOwnComment: true
+        )
+        let node = CommentCellNode(
+            comment: ownComment,
+            renderedBody: [],
+            onImageTapped: { _, _ in },
+            onEditTapped: { _ in },
+            onTextLayoutInvalidated: {}
+        )
+        let layout = node.layoutThatFits(ASSizeRange(
+            min: .zero,
+            max: CGSize(width: 390, height: CGFloat.greatestFiniteMagnitude)
+        ))
+        let likeButton = try XCTUnwrap(uxAuditStoredNode(named: "likeButtonNode", in: node) as? ASButtonNode)
+        let chickenLegButton = try XCTUnwrap(uxAuditStoredNode(named: "chickenLegButtonNode", in: node) as? ASButtonNode)
+
+        XCTAssertNotNil(layout.uxAuditAbsoluteOrigin(of: likeButton), "已有点赞数应继续显示")
+        XCTAssertEqual(likeButton.attributedTitle(for: .normal)?.string, "3")
+        XCTAssertFalse(likeButton.isEnabled, "自己的评论点赞按钮不应可点")
+        XCTAssertNil(layout.uxAuditAbsoluteOrigin(of: chickenLegButton), "计数为 0 的鸡腿按钮不应占位")
+    }
+
     // MARK: - U32
 
     // 预期：自己评论的长按菜单不出现「投放鸡腿」。
