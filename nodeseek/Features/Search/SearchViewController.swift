@@ -617,7 +617,15 @@ final class SearchViewController: UIViewController {
     @objc private func scopeControlChanged() {
         let index = scopeControl.selectedSegmentIndex
         guard SearchScope.allCases.indices.contains(index) else { return }
+        let previousScope = selectedScope
         applyScope(SearchScope.allCases[index])
+
+        guard previousScope == .post, selectedScope == .user,
+              keywordTextField.markedTextRange == nil,
+              let query = activeRequest?.query,
+              keywordTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) == query,
+              activeUserQuery != query else { return }
+        submitSearch()
     }
 
     @objc private func keywordTextChanged() {

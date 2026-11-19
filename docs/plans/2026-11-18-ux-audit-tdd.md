@@ -47,7 +47,7 @@
 | U34 | P2 | 「添加探针」填了内容点关闭不确认 | `AppUXAuditTests.test_U34_probeEditorAsksBeforeDiscardingTypedAddress` |
 | U35 | P2 | 侧边栏菜单文字左边缘不齐（73~80pt） | `AppUXAuditTests.test_U35_sideMenuRowTitlesShareLeadingEdge` |
 | U36 | P2 | 搜索结果不高亮关键词 | `AppUXAuditTests.test_U36_searchResultTitleHighlightsKeyword` |
-| U37 | P2 | 搜索切到「用户」tab 时不自动用已有关键字搜索 | `AppUXAuditTests.test_U37_switchingToUserScopeSearchesExistingKeyword` |
+| U37 | P2 | 搜索切到「用户」tab 时不自动用已有关键字搜索 | `AppUXAuditTests.test_U37_switchingToUserScopeSearchesExistingKeyword`（已修复：从「帖子」切到「用户」时自动搜索已提交的同一关键词） |
 | U38 | P2 | 通知只显示帖子标题，看不到对方说了什么 | 不修。「@我」和「回复主题」通知继续只显示帖子标题。现有接口不返回评论正文，展示摘要需逐条请求。 |
 | U39 | P2 | 收藏后帖子操作栏图标整体左移（布局跳动） | `PostDetailUXAuditTests.test_U39_postActionRowStaysStableWhenFavoriteCountAppears` |
 | U40 | P2 | 字号滑块、复制面板「复制」按钮使用系统蓝，不符合黑白主题 | `AppUXAuditTests.test_U40_textSizeSliderUsesMonochromeTint`<br>`PostDetailUXAuditTests.test_U40_copySheetPrimaryButtonIsNotSystemBlue`（已修复：滑块已选轨道与复制按钮改用 .label 反色） |
