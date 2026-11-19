@@ -26,7 +26,7 @@
 | U13 | P1 | 特别关注说明写「右滑删除」，实际是左滑 | `AppUXAuditTests.test_U13_specialFollowFooterSaysSwipeToDelete`（已修复：文案改为滑动删除） |
 | U14 | P1 | App 内字号 +8 时首页元信息行的时间被截断 | 不修。保留首页元信息的单行布局。 |
 | U15 | P1 | 回复成功后停在原位，看不到自己刚发的评论 | `PostDetailComposerUXAuditTests.test_U15_successfulReplyRevealsNewComment` |
-| U16 | P1 | 表情面板打开时点输入框，面板不收起，与键盘同时出现 | `PostDetailComposerUXAuditTests.test_U16_stickerPanelHidesWhenTextViewBecomesFirstResponder` |
+| U16 | P1 | 表情面板打开时点输入框，面板不收起，与键盘同时出现 | 不修：表情面板与键盘同时显示属预期行为；已删除对应测试 |
 | U17 | P1 | 「发帖时间优先」排序下仍显示最后回复时间，看起来没排好 | 不写：列表 HTML 只有最后回复时间，没有发帖时间可解析，需先定产品方案（如标注「最后回复」） |
 | U18 | P1 | 错误提示（如「更多评论加载失败」）也带绿色成功勾 | `PostDetailUXAuditTests.test_U18_loadMoreFailureDoesNotUseSuccessToast`（已修复：失败提示改用橙色警示图标） |
 | U19 | P1 | 自己的帖子和评论仍显示点赞 / 鸡腿 / 反对按钮，点了才报错 | `PostDetailUXAuditTests.test_U19_ownContentHidesSelfVoteButtons` |

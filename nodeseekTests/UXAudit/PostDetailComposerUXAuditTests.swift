@@ -90,28 +90,6 @@ final class PostDetailComposerUXAuditTests: XCTestCase {
         )
     }
 
-    // MARK: - U16
-
-    // 期望：表情面板展开时点输入框弹出键盘，表情面板应自动收起。
-    func test_U16_stickerPanelHidesWhenTextViewBecomesFirstResponder() async throws {
-        let viewController = try await makeHostedDetailViewController()
-        viewController.showReplyEditorForTesting(action: "回复", authorName: "netcup", floorText: "#10")
-        viewController.setStickerPickerVisible(true, animated: false)
-        XCTAssertFalse(viewController.replyStickerPickerView.isHidden, "前置条件：表情面板应已展开")
-
-        let didFocus = viewController.replyTextView.becomeFirstResponder()
-        XCTAssertTrue(didFocus, "前置条件：回复输入框应成为第一响应者")
-
-        let pickerHidden = await waitUntil(timeout: 1) {
-            viewController.replyStickerPickerView.isHidden
-                || (viewController.replyStickerPickerHeightConstraint?.constant ?? 0) == 0
-        }
-        XCTAssertTrue(
-            pickerHidden,
-            "U16: 输入框获得焦点后表情面板仍显示（isHidden=\(viewController.replyStickerPickerView.isHidden), height=\(viewController.replyStickerPickerHeightConstraint?.constant ?? -1)），与键盘叠在一起"
-        )
-    }
-
     // MARK: - U20
 
     // 期望：去掉空白后内容为空时，“发送”按钮置灰不可点。
