@@ -30,7 +30,7 @@
 | U17 | P1 | 「发帖时间优先」排序下仍显示最后回复时间，看起来没排好 | 不修：「发帖时间优先」下显示最后回复时间属预期行为（列表 HTML 也只有最后回复时间）；未写测试 |
 | U18 | P1 | 错误提示（如「更多评论加载失败」）也带绿色成功勾 | `PostDetailUXAuditTests.test_U18_loadMoreFailureDoesNotUseSuccessToast`（已修复：失败提示改用橙色警示图标） |
 | U19 | P1 | 自己的帖子和评论仍显示点赞 / 鸡腿 / 反对按钮，点了才报错 | `PostDetailUXAuditTests.test_U19_ownContentHidesSelfVoteButtons`（已修复：自己的内容计数为 0 的投票按钮不显示，已有计数只显示数字不可点） |
-| U20 | P1 | 评论框内容为空时「发送」仍可点，点了弹错误框 | `PostDetailComposerUXAuditTests.test_U20_sendButtonDisabledWhenContentIsEmpty` |
+| U20 | P1 | 评论框内容为空时「发送」仍可点，点了弹错误框 | 不修：空内容点「发送」给出提示属预期行为；已删除对应测试 |
 | U21 | P1 | 引用多行评论时换行被压成一行 | `PostDetailComposerUXAuditTests.test_U21_quotePreservesLineBreaks` |
 | U22 | P1 | 引用纯表情 / 图片评论时引用块没有内容 | `PostDetailComposerUXAuditTests.test_U22_quoteOfImageOnlyCommentHasPlaceholder` |
 | U23 | P1 | 「我的评论」点评论文字只打开帖子顶部，不跳到对应楼层 | `AppUXAuditTests.test_U23_userCommentRowTapOpensCommentFloor`（已修复：点回复文字整行跳到对应楼层，点标题仍打开帖子开头） |

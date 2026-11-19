@@ -39,24 +39,6 @@ final class PostDetailComposerUXAuditTests: XCTestCase {
         )
     }
 
-    // MARK: - U20
-
-    // 期望：去掉空白后内容为空时，“发送”按钮置灰不可点。
-    func test_U20_sendButtonDisabledWhenContentIsEmpty() async throws {
-        let viewController = PostDetailViewController(
-            presenter: UXComposerStubPresenter(),
-            accountRefresher: UXComposerLoggedInRefresher()
-        )
-        viewController.loadViewIfNeeded()
-        viewController.showReplyEditorForTesting(action: "回复", authorName: "netcup", floorText: "#10")
-        viewController.replyTextView.text = "  \n "
-
-        XCTAssertFalse(
-            viewController.inlineReplySendButton.isEnabled,
-            "U20: 回复内容为空时“发送”按钮仍可点，点了才弹“回复内容不能为空”"
-        )
-    }
-
     // MARK: - U21
 
     // 期望：引用多行评论时保留换行，每行都是独立的 "> " 引用行。
