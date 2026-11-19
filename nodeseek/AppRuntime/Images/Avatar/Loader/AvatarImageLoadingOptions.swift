@@ -39,7 +39,10 @@ enum AvatarImageLoadingOptions {
         WebRequestFingerprint.applyImageHeaders(to: &request)
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
         request.setValue("no-cache", forHTTPHeaderField: "Pragma")
-        _ = try? await URLSession(configuration: makeSessionConfiguration()).data(for: request)
+        let session = URLSession(configuration: makeSessionConfiguration())
+        // 临时会话用完要释放，否则会一直留着。
+        defer { session.finishTasksAndInvalidate() }
+        _ = try? await session.data(for: request)
         removeCachedAvatar(for: resolved)
     }
 

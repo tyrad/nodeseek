@@ -203,8 +203,12 @@ private final class ProfileAvatarUploaderStub: ProfileAvatarUploading {
 private final class ProfileEditClientStub: ProfileEditClienting {
     var saved: [ProfileIntroduction] = []
     var error: Error?
+    var loadError: Error?
 
-    func loadIntroduction(uid: Int) async throws -> ProfileIntroduction { ProfileIntroduction() }
+    func loadIntroduction(uid: Int) async throws -> ProfileIntroduction {
+        if let loadError { throw loadError }
+        return ProfileIntroduction()
+    }
 
     func saveIntroduction(_ introduction: ProfileIntroduction) async throws {
         if let error { throw error }
@@ -316,5 +320,41 @@ struct HiddenWebViewAutomationPageMatchTests {
         #expect(HiddenWebViewLoader.isSameAutomationPage(loaded, NodeSeekSite.baseURL))
         #expect(HiddenWebViewLoader.isSameAutomationPage(loaded, try #require(URL(string: "https://www.nodeseek.com/fans"))) == false)
         #expect(HiddenWebViewLoader.isSameAutomationPage(loaded, try #require(URL(string: "https://www.nodeseek.com/?page=2"))) == false)
+    }
+}
+
+@MainActor
+struct ProfileEditPageTests {
+    @Test func loadFailureShowsRetryBelowAvatar() async throws {
+        let client = ProfileEditClientStub()
+        client.loadError = UserContentClientError.rejected("网络错误")
+        let page = ProfileEditViewController(
+            uid: 1,
+            account: AccountResponse(displayName: "测试", isLoggedIn: true),
+            client: client
+        )
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 393, height: 852))
+        window.rootViewController = UINavigationController(rootViewController: page)
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+
+        var retry: UIButton?
+        for _ in 0..<50 {
+            window.layoutIfNeeded()
+            retry = Self.descendants(of: page.view).compactMap { $0 as? UIButton }
+                .first { $0.configuration?.title == "重试" && !$0.isHidden && $0.window != nil }
+            if retry != nil { break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        let button = try #require(retry)
+        let avatar = try #require(Self.descendants(of: page.view).first { $0.accessibilityIdentifier == "profile-edit-change-avatar" })
+        let buttonFrame = button.convert(button.bounds, to: page.view)
+        let avatarFrame = avatar.convert(avatar.bounds, to: page.view)
+        #expect(buttonFrame.minY > avatarFrame.maxY)
+        #expect(page.view.bounds.contains(buttonFrame))
+    }
+
+    private static func descendants(of view: UIView) -> [UIView] {
+        view.subviews + view.subviews.flatMap(descendants)
     }
 }
