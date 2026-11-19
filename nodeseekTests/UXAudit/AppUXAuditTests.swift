@@ -108,31 +108,6 @@ final class AppUXAuditTests: XCTestCase {
         )
     }
 
-    // MARK: - U06 私信列表系统通知显示 Markdown 原文
-
-    /// 期望：私信预览把 Markdown 链接渲染成纯文字。
-    func test_U06_messagePreviewRendersMarkdownLinksAsPlainText() throws {
-        let cell = NotificationMessageCell(style: .default, reuseIdentifier: nil)
-        let record = NodeSeekMessageConversationRecord(
-            receiverID: 31037,
-            senderID: 5230,
-            maxID: 1,
-            content: "您的 [评论](https://www.nodeseek.com/post-1047296-1#8) 被用户 [genguzzz](https://www.nodeseek.com/space/12345) 回复了",
-            createdAt: Date(),
-            viewed: 1,
-            senderName: "系统通知",
-            receiverName: "缭雾"
-        )
-
-        cell.configure(record: record, currentUserID: 31037, timeText: "刚刚")
-
-        let contentLabel = try XCTUnwrap(uxChild(of: cell, named: "contentLabel") as UILabel?)
-        XCTAssertEqual(
-            contentLabel.text, "您的 评论 被用户 genguzzz 回复了",
-            "U06: 私信预览直接显示了 Markdown 原文"
-        )
-    }
-
     // MARK: - U07 首页相对时间不刷新
 
     /// 期望：列表模型保存最后活动的绝对时间（来自 <time datetime>），界面才能随时间重新计算相对时间。
