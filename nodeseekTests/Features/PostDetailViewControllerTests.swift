@@ -2856,6 +2856,49 @@ struct PostDetailViewControllerTests {
         #expect(richTextView.point(inside: CGPoint(x: 92, y: -12), with: nil))
     }
 
+    @Test func richTextViewPrefersExactLinkOverOverlappingSignatureHitArea() throws {
+        let bodyURL = try #require(URL(string: "https://body.example.com"))
+        let signatureURL = try #require(URL(string: "https://signature.example.com"))
+        let attributedText = NSMutableAttributedString(string: "正文链接 签名链接")
+        attributedText.addAttributes(
+            NodeSeekLinkStyle.attributes(url: bodyURL),
+            range: NSRange(location: 0, length: 4)
+        )
+        attributedText.addAttributes(
+            NodeSeekSignatureStyle.linkAttributes(url: signatureURL),
+            range: NSRange(location: 5, length: 4)
+        )
+
+        let richTextView = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 320, height: 80))
+        richTextView.configure(
+            attributedText,
+            onImageTapped: nil,
+            onLinkTapped: nil,
+            onLayoutInvalidated: nil
+        )
+        // 同一行内，签名链接扩大后的点击区（x 6...78）覆盖正文链接中心；签名在首行，不受上边界裁剪影响。
+        let bodyOverlay = try #require(richTextView.attributedTextContentView(
+            richTextView,
+            viewForLink: bodyURL,
+            identifier: "body",
+            frame: CGRect(x: 0, y: 0, width: 24, height: 14)
+        ))
+        let signatureOverlay = try #require(richTextView.attributedTextContentView(
+            richTextView,
+            viewForLink: signatureURL,
+            identifier: "signature",
+            frame: CGRect(x: 30, y: 0, width: 24, height: 14)
+        ))
+        bodyOverlay.tag = 0
+        signatureOverlay.tag = 5
+        richTextView.addSubview(bodyOverlay)
+        richTextView.addSubview(signatureOverlay)
+
+        #expect(signatureOverlay.point(inside: CGPoint(x: -18, y: 7), with: nil))
+        #expect(richTextView.hitTest(CGPoint(x: 12, y: 7), with: nil) === bodyOverlay)
+        #expect(richTextView.hitTest(CGPoint(x: 66, y: 7), with: nil) === signatureOverlay)
+    }
+
     @Test func richTextViewReturnsMultipleNearbySignatureLinkCandidatesOnly() throws {
         let bodyURL = try #require(URL(string: "https://body.example.com"))
         let firstSignatureURL = try #require(URL(string: "https://t.me/nodefans"))
