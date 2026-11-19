@@ -3,6 +3,7 @@
 //  nodeseek
 //
 
+import PhotosUI
 import UIKit
 
 /// 原生的个人信息编辑页：头像、Bio、签名、Readme。每一项单独保存，签名和 Readme 复用发帖编辑器。
@@ -22,6 +23,7 @@ final class ProfileEditViewController: UIViewController {
     private let uid: Int
     private let account: AccountResponse
     private let client: ProfileEditClienting
+    private let avatarUploader: ProfileAvatarUploading
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private let headerView = ProfileEditAvatarHeaderView()
     private let statusView = ProfileEditStatusView()
@@ -31,10 +33,16 @@ final class ProfileEditViewController: UIViewController {
     /// 从网页编辑返回后重新读取，网页里的修改才能显示出来。
     private var needsReloadOnAppear = false
 
-    init(uid: Int, account: AccountResponse, client: ProfileEditClienting? = nil) {
+    init(
+        uid: Int,
+        account: AccountResponse,
+        client: ProfileEditClienting? = nil,
+        avatarUploader: ProfileAvatarUploading? = nil
+    ) {
         self.uid = uid
         self.account = account
         self.client = client ?? NodeSeekProfileEditClient()
+        self.avatarUploader = avatarUploader ?? WebViewProfileAvatarUploader()
         super.init(nibName: nil, bundle: nil)
         title = Self.text("编辑资料")
     }
@@ -111,6 +119,7 @@ final class ProfileEditViewController: UIViewController {
             tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         headerView.configure(account: account)
+        headerView.onChangeAvatar = { [weak self] in self?.pickAvatar() }
         tableView.tableHeaderView = headerView
 
         statusView.onRetry = { [weak self] in self?.load() }
@@ -233,6 +242,46 @@ final class ProfileEditViewController: UIViewController {
         BottomToast.show(Self.text("已保存"), in: view)
     }
 
+    // MARK: - 头像
+
+    private func pickAvatar() {
+        var configuration = PHPickerConfiguration()
+        configuration.filter = .images
+        configuration.selectionLimit = 1
+        let picker = PHPickerViewController(configuration: configuration)
+        picker.delegate = self
+        present(picker, animated: true)
+    }
+
+    func showAvatarCrop(for image: UIImage) {
+        let crop = ProfileAvatarCropViewController(image: image) { [weak self] cropped in
+            self?.uploadAvatar(cropped)
+        }
+        present(crop, animated: true)
+    }
+
+    private func uploadAvatar(_ image: UIImage) {
+        guard let data = image.pngData() else { return }
+        headerView.setUploading(true, preview: image)
+        Task { @MainActor [weak self, avatarUploader] in
+            do {
+                try await avatarUploader.upload(pngData: data)
+                guard let self else { return }
+                // 头像地址不变，清掉缓存后其他页面再显示时会重新下载。
+                AvatarImageLoadingOptions.removeCachedAvatar(for: account.avatarURL)
+                headerView.setUploading(false, preview: image)
+                BottomToast.show(Self.text("头像已更新"), in: view)
+            } catch {
+                guard let self else { return }
+                headerView.setUploading(false, preview: nil)
+                headerView.configure(account: account)
+                let alert = UIAlertController(title: Self.text("头像上传失败"), message: error.localizedDescription, preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: Self.text("好"), style: .cancel))
+                present(alert, animated: true)
+            }
+        }
+    }
+
     private func openWebSettings() {
         needsReloadOnAppear = true
         navigationController?.pushViewController(NodeSeekWebViewController(url: NodeSeekSite.profileSettingsURL), animated: true)
@@ -257,6 +306,26 @@ final class ProfileEditViewController: UIViewController {
         case .bio: return introduction.bio
         case .signature: return introduction.signature
         case .readme: return introduction.readme
+        }
+    }
+}
+
+// MARK: - PHPickerViewControllerDelegate
+
+extension ProfileEditViewController: PHPickerViewControllerDelegate {
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        guard let provider = results.first?.itemProvider, provider.canLoadObject(ofClass: UIImage.self) else {
+            picker.dismiss(animated: true)
+            return
+        }
+        provider.loadObject(ofClass: UIImage.self) { object, _ in
+            DispatchQueue.main.async { [weak self] in
+                // 等选图页收起后再弹裁剪页，避免两个全屏页叠在一起转场。
+                picker.dismiss(animated: true) {
+                    guard let image = object as? UIImage else { return }
+                    self?.showAvatarCrop(for: image)
+                }
+            }
         }
     }
 }
@@ -313,11 +382,23 @@ extension ProfileEditViewController: UITableViewDataSource, UITableViewDelegate 
     }
 }
 
-/// 表头：居中的大头像和昵称。
+/// 表头：居中的大头像、更换按钮和昵称。
 final class ProfileEditAvatarHeaderView: UIView {
+    var onChangeAvatar: (() -> Void)?
+
     private let avatarImageView = UIImageView()
     private let nameLabel = UILabel()
-    let stack = UIStackView()
+    private let stack = UIStackView()
+    private lazy var changeButton: UIButton = {
+        var configuration = UIButton.Configuration.plain()
+        configuration.baseForegroundColor = .label
+        configuration.imagePadding = 6
+        let button = UIButton(configuration: configuration, primaryAction: UIAction { [weak self] _ in
+            self?.onChangeAvatar?()
+        })
+        button.accessibilityIdentifier = "profile-edit-change-avatar"
+        return button
+    }()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -340,7 +421,9 @@ final class ProfileEditAvatarHeaderView: UIView {
         stack.alignment = .center
         stack.spacing = 10
         stack.addArrangedSubview(avatarImageView)
+        stack.addArrangedSubview(changeButton)
         stack.addArrangedSubview(nameLabel)
+        stack.setCustomSpacing(4, after: avatarImageView)
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         NSLayoutConstraint.activate([
@@ -365,6 +448,25 @@ final class ProfileEditAvatarHeaderView: UIView {
 
     func updateTextSize() {
         nameLabel.font = AppTypography.font(basePointSize: 20, weight: .semibold)
+        updateChangeButtonTitle()
+    }
+
+    /// 上传中按钮转圈且不可点；成功后直接显示裁好的图，失败由页面恢复原头像。
+    func setUploading(_ isUploading: Bool, preview: UIImage?) {
+        if let preview {
+            AvatarImageLoader.shared.cancel(on: avatarImageView)
+            avatarImageView.image = preview
+        }
+        changeButton.configuration?.showsActivityIndicator = isUploading
+        changeButton.isEnabled = !isUploading
+        updateChangeButtonTitle()
+    }
+
+    private func updateChangeButtonTitle() {
+        let isUploading = changeButton.configuration?.showsActivityIndicator == true
+        var title = AttributedString(NSLocalizedString(isUploading ? "正在上传头像" : "更换头像", tableName: "Me", comment: ""))
+        title.font = AppTypography.font(basePointSize: 15, weight: .medium)
+        changeButton.configuration?.attributedTitle = title
     }
 }
 

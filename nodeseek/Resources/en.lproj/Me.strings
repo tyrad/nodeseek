@@ -21,3 +21,12 @@
 "签名不允许使用引用" = "Signatures can't contain quotes.";
 "签名不允许使用图片" = "Signatures can't contain images.";
 "签名只支持 Unicode 1.1，不支持扩展 emoji：%@" = "Signatures only support Unicode 1.1. These emoji aren't allowed: %@";
+"更换头像" = "Change Photo";
+"正在上传头像" = "Uploading Photo";
+"头像已更新" = "Photo updated";
+"头像上传失败" = "Couldn't Upload Photo";
+"上传时间最短间隔为一分钟" = "Please wait at least one minute between uploads.";
+"头像上传失败（HTTP %ld）" = "Couldn't upload photo (HTTP %ld).";
+"头像上传失败，请稍后重试" = "Couldn't upload photo. Try again later.";
+"移动和缩放" = "Move and Scale";
+"选取" = "Choose";

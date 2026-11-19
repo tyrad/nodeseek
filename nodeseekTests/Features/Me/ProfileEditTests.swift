@@ -185,3 +185,42 @@ private final class ProfileEditMockURLProtocol: URLProtocol {
 
     override func stopLoading() {}
 }
+
+@MainActor
+struct ProfileAvatarTests {
+    @Test func cropOutputsWebSizedSquareFromSelectedRegion() throws {
+        // 左半红、右半蓝的 200×100 图，裁右半边应该全是蓝色。
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let source = UIGraphicsImageRenderer(size: CGSize(width: 200, height: 100), format: format).image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 100, height: 100))
+            UIColor.blue.setFill()
+            context.fill(CGRect(x: 100, y: 0, width: 100, height: 100))
+        }
+
+        let cropped = ProfileAvatarCropViewController.crop(source, to: CGRect(x: 100, y: 0, width: 100, height: 100))
+
+        #expect(cropped.size == CGSize(width: 100, height: 100))
+        #expect(cropped.scale == 1)
+        let pixel = try #require(Self.centerPixel(of: cropped))
+        #expect(pixel.blue > 200 && pixel.red < 50)
+    }
+
+    @Test func rateLimitFailureExplainsOneMinuteInterval() {
+        #expect(WebViewProfileAvatarUploader.failureMessage(status: 429, message: nil) == "上传时间最短间隔为一分钟")
+        #expect(WebViewProfileAvatarUploader.failureMessage(status: 500, message: "图片太大") == "图片太大")
+        #expect(WebViewProfileAvatarUploader.failureMessage(status: 403, message: nil) == "头像上传失败（HTTP 403）")
+    }
+
+    private static func centerPixel(of image: UIImage) -> (red: UInt8, blue: UInt8)? {
+        guard let cgImage = image.cgImage else { return nil }
+        var data = [UInt8](repeating: 0, count: 4)
+        guard let context = CGContext(
+            data: &data, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        context.draw(cgImage, in: CGRect(x: -50, y: -50, width: 100, height: 100))
+        return (data[0], data[2])
+    }
+}

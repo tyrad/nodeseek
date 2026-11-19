@@ -22,6 +22,15 @@ enum AvatarImageLoadingOptions {
         return cache
     }()
 
+    /// 头像地址不变、内容变了（比如刚上传新头像）时，清掉缓存才能重新下载。
+    static func removeCachedAvatar(for url: URL?) {
+        guard let url = ImageURLResolver.resolve(url) else { return }
+        cache.removeImage(
+            forKey: url.absoluteString,
+            processorIdentifier: AvatarImageProcessor(size: targetSize).identifier
+        )
+    }
+
     static func makeDownloader() -> ImageDownloader {
         let downloader = ImageDownloader(name: "NodeSeekAvatarDownloader")
         downloader.sessionConfiguration = makeSessionConfiguration()
