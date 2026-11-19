@@ -212,6 +212,8 @@ class SettingsViewController: UITableViewController {
         super.viewDidLoad()
         tableView.backgroundColor = UIColor.systemGroupedBackground
         title = "设置"
+        // 黑白主题：图标等跟随 tableView 着色，不用系统蓝
+        tableView.tintColor = .label
         tableView.accessibilityIdentifier = "settings-table-view"
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 72
@@ -397,6 +399,7 @@ class SettingsViewController: UITableViewController {
             cell.textLabel?.text = "取消 NodeImage 授权"
             cell.textLabel?.textColor = .systemRed
             cell.imageView?.image = UIImage(systemName: "xmark.circle")
+            cell.imageView?.tintColor = .systemRed
             cell.accessoryType = .none
         } else {
             cell.textLabel?.text = "NodeImage 授权"
@@ -1099,6 +1102,8 @@ final class SettingsDebugViewController: UITableViewController {
         super.viewDidLoad()
         tableView.backgroundColor = UIColor.systemGroupedBackground
         title = "调试"
+        // 黑白主题：图标等跟随 tableView 着色，不用系统蓝
+        tableView.tintColor = .label
         tableView.accessibilityIdentifier = "settings-debug-table-view"
     }
 
