@@ -8,6 +8,8 @@ import Foundation
 protocol ProfileEditClienting: AnyObject {
     func loadIntroduction(uid: Int) async throws -> ProfileIntroduction
     func saveIntroduction(_ introduction: ProfileIntroduction) async throws
+    /// 提前在隐藏 WebView 里打开首页，保存和上传头像时不用再等页面加载。
+    func prepareForSaving()
 }
 
 /// 读写个人信息设置页的 Bio、签名、Readme，接口与网页 /setting#introduction 一致。
@@ -42,6 +44,19 @@ final class NodeSeekProfileEditClient: ProfileEditClienting {
             throw decoded.message.map(UserContentClientError.rejected) ?? UserContentClientError.unsuccessfulResponse
         }
         return ProfileIntroduction(bio: detail.bio ?? "", signature: detail.signatureMarkdown ?? "", readme: detail.readme ?? "")
+    }
+
+    func prepareForSaving() {
+        let pageURL = baseURL
+        Task { @MainActor in
+            do {
+                try await withHiddenWebViewPageActionLoader(logMessage: "预热编辑资料保存页") { loader in
+                    try await loader.prepareAutomationPage(pageURL: pageURL, timeoutInterval: 20, reason: "编辑资料打开预热")
+                }
+            } catch {
+                AppLog.warning(.webView, "编辑资料保存页预热失败: error=\(error.localizedDescription)")
+            }
+        }
     }
 
     func saveIntroduction(_ introduction: ProfileIntroduction) async throws {

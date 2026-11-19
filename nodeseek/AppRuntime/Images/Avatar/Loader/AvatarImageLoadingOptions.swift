@@ -31,6 +31,18 @@ enum AvatarImageLoadingOptions {
         )
     }
 
+    /// 站点头像经 CDN 缓存（max-age 4 小时），地址不变时上传后仍会拿到旧图。
+    /// 和网页上传后一样带 no-cache 请求一次让 CDN 回源，再清掉本地缓存。
+    static func refreshAfterUpload(url: URL?) async {
+        guard let resolved = ImageURLResolver.resolve(url) else { return }
+        var request = URLRequest(url: resolved, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
+        WebRequestFingerprint.applyImageHeaders(to: &request)
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.setValue("no-cache", forHTTPHeaderField: "Pragma")
+        _ = try? await URLSession(configuration: makeSessionConfiguration()).data(for: request)
+        removeCachedAvatar(for: resolved)
+    }
+
     static func makeDownloader() -> ImageDownloader {
         let downloader = ImageDownloader(name: "NodeSeekAvatarDownloader")
         downloader.sessionConfiguration = makeSessionConfiguration()

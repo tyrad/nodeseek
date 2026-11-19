@@ -139,6 +139,7 @@ private final class ProfileEditClientStub: ProfileEditClienting {
     var error: Error?
 
     func loadIntroduction(uid: Int) async throws -> ProfileIntroduction { ProfileIntroduction() }
+    func prepareForSaving() {}
 
     func saveIntroduction(_ introduction: ProfileIntroduction) async throws {
         if let error { throw error }
@@ -222,5 +223,16 @@ struct ProfileAvatarTests {
         ) else { return nil }
         context.draw(cgImage, in: CGRect(x: -50, y: -50, width: 100, height: 100))
         return (data[0], data[2])
+    }
+}
+
+@MainActor
+struct HiddenWebViewAutomationPageMatchTests {
+    /// 站点根地址带不带 / 是同一页，否则每次保存资料都要重新加载首页。
+    @Test func siteRootWithAndWithoutSlashIsSamePage() throws {
+        let loaded = try #require(URL(string: "https://www.nodeseek.com/"))
+        #expect(HiddenWebViewLoader.isSameAutomationPage(loaded, NodeSeekSite.baseURL))
+        #expect(HiddenWebViewLoader.isSameAutomationPage(loaded, try #require(URL(string: "https://www.nodeseek.com/fans"))) == false)
+        #expect(HiddenWebViewLoader.isSameAutomationPage(loaded, try #require(URL(string: "https://www.nodeseek.com/?page=2"))) == false)
     }
 }

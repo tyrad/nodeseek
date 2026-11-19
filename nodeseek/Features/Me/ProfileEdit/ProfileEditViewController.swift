@@ -61,6 +61,7 @@ final class ProfileEditViewController: UIViewController {
         view.accessibilityIdentifier = "profile-edit-page"
         setupNavigationItem()
         setupTableView()
+        client.prepareForSaving()
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(appTextSizeDidChange),
@@ -217,9 +218,12 @@ final class ProfileEditViewController: UIViewController {
         present(alert, animated: true)
     }
 
+    /// 先显示新内容，后台保存；失败时恢复原内容并提示。
     private func saveBio(_ updated: ProfileIntroduction) {
+        let previous = introduction
         isSavingBio = true
-        tableView.reloadRows(at: [IndexPath(row: Row.bio.rawValue, section: 0)], with: .none)
+        loadState = .loaded(updated)
+        tableView.reloadData()
         Task { @MainActor [weak self, client] in
             do {
                 try await client.saveIntroduction(updated)
@@ -228,6 +232,7 @@ final class ProfileEditViewController: UIViewController {
             } catch {
                 guard let self else { return }
                 isSavingBio = false
+                if let previous { loadState = .loaded(previous) }
                 tableView.reloadData()
                 let alert = UIAlertController(title: Self.text("保存失败"), message: error.localizedDescription, preferredStyle: .alert)
                 alert.addAction(UIAlertAction(title: Self.text("好"), style: .cancel))
@@ -267,8 +272,7 @@ final class ProfileEditViewController: UIViewController {
             do {
                 try await avatarUploader.upload(pngData: data)
                 guard let self else { return }
-                // 头像地址不变，清掉缓存后其他页面再显示时会重新下载。
-                AvatarImageLoadingOptions.removeCachedAvatar(for: account.avatarURL)
+                await AvatarImageLoadingOptions.refreshAfterUpload(url: account.avatarURL)
                 headerView.setUploading(false, preview: image)
                 BottomToast.show(Self.text("头像已更新"), in: view)
             } catch {
@@ -382,36 +386,22 @@ extension ProfileEditViewController: UITableViewDataSource, UITableViewDelegate 
     }
 }
 
-/// 表头：居中的大头像、更换按钮和昵称。
+/// 表头：居中的大头像和昵称，点头像更换。
 final class ProfileEditAvatarHeaderView: UIView {
     var onChangeAvatar: (() -> Void)?
 
+    private let avatarControl = UIControl()
     private let avatarImageView = UIImageView()
+    /// 右下角相机标记，提示头像可以点。
+    private let badgeView = UIImageView()
+    private let uploadingOverlay = UIView()
+    private let spinner = UIActivityIndicatorView(style: .medium)
     private let nameLabel = UILabel()
     private let stack = UIStackView()
-    private lazy var changeButton: UIButton = {
-        var configuration = UIButton.Configuration.plain()
-        configuration.baseForegroundColor = .label
-        configuration.imagePadding = 6
-        let button = UIButton(configuration: configuration, primaryAction: UIAction { [weak self] _ in
-            self?.onChangeAvatar?()
-        })
-        button.accessibilityIdentifier = "profile-edit-change-avatar"
-        return button
-    }()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        avatarImageView.contentMode = .scaleAspectFill
-        avatarImageView.clipsToBounds = true
-        avatarImageView.layer.cornerRadius = 44
-        avatarImageView.backgroundColor = .secondarySystemFill
-        avatarImageView.translatesAutoresizingMaskIntoConstraints = false
-        avatarImageView.accessibilityIgnoresInvertColors = true
-        NSLayoutConstraint.activate([
-            avatarImageView.widthAnchor.constraint(equalToConstant: 88),
-            avatarImageView.heightAnchor.constraint(equalToConstant: 88)
-        ])
+        setupAvatar()
 
         nameLabel.textColor = .label
         nameLabel.textAlignment = .center
@@ -420,10 +410,8 @@ final class ProfileEditAvatarHeaderView: UIView {
         stack.axis = .vertical
         stack.alignment = .center
         stack.spacing = 10
-        stack.addArrangedSubview(avatarImageView)
-        stack.addArrangedSubview(changeButton)
+        stack.addArrangedSubview(avatarControl)
         stack.addArrangedSubview(nameLabel)
-        stack.setCustomSpacing(4, after: avatarImageView)
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         NSLayoutConstraint.activate([
@@ -448,25 +436,83 @@ final class ProfileEditAvatarHeaderView: UIView {
 
     func updateTextSize() {
         nameLabel.font = AppTypography.font(basePointSize: 20, weight: .semibold)
-        updateChangeButtonTitle()
     }
 
-    /// 上传中按钮转圈且不可点；成功后直接显示裁好的图，失败由页面恢复原头像。
+    /// 上传中头像上转圈且不可点；成功后直接显示裁好的图，失败由页面恢复原头像。
     func setUploading(_ isUploading: Bool, preview: UIImage?) {
         if let preview {
             AvatarImageLoader.shared.cancel(on: avatarImageView)
             avatarImageView.image = preview
         }
-        changeButton.configuration?.showsActivityIndicator = isUploading
-        changeButton.isEnabled = !isUploading
-        updateChangeButtonTitle()
+        uploadingOverlay.isHidden = !isUploading
+        isUploading ? spinner.startAnimating() : spinner.stopAnimating()
+        avatarControl.isEnabled = !isUploading
+        avatarControl.accessibilityLabel = NSLocalizedString(isUploading ? "正在上传头像" : "更换头像", tableName: "Me", comment: "")
     }
 
-    private func updateChangeButtonTitle() {
-        let isUploading = changeButton.configuration?.showsActivityIndicator == true
-        var title = AttributedString(NSLocalizedString(isUploading ? "正在上传头像" : "更换头像", tableName: "Me", comment: ""))
-        title.font = AppTypography.font(basePointSize: 15, weight: .medium)
-        changeButton.configuration?.attributedTitle = title
+    private func setupAvatar() {
+        let size: CGFloat = 88
+        avatarControl.translatesAutoresizingMaskIntoConstraints = false
+        avatarControl.isAccessibilityElement = true
+        avatarControl.accessibilityTraits = .button
+        avatarControl.accessibilityLabel = NSLocalizedString("更换头像", tableName: "Me", comment: "")
+        avatarControl.accessibilityIdentifier = "profile-edit-change-avatar"
+        avatarControl.addAction(UIAction { [weak self] _ in self?.onChangeAvatar?() }, for: .touchUpInside)
+
+        avatarImageView.contentMode = .scaleAspectFill
+        avatarImageView.clipsToBounds = true
+        avatarImageView.layer.cornerRadius = size / 2
+        avatarImageView.backgroundColor = .secondarySystemFill
+        avatarImageView.accessibilityIgnoresInvertColors = true
+        avatarImageView.isUserInteractionEnabled = false
+
+        uploadingOverlay.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.5)
+        uploadingOverlay.layer.cornerRadius = size / 2
+        uploadingOverlay.isHidden = true
+        uploadingOverlay.isUserInteractionEnabled = false
+        spinner.hidesWhenStopped = true
+
+        // 反色圆底 + 背景色描边，浅色深色下都和头像分得开。
+        badgeView.image = UIImage(
+            systemName: "camera.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        )
+        badgeView.contentMode = .center
+        badgeView.tintColor = .systemBackground
+        badgeView.backgroundColor = .label
+        badgeView.layer.cornerRadius = 14
+        badgeView.layer.borderWidth = 2
+        badgeView.layer.borderColor = UIColor.systemGroupedBackground.cgColor
+        badgeView.isUserInteractionEnabled = false
+
+        for subview in [avatarImageView, uploadingOverlay, spinner, badgeView] as [UIView] {
+            subview.translatesAutoresizingMaskIntoConstraints = false
+            avatarControl.addSubview(subview)
+        }
+        NSLayoutConstraint.activate([
+            avatarControl.widthAnchor.constraint(equalToConstant: size),
+            avatarControl.heightAnchor.constraint(equalToConstant: size),
+            avatarImageView.topAnchor.constraint(equalTo: avatarControl.topAnchor),
+            avatarImageView.leadingAnchor.constraint(equalTo: avatarControl.leadingAnchor),
+            avatarImageView.trailingAnchor.constraint(equalTo: avatarControl.trailingAnchor),
+            avatarImageView.bottomAnchor.constraint(equalTo: avatarControl.bottomAnchor),
+            uploadingOverlay.topAnchor.constraint(equalTo: avatarControl.topAnchor),
+            uploadingOverlay.leadingAnchor.constraint(equalTo: avatarControl.leadingAnchor),
+            uploadingOverlay.trailingAnchor.constraint(equalTo: avatarControl.trailingAnchor),
+            uploadingOverlay.bottomAnchor.constraint(equalTo: avatarControl.bottomAnchor),
+            spinner.centerXAnchor.constraint(equalTo: avatarControl.centerXAnchor),
+            spinner.centerYAnchor.constraint(equalTo: avatarControl.centerYAnchor),
+            badgeView.widthAnchor.constraint(equalToConstant: 28),
+            badgeView.heightAnchor.constraint(equalToConstant: 28),
+            badgeView.trailingAnchor.constraint(equalTo: avatarControl.trailingAnchor, constant: 2),
+            badgeView.bottomAnchor.constraint(equalTo: avatarControl.bottomAnchor, constant: 2)
+        ])
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        // CALayer 的颜色不会自动跟随深浅色。
+        badgeView.layer.borderColor = UIColor.systemGroupedBackground.resolvedColor(with: traitCollection).cgColor
     }
 }
 

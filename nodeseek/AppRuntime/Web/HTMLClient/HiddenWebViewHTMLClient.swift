@@ -787,7 +787,7 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         return request
     }
 
-    private static func isSameAutomationPage(_ lhs: URL, _ rhs: URL) -> Bool {
+    static func isSameAutomationPage(_ lhs: URL, _ rhs: URL) -> Bool {
         guard let lhsComponents = URLComponents(url: lhs, resolvingAgainstBaseURL: false),
               let rhsComponents = URLComponents(url: rhs, resolvingAgainstBaseURL: false) else {
             return lhs.absoluteString == rhs.absoluteString
@@ -795,7 +795,8 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
         return lhsComponents.scheme?.lowercased() == rhsComponents.scheme?.lowercased()
             && lhsComponents.host?.lowercased() == rhsComponents.host?.lowercased()
             && lhsComponents.port == rhsComponents.port
-            && lhsComponents.path == rhsComponents.path
+            // 页面加载后的地址总带 /，调用方传的站点根地址可能没有，二者是同一页。
+            && (lhsComponents.path.isEmpty ? "/" : lhsComponents.path) == (rhsComponents.path.isEmpty ? "/" : rhsComponents.path)
             && lhsComponents.percentEncodedQuery == rhsComponents.percentEncodedQuery
     }
 
