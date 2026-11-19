@@ -69,6 +69,48 @@ final class PostDetailUXAuditTests: XCTestCase {
         )
     }
 
+    // 预期：点正文最后一行的普通文字不会落到签名链接；签名链接下方的扩大点击区仍然有效。
+    func test_U01_signatureHitAreaDoesNotCoverBodyLastLinePlainText() throws {
+        let signatureURLString = "https://www.nodeseek.com/post-717963-1"
+        let rendered = try XCTUnwrap(PostDetailViewController.makeRenderedContent(
+            html: "<p><a href=\"https://www.nodeseek.com/post-1016685-1#0\">#0</a> reply op test</p>",
+            signatureHTML: "<p><a href=\"\(signatureURLString)\">超好用的Nodeseek开源客户端</a></p>",
+            baseURL: NodeSeekSite.baseURL,
+            maxImageWidth: 308,
+            showsSignature: true
+        ))
+        let attributedText = try XCTUnwrap(rendered.compactMap { block -> NSAttributedString? in
+            if case .text(let text) = block { return text }
+            return nil
+        }.first)
+        let bodyLinkRange = (attributedText.string as NSString).range(of: "#0")
+        let signatureLinkRange = (attributedText.string as NSString).range(of: "超好用的Nodeseek开源客户端")
+
+        let richTextView = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 308, height: 400))
+        richTextView.configure(attributedText, onImageTapped: nil, onLinkTapped: nil, onLayoutInvalidated: nil)
+        richTextView.setNeedsLayout()
+        richTextView.layoutIfNeeded()
+
+        let linkButtons = richTextView.subviews.compactMap { $0 as? UIButton }
+        let bodyButton = try XCTUnwrap(linkButtons.first { NSLocationInRange($0.tag, bodyLinkRange) })
+        let signatureButton = try XCTUnwrap(linkButtons.first { NSLocationInRange($0.tag, signatureLinkRange) })
+
+        // 「reply op test」所在位置：正文链接右侧同一行，横向仍落在签名链接范围内。
+        let plainTextPoint = CGPoint(x: bodyButton.frame.maxX + 30, y: bodyButton.frame.midY)
+        XCTAssertLessThan(plainTextPoint.x, signatureButton.frame.maxX, "前置条件：该点横向应位于签名链接范围内")
+        let plainTextHit = richTextView.hitTest(plainTextPoint, with: nil)
+        XCTAssertFalse(
+            plainTextHit === signatureButton,
+            "点正文最后一行普通文字 \(plainTextPoint) 命中了签名链接，签名扩大点击区越过了正文"
+        )
+
+        let belowSignaturePoint = CGPoint(x: signatureButton.frame.midX, y: signatureButton.frame.maxY + 8)
+        XCTAssertTrue(
+            richTextView.hitTest(belowSignaturePoint, with: nil) === signatureButton,
+            "签名链接下方 \(belowSignaturePoint) 的扩大点击区应仍然有效"
+        )
+    }
+
     // MARK: - U04
 
     // 预期：浮动「评论」按钮默认位置与评论行尾部操作按钮（回复 / 引用 / 编辑）所在列不重叠。

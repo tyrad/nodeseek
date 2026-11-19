@@ -11,7 +11,7 @@
 
 | 编号 | 优先级 | 问题 | 测试 |
 | --- | --- | --- | --- |
-| U01 | P0 | 评论正文最后一行的链接被签名链接抢点击（点 #0 打开了签名里的帖子） | `PostDetailUXAuditTests.test_U01_bodyLastLineLinkCenterTapResolvesToBodyURL` |
+| U01 | P0 | 评论正文最后一行的链接被签名链接抢点击（点 #0 打开了签名里的帖子） | `PostDetailUXAuditTests.test_U01_bodyLastLineLinkCenterTapResolvesToBodyURL`<br>`PostDetailUXAuditTests.test_U01_signatureHitAreaDoesNotCoverBodyLastLinePlainText`（已修复） |
 | U02 | P0 | 未授权 NodeImage 时授权页堆满十几个「加载API密钥失败」提示 | `AppUXAuditTests.test_U02_nodeImageExtractionDoesNotClickAPIButtonInsidePollingTimer` |
 | U03 | P0 | 「每日签到」网页已加载完，但一直白屏 + 转圈，要滑一下才显示 | `AppUXAuditTests.test_U03_webPageStopsSpinnerOnceNavigationCommits` |
 | U04 | P0 | 详情页浮动「评论」按钮盖住评论行的操作按钮（编辑 / 引用） | `PostDetailUXAuditTests.test_U04_floatingReplyButtonDoesNotCoverCommentActionColumn` |
