@@ -334,11 +334,12 @@ final class AppUXAuditTests: XCTestCase {
         (control as? UIControl)?.sendActions(for: .touchUpInside)
         _ = await uxWaitUntil(timeout: 1) { context.navigationController.viewControllers.count > 1 }
 
-        let pushed = context.navigationController.viewControllers.last
-        XCTAssertTrue(
-            pushed is UserConnectionsViewController,
-            "U33: 点「粉丝」打开的是 \(pushed.map { String(describing: type(of: $0)) } ?? "nil")，不是粉丝列表"
-        )
+        let list = try XCTUnwrap(context.navigationController.topViewController as? UserConnectionsViewController)
+        let tabs = try XCTUnwrap(uxDescendants(of: list.view).first {
+            $0.accessibilityIdentifier == "connections-tabs"
+        } as? UISegmentedControl)
+        XCTAssertEqual(UserConnectionKind.allCases.firstIndex(of: .followers), tabs.selectedSegmentIndex)
+        XCTAssertEqual(context.navigationController.viewControllers.count, 2)
     }
 
     // MARK: - U34 「添加探针」填写后关闭不确认

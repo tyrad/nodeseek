@@ -665,7 +665,8 @@ private final class UserProfileBadgeLabel: UILabel {
     }
 }
 
-private final class UserProfileStatView: UIControl {
+final class UserProfileStatView: UIControl {
+    private let title: String
     private let separator = UIView()
     private let action: (() -> Void)?
 
@@ -675,15 +676,17 @@ private final class UserProfileStatView: UIControl {
 
     func setValue(_ value: String) {
         valueLabel.text = value
+        accessibilityLabel = "\(title) \(value)"
     }
 
     private let valueLabel = UILabel()
 
     init(value: String, title: String, action: (() -> Void)? = nil) {
+        self.title = title
         self.action = action
         super.init(frame: .zero)
 
-        valueLabel.text = value
+        setValue(value)
         valueLabel.font = .monospacedDigitSystemFont(ofSize: 20, weight: .bold)
         valueLabel.textColor = ReadingColors.text
         valueLabel.textAlignment = .center
@@ -736,7 +739,6 @@ private final class UserProfileStatView: UIControl {
         ])
 
         isAccessibilityElement = true
-        accessibilityLabel = "\(title) \(value)"
         accessibilityTraits = action == nil ? .staticText : .button
         if action != nil {
             addTarget(self, action: #selector(tapped), for: .touchUpInside)

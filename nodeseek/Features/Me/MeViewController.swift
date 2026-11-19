@@ -29,7 +29,9 @@ final class MeViewController: UIViewController {
 
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
-    private let profileCard = MeProfileCardView()
+    private lazy var profileCard = MeProfileCardView { [weak self] destination in
+        self?.openStat(destination)
+    }
     private let discussionsRow = MeListRowView(symbolName: "doc.text", title: "我的帖子")
     private let commentsRow = MeListRowView(symbolName: "bubble.left", title: "我的评论")
     private let collectionsRow = MeListRowView(symbolName: "bookmark", title: "我的收藏")
@@ -285,6 +287,24 @@ final class MeViewController: UIViewController {
         }
     }
 
+    private func openStat(_ destination: MeStatDestination) {
+        guard requireLogin() else { return }
+        let controller: UIViewController
+        switch destination {
+        case .credit:
+            guard let uid = account.nodeSeekUID else { return }
+            controller = UserCreditViewController(uid: uid, profile: profile, client: client)
+        case .stardust:
+            guard let uid = account.nodeSeekUID else { return }
+            controller = UserStardustViewController(uid: uid, profile: profile, isSelf: true, client: client)
+        case .followers:
+            controller = UserConnectionsViewController(initialKind: .followers, client: client)
+        case .following:
+            controller = UserConnectionsViewController(initialKind: .following, client: client)
+        }
+        navigationController?.pushViewController(controller, animated: true)
+    }
+
     @objc private func discussionsTapped() {
         guard requireLogin() else { return }
         router.navigateToUserDiscussions()
@@ -398,7 +418,11 @@ final class MeViewController: UIViewController {
 
 // MARK: - 资料卡
 
-/// 账号 + 五格数字 + 升级进度合成一张卡，整卡可点；未登录时显示登录引导。
+private enum MeStatDestination {
+    case credit, stardust, followers, following
+}
+
+/// 头像和昵称通往个人主页，可操作的统计项直达明细。
 private final class MeProfileCardView: UIControl {
     var onTap: (() -> Void)?
     var onLoginTap: (() -> Void)?
@@ -408,7 +432,7 @@ private final class MeProfileCardView: UIControl {
         withConfiguration: UIImage.SymbolConfiguration(pointSize: 26, weight: .regular)
     )
 
-    private let headerView = UIView()
+    private let headerView = UIControl()
     private let avatarImageView = UIImageView()
     private let nameLabel = UILabel()
     private let metaLabel = UILabel()
@@ -417,7 +441,7 @@ private final class MeProfileCardView: UIControl {
 
     private let statsSeparator = MeSeparatorView()
     private let statsStack = UIStackView()
-    private let statViews: [MeStatView] = ["等级", "鸡腿", "星辰", "粉丝", "关注"].map { MeStatView(title: $0) }
+    private let statViews: [UserProfileStatView]
 
     private let levelSeparator = MeSeparatorView()
     private let levelContainer = UIView()
@@ -425,15 +449,22 @@ private final class MeProfileCardView: UIControl {
     private let todayLabel = UILabel()
     private let levelBar = MeProgressBar()
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
+    init(onStatTap: @escaping (MeStatDestination) -> Void) {
+        statViews = [
+            UserProfileStatView(value: "–", title: "等级"),
+            UserProfileStatView(value: "–", title: "鸡腿") { onStatTap(.credit) },
+            UserProfileStatView(value: "–", title: "星辰") { onStatTap(.stardust) },
+            UserProfileStatView(value: "–", title: "粉丝") { onStatTap(.followers) },
+            UserProfileStatView(value: "–", title: "关注") { onStatTap(.following) }
+        ]
+        super.init(frame: .zero)
         backgroundColor = .secondarySystemGroupedBackground
         layer.cornerRadius = 18
         layer.cornerCurve = .continuous
         accessibilityIdentifier = "me-profile-card"
         isAccessibilityElement = true
-        accessibilityTraits = .button
         addTarget(self, action: #selector(cardTapped), for: .touchUpInside)
+        headerView.addTarget(self, action: #selector(cardTapped), for: .touchUpInside)
         setupHeader()
         setupStats()
         setupLevel()
@@ -463,13 +494,14 @@ private final class MeProfileCardView: UIControl {
         }
     }
 
-    /// 除了“登录”按钮，卡片内任意位置的点按都交给整卡处理。
+    /// 游客可点整卡登录；登录后各统计项独立接收点按。
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         guard let hitView = super.hitTest(point, with: event) else { return nil }
-        if loginButton.isHidden == false, hitView.isDescendant(of: loginButton) {
-            return hitView
+        if !loginButton.isHidden {
+            return hitView.isDescendant(of: loginButton) ? hitView : self
         }
-        return self
+        if hitView.isDescendant(of: headerView) { return headerView }
+        return hitView.isDescendant(of: statsStack) ? hitView : self
     }
 
     func renderLoggedIn(account: AccountResponse, profile: UserProfileRecord?, progress: UserTodayProgressRecord?) {
@@ -598,9 +630,10 @@ private final class MeProfileCardView: UIControl {
         statsStack.axis = .horizontal
         statsStack.distribution = .fillEqually
         statsStack.isLayoutMarginsRelativeArrangement = true
-        statsStack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 12, leading: 0, bottom: 12, trailing: 0)
+        statsStack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 7, leading: 0, bottom: 7, trailing: 0)
         for (index, statView) in statViews.enumerated() {
-            statView.showsLeadingDivider = index > 0
+            statView.showsLeadingSeparator = index > 0
+            statView.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
             statsStack.addArrangedSubview(statView)
         }
     }
@@ -632,16 +665,20 @@ private final class MeProfileCardView: UIControl {
         ])
     }
 
-    /// 整卡作为一个无障碍元素：读名字、UID 和五格数字。
     private func updateAccessibility(loggedIn: Bool) {
+        isAccessibilityElement = !loggedIn
+        accessibilityTraits = loggedIn ? .none : .button
+        headerView.isAccessibilityElement = loggedIn
+        headerView.accessibilityTraits = .button
         guard loggedIn else {
             accessibilityLabel = "未登录，登录后查看等级、鸡腿和今日进度"
             accessibilityHint = "点按登录"
             return
         }
-        let stats = statViews.compactMap(\.accessibilityLabel).joined(separator: "，")
-        accessibilityLabel = [nameLabel.text, metaLabel.text, stats].compactMap { $0 }.joined(separator: "，")
-        accessibilityHint = "点按查看个人主页"
+        accessibilityLabel = nil
+        accessibilityHint = nil
+        headerView.accessibilityLabel = [nameLabel.text, metaLabel.text].compactMap { $0 }.joined(separator: "，")
+        headerView.accessibilityHint = "点按查看个人主页"
     }
 
     @objc private func cardTapped() {
@@ -650,66 +687,6 @@ private final class MeProfileCardView: UIControl {
 
     @objc private func loginTapped() {
         onLoginTap?()
-    }
-}
-
-/// 五格数字中的一格：粗体数字 + 灰色标签，左侧细分隔线。
-private final class MeStatView: UIView {
-    var showsLeadingDivider = false {
-        didSet { divider.isHidden = !showsLeadingDivider }
-    }
-
-    private let valueLabel = UILabel()
-    private let titleLabel = UILabel()
-    private let divider = UIView()
-
-    init(title: String) {
-        super.init(frame: .zero)
-        valueLabel.font = .monospacedDigitSystemFont(ofSize: 19, weight: .bold)
-        valueLabel.textColor = ReadingColors.text
-        valueLabel.textAlignment = .center
-        valueLabel.adjustsFontSizeToFitWidth = true
-        valueLabel.minimumScaleFactor = 0.7
-        valueLabel.text = "–"
-        titleLabel.font = .systemFont(ofSize: 12)
-        titleLabel.textColor = .secondaryLabel
-        titleLabel.textAlignment = .center
-        titleLabel.text = title
-        divider.backgroundColor = .separator
-        divider.isHidden = true
-
-        let stack = UIStackView(arrangedSubviews: [valueLabel, titleLabel])
-        stack.axis = .vertical
-        stack.spacing = 2
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        divider.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
-        addSubview(divider)
-        NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
-            stack.topAnchor.constraint(equalTo: topAnchor),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            divider.leadingAnchor.constraint(equalTo: leadingAnchor),
-            divider.widthAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
-            divider.topAnchor.constraint(equalTo: topAnchor, constant: 5),
-            divider.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -5)
-        ])
-        isAccessibilityElement = true
-        updateAccessibility()
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    func setValue(_ value: String) {
-        valueLabel.text = value
-        updateAccessibility()
-    }
-
-    private func updateAccessibility() {
-        accessibilityLabel = "\(titleLabel.text ?? "") \(valueLabel.text ?? "")"
     }
 }
 

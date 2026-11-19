@@ -43,7 +43,7 @@
 | U30 | P2 | 0 条评论的帖子下方空白，没有空状态提示 | 不修。帖子正常加载且没有回复时，正文下方自然留白。 |
 | U31 | P2 | 编辑评论的草稿条写「无标题」 | `PostDetailComposerUXAuditTests.test_U31_commentDraftStripDoesNotShowUntitled` |
 | U32 | P2 | 自己评论的长按菜单里有「投放鸡腿」 | `PostDetailUXAuditTests.test_U32_ownCommentContextMenuHasNoChickenLeg` |
-| U33 | P2 | 「我的」页点「粉丝」进入个人主页而不是粉丝列表 | `AppUXAuditTests.test_U33_meFansStatOpensFollowersList` |
+| U33 | P2 | 「我的」页点「粉丝」进入个人主页而不是粉丝列表 | `AppUXAuditTests.test_U33_meFansStatOpensFollowersList`（已修复：鸡腿、星辰、粉丝、关注均可直接打开对应明细） |
 | U34 | P2 | 「添加探针」填了内容点关闭不确认 | `AppUXAuditTests.test_U34_probeEditorAsksBeforeDiscardingTypedAddress` |
 | U35 | P2 | 侧边栏菜单文字左边缘不齐（73~80pt） | `AppUXAuditTests.test_U35_sideMenuRowTitlesShareLeadingEdge` |
 | U36 | P2 | 搜索结果不高亮关键词 | `AppUXAuditTests.test_U36_searchResultTitleHighlightsKeyword` |
