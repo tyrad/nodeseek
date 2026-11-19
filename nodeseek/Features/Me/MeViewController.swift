@@ -23,7 +23,7 @@ final class MeViewController: UIViewController {
     private var progress: UserTodayProgressRecord?
     private var loadTask: Task<Void, Never>?
     private var loadingUID: Int?
-    private weak var progressSheet: MeTodayProgressViewController?
+    private weak var progressDialog: MeTodayProgressViewController?
     private var unreadCountTask: Task<Void, Never>?
     /// 登录页是 push 进来的，关闭时本页还不在 window 上，所以用出现/消失自己记可见状态
     private var isPageVisible = false
@@ -198,8 +198,8 @@ final class MeViewController: UIViewController {
         let uidChanged = account.nodeSeekUID != self.account.nodeSeekUID
         self.account = account
         if uidChanged || account.isLoggedIn == false {
-            progressSheet?.dismiss(animated: false)
-            progressSheet = nil
+            progressDialog?.dismiss(animated: false)
+            progressDialog = nil
             profile = nil
             progress = nil
         }
@@ -221,12 +221,12 @@ final class MeViewController: UIViewController {
         guard loadingUID != uid else { return }
         loadTask?.cancel()
         loadingUID = uid
-        updateProgressSheet()
+        updateProgressDialog()
         loadTask = Task { [weak self, client] in
             defer {
                 if !Task.isCancelled {
                     self?.loadingUID = nil
-                    self?.updateProgressSheet()
+                    self?.updateProgressDialog()
                 }
             }
             // 资料和今日进度并行请求；进度失败不影响资料展示，只是不显示今日摘要
@@ -264,7 +264,7 @@ final class MeViewController: UIViewController {
 
     private func render() {
         guard isViewLoaded else { return }
-        updateProgressSheet()
+        updateProgressDialog()
         if account.isLoggedIn {
             profileCard.renderLoggedIn(account: account, profile: profile, progress: progress)
         } else {
@@ -298,27 +298,19 @@ final class MeViewController: UIViewController {
 
     private func showTodayProgress() {
         guard profile != nil, presentedViewController == nil else { return }
-        let sheet = MeTodayProgressViewController()
-        sheet.onRetry = { [weak self] in self?.loadProfile() }
-        progressSheet = sheet
-        updateProgressSheet()
+        let dialog = MeTodayProgressViewController()
+        dialog.modalPresentationStyle = .overFullScreen
+        dialog.modalTransitionStyle = .crossDissolve
+        dialog.onRetry = { [weak self] in self?.loadProfile() }
+        progressDialog = dialog
+        updateProgressDialog()
         if progress == nil { loadProfile() }
-        let navigation = UINavigationController(rootViewController: sheet)
-        navigation.modalPresentationStyle = .pageSheet
-        if let presentation = navigation.sheetPresentationController {
-            if #available(iOS 16.0, *) {
-                presentation.detents = [.custom { _ in 320 }, .large()]
-            } else {
-                presentation.detents = [.medium(), .large()]
-            }
-            presentation.prefersGrabberVisible = true
-        }
-        present(navigation, animated: true)
+        present(dialog, animated: true)
     }
 
-    private func updateProgressSheet() {
-        guard let progressSheet, let profile else { return }
-        progressSheet.render(level: profile.levelProgress, progress: progress, isLoading: loadingUID != nil)
+    private func updateProgressDialog() {
+        guard let progressDialog, let profile else { return }
+        progressDialog.render(level: profile.levelProgress, progress: progress, isLoading: loadingUID != nil)
     }
 
     private func openStat(_ destination: MeStatDestination) {
