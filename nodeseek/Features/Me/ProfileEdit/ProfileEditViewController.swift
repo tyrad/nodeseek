@@ -271,7 +271,7 @@ final class ProfileEditViewController: UIViewController {
             do {
                 try await avatarUploader.upload(pngData: data)
                 guard let self else { return }
-                await AvatarImageLoadingOptions.refreshAfterUpload(url: account.avatarURL)
+                await AvatarImageLoadingOptions.refreshFromOrigin(url: account.avatarURL)
                 headerView.setUploading(false, preview: image)
                 BottomToast.show(Self.text("头像已更新"), in: view)
             } catch {

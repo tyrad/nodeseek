@@ -108,6 +108,19 @@ struct AppNavigationLayoutTests {
         #expect(settings.hasConfirmedChoice)
     }
 
+    @Test func mePageSupportsPullToRefresh() throws {
+        let viewController = MeViewController()
+        viewController.loadViewIfNeeded()
+        let scrollView = try #require(viewController.view.subviews.compactMap { $0 as? UIScrollView }.first)
+        let refreshControl = try #require(scrollView.refreshControl)
+        #expect(refreshControl.allTargets.contains(viewController))
+
+        // 游客下拉也要及时收起，不能一直转圈
+        refreshControl.beginRefreshing()
+        refreshControl.sendActions(for: .valueChanged)
+        #expect(refreshControl.isRefreshing == false)
+    }
+
     @Test func mePageShowsGuestStateWithLoginButtonAndEntries() throws {
         let viewController = MeViewController()
         viewController.loadViewIfNeeded()

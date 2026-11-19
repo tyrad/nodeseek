@@ -29,6 +29,7 @@ final class MeViewController: UIViewController {
     private var isPageVisible = false
 
     private let scrollView = UIScrollView()
+    private let refreshControl = UIRefreshControl()
     private let contentStack = UIStackView()
     private lazy var profileCard = MeProfileCardView { [weak self] destination in
         self?.openStat(destination)
@@ -140,6 +141,8 @@ final class MeViewController: UIViewController {
 
     private func setupLayout() {
         scrollView.alwaysBounceVertical = true
+        refreshControl.addTarget(self, action: #selector(pullToRefresh), for: .valueChanged)
+        scrollView.refreshControl = refreshControl
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         contentStack.axis = .vertical
         contentStack.spacing = Layout.groupSpacing
@@ -244,6 +247,29 @@ final class MeViewController: UIViewController {
                 guard !Task.isCancelled else { return }
                 AppLog.warning(.account, "我的页资料加载失败: \(error.localizedDescription)")
             }
+        }
+    }
+
+    /// 下拉刷新：账号、资料、通知未读数重新请求；头像地址不变，
+    /// 网页端换过头像时本地和 CDN 都还是旧图，需要回源后重新加载。
+    @objc private func pullToRefresh() {
+        accountController.refreshIfNeeded(force: true)
+        guard account.isLoggedIn else {
+            refreshControl.endRefreshing()
+            return
+        }
+        refreshNotificationUnreadCount()
+        // 正在请求的资料作废，重新拉一次最新的
+        loadingUID = nil
+        loadProfile()
+        let profileTask = loadTask
+        let avatarURL = account.avatarURL
+        Task { [weak self] in
+            await AvatarImageLoadingOptions.refreshFromOrigin(url: avatarURL)
+            await profileTask?.value
+            guard let self else { return }
+            render()
+            refreshControl.endRefreshing()
         }
     }
 
