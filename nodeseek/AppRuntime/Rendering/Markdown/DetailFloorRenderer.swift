@@ -11,7 +11,7 @@ nonisolated struct DetailFloorRequest: Equatable, Sendable {
 nonisolated indirect enum DetailLayoutBlock: Sendable {
     case text(DetailTextSnapshot)
     case quote([DetailLayoutBlock])
-    case tabs(titles: [String], pages: [[DetailLayoutBlock]])
+    case tabs(sections: [DetailDocument.Tab], firstPage: [DetailLayoutBlock])
     case widget(DetailDocument.Block)
 }
 
@@ -43,6 +43,16 @@ nonisolated struct DetailFloorRenderer: Sendable {
             }
             guard !Task.isCancelled else { return }
             await deliver(request, result)
+        }
+    }
+
+    @MainActor
+    func startTab(_ section: DetailDocument.Tab, appearance: DetailTextAppearance, width: CGFloat,
+                  deliver: @escaping @MainActor @Sendable ([DetailLayoutBlock]) -> Void) -> Task<Void, Never> {
+        Task.detached(priority: .userInitiated) {
+            guard let blocks = try? layout(section.blocks, appearance: appearance, width: width),
+                  !Task.isCancelled else { return }
+            await deliver(blocks)
         }
     }
 
@@ -84,7 +94,10 @@ nonisolated struct DetailFloorRenderer: Sendable {
                 }
             case .tabs(let tabs):
                 try flush()
-                result.append(.tabs(titles: tabs.map(\.title), pages: try tabs.map { try layout($0.blocks, appearance: appearance, width: width) }))
+                if let first = tabs.first {
+                    let visible = try layout(first.blocks, appearance: appearance, width: width)
+                    result.append(.tabs(sections: tabs, firstPage: visible))
+                }
             default:
                 try flush()
                 result.append(.widget(block))

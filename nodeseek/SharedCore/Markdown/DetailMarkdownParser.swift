@@ -164,9 +164,15 @@ nonisolated struct DetailMarkdownParser: Sendable {
     }
 
     private func destination(_ raw: String?) -> URL? {
-        guard let raw, !raw.isEmpty, let url = URL(string: raw, relativeTo: baseURL)?.absoluteURL,
-              ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host != nil else { return nil }
-        return url
+        // UTF-8 字节初始化保留已有的 %XX，同时转义裸字符，避免混合输入被二次编码。
+        guard let raw, !raw.isEmpty,
+              let url = URL(dataRepresentation: Data(raw.utf8), relativeTo: baseURL)?.absoluteURL,
+              var components = URLComponents(url: url, resolvingAgainstBaseURL: true),
+              ["http", "https"].contains(components.scheme?.lowercased() ?? ""),
+              let host = components.host, !host.isEmpty else { return nil }
+        // 重新设置解码后的主机名，使无效主机不能借由百分号编码成为跳转目标。
+        components.host = host
+        return components.url
     }
 
     private static let token = try! NSRegularExpression(pattern: #"https?://[^\s<>]+|nsapp://[^\s<>]+|:[A-Za-z][A-Za-z0-9]+:|(?<![\p{L}\p{N}_])@[\p{L}\p{N}_-]+"#)

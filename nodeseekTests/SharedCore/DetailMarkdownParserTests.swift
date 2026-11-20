@@ -1,3 +1,4 @@
+import CoreFoundation
 import Foundation
 import Kanna
 import Testing
@@ -188,14 +189,47 @@ struct DetailMarkdownParserTests {
         }
     }
 
+    private func bareLinkTarget(_ text: String) throws -> String {
+        let blocks = try parse(text)
+        guard case .paragraph(let runs) = blocks.first, case .text(let label, _, let link) = runs.first else {
+            throw TestError.fallback
+        }
+        #expect(label == text)
+        return try #require(link).absoluteString
+    }
+
+    @Test func mixedEscapesSurviveNavigation() throws {
+        let raw = "https://example.com/a%2Fb中文?q=%23）&raw=%xx#段"
+        let target = "https://example.com/a%2Fb%E4%B8%AD%E6%96%87?q=%23%EF%BC%89&raw=%25xx#%E6%AE%B5"
+        #expect(CFURLCreateWithString(nil, raw as CFString, nil) == nil)
+        let rendered = try bareLinkTarget(raw)
+        #expect(rendered == target)
+        #expect(CFURLCreateWithString(nil, rendered as CFString, nil) != nil)
+        #expect(try bareLinkTarget(target) == target)
+    }
+
+    @Test func relativeLinkAndImageKeepExistingEscapes() throws {
+        let raw = "/a%2Fb 中文?q=%23）"
+        let url = try #require(URL(string: "/a%2Fb%20%E4%B8%AD%E6%96%87?q=%23%EF%BC%89", relativeTo: NodeSeekSite.baseURL)?.absoluteURL)
+        #expect(try parse("[详情](<" + raw + ">)") == [.paragraph([.text("详情", [], url)])])
+        #expect(try parse("![图](<" + raw + ">)") == [.image(alt: "图", url: url)])
+        #expect(try bareLinkTarget("https://[::1]/a%2Fb") == "https://[::1]/a%2Fb")
+        #expect(parser.render(.init(html: "网页", visibleMarkdown: "[链接](<https://bad host/path>)")) == .webpage(html: "网页"))
+    }
+
     @Test func dialectMatchesCapturedExamples() throws {
-        struct Example: Decodable { struct Item: Decodable { let markdown: String }; let item: Item; let match: String }
+        struct Example: Decodable { struct Item: Decodable { let markdown: String; let html: String }; let item: Item; let match: String }
         let cases = try JSONDecoder().decode([String: Example].self, from: data("detail-replay-dialect"))
         for (key, example) in cases { if case .webpage = parser.render(.init(html: "", visibleMarkdown: example.item.markdown)) { Issue.record("Unexpected fallback: \(key)") } }
         #expect(try parse("# 标题\n\n甲\n乙") == [.heading(2, [.text("标题", [], nil)]), .paragraph([.text("甲", [], nil), .text("\n", [], nil), .text("乙", [], nil)])])
         #expect(try parse("**点进去**就") == [.paragraph([.text("点进去", .bold, nil), .text("就", [], nil)])])
         let url = try #require(cases["urlBoundary"]?.match)
-        #expect(try parse(url) == [.paragraph([.text(url, [], URL(string: url))])])
+        let page = try #require(cases["urlBoundary"])
+        let anchor = try #require(Kanna.HTML(html: page.item.html, encoding: .utf8).at_xpath("//a"))
+        let href = try #require(anchor["href"])
+        let jump = try #require(URLComponents(string: href))
+        let target = try #require(jump.queryItems?.first(where: { $0.name == "to" })?.value)
+        #expect(try bareLinkTarget(url) == target)
         #expect(try parse("| A |\n|---|\n| <br> |") == [.table(rows: [[[.text("A", [], nil)]], [[.text("<br>", [], nil)]]])])
         let sticker = try #require(NodeSeekStickerLibrary.urlsByToken["xhj003"])
         #expect(try parse("@男朋友 :xhj003:") == [.paragraph([.text("@男朋友", [], URL(string: "/member?t=%E7%94%B7%E6%9C%8B%E5%8F%8B", relativeTo: NodeSeekSite.baseURL)?.absoluteURL), .text(" ", [], nil), .sticker(token: ":xhj003:", url: sticker)])])

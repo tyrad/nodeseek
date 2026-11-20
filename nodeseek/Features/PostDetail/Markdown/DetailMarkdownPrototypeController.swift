@@ -144,8 +144,17 @@ final class DetailMarkdownPrototypeController: UIViewController, UIScrollViewDel
                 stack.addArrangedSubview(text.accessibleContainer())
             case .quote(let children):
                 append(children, to: quote(in: stack), width: width-12)
-            case .tabs(let titles, let pages):
-                tabs(titles, in: stack) { [weak self] index, page in self?.append(pages[index], to: page, width: width) }
+            case .tabs(let sections, let firstPage):
+                tabs(sections.map(\.title), in: stack, initial: { page in
+                    self.append(firstPage, to: page, width: width)
+                }) { [weak self] index, page in
+                    guard let self, let appearance = self.appearance else { return }
+                    page.layoutTask = self.renderer.startTab(sections[index], appearance: appearance, width: width) { [weak self, weak page] blocks in
+                        guard !Task.isCancelled, let self, let page else { return }
+                        self.append(blocks, to: page, width: width)
+                        self.updatePlayback()
+                    }
+                }
             case .widget(let block):
                 switch block {
                 case let .image(alt, url): appendLegacy([.image(.init(url: url, altText: alt))], to: stack, width: width)
@@ -193,9 +202,15 @@ final class DetailMarkdownPrototypeController: UIViewController, UIScrollViewDel
         return stack
     }
 
-    private func tabs(_ titles: [String], in parent: UIStackView, show: @escaping (Int, UIStackView) -> Void) {
+    private final class TabPage: UIStackView {
+        var layoutTask: Task<Void, Never>?
+        deinit { layoutTask?.cancel() }
+    }
+
+    private func tabs(_ titles: [String], in parent: UIStackView, initial: ((TabPage) -> Void)? = nil,
+                      show: @escaping (Int, TabPage) -> Void) {
         guard !titles.isEmpty else { return }
-        let page = UIStackView()
+        let page = TabPage()
         page.axis = .vertical
         page.spacing = 8
         let scroller = UIScrollView()
@@ -216,12 +231,13 @@ final class DetailMarkdownPrototypeController: UIViewController, UIScrollViewDel
         ])
         control.addAction(UIAction { [weak page, weak control] _ in
             guard let page, let index = control?.selectedSegmentIndex, titles.indices.contains(index) else { return }
+            page.layoutTask?.cancel()
             page.arrangedSubviews.forEach { $0.removeFromSuperview() }
             show(index, page)
         }, for: .valueChanged)
         attach(scroller, to: parent, height: max(44, font.lineHeight + 16))
         parent.addArrangedSubview(page)
-        show(0, page)
+        if let initial { initial(page) } else { show(0, page) }
     }
 
     @discardableResult

@@ -1,5 +1,6 @@
 #if DEBUG
 import Kingfisher
+import SafariServices
 import UIKit
 import ImageIO
 import UniformTypeIdentifiers
@@ -141,6 +142,97 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         }).keeping("TextKit-dark-accessibility"))
     }
 
+    func testActivatingRenderedLinkDeliversEncodedDestination() async throws {
+        let raw = "https://example.invalid/a%2Fb中文?q=%23）"
+        let page = DetailMarkdownPrototypeController(id: "link", source: .init(html: "", visibleMarkdown: raw))
+        let window = try host(page)
+        defer { window.isHidden = true }
+        try await waitFor { page.installedRequest != nil }
+        let rendered = try XCTUnwrap(descendants(page.view, DetailSelectableTextView.self).first)
+        var destination: URL?
+        let text = DetailSelectableTextView(snapshot: rendered.snapshot, scale: 2, onLink: { destination = $0 }, stickerSizeChanged: {})
+        let container = text.accessibleContainer()
+        let elements = try XCTUnwrap(container.accessibilityElements as? [UIAccessibilityElement])
+        let link = try XCTUnwrap(elements.first { $0.accessibilityTraits.contains(.link) })
+        XCTAssertEqual(link.accessibilityLabel, raw)
+        XCTAssertTrue(link.accessibilityActivate())
+        XCTAssertEqual(destination?.absoluteString, "https://example.invalid/a%2Fb%E4%B8%AD%E6%96%87?q=%23%EF%BC%89")
+
+        let installed = try XCTUnwrap(rendered.superview?.accessibilityElements as? [UIAccessibilityElement])
+        let installedLink = try XCTUnwrap(installed.first { $0.accessibilityTraits.contains(.link) })
+        XCTAssertTrue(installedLink.accessibilityActivate())
+        XCTAssertTrue(page.presentedViewController is SFSafariViewController)
+    }
+
+    func testTouchAtBottomOfTextBesideLeadingSticker() async throws {
+        let raw = ":xhj003:链接\n下一行"
+        let page = DetailMarkdownPrototypeController(id: "hit", source: .init(html: "", visibleMarkdown: raw))
+        let window = try host(page)
+        defer { window.isHidden = true }
+        try await waitFor { page.installedRequest != nil }
+        let view = try XCTUnwrap(descendants(page.view, DetailSelectableTextView.self).first)
+        let snapshot = view.snapshot
+        let box = try XCTUnwrap(snapshot.characters.first { (snapshot.string as NSString).substring(with: $0.range) == "链" })
+        let sticker = try XCTUnwrap(snapshot.stickers.first)
+        for y in [sticker.rect.maxY + 1, box.rect.maxY - 0.5] {
+            let hit = try XCTUnwrap(view.characterRange(at: CGPoint(x: box.rect.midX, y: y)))
+            XCTAssertEqual(view.text(in: hit), "链")
+        }
+        let next = try XCTUnwrap(snapshot.characters.first { (snapshot.string as NSString).substring(with: $0.range) == "下" })
+        XCTAssertLessThanOrEqual(box.rect.maxY, next.rect.minY + 0.01)
+        let hit = try XCTUnwrap(view.characterRange(at: CGPoint(x: next.rect.midX, y: next.rect.minY + 0.5)))
+        XCTAssertEqual(view.text(in: hit), "下")
+    }
+
+    func testUnopenedTabDoesNotAllocateTextBitmaps() async throws {
+        func residentBytes(_ blocks: [DetailLayoutBlock]) -> Int {
+            blocks.reduce(0) { sum, block in
+                switch block {
+                case .text(let text): return sum + text.tiles.reduce(0) { $0 + $1.image.bytesPerRow * $1.image.height }
+                case .quote(let nested): return sum + residentBytes(nested)
+                case .tabs(_, let firstPage): return sum + residentBytes(firstPage)
+                case .widget: return sum
+                }
+            }
+        }
+        func bytes(hidden: String) async throws -> Int {
+            let markdown = ":::: tabs\n::: tab-item 一\n首页\n:::\n::: tab-item 二\n" + hidden + "\n:::\n::::"
+            let request = DetailFloorRequest(id: "tabs", version: 1, source: .init(html: "", visibleMarkdown: markdown),
+                appearance: .init(width: 280, pointSize: 17, scale: 2, dark: false), baseURL: NodeSeekSite.baseURL)
+            var bytes: Int?
+            await DetailFloorRenderer().start(request) { _, layout in
+                if case .native(let blocks) = layout { bytes = residentBytes(blocks) }
+            }.value
+            return try XCTUnwrap(bytes)
+        }
+        let short = try await bytes(hidden: "短")
+        let long = try await bytes(hidden: String(repeating: "很长的测评正文。", count: 300))
+        XCTAssertGreaterThan(short, 0)
+        XCTAssertEqual(long, short)
+    }
+
+    func testOnlyLastSelectedTabInstallsText() async throws {
+        let long = String(repeating: "第二页很长。", count: 400)
+        let markdown = ":::: tabs\n::: tab-item 一\n首页\n:::\n::: tab-item 二\n" + long + "\n:::\n::: tab-item 三\n末页\n:::\n::::"
+        let page = DetailMarkdownPrototypeController(id: "switch", source: .init(html: "", visibleMarkdown: markdown))
+        let window = try host(page)
+        defer { window.isHidden = true }
+        func visibleText() -> [String] { descendants(page.view, DetailSelectableTextView.self).map { $0.snapshot.string } }
+        try await waitFor { visibleText() == ["首页"] }
+        let control = try XCTUnwrap(descendants(page.view, UISegmentedControl.self).first)
+        func select(_ index: Int) {
+            control.selectedSegmentIndex = index
+            control.sendActions(for: .valueChanged)
+        }
+        select(1)
+        select(2)
+        try await waitFor { visibleText() == ["末页"] }
+        select(1)
+        try await waitFor { visibleText() == [long] }
+        select(0)
+        try await waitFor { visibleText() == ["首页"] }
+    }
+
     func testInlineGIFUsesMeasuredSizeAndPausesOutsideViewport() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".gif")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -207,7 +299,9 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         for index in 0..<tabs.numberOfSegments {
             tabs.selectedSegmentIndex = index
             tabs.sendActions(for: .valueChanged)
-            if let terminal = descendants(review.view, DetailTerminalView.self).first {
+            if index < 2 {
+                try await waitFor { !self.descendants(review.view, DetailTerminalView.self).isEmpty }
+                let terminal = try XCTUnwrap(descendants(review.view, DetailTerminalView.self).first)
                 review.view.layoutIfNeeded()
                 try await waitFor { terminal.snapshot != nil }
                 let pages = try XCTUnwrap(terminal.snapshot?.pages)

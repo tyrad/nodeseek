@@ -27,7 +27,12 @@ nonisolated struct DetailTextSnapshot: Sendable {
     let tiles: [Tile]
     let characters: [CharacterBox]
     let stickers: [Sticker]
-    let lines: [Range<Int>]
+    nonisolated struct Line: Sendable {
+        let characters: Range<Int>
+        let maxY: CGFloat
+    }
+
+    let lines: [Line]
 
     func characterIndex(at offset: Int) -> Int {
         var lower = 0
@@ -45,9 +50,9 @@ nonisolated struct DetailTextSnapshot: Sendable {
         var upper = lines.count
         while lower < upper {
             let mid = (lower + upper) / 2
-            if characters[lines[mid].lowerBound].rect.maxY <= y { lower = mid + 1 } else { upper = mid }
+            if lines[mid].maxY <= y { lower = mid + 1 } else { upper = mid }
         }
-        return lines[min(lower, lines.count - 1)]
+        return lines[min(lower, lines.count - 1)].characters
     }
 
     func copyText(in range: NSRange) -> String {
@@ -151,8 +156,8 @@ nonisolated enum DetailTextTypesetter {
             } else if let font = storage.attribute(.font, at: index, effectiveRange: nil) as? UIFont {
                 // 同行的高表情不应把普通文字的选择手柄顶到附件上沿。
                 let baseline = lineRect.minY + layout.location(forGlyphAt: glyphs.location).y
-                rect.origin.y = baseline - font.ascender
-                rect.size.height = ceil(font.ascender - font.descender)
+                rect.origin.y = max(lineRect.minY, baseline - font.ascender)
+                rect.size.height = max(0, min(lineRect.maxY, baseline - font.descender) - rect.minY)
             }
             rect.size.width = max(1, rect.width)
             characters.append(.init(range: range, rect: rect, line: line.location, rtl: level % 2 == 1, link: storage.attribute(.link, at: index, effectiveRange: nil) as? URL))
@@ -176,13 +181,17 @@ nonisolated enum DetailTextTypesetter {
             if let cgImage = image.cgImage { tiles.append(.init(rect: rect, image: cgImage)) }
             y = rect.maxY
         }
-        var lines: [Range<Int>] = []
+        var lines: [DetailTextSnapshot.Line] = []
         var start = 0
-        for index in characters.indices where characters[start].line != characters[index].line {
-            lines.append(start..<index)
-            start = index
+        while start < characters.count {
+            let glyph = characters[start].line
+            var end = start + 1
+            while end < characters.count, characters[end].line == glyph { end += 1 }
+            // 附件与文字共享基线，但各自的底边不同。触点属于哪一行由整行的布局框决定。
+            let rect = layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+            lines.append(.init(characters: start..<end, maxY: rect.maxY))
+            start = end
         }
-        if start < characters.count { lines.append(start..<characters.count) }
         return .init(string: storage.string, size: size, tiles: tiles, characters: characters, stickers: stickers, lines: lines)
     }
 }
