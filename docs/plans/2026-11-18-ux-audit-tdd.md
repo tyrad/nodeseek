@@ -34,7 +34,7 @@
 | U21 | P1 | 引用多行评论时换行被压成一行 | `PostDetailComposerUXAuditTests.test_U21_quotePreservesLineBreaks`（已修复：与网页一致，引用正文取页面配置里的原始 Markdown 逐行加 `> `，编辑过带编辑时间，楼层链接指向楼层所在页；不解析 HTML，拿不到原文时只保留标题行） |
 | U22 | P1 | 引用纯表情 / 图片评论时引用块没有内容 | `PostDetailComposerUXAuditTests.test_U22_quoteOfImageOnlyCommentCarriesSourceMarkdown`（已修复：随 U21 改为引用原文，图片和表情以原文 `![](…)`、`:xhj001:` 带入引用块，与网页一致，不另加占位文字） |
 | U23 | P1 | 「我的评论」点评论文字只打开帖子顶部，不跳到对应楼层 | `AppUXAuditTests.test_U23_userCommentRowTapOpensCommentFloor`（已修复：点回复文字整行跳到对应楼层，点标题仍打开帖子开头） |
-| U24 | P1 | 楼层跳转后没有高亮，看不出跳到了哪一层 | 不写：代码已在跳转后 0.35s 闪烁高亮，测试中可观察到；属于高亮颜色、时长、停靠位置的设计问题 |
+| U24 | P1 | 楼层跳转后没有高亮，看不出跳到了哪一层 | 不修：跳转后已有整行闪烁高亮，保持现有颜色和时长；未写测试 |
 | U25 | P1 | 「在浏览器打开」在第 2 页时打开的是第 1 页 | 不修：「在浏览器打开」沿用进入时的页码，属预期行为；已删除对应测试 |
 | U26 | P1 | 暗黑模式看大图时图片仍被「图片变暗」压暗 | `PostDetailUXAuditTests.test_U26_photoPreviewIsNotDimmedInDarkMode`（不修：大图沿用图片变暗设置，属预期行为） |
 | U27 | P1 | 系统 Dynamic Type 调大后首页 / 详情字号不变 | `AppUXAuditTests.test_U27_typographyScalesWithSystemDynamicType` |
