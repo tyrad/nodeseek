@@ -3,13 +3,39 @@ import UIKit
 final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
     private let avatar = UIImageView()
     private let actions = UIStackView()
+    private let footer = UIScrollView()
+    private let actionSpacer = UIView()
+    private let identity = UIStackView()
+    private let header = UIStackView()
+    private let floorNumber = UILabel()
+    private let timestamp = UILabel()
+    private var topInset: NSLayoutConstraint!
+    private var headerHeight: NSLayoutConstraint!
+    private var bottomInset: CGFloat = 0
     private var authorURL: URL?
     private var openAuthor: ((URL) -> Void)?
     var textIndent: CGFloat = 0
     let stack = UIStackView()
     let heading = UILabel()
     let metadata = UILabel()
-    let menuButton = UIButton(type: .system)
+    struct FloorAction {
+        let title: String
+        let perform: () -> Bool
+    }
+
+    private let menuSurface = UIView()
+    var floorActions: [FloorAction] = [] {
+        didSet {
+            for label in [heading, floorNumber, metadata] { label.accessibilityCustomActions = nil }
+            let anchor = !heading.isHidden ? heading : !floorNumber.isHidden ? floorNumber : metadata
+            anchor.accessibilityCustomActions = floorActions.map { action in
+                UIAccessibilityCustomAction(name: action.title) { _ in action.perform() }
+            }
+            if anchor === metadata && metadata.text?.isEmpty != false {
+                metadata.accessibilityLabel = DetailListStrings.text("more")
+            }
+        }
+    }
     private(set) var body = DetailBlockStack()
     private(set) var request: DetailFloorRequest?
     private(set) var contentInstalled = false
@@ -38,23 +64,28 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         stack.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(stack)
         let inset = PostDetailContentLayout.horizontalInset
+        topInset = stack.topAnchor.constraint(equalTo: contentView.topAnchor)
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: inset),
             stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -inset),
-            stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8)
+            topInset
         ])
         heading.font = .preferredFont(forTextStyle: .headline)
         metadata.font = .preferredFont(forTextStyle: .subheadline)
         metadata.textColor = .secondaryLabel
-        for label in [heading, metadata] {
+        for label in [heading, metadata, floorNumber, timestamp] {
             label.numberOfLines = 0
             label.adjustsFontForContentSizeCategory = true
         }
-        menuButton.setImage(UIImage(systemName: "ellipsis.circle"), for: .normal)
-        menuButton.showsMenuAsPrimaryAction = true
-        menuButton.accessibilityLabel = DetailListStrings.text("more")
-        menuButton.widthAnchor.constraint(equalToConstant: 44).isActive = true
-        menuButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+        floorNumber.textColor = .tertiaryLabel
+        floorNumber.textAlignment = .natural
+        floorNumber.setContentHuggingPriority(.required, for: .horizontal)
+        timestamp.textColor = .secondaryLabel
+        // 把菜单装在正文的同级视图上，文字和媒体的触摸不会进入菜单的识别器。
+        menuSurface.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        menuSurface.frame = contentView.bounds
+        menuSurface.addInteraction(UIContextMenuInteraction(delegate: self))
+        contentView.insertSubview(menuSurface, at: 0)
         avatar.widthAnchor.constraint(equalToConstant: PostDetailContentLayout.avatarSize).isActive = true
         avatar.heightAnchor.constraint(equalToConstant: PostDetailContentLayout.avatarSize).isActive = true
         avatar.contentMode = .scaleAspectFill
@@ -63,21 +94,100 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         avatar.layer.cornerRadius = PostDetailContentLayout.avatarCornerRadius
         avatar.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(showAuthor)))
         avatar.addInteraction(UIContextMenuInteraction(delegate: self))
-        let header = UIStackView(arrangedSubviews: [avatar, metadata, menuButton])
-        header.spacing = PostDetailContentLayout.avatarSpacing
-        header.alignment = .center
+        metadata.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(showAuthor)))
+        identity.spacing = 5
+        identity.alignment = .center
+        identity.addArrangedSubview(metadata)
+        identity.addArrangedSubview(UIView())
+        identity.addArrangedSubview(floorNumber)
+        header.axis = .vertical
+        header.distribution = .equalCentering
+        header.spacing = 3
+        header.addArrangedSubview(identity)
+        header.addArrangedSubview(timestamp)
+        header.isLayoutMarginsRelativeArrangement = true
+        headerHeight = header.heightAnchor.constraint(greaterThanOrEqualToConstant: 28)
+        headerHeight.isActive = true
         stack.addArrangedSubview(heading)
         stack.addArrangedSubview(header)
         stack.addArrangedSubview(body)
         body.axis = .vertical
         body.spacing = 8
-        actions.distribution = .fillEqually
-        stack.addArrangedSubview(actions)
+
+        contentView.addSubview(avatar)
+        avatar.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            avatar.leadingAnchor.constraint(equalTo: header.leadingAnchor),
+            avatar.topAnchor.constraint(equalTo: header.topAnchor)
+        ])
+        let separator = UIView()
+        separator.translatesAutoresizingMaskIntoConstraints = false
+        separator.backgroundColor = .separator
+        contentView.addSubview(separator)
+        NSLayoutConstraint.activate([
+            separator.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            separator.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            separator.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            separator.heightAnchor.constraint(equalToConstant: 1 / max(1, traitCollection.displayScale))
+        ])
+        actions.spacing = PostDetailContentLayout.reactionActionSpacing
+        actions.addArrangedSubview(actionSpacer)
+        actions.translatesAutoresizingMaskIntoConstraints = false
+        footer.showsHorizontalScrollIndicator = false
+        footer.addSubview(actions)
+        stack.addArrangedSubview(footer)
+        NSLayoutConstraint.activate([
+            actions.leadingAnchor.constraint(equalTo: footer.contentLayoutGuide.leadingAnchor),
+            actions.trailingAnchor.constraint(equalTo: footer.contentLayoutGuide.trailingAnchor),
+            actions.topAnchor.constraint(equalTo: footer.contentLayoutGuide.topAnchor),
+            actions.bottomAnchor.constraint(equalTo: footer.contentLayoutGuide.bottomAnchor),
+            actions.heightAnchor.constraint(equalTo: footer.frameLayoutGuide.heightAnchor),
+            actions.widthAnchor.constraint(greaterThanOrEqualTo: footer.frameLayoutGuide.widthAnchor)
+        ])
+        let fit = actions.widthAnchor.constraint(equalTo: footer.frameLayoutGuide.widthAnchor)
+        fit.priority = .defaultLow
+        fit.isActive = true
+        footer.isHidden = true
+    }
+
+    func configureHeader(title: String?, name: String, badges: [String], time: String?, floor: String?) {
+        let isReply = title == nil
+        let hasAuthor = AuthorDisplayPolicy.isDisplayable(name)
+        let metrics = UIFontMetrics(forTextStyle: .subheadline)
+        let small = metrics.scaledFont(for: AppTypography.commentMetadataFont(), compatibleWith: traitCollection)
+        let authorFont = metrics.scaledFont(for: isReply ? AppTypography.commentAuthorFont() : AppTypography.detailMetadataFont(), compatibleWith: traitCollection)
+        let author = NSMutableAttributedString(string: hasAuthor ? name : "", attributes: [
+            .font: authorFont, .foregroundColor: isReply ? ReadingColors.text : UIColor.secondaryLabel
+        ])
+        let details = badges + (!isReply && badges.isEmpty ? [time].compactMap { $0 } : [])
+        for detail in details where !detail.isEmpty {
+            author.append(NSAttributedString(string: (author.length == 0 ? "" : "  ") + detail,
+                                             attributes: [.font: small, .foregroundColor: UIColor.secondaryLabel]))
+        }
+        metadata.accessibilityLabel = nil
+        metadata.attributedText = author
+        floorNumber.font = small
+        floorNumber.text = floor
+        floorNumber.isHidden = floor?.isEmpty != false
+        timestamp.font = small
+        timestamp.text = time
+        timestamp.isHidden = time?.isEmpty != false || (!isReply && badges.isEmpty)
+        header.directionalLayoutMargins = .init(top: 0, leading: hasAuthor ? PostDetailContentLayout.avatarSize + PostDetailContentLayout.avatarSpacing : 0, bottom: 0, trailing: 0)
+        headerHeight.constant = !isReply && hasAuthor ? PostDetailContentLayout.avatarSize : 0
+        heading.text = title
+        heading.isHidden = isReply
+        heading.font = UIFontMetrics(forTextStyle: .headline).scaledFont(for: AppTypography.detailTitleFont(), compatibleWith: traitCollection)
+        topInset.constant = isReply ? PostDetailContentLayout.commentTopInset : 18
+        bottomInset = isReply ? PostDetailContentLayout.commentBottomInset : 14
+        stack.spacing = isReply ? 8 : 12
+        stack.setCustomSpacing(isReply ? 8 : 18, after: header)
+        body.spacing = stack.spacing
     }
 
     func configureAuthor(name: String, avatarURL: URL?, profileURL: URL?, open: @escaping (URL) -> Void) {
         avatar.isHidden = !AuthorDisplayPolicy.isDisplayable(name)
         avatar.isUserInteractionEnabled = profileURL != nil
+        metadata.isUserInteractionEnabled = profileURL != nil
         authorURL = profileURL
         openAuthor = open
         if !avatar.isHidden { ImageLoad.url(avatarURL).toAvatar(requestID: request?.id ?? name).into(avatar) }
@@ -87,24 +197,76 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         if let authorURL { openAuthor?(authorURL) }
     }
 
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        guard let hit = super.hitTest(point, with: event) else { return nil }
+        guard !floorActions.isEmpty else { return hit }
+        if let text = hit as? DetailSelectableTextView {
+            return text.handlesTouch(at: convert(point, to: text)) ? text : menuSurface
+        }
+        if !avatar.isHidden, avatar.bounds.contains(convert(point, to: avatar)) { return hit }
+        if hit === metadata && metadata.isUserInteractionEnabled { return hit }
+        if hit === self || hit === contentView || hit === stack || hit === heading || hit.isDescendant(of: header) {
+            return menuSurface
+        }
+        if (hit === actionSpacer || hit === actions || hit === footer),
+           footer.contentSize.width <= footer.bounds.width + 1 {
+            return menuSurface
+        }
+        var container: UIView? = hit
+        while let view = container as? UIStackView {
+            if view === body { return menuSurface }
+            container = view.superview
+        }
+        return hit
+    }
+
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
-        guard let authorURL else { return nil }
+        if interaction.view === menuSurface {
+            guard !floorActions.isEmpty else { return nil }
+            let actions = floorActions
+            return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in
+                UIMenu(children: actions.map { action in UIAction(title: action.title) { _ in _ = action.perform() } })
+            }
+        }
+        guard interaction.view === avatar, let authorURL else { return nil }
         return UIContextMenuConfiguration(identifier: nil, previewProvider: { UserProfileRouter.makeViewController(profileURL: authorURL) })
     }
 
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willPerformPreviewActionForMenuWith configuration: UIContextMenuConfiguration, animator: UIContextMenuInteractionCommitAnimating) {
+        guard interaction.view === avatar else { return }
         animator.addCompletion { [weak self] in self?.showAuthor() }
     }
 
-    func addAction(_ key: String, symbol: String, count: Int? = nil, selected: Bool = false, perform: @escaping () -> Void) {
+    func addVotes(like: Int?, chicken: Int?, oppose: Int?, liked: Bool, rewarded: Bool, opposed: Bool, isOwn: Bool,
+                  onLike: @escaping () -> Void, onChicken: @escaping () -> Void, onOppose: @escaping () -> Void) {
+        if !isOwn || (like ?? 0) > 0 {
+            addAction("like", symbol: liked ? "hand.thumbsup.fill" : "hand.thumbsup", count: like, selected: liked, enabled: !isOwn, perform: onLike)
+        }
+        if !isOwn || (chicken ?? 0) > 0 {
+            addAction("chicken", symbol: "fork.knife", count: chicken, selected: rewarded, enabled: !isOwn, perform: onChicken)
+        }
+        if !isOwn || (oppose ?? 0) > 0 {
+            addAction("oppose", symbol: opposed ? "hand.thumbsdown.fill" : "hand.thumbsdown", count: oppose, selected: opposed, enabled: !isOwn, perform: onOppose)
+        }
+    }
+
+    func addAction(_ key: String, symbol: String, count: Int? = nil, selected: Bool = false, enabled: Bool = true, perform: @escaping () -> Void) {
         let button = UIButton(type: .system)
-        button.setImage(UIImage(systemName: symbol), for: .normal)
+        let config = UIImage.SymbolConfiguration(pointSize: PostDetailContentLayout.reactionSymbolPointSize, weight: .regular)
+        let icon = key == "chicken" ? UIImage(named: "ChickenLeg") : UIImage(systemName: symbol)
+        button.setImage(icon?.applyingSymbolConfiguration(config)?.withRenderingMode(.alwaysTemplate), for: .normal)
+        button.isEnabled = enabled
+        footer.isHidden = false
         if let count, count > 0 { button.setTitle(" " + count.formatted(), for: .normal) }
-        button.titleLabel?.font = AppTypography.commentActionFont()
+        button.titleLabel?.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(for: AppTypography.commentActionFont(), compatibleWith: traitCollection)
+        button.titleLabel?.adjustsFontForContentSizeCategory = true
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        button.widthAnchor.constraint(greaterThanOrEqualToConstant: (count ?? 0) > 0 ? PostDetailContentLayout.reactionActionMinWidth : PostDetailContentLayout.reactionIconOnlyWidth).isActive = true
         button.accessibilityLabel = DetailListStrings.text(key)
         button.accessibilityValue = count.map { String($0) }
-        button.tintColor = selected ? .systemOrange : .secondaryLabel
-        button.heightAnchor.constraint(greaterThanOrEqualToConstant: 32).isActive = true
+        button.tintColor = selected ? (key == "chicken" || key == "favorite" ? .systemOrange : .systemRed) : UIColor.secondaryLabel.withAlphaComponent(PostDetailContentLayout.inactiveReactionAlpha)
+        button.heightAnchor.constraint(greaterThanOrEqualToConstant: PostDetailContentLayout.reactionActionHeight).isActive = true
         button.addAction(UIAction { _ in perform() }, for: .touchUpInside)
         actions.addArrangedSubview(button)
     }
@@ -129,7 +291,9 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         avatar.image = nil
         authorURL = nil
         openAuthor = nil
-        actions.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        actions.arrangedSubviews.filter { $0 !== actionSpacer }.forEach { $0.removeFromSuperview() }
+        footer.isHidden = true
+        footer.contentOffset = .zero
         contentInstalled = false
         request = nil
         copyText = nil
@@ -139,7 +303,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         body.axis = .vertical
         body.spacing = 8
         stack.insertArrangedSubview(body, at: 2)
-        menuButton.menu = nil
+        floorActions = []
         accessibilityIdentifier = nil
     }
 
@@ -192,7 +356,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     func measuredHeight(width: CGFloat) -> CGFloat {
         let size = CGSize(width: width - 2 * PostDetailContentLayout.horizontalInset, height: UIView.layoutFittingCompressedSize.height)
         let measured = stack.systemLayoutSizeFitting(size, withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel)
-        return ceil(measured.height) + 16
+        return ceil(measured.height + topInset.constant + bottomInset)
     }
 }
 

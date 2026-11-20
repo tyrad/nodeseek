@@ -74,6 +74,8 @@ nonisolated struct DetailTextAppearance: Sendable, Equatable {
 nonisolated struct DetailTextSegment: Sendable {
     let runs: [DetailDocument.Inline]
     let pointSize: CGFloat
+    var isListItem = false
+    var isAccentHeading = false
 }
 
 nonisolated enum DetailTextTypesetter {
@@ -95,12 +97,21 @@ nonisolated enum DetailTextTypesetter {
         let color = ReadingColors.text.resolvedColor(with: traits)
         let linkColor = NodeSeekLinkStyle.color.resolvedColor(with: traits)
         let storage = NSTextStorage()
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = DTCoreTextHTMLContentRenderer.Layout.bodyLineSpacing
         var attachments: [(index: Int, size: CGSize, token: String, url: URL)] = []
         for (index, segment) in segments.enumerated() {
             if index > 0 {
-                storage.append(NSAttributedString(string: "\n\n", attributes: [.font: UIFont.systemFont(ofSize: segment.pointSize)]))
+                // 两个换行保留复制出的段落。空行单独测量，避免按正文字号撑高。
+                let gap = NSMutableParagraphStyle()
+                gap.minimumLineHeight = segment.isListItem ? 4 : 8
+                gap.maximumLineHeight = gap.minimumLineHeight
+                storage.append(NSAttributedString(string: "\n", attributes: [.font: UIFont.systemFont(ofSize: segments[index-1].pointSize), .paragraphStyle: paragraph]))
+                storage.append(NSAttributedString(string: "\n", attributes: [.font: UIFont.systemFont(ofSize: 1), .paragraphStyle: gap]))
             }
             let pointSize = segment.pointSize
+            let start = storage.length
+            let foreground = segment.isAccentHeading ? (appearance.dark ? UIColor.systemGreen.resolvedColor(with: traits) : NodeSeekLinkStyle.color) : color
             for run in segment.runs {
                 switch run {
                 case let .text(string, style, url):
@@ -111,7 +122,7 @@ nonisolated enum DetailTextTypesetter {
                     if let descriptor = font.fontDescriptor.withSymbolicTraits(options) {
                         font = UIFont(descriptor: descriptor, size: pointSize)
                     }
-                    var attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: url == nil ? color : linkColor]
+                    var attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: url == nil ? foreground : linkColor]
                     if let url { attrs[linkTarget] = url }
                     if style.contains(.strike) { attrs[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
                     storage.append(NSAttributedString(string: string, attributes: attrs))
@@ -125,10 +136,13 @@ nonisolated enum DetailTextTypesetter {
                     storage.append(NSAttributedString(attachment: attachment))
                 }
             }
+            let style = paragraph.mutableCopy() as! NSMutableParagraphStyle
+            if segment.isListItem {
+                style.firstLineHeadIndent = 10
+                style.headIndent = 24
+            }
+            storage.addAttribute(.paragraphStyle, value: style, range: NSRange(location: start, length: storage.length - start))
         }
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = DTCoreTextHTMLContentRenderer.Layout.bodyLineSpacing
-        storage.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: storage.length))
         let layout = NSLayoutManager()
         let container = NSTextContainer(size: CGSize(width: max(1, width), height: .greatestFiniteMagnitude))
         container.lineFragmentPadding = 0

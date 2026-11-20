@@ -110,7 +110,10 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         let row = rows[path.item]
         var source: DetailFloorSource
         var title: String?
-        var metadata: [String?]
+        let author: String
+        let badges: [String]
+        let time: String?
+        var floor: String?
         var signature: String?
         var comment: Comment?
         switch row {
@@ -118,13 +121,18 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             let header = page.currentHeaderContent!
             source = headerSource ?? .init(html: header.contentHTML, visibleMarkdown: nil)
             title = header.title + (header.requiredReadingLevel.map { " 🔒 \($0)" } ?? "")
-            metadata = [header.authorName, header.authorBadgeTexts.joined(separator: " "), header.metadataText, page.authorRiskWarningPostID == header.postID ? PostAuthorRiskWarningNode.message : nil]
+            author = header.authorName
+            badges = header.authorBadgeTexts + (page.authorRiskWarningPostID == header.postID ? [PostAuthorRiskWarningNode.message] : [])
+            time = header.metadataText
             signature = header.signatureHTML
         case .comment(let index):
             let value = page.comments[index]
             comment = value
             source = .init(comment: value)
-            metadata = [value.authorName, value.isPoster ? DetailListStrings.text("poster") : nil, value.authorBadgeTexts.joined(separator: " "), value.isHot ? DetailListStrings.text("hot") : nil, value.floorText, value.createdAtText]
+            author = value.authorName
+            badges = (value.isPoster ? [DetailListStrings.text("poster")] : []) + value.authorBadgeTexts
+            floor = [value.isHot ? DetailListStrings.text("hot") : nil, value.floorText].compactMap { $0 }.joined(separator: " ")
+            time = value.createdAtText
             signature = value.signatureHTML
         default:
             let cell = list.dequeueReusableCell(withReuseIdentifier: "notice", for: path) as! UICollectionViewListCell
@@ -147,11 +155,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         cell.body.isLayoutMarginsRelativeArrangement = true
         cell.textIndent = indent
         cell.body.directionalLayoutMargins = .init(top: 0, leading: indent, bottom: 0, trailing: 0)
-        cell.heading.font = UIFontMetrics(forTextStyle: .headline).scaledFont(for: AppTypography.detailTitleFont())
-        cell.metadata.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: AppTypography.commentMetadataFont())
-        cell.heading.text = title
-        cell.heading.isHidden = title == nil
-        cell.metadata.text = metadata.compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+        cell.configureHeader(title: title, name: author, badges: badges, time: time, floor: floor)
         cell.body.onLink = { [weak page] in page?.handleContentLinkTap($0) }
         cell.body.onSignatureLinks = { [weak page] in page?.handleSignatureLinkCandidatesTap($0) }
         cell.body.onPhotos = { [weak page] in page?.presentPhotoBrowser(imageURLs: $0, initialIndex: $1) }
@@ -171,20 +175,31 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         }
         if let comment {
             cell.configureAuthor(name: comment.authorName, avatarURL: comment.avatarURL, profileURL: comment.authorProfileURL) { [weak page] in page?.openUserInfo(profileURL: $0) }
-            cell.addAction("like", symbol: "hand.thumbsup", count: comment.likeCount, selected: comment.isLikeClicked) { [weak page] in page?.handleCommentLikeTap(comment) }
-            cell.addAction("oppose", symbol: "hand.thumbsdown", count: comment.opposeCount, selected: comment.isOpposeClicked) { [weak page] in page?.handleCommentOpposeTap(comment) }
-            cell.addAction("chicken", symbol: "fork.knife", count: comment.chickenLegCount, selected: comment.isChickenLegClicked) { [weak page] in page?.handleCommentChickenLegTap(comment) }
+            cell.addVotes(like: comment.likeCount, chicken: comment.chickenLegCount, oppose: comment.opposeCount,
+                          liked: comment.isLikeClicked, rewarded: comment.isChickenLegClicked, opposed: comment.isOpposeClicked,
+                          isOwn: comment.isOwnComment,
+                          onLike: { [weak page] in page?.handleCommentLikeTap(comment) },
+                          onChicken: { [weak page] in page?.handleCommentChickenLegTap(comment) },
+                          onOppose: { [weak page] in page?.handleCommentOpposeTap(comment) })
             cell.addAction("reply", symbol: "arrowshape.turn.up.left") { [weak page] in page?.handleReply(to: comment) }
         } else if let header = page.currentHeaderContent {
             cell.configureAuthor(name: header.authorName, avatarURL: header.avatarURL, profileURL: header.authorProfileURL) { [weak page] in page?.openUserInfo(profileURL: $0) }
+            if headerHasReactions(header) {
+                cell.addVotes(like: header.likeCount, chicken: header.chickenLegCount, oppose: header.opposeCount,
+                              liked: header.isLikeClicked, rewarded: header.isChickenLegClicked, opposed: header.isOpposeClicked,
+                              isOwn: header.isOwnPost,
+                              onLike: { [weak page] in page?.handlePostLikeTap(header) },
+                              onChicken: { [weak page] in page?.handlePostChickenLegTap(header) },
+                              onOppose: { [weak page] in page?.handlePostOpposeTap(header) })
+                cell.addAction("favorite", symbol: header.isFavoriteCollected ? "star.fill" : "star", count: header.favoriteCount,
+                               selected: header.isFavoriteCollected, enabled: !header.isFavoriteSubmitting) { [weak page] in page?.presenter.didTapFavorite() }
+            }
             if page.showsReplyEntry {
-                cell.addAction("like", symbol: "hand.thumbsup", count: header.likeCount, selected: header.isLikeClicked) { [weak page] in page?.handlePostLikeTap(header) }
-                cell.addAction("oppose", symbol: "hand.thumbsdown", count: header.opposeCount, selected: header.isOpposeClicked) { [weak page] in page?.handlePostOpposeTap(header) }
-                cell.addAction("favorite", symbol: "star", count: header.favoriteCount, selected: header.isFavoriteCollected) { [weak page] in page?.presenter.didTapFavorite() }
                 cell.addAction("reply", symbol: "arrowshape.turn.up.left") { [weak page] in page?.handleReply(toPostHeader: header) }
+                cell.addAction("comment", symbol: "text.bubble") { [weak page] in page?.presentCommentEditor() }
             }
         }
-        cell.menuButton.menu = menu(page: page, cell: cell, comment: comment)
+        cell.floorActions = floorActions(page: page, cell: cell, comment: comment)
         if let cached = cache.object(forKey: key as NSString), cached.source == source, cached.appearance == request.appearance {
             cell.receiver.install(request, .native(cached.blocks))
         } else {
@@ -285,30 +300,37 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
 }
 
 private extension PostDetailCollectionList {
-    func menu(page: PostDetailViewController, cell: DetailFloorListCell, comment: Comment?) -> UIMenu {
-        var actions: [UIAction] = []
+    func headerHasReactions(_ header: PostDetailHeaderContent) -> Bool {
+        [header.likeCount, header.chickenLegCount, header.opposeCount, header.favoriteCount].contains { $0 != nil }
+    }
+
+    func floorActions(page: PostDetailViewController, cell: DetailFloorListCell, comment: Comment?) -> [DetailFloorListCell.FloorAction] {
+        let binding = cell.request
+        var actions: [DetailFloorListCell.FloorAction] = []
         func add(_ key: String, _ perform: @escaping (PostDetailViewController) -> Void) {
-            actions.append(UIAction(title: DetailListStrings.text(key)) { [weak page] _ in
-                if let page { perform(page) }
+            actions.append(.init(title: DetailListStrings.text(key)) { [weak page, weak cell] in
+                guard let page, let cell, cell.request == binding else { return false }
+                perform(page)
+                return true
             })
         }
-        let binding = cell.request
         add("copy") { [weak cell] page in
-            if cell?.request == binding, let text = cell?.copyText {
+            if let text = cell?.copyText {
                 page.present(CommentCopySheetViewController(text: text), animated: true)
             }
         }
         if let comment {
             add("quote") { $0.handleQuote(comment) }
-            add("chicken") { $0.handleCommentChickenLegTap(comment) }
             add(page.authorFilter == nil ? "author" : "all") { $0.toggleAuthorFilter(.author(of: comment), focusingCommentID: comment.id) }
             if comment.isOwnComment { add("edit") { $0.presenter.didTapEditComment(comment) } }
         } else if let header = page.currentHeaderContent {
-            add("chicken") { $0.handlePostChickenLegTap(header) }
+            if !headerHasReactions(header), !header.isOwnPost, page.showsReplyEntry {
+                add("chicken") { $0.handlePostChickenLegTap(header) }
+            }
             add(page.authorFilter == nil ? "author" : "all") { $0.toggleAuthorFilter(.poster(of: header), focusingCommentID: nil) }
             if header.isOwnPost { add("edit") { $0.presenter.didTapEditPost() } }
         }
-        return UIMenu(children: actions)
+        return actions
     }
 }
 

@@ -280,6 +280,18 @@ final class DetailSelectableTextView: UIView, UITextInput, UITextInteractionDele
         guard let next = self.position(from: position, in: direction, offset: 1) else { return nil }
         return textRange(from: position, to: next)
     }
+    func handlesTouch(at point: CGPoint) -> Bool {
+        if selection?.isEmpty == false { return true }
+        // 仅用于手势起点。保留字边缘容差，拖选仍由 UITextInput 按最近字符定位。
+        let tolerance: CGFloat = 5
+        guard let first = snapshot.line(at: point.y - tolerance)?.lowerBound,
+              let last = snapshot.line(at: point.y + tolerance)?.upperBound else { return false }
+        return snapshot.characters[first..<last].contains { box in
+            guard box.rect.insetBy(dx: -tolerance, dy: -tolerance).contains(point) else { return false }
+            return (snapshot.string as NSString).character(at: box.range.location) != 10
+        }
+    }
+
     private func nearest(_ point: CGPoint) -> DetailTextSnapshot.CharacterBox? {
         guard let line = snapshot.line(at: point.y) else { return nil }
         return snapshot.characters[line].min { abs(point.x - $0.rect.midX) < abs(point.x - $1.rect.midX) }

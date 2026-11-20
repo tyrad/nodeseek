@@ -67,3 +67,16 @@ iOS 26.5，Debug，列表宽 402 pt。
 make xcode-test-class TEST="DetailCollectionBaselineTests DetailCollectionTests"
 python3 scripts/compare-detail-lists.py .build/detail-baseline/results .build/detail-list/results .build/detail-list/sim-comparison
 ```
+
+## 楼层长按与排版调整后的复测
+
+使用同一套页面驱动与 Texture 基线对照。调整涵盖段距、列表缩进、引用内边距、作者栏和底部操作排列。每台设备各有 256 对截图，表中高度差取绝对值。
+
+| 设备 | 高度差中位数，调整前 → 调整后 | 高度差 ≤ 1 pt，调整前 → 调整后 | 最大差值，调整前 → 调整后 |
+|---|---:|---:|---:|
+| iPhone Air | 12.33 → 3.67 pt | 0 → 38 | 613 → 111.67 pt |
+| iOS 26.5 模拟器 | 12.33 → 5.00 pt | 10 → 38 | 339 → 371 pt |
+
+iPhone Air 的 160 对高度更接近 Texture，74 对持平，22 对变远。1067722 帖 6 楼在大字号下的引用缩进和作者栏对齐已经接近，正文仍有换行差异。893437 主楼是两台设备当前的最大偏差；模拟器的大字号样本比 Texture 矮 371 pt。[引用楼层三版对照](../../.build/detail-gesture/quote-comparison.jpg) · [真机逐楼对照与速度数据](../../.build/detail-gesture/phone-comparison/index.html) · [模拟器逐楼对照与速度数据](../../.build/detail-gesture/sim-comparison/index.html)
+
+iOS 17.5 模拟器用实际触摸验证了三个入口。长按末字右侧 2 pt 出现系统选区和拷贝菜单，长按明显的行尾留白或楼层号打开楼层菜单。从该菜单进入复制面板，可读取完整原文 `短**回复** ！`。iOS 17.5 和 26.5 的模拟器分别点按系统拷贝，并从剪贴板读回选中的 `回复 ！`。iPhone Air 验证了相同位置的触摸分派和楼层辅助功能操作；真机 XCTest 手势驱动在连接 IDE 时退出，未取得真机长按弹层的自动化结果。

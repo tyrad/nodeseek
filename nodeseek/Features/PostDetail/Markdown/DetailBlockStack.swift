@@ -33,7 +33,7 @@ final class DetailBlockStack: UIStackView {
                     onLink: { [weak self] in self?.onLink?($0) }, stickerSizeChanged: { [weak self] in self?.onStickerSizeChange?() })
                 stack.addArrangedSubview(text.accessibleContainer())
             case .quote(let children):
-                append(children, to: quote(in: stack), width: width-12)
+                append(children, to: quote(in: stack), width: DetailQuoteLayout.contentWidth(width))
             case .tabs(let sections, let firstPage):
                 tabs(sections.map(\.title), in: stack, initial: { page in
                     self.append(firstPage, to: page, width: width)
@@ -85,9 +85,23 @@ final class DetailBlockStack: UIStackView {
     private func quote(in parent: UIStackView) -> UIStackView {
         let stack = UIStackView()
         stack.axis = .vertical
-        stack.spacing = 6
+        stack.spacing = DetailQuoteLayout.blockSpacing
         stack.isLayoutMarginsRelativeArrangement = true
-        stack.directionalLayoutMargins = .init(top: 4, leading: 12, bottom: 4, trailing: 0)
+        let inset = DetailQuoteLayout.insets
+        stack.directionalLayoutMargins = .init(top: inset.top, leading: DetailQuoteLayout.borderWidth + inset.left, bottom: inset.bottom, trailing: inset.right)
+        stack.layer.cornerRadius = DetailQuoteLayout.cornerRadius
+        stack.clipsToBounds = true
+        let border = UIView()
+        border.backgroundColor = .separator
+        border.isUserInteractionEnabled = false
+        border.translatesAutoresizingMaskIntoConstraints = false
+        stack.addSubview(border)
+        NSLayoutConstraint.activate([
+            border.leadingAnchor.constraint(equalTo: stack.leadingAnchor),
+            border.topAnchor.constraint(equalTo: stack.topAnchor),
+            border.bottomAnchor.constraint(equalTo: stack.bottomAnchor),
+            border.widthAnchor.constraint(equalToConstant: DetailQuoteLayout.borderWidth)
+        ])
         stack.backgroundColor = .secondarySystemBackground
         parent.addArrangedSubview(stack)
         return stack
@@ -151,7 +165,7 @@ final class DetailBlockStack: UIStackView {
                 let rich = DetailRichTextView(frame: CGRect(origin: .zero, size: CGSize(width: width, height: 1)))
                 rich.configure(text, onImageTapped: photos, onLinkTapped: open, onSignatureLinkCandidatesTapped: onSignatureLinks, onLayoutInvalidated: { [weak self, weak rich] in rich?.invalidateIntrinsicContentSize(); self?.onSizeChange?() })
                 stack.addArrangedSubview(rich)
-            case .quote(let children): appendLegacy(children.children, to: quote(in: stack), width: width-12)
+            case .quote(let children): appendLegacy(children.children, to: quote(in: stack), width: DetailQuoteLayout.contentWidth(width))
             case .tabs(let content):
                 tabs(content.sections.map(\.title), in: stack) { [weak self] index, page in
                     self?.appendLegacy(content.sections[index].blocks, to: page, width: width)

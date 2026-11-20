@@ -2,7 +2,7 @@
 "cancel" = "Cancel";
 "close" = "Close";
 "use-list" = "Use TextKit in post details";
-"more" = "More";
+"more" = "Floor actions";
 "open-first" = "Go to first page";
 "reply" = "Reply";
 "quote" = "Quote";
@@ -15,3 +15,4 @@
 "favorite" = "Favorite";
 "poster" = "Author";
 "hot" = "Hot";
+"comment" = "Comment on post";

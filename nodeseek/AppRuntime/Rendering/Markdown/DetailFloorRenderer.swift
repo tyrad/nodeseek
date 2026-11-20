@@ -81,20 +81,20 @@ nonisolated struct DetailFloorRenderer: Sendable {
                 paragraphs.append(.init(runs: runs.map { run in
                     if case let .text(text, style, link) = run { return .text(text, style.union(.bold), link) }
                     return run
-                }, pointSize: appearance.pointSize * (1 + CGFloat(7-level) * 0.07)))
+                }, pointSize: appearance.pointSize + CGFloat([7, 5, 3, 2, 1, 0][max(0, min(5, level - 1))]), isAccentHeading: level == 2))
             case .quote(let nested):
                 try flush()
-                result.append(.quote(try layout(nested, appearance: appearance, width: max(1, width-12))))
+                result.append(.quote(try layout(nested, appearance: appearance, width: DetailQuoteLayout.contentWidth(width))))
             case .list(let start, let items):
                 for (index, item) in items.enumerated() {
                     let prefix = DetailDocument.Inline.text(start.map { "\($0 + index). " } ?? "• ", [], nil)
                     if case .paragraph(let text) = item.first {
-                        paragraphs.append(.init(runs: [prefix] + text, pointSize: appearance.pointSize))
+                        paragraphs.append(.init(runs: [prefix] + text, pointSize: appearance.pointSize, isListItem: true))
                         if item.count == 1 { continue }
                         try flush()
                         result += try layout(Array(item.dropFirst()), appearance: appearance, width: width)
                     } else {
-                        paragraphs.append(.init(runs: [prefix], pointSize: appearance.pointSize))
+                        paragraphs.append(.init(runs: [prefix], pointSize: appearance.pointSize, isListItem: true))
                         try flush()
                         result += try layout(item, appearance: appearance, width: width)
                     }

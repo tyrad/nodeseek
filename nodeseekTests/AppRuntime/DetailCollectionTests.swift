@@ -4,6 +4,73 @@ import XCTest
 
 @MainActor
 final class DetailCollectionTests: XCTestCase {
+    func testFloorMenuAndTextSelectionHaveSeparateHitAreas() async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        window.rootViewController = page
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let raw = "短 [链](https://example.com)！"
+        let comment = Comment(id: "2", anchorID: "1", authorName: "Alice", avatarURL: nil, floorText: "#1",
+                              createdAtText: nil, contentHTML: "<p>短 链！</p>", markdown: raw, hasVisibleMarkdown: true)
+        page.render(detail: PostDetail(id: "1", title: "主题", authorName: "Bob", avatarURL: nil,
+                                       metadataText: nil, contentHTML: "主帖", visibleMarkdown: "主帖", comments: [comment]))
+        let list = try XCTUnwrap(page.collectionList?.view)
+        window.layoutIfNeeded()
+        let path = try XCTUnwrap(page.indexPathForCurrentPageAnchor("1"))
+        let cell = try XCTUnwrap(list.cellForItem(at: path) as? DetailFloorListCell)
+        for _ in 0..<100 where !cell.contentInstalled { try await Task.sleep(nanoseconds: 10_000_000) }
+        window.layoutIfNeeded()
+        let text = try XCTUnwrap(cell.body.arrangedSubviews.first?.subviews.first as? DetailSelectableTextView)
+        let last = try XCTUnwrap(text.snapshot.characters.last)
+        func hit(_ x: CGFloat) -> UIView? {
+            cell.hitTest(text.convert(CGPoint(x: x, y: last.rect.midY), to: cell), with: nil)
+        }
+        XCTAssertTrue(hit(last.rect.maxX + 2) === text)
+        let space = try XCTUnwrap(text.snapshot.characters.first { (text.snapshot.string as NSString).substring(with: $0.range) == " " })
+        XCTAssertTrue(hit(space.rect.midX) === text)
+        let blank = try XCTUnwrap(hit(text.bounds.maxX - 8))
+        XCTAssertTrue(blank.interactions.contains { $0 is UIContextMenuInteraction })
+        let floor = try XCTUnwrap(cell.contentView.subviews.flatMap(allLabels).first { $0.text == "#1" })
+        let floorPoint = floor.convert(CGPoint(x: floor.bounds.midX, y: floor.bounds.midY), to: cell)
+        XCTAssertTrue(cell.hitTest(floorPoint, with: nil) === blank)
+        let copy = try XCTUnwrap(floor.accessibilityCustomActions?.first { $0.name == DetailListStrings.text("copy") })
+        let reply = try XCTUnwrap(cell.contentView.subviews.flatMap(allButtons).first { $0.accessibilityLabel == DetailListStrings.text("reply") })
+        let replyPoint = reply.convert(CGPoint(x: reply.bounds.midX, y: reply.bounds.midY), to: cell)
+        XCTAssertTrue(cell.hitTest(replyPoint, with: nil) === reply)
+        let footerBlank = reply.convert(CGPoint(x: 0, y: reply.bounds.midY), to: cell)
+        XCTAssertTrue(cell.hitTest(CGPoint(x: cell.stack.frame.minX + 2, y: footerBlank.y), with: nil) === blank)
+        text.selectAll(nil)
+        XCTAssertTrue(hit(text.bounds.maxX - 8) === text)
+        XCTAssertEqual(text.text(in: try XCTUnwrap(text.selectedTextRange)), "短 链！")
+        cell.prepareForReuse()
+        XCTAssertEqual(copy.actionHandler?(copy), false)
+    }
+
+    private func allButtons(_ root: UIView) -> [UIButton] {
+        (root as? UIButton).map { [$0] } ?? root.subviews.flatMap(allButtons)
+    }
+
+    private func allLabels(_ root: UIView) -> [UILabel] {
+        (root as? UILabel).map { [$0] } ?? root.subviews.flatMap(allLabels)
+    }
+
+    func testParagraphGapKeepsCopyBreaksAtLargeType() throws {
+        let size: CGFloat = 25
+        let appearance = DetailTextAppearance(width: 360, pointSize: size, scale: 2, dark: false)
+        func layout(_ paragraphs: [String]) throws -> DetailTextSnapshot {
+            try DetailTextTypesetter.layout(paragraphs.map { .init(runs: [.text($0, [], nil)], pointSize: size) },
+                                           appearance: appearance, width: appearance.width)
+        }
+        let paragraphs = try layout(["第一段", "第二段"])
+        let lines = try layout(["第一段\n第二段"])
+        let gap = paragraphs.size.height - lines.size.height
+        XCTAssertGreaterThan(gap, 0)
+        XCTAssertLessThanOrEqual(gap, 12)
+        XCTAssertEqual(paragraphs.copyText(in: NSRange(location: 0, length: paragraphs.string.utf16.count)), "第一段\n\n第二段")
+    }
+
     func testWrappedBodyKeepsReadingLineSpacing() throws {
         let pointSize: CGFloat = 25
         let appearance = DetailTextAppearance(width: 220, pointSize: pointSize, scale: 2, dark: false)

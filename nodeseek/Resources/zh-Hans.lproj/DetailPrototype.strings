@@ -2,7 +2,7 @@
 "cancel" = "取消";
 "close" = "关闭";
 "use-list" = "详情页使用 TextKit 列表";
-"more" = "更多";
+"more" = "楼层操作";
 "open-first" = "查看第一页";
 "reply" = "回复";
 "quote" = "引用";
@@ -15,3 +15,4 @@
 "favorite" = "收藏";
 "poster" = "楼主";
 "hot" = "热评";
+"comment" = "评论帖子";
