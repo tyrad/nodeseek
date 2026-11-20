@@ -692,7 +692,9 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
         if let logReason = handling.logReason {
             AppLog.debug(.postDetail, "详情评论页请求完成: reason=\(logReason), page=\(loadedPage), pageSizeHint=\(commentPageSizeHint ?? -1)")
         }
-        if handling.shouldToastNoNewComments {
+        if case .refreshCurrent = commentRequest, nextCommentPage != nil {
+            didApproachCommentEnd()
+        } else if handling.shouldToastNoNewComments {
             AppLog.info(.postDetail, "详情评论到底更新无新评论: page=\(loadedPage), count=\(response.detail.comments.count)")
             view?.showToast(message: "暂无新评论")
         }

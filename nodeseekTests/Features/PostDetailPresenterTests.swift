@@ -476,6 +476,24 @@ struct PostDetailPresenterTests {
         #expect(view.toastMessage == "暂无新评论")
     }
 
+    @Test func endRefreshAppendsNewlyDiscoveredPage() {
+        let interactor = SpyPostDetailInteractor()
+        let view = SpyPostDetailView()
+        let presenter = PostDetailPresenter(interactor: interactor, router: SpyPostDetailRouter(), initialPage: 1)
+        presenter.setView(view)
+        let refreshed = makePagedDetail(page: 1, commentID: "1")
+        let initial = refreshed.replacingComments(refreshed.comments, page: 1, pagination: nil)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: initial))
+        presenter.didTapRefreshCommentsAtEnd()
+        presenter.didLoadPostDetail(PostDetailResponse(detail: refreshed))
+
+        #expect(interactor.loadedPages == [1, 2])
+        #expect(view.toastMessage == nil)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: makePagedDetail(page: 2, commentID: "2")))
+        #expect(view.appendedCommentPageDetails.map(\.page) == [2])
+        #expect(interactor.loadedPages == [1, 2])
+    }
+
     @Test func refreshingAtCommentEndWithShortLastPageReloadsCurrentPage() {
         let interactor = SpyPostDetailInteractor()
         let router = SpyPostDetailRouter()

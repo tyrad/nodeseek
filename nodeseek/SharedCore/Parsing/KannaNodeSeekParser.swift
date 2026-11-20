@@ -420,7 +420,7 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             comments: comments,
             page: page,
             pagination: pagination,
-            isLastPage: document.at_xpath(XPathRules.postDetailNextPage) == nil
+            isLastPage: pagination?.nextPage == nil && document.at_xpath(XPathRules.postDetailNextPage) == nil
         )
     }
 
@@ -635,11 +635,12 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
         let currentPage = items.first(where: \.isCurrent)?.page ?? currentPageFromURL
         let previousPage = Self.postPage(from: pager.at_xpath(XPathRules.pagerPrevious)?["href"], relativeTo: baseURL)
         let nextPage = Self.postPage(from: pager.at_xpath(XPathRules.pagerNext)?["href"], relativeTo: baseURL)
+        let numberedNextPage = items.contains { $0.page > currentPage } ? currentPage + 1 : nil
         let pagination = PostDetailPagination(
             currentPage: currentPage,
             items: items,
             previousPage: previousPage,
-            nextPage: nextPage
+            nextPage: nextPage ?? numberedNextPage
         )
         return pagination.hasMultiplePages ? pagination : nil
     }

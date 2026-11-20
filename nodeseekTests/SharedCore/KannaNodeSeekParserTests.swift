@@ -1071,8 +1071,12 @@ struct KannaNodeSeekParserTests {
         #expect(detail.requiredReadingLevel == 1)
     }
 
-    @Test func parsesPostDetailPaginationFromFixture() throws {
-        let html = try FixtureLoader.html(named: "post-703863-1")
+    @Test(arguments: [true, false])
+    func parsesPostDetailPaginationFromFixture(hasNextArrow: Bool) throws {
+        let fixture = try FixtureLoader.html(named: "post-703863-1")
+        let html = hasNextArrow ? fixture : fixture.replacingOccurrences(
+            of: #"<a[^>]*class="pager-next"[^>]*>.*?</a>"#, with: "", options: .regularExpression
+        )
         let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
 
         let detail = try parser.parsePostDetail(
@@ -1085,6 +1089,7 @@ struct KannaNodeSeekParserTests {
         #expect(pagination.currentPage == 1)
         #expect(pagination.previousPage == nil)
         #expect(pagination.nextPage == 2)
+        #expect(!detail.isLastPage)
         #expect(pagination.items.map(\.page) == [1, 2, 3, 4])
         #expect(pagination.items.first?.isCurrent == true)
         #expect(pagination.items.dropFirst().first?.isCurrent == false)
