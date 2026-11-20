@@ -43,7 +43,7 @@ private final class DetailAccessibleText: UIAccessibilityElement {
     }
 }
 
-final class DetailSelectableTextView: UIView, UITextInput, UITextInteractionDelegate {
+final class DetailSelectableTextView: UIView, UITextInput, UITextInteractionDelegate, UIGestureRecognizerDelegate {
     let snapshot: DetailTextSnapshot
     private let onLink: (URL) -> Void
     private var selection: DetailRange?
@@ -100,9 +100,10 @@ final class DetailSelectableTextView: UIView, UITextInput, UITextInteractionDele
         selectionInteraction.textInput = self
         addInteraction(selectionInteraction)
         let tap = UITapGestureRecognizer(target: self, action: #selector(openLink(_:)))
-        for gesture in selectionInteraction.gesturesForFailureRequirements { tap.require(toFail: gesture) }
+        tap.delegate = self
+        tap.cancelsTouchesInView = false
         addGestureRecognizer(tap)
-        configureAccessibility()
+        isAccessibilityElement = false
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -123,7 +124,18 @@ final class DetailSelectableTextView: UIView, UITextInput, UITextInteractionDele
         if window == nil { gifs.forEach { $0.stopAnimating() } }
     }
 
-    private func configureAccessibility() {
+    // UIKit 将 UITextInput 自动暴露为一个文本框。让外层容器负责逐段朗读和链接激活。
+    func accessibleContainer() -> UIView {
+        let container = UIView(frame: bounds)
+        container.isAccessibilityElement = false
+        container.addSubview(self)
+        translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            topAnchor.constraint(equalTo: container.topAnchor),
+            bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        ])
         var elements: [DetailAccessibleText] = []
         var start = 0
         let boxes = snapshot.characters
@@ -135,7 +147,8 @@ final class DetailSelectableTextView: UIView, UITextInput, UITextInteractionDele
                 rect = rect.union(boxes[end].rect)
                 end += 1
             }
-            let element = DetailAccessibleText(accessibilityContainer: self)
+            let element = DetailAccessibleText(accessibilityContainer: container)
+            element.isAccessibilityElement = true
             element.accessibilityFrameInContainerSpace = rect
             element.accessibilityLabel = snapshot.copyText(in: NSUnionRange(boxes[start].range, boxes[end-1].range))
             element.accessibilityTraits = link == nil ? .staticText : .link
@@ -143,11 +156,22 @@ final class DetailSelectableTextView: UIView, UITextInput, UITextInteractionDele
             elements.append(element)
             start = end
         }
-        accessibilityElements = elements
+        container.accessibilityElements = elements
+        return container
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        let point = touch.location(in: self)
+        guard let hit = nearest(point) else { return false }
+        return hit.link != nil && hit.rect.contains(point)
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        gestureRecognizer is UITapGestureRecognizer
     }
 
     @objc private func openLink(_ tap: UITapGestureRecognizer) {
-        guard selection?.isEmpty != false else { selectedTextRange = nil; return }
+        guard selection?.isEmpty != false else { return }
         let point = tap.location(in: self)
         if let hit = nearest(point), hit.rect.contains(point), let url = hit.link { onLink(url) }
     }

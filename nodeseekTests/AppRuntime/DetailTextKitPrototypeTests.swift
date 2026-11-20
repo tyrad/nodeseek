@@ -122,7 +122,7 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         XCTAssertGreaterThan(try XCTUnwrap(rects.last).rect.maxY - (rects.first?.rect.minY ?? 0), 384)
         text.copy(nil)
         XCTAssertEqual(UIPasteboard.general.string, sample + "\n\n" + emoji + " :xhj003: 站点 שלום")
-        let accessibility = try XCTUnwrap(text.accessibilityElements as? [UIAccessibilityElement])
+        let accessibility = try XCTUnwrap(text.superview?.accessibilityElements as? [UIAccessibilityElement])
         XCTAssertTrue(accessibility.contains { $0.accessibilityLabel == "站点" && $0.accessibilityTraits.contains(.link) })
         XCTAssertEqual(text.snapshot.copyText(in: sticker.range), ":xhj003:")
         add(XCTAttachment(image: UIGraphicsImageRenderer(bounds: window.bounds).image { _ in

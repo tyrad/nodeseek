@@ -141,7 +141,7 @@ final class DetailMarkdownPrototypeController: UIViewController, UIScrollViewDel
             case .text(let snapshot):
                 let text = DetailSelectableTextView(snapshot: snapshot, scale: traitCollection.displayScale,
                     onLink: { [weak self] in self?.open($0) }, stickerSizeChanged: { [weak self] in self?.invalidate() })
-                stack.addArrangedSubview(text)
+                stack.addArrangedSubview(text.accessibleContainer())
             case .quote(let children):
                 append(children, to: quote(in: stack), width: width-12)
             case .tabs(let titles, let pages):
