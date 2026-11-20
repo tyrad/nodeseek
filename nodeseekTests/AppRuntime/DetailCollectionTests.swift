@@ -4,6 +4,28 @@ import XCTest
 
 @MainActor
 final class DetailCollectionTests: XCTestCase {
+    func testReusedFloorActionUsesOnlyCurrentCountAndHandler() throws {
+        let cell = DetailFloorListCell(frame: CGRect(x: 0, y: 0, width: 390, height: 120))
+        let appearance = DetailTextAppearance(width: 358, pointSize: 16, scale: 3, dark: false)
+        func bind(_ id: String) {
+            cell.bind(.init(id: id, version: 1, source: .init(html: "", visibleMarkdown: id),
+                            appearance: appearance, baseURL: URL(string: "https://www.nodeseek.com")!))
+        }
+        var calls: [String] = []
+        bind("a")
+        cell.addAction("like", symbol: "hand.thumbsup.fill", count: 19, selected: true) { calls.append("a") }
+        let first = try XCTUnwrap(allButtons(cell.contentView).first)
+        cell.prepareForReuse()
+        bind("b")
+        cell.addAction("like", symbol: "hand.thumbsup", count: 0) { calls.append("b") }
+        let second = try XCTUnwrap(allButtons(cell.contentView).first { !$0.isHidden })
+        XCTAssertTrue(first === second)
+        XCTAssertNil(second.title(for: .normal))
+        XCTAssertEqual(second.accessibilityValue, "0")
+        second.sendActions(for: .touchUpInside)
+        XCTAssertEqual(calls, ["b"])
+    }
+
     func testFloorMenuAndTextSelectionHaveSeparateHitAreas() async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)

@@ -5,6 +5,26 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     private let actions = UIStackView()
     private let footer = UIScrollView()
     private let actionSpacer = UIView()
+    private var actionButtons: [FloorButton] = []
+    private var usedButtonCount = 0
+
+    private final class FloorButton: UIButton {
+        var perform: (() -> Void)?
+        lazy var minimumWidth = widthAnchor.constraint(greaterThanOrEqualToConstant: 0)
+
+        func prepare() {
+            titleLabel?.adjustsFontForContentSizeCategory = true
+            setContentHuggingPriority(.required, for: .horizontal)
+            setContentCompressionResistancePriority(.required, for: .horizontal)
+            NSLayoutConstraint.activate([
+                minimumWidth,
+                heightAnchor.constraint(greaterThanOrEqualToConstant: PostDetailContentLayout.reactionActionHeight)
+            ])
+            addTarget(self, action: #selector(tapped), for: .touchUpInside)
+        }
+
+        @objc private func tapped() { perform?() }
+    }
     private let identity = UIStackView()
     private let header = UIStackView()
     private let floorNumber = UILabel()
@@ -251,24 +271,29 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     }
 
     func addAction(_ key: String, symbol: String, count: Int? = nil, selected: Bool = false, enabled: Bool = true, perform: @escaping () -> Void) {
-        let button = UIButton(type: .system)
+        let button: FloorButton
+        if usedButtonCount < actionButtons.count {
+            button = actionButtons[usedButtonCount]
+        } else {
+            button = FloorButton(type: .system)
+            button.prepare()
+            actionButtons.append(button)
+            actions.addArrangedSubview(button)
+        }
+        usedButtonCount += 1
+        button.isHidden = false
+        button.perform = perform
         let config = UIImage.SymbolConfiguration(pointSize: PostDetailContentLayout.reactionSymbolPointSize, weight: .regular)
         let icon = key == "chicken" ? UIImage(named: "ChickenLeg") : UIImage(systemName: symbol)
         button.setImage(icon?.applyingSymbolConfiguration(config)?.withRenderingMode(.alwaysTemplate), for: .normal)
         button.isEnabled = enabled
         footer.isHidden = false
-        if let count, count > 0 { button.setTitle(" " + count.formatted(), for: .normal) }
+        button.setTitle(count.flatMap { $0 > 0 ? " " + $0.formatted() : nil }, for: .normal)
         button.titleLabel?.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(for: AppTypography.commentActionFont(), compatibleWith: traitCollection)
-        button.titleLabel?.adjustsFontForContentSizeCategory = true
-        button.setContentHuggingPriority(.required, for: .horizontal)
-        button.setContentCompressionResistancePriority(.required, for: .horizontal)
-        button.widthAnchor.constraint(greaterThanOrEqualToConstant: (count ?? 0) > 0 ? PostDetailContentLayout.reactionActionMinWidth : PostDetailContentLayout.reactionIconOnlyWidth).isActive = true
+        button.minimumWidth.constant = (count ?? 0) > 0 ? PostDetailContentLayout.reactionActionMinWidth : PostDetailContentLayout.reactionIconOnlyWidth
         button.accessibilityLabel = DetailListStrings.text(key)
         button.accessibilityValue = count.map { String($0) }
         button.tintColor = selected ? (key == "chicken" || key == "favorite" ? .systemOrange : .systemRed) : UIColor.secondaryLabel.withAlphaComponent(PostDetailContentLayout.inactiveReactionAlpha)
-        button.heightAnchor.constraint(greaterThanOrEqualToConstant: PostDetailContentLayout.reactionActionHeight).isActive = true
-        button.addAction(UIAction { _ in perform() }, for: .touchUpInside)
-        actions.addArrangedSubview(button)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -291,7 +316,12 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         avatar.image = nil
         authorURL = nil
         openAuthor = nil
-        actions.arrangedSubviews.filter { $0 !== actionSpacer }.forEach { $0.removeFromSuperview() }
+        for button in actionButtons.prefix(usedButtonCount) {
+            button.perform = nil
+            button.minimumWidth.constant = 0
+            button.isHidden = true
+        }
+        usedButtonCount = 0
         footer.isHidden = true
         footer.contentOffset = .zero
         contentInstalled = false
@@ -308,7 +338,8 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     }
 
     func bind(_ request: DetailFloorRequest) {
-        clear()
+        // diffable 重配可跳过 prepareForReuse；首次绑定和刚完成复用的空楼层无需再拆一次视图。
+        if self.request != nil { clear() }
         self.request = request
         body.appearance = request.appearance
         copyText = request.source.visibleMarkdown
