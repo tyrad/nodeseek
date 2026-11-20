@@ -372,7 +372,8 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
                 item,
                 reactionConfiguration: reactionConfiguration,
                 ownCommentIDs: ownCommentIDs,
-                commentSources: commentSources
+                commentSources: commentSources,
+                restrictedNotice: restrictedNotice
             )
         }
         let page = Self.postPage(from: url) ?? 1
@@ -407,6 +408,7 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             authorProfileURL: authorProfileURL,
             metadataText: metadataText,
             contentHTML: contentHTML,
+            visibleMarkdown: visibleMarkdown(in: bodyItem, sources: commentSources, pageRestricted: restrictedNotice != nil),
             signatureHTML: signatureHTML,
             likeCount: bodyLikeCount,
             isLikeClicked: bodyItem.map { parseReactionClicked(in: $0, kind: .like) } ?? false,
@@ -467,12 +469,49 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
                 let time = comment["time"] as? [String: Any]
                 sources[String(commentID)] = CommentSource(
                     markdown: comment["markdown"] as? String,
+                    blocked: comment["blocked"] as? Bool,
+                    deleted: comment["deleted"] as? Bool == true,
                     editedAtText: (time?["editedDateFormated"] as? String)?.trimmedNonEmpty
                 )
             }
             return sources
         }
         return [:]
+    }
+
+    private func visibleMarkdown(in item: Kanna.XMLElement?, sources: [String: CommentSource], pageRestricted: Bool) -> String? {
+        guard !pageRestricted, let item, let id = item["data-comment-id"],
+              let source = sources[id], source.blocked == false, !source.deleted, let markdown = source.markdown,
+              let article = item.at_xpath(XPathRules.contentArticle), article.innerHTML?.trimmedNonEmpty != nil else { return nil }
+        let status = "contains(concat(' ', normalize-space(@class), ' '), ' blocked ') or contains(concat(' ', normalize-space(@class), ' '), ' deleted ') or contains(concat(' ', normalize-space(@class), ' '), ' restricted ')"
+        let notices = ["权限不足", "无权查看", "已被删除", "已删除", "已屏蔽", "已被屏蔽", "登录后可见", "登陆后可见", "本帖需要"]
+        let text = article.text ?? ""
+        guard !notices.contains(where: text.contains),
+              article.at_xpath("ancestor-or-self::*[\(status) or \(Self.hiddenElement)]") == nil,
+              article.at_xpath(".//*[\(status) or \(Self.hiddenElement)]") == nil else { return nil }
+        if let visible = text.normalizedNonEmpty, article.at_css("a, img, video, pre, table, strong, em, blockquote, ul, ol, del, s, code, br, h1, h2, h3, h4, h5, h6") == nil,
+           markdown.normalizedNonEmpty != visible {
+            return nil
+        }
+        // 原文与网页完全无关时，含链接或强调的状态提示也不能视作正文。
+        let leaves = article.xpath(".//*[not(*)]").compactMap { $0.text?.trimmedNonEmpty }
+        if !leaves.isEmpty, !leaves.contains(where: markdown.contains), !markdown.contains(":::: tabs"),
+           article.at_css("pre, img, video") == nil {
+            return nil
+        }
+        return markdown
+    }
+
+    private static let hiddenElement = "@hidden or @aria-hidden='true' or contains(translate(@style,'ABCDEFGHIJKLMNOPQRSTUVWXYZ ','abcdefghijklmnopqrstuvwxyz'),'display:none')"
+
+    private func visibleArticleHTML(in item: Kanna.XMLElement?) -> String? {
+        guard let article = item?.at_xpath(XPathRules.contentArticle),
+              article.at_xpath("ancestor-or-self::*[\(Self.hiddenElement)]") == nil else { return nil }
+        let hidden = ".//*[\(Self.hiddenElement) or self::script or self::style]"
+        guard article.at_xpath(hidden) != nil else { return article.innerHTML?.trimmedNonEmpty }
+        guard let copy = article.cloneNode(deep: true) else { return nil }
+        for element in copy.xpath(hidden).reversed() { element.parent?.removeChild(element) }
+        return copy.innerHTML?.trimmedNonEmpty
     }
 
     private func lowLevelWarningAuthorID(in document: HTMLDocument, bodyItem: Kanna.XMLElement?) -> Int? {
@@ -496,15 +535,8 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
     }
 
     private func postDetailContentHTML(bodyItem: Kanna.XMLElement?, document: HTMLDocument) -> String {
-        if let contentHTML = bodyItem?.at_xpath(XPathRules.contentArticle)?.innerHTML?.trimmedNonEmpty {
-            return contentHTML
-        }
-
-        if let notice = postDetailRestrictedNotice(in: document) {
-            return notice
-        }
-
-        return ""
+        if let notice = postDetailRestrictedNotice(in: document) { return notice }
+        return visibleArticleHTML(in: bodyItem) ?? ""
     }
 
     private func contentSignatureHTML(in item: Kanna.XMLElement?) -> String? {
@@ -648,7 +680,8 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
         _ item: Kanna.XMLElement,
         reactionConfiguration: PostReactionConfiguration?,
         ownCommentIDs: Set<String> = [],
-        commentSources: [String: CommentSource] = [:]
+        commentSources: [String: CommentSource] = [:],
+        restrictedNotice: String? = nil
     ) -> Comment? {
         guard let authorName = firstText(in: item, xpaths: [XPathRules.contentAuthor]) else {
             return nil
@@ -671,6 +704,11 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
         let opposeCount = parseReactionCount(in: item, kind: .oppose)
             ?? commentReactionConfiguration?.opposeCount
 
+        let source = commentSources[id]
+        let visibleSource = visibleMarkdown(in: item, sources: commentSources, pageRestricted: restrictedNotice != nil)
+        // 老页面可能没有 blocked 字段。保留原有引用来源，新渲染和复制始终只读取可见原文。
+        let quoteMarkdown = restrictedNotice == nil && source?.blocked == nil && source?.deleted != true ? source?.markdown : visibleSource
+
         return Comment(
             id: id,
             anchorID: item["id"]?.trimmedNonEmpty,
@@ -686,7 +724,7 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
                 xpaths: [XPathRules.contentCreatedAt],
                 attribute: "title"
             ),
-            contentHTML: item.at_xpath(XPathRules.contentArticle)?.innerHTML?.trimmedNonEmpty ?? "",
+            contentHTML: restrictedNotice ?? visibleArticleHTML(in: item) ?? "",
             signatureHTML: contentSignatureHTML(in: item),
             isHot: item.at_xpath(XPathRules.contentHotBadge) != nil,
             likeCount: likeCount,
@@ -696,7 +734,8 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             opposeCount: opposeCount,
             isOpposeClicked: parseReactionClicked(in: item, kind: .oppose),
             isOwnComment: ownCommentIDs.contains(id),
-            markdown: commentSources[id]?.markdown,
+            markdown: quoteMarkdown,
+            hasVisibleMarkdown: visibleSource != nil,
             editedAtTitleText: commentSources[id]?.editedAtText
         )
     }
@@ -1062,5 +1101,7 @@ nonisolated private extension Kanna.XMLElement {
 
 nonisolated private struct CommentSource {
     let markdown: String?
+    let blocked: Bool?
+    let deleted: Bool
     let editedAtText: String?
 }

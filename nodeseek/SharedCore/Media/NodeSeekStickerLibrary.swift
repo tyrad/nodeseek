@@ -7,17 +7,28 @@
 
 import Foundation
 
-struct NodeSeekStickerItem: Hashable {
+nonisolated struct NodeSeekStickerItem: Hashable, Sendable {
     let token: String
     let imageURLs: [URL]
 }
 
-struct NodeSeekStickerPack: Hashable {
+nonisolated struct NodeSeekStickerPack: Hashable, Sendable {
     let title: String
     let items: [NodeSeekStickerItem]
 }
 
-enum NodeSeekStickerLibrary {
+nonisolated enum NodeSeekStickerLibrary {
+    static let urlsByToken = Dictionary(uniqueKeysWithValues: defaultPacks.flatMap(\.items).compactMap { item in
+        item.imageURLs.first.map { (item.token, $0) }
+    })
+
+    private static let tokensByPath = Dictionary(uniqueKeysWithValues: urlsByToken.map { ($0.value.path, $0.key) })
+
+    static func token(for url: URL) -> String? {
+        guard NodeSeekSite.isNodeSeekHost(url) else { return nil }
+        return tokensByPath[url.path]
+    }
+
     nonisolated static let defaultPacks: [NodeSeekStickerPack] = [
         makePack(title: "AC娘", directory: "ac", group: "ac", files: acFiles),
         makePack(title: "洋葱头", directory: "yct", group: "yct", files: yctFiles),

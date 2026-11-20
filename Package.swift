@@ -10,13 +10,15 @@ let package = Package(
         .library(name: "NodeSeekCore", targets: ["NodeSeekCore"])
     ],
     dependencies: [
-        .package(url: "https://github.com/tid-kijyun/Kanna.git", exact: "6.1.0")
+        .package(url: "https://github.com/tid-kijyun/Kanna.git", exact: "6.1.0"),
+        .package(url: "https://github.com/swiftlang/swift-markdown.git", exact: "0.7.3")
     ],
     targets: [
         .target(
             name: "NodeSeekCore",
             dependencies: [
-                "Kanna"
+                "Kanna",
+                .product(name: "Markdown", package: "swift-markdown")
             ],
             path: "nodeseek/SharedCore"
         ),

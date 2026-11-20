@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		7A2000022FA0000000000001 /* ProbeWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7A2000012FA0000000000001 /* ProbeWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		7A1000012FA0000000000001 /* Kanna in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000022FA0000000000001 /* Kanna */; };
+		7A1000012FA0000000000009 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000022FA0000000000009 /* Markdown */; };
 		7A1000042FA0000000000001 /* AsyncDisplayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000052FA0000000000001 /* AsyncDisplayKit */; };
 		7A1000092FA0000000000001 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000082FA0000000000001 /* Kingfisher */; };
 		7A1000152FA0000000000001 /* JXPhotoBrowser in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000172FA0000000000001 /* JXPhotoBrowser */; };
@@ -133,6 +134,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7A1000012FA0000000000001 /* Kanna in Frameworks */,
+				7A1000012FA0000000000009 /* Markdown in Frameworks */,
 				7A1000042FA0000000000001 /* AsyncDisplayKit in Frameworks */,
 				7A1000092FA0000000000001 /* Kingfisher in Frameworks */,
 				7A1000152FA0000000000001 /* JXPhotoBrowser in Frameworks */,
@@ -220,6 +222,7 @@
 			name = nodeseek;
 			packageProductDependencies = (
 				7A1000022FA0000000000001 /* Kanna */,
+				7A1000022FA0000000000009 /* Markdown */,
 				7A1000052FA0000000000001 /* AsyncDisplayKit */,
 				7A1000082FA0000000000001 /* Kingfisher */,
 				7A1000172FA0000000000001 /* JXPhotoBrowser */,
@@ -291,6 +294,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				7A1000032FA0000000000001 /* XCRemoteSwiftPackageReference "Kanna" */,
+				7A1000032FA0000000000009 /* XCRemoteSwiftPackageReference "Markdown" */,
 				7A1000062FA0000000000001 /* XCRemoteSwiftPackageReference "Texture" */,
 				7A1000072FA0000000000001 /* XCRemoteSwiftPackageReference "Kingfisher" */,
 				7A1000162FA0000000000001 /* XCRemoteSwiftPackageReference "PhotoBrowser" */,
@@ -751,6 +755,14 @@
 				minimumVersion = 6.0.0;
 			};
 		};
+		7A1000032FA0000000000009 /* XCRemoteSwiftPackageReference "Markdown" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/swiftlang/swift-markdown.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.7.3;
+			};
+		};
 		7A1000062FA0000000000001 /* XCRemoteSwiftPackageReference "Texture" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/FluidGroup/Texture.git";
@@ -822,6 +834,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7A1000032FA0000000000001 /* XCRemoteSwiftPackageReference "Kanna" */;
 			productName = Kanna;
+		};
+		7A1000022FA0000000000009 /* Markdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7A1000032FA0000000000009 /* XCRemoteSwiftPackageReference "Markdown" */;
+			productName = Markdown;
 		};
 		7A1000052FA0000000000001 /* AsyncDisplayKit */ = {
 			isa = XCSwiftPackageProductDependency;
