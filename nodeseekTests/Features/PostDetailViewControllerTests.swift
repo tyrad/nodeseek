@@ -4444,19 +4444,28 @@ struct PostDetailLoginViewControllerTests {
             presenter: presenter,
             accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true)
         )
-        let lastOfPage1 = quoteSourceComment(id: "110", floor: 10, author: "alice", markdown: "第一页最后一楼\n第二行")
-        let firstOfPage2 = quoteSourceComment(id: "211", floor: 11, author: "carol", markdown: "> 嵌套引用\n\n第二页正文")
+        let page1 = try CommentQuotePageFixture.parsePage(1, pageCount: 4, comments: [
+            .init(id: 131, floor: 31, author: "hot", markdown: "来自第四页的热评", hot: true),
+            .init(id: 110, floor: 10, author: "alice", markdown: "第一页最后一楼\n第二行")
+        ])
+        let nextPage = try #require(page1.pagination?.nextPage)
+        #expect(nextPage == 2)
+        let page2 = try CommentQuotePageFixture.parsePage(nextPage, pageCount: 4, comments: [
+            .init(id: 211, floor: 11, author: "carol", markdown: "> 嵌套引用\n\n第二页正文")
+        ])
 
         viewController.loadViewIfNeeded()
-        viewController.render(detail: quoteSourceDetail(page: 1, comments: [lastOfPage1]))
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.view.layoutIfNeeded()
+        viewController.render(detail: page1)
         await waitForDetailContent(in: viewController)
-        viewController.appendCommentPage(detail: quoteSourceDetail(page: 2, comments: [firstOfPage2]))
-        await Task.yield()
+        viewController.appendCommentPage(detail: page2)
 
-        viewController.handleQuote(lastOfPage1)
-        await Task.yield()
-        viewController.handleQuote(firstOfPage2)
-        await Task.yield()
+        for floor in [10, 31, 11] {
+            try tapCommentAction("引用评论", floor: floor, in: viewController)
+            #expect(await waitUntil { viewController.replyComposerMode.quotes.last?.floorText == "#\(floor)" })
+            if floor != 11 { viewController.dismissReplyEditor() }
+        }
         let replyTextView = try #require(viewController.view.firstTextView(accessibilityIdentifier: "post-detail-reply-text-view"))
         replyTextView.text = "看看"
         let sendButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-send-button"))
@@ -4464,11 +4473,14 @@ struct PostDetailLoginViewControllerTests {
         await Task.yield()
 
         #expect(presenter.sentReplyContent == """
-        > @alice [#10](https://www.nodeseek.com/post-703863-1#10) 发布于2026-11-15 17:00:10
+        > @alice [#10](https://www.nodeseek.com/post-1016685-1#10) 发布于2026-11-15 17:00:10
         > 第一页最后一楼
         > 第二行
 
-        > @carol [#11](https://www.nodeseek.com/post-703863-2#11) 发布于2026-11-15 17:00:11
+        > @hot [#31](https://www.nodeseek.com/post-1016685-4#31) 发布于2026-11-15 17:00:31
+        > 来自第四页的热评
+
+        > @carol [#11](https://www.nodeseek.com/post-1016685-2#11) 发布于2026-11-15 17:00:11
         > > 嵌套引用
         >\u{20}
         > 第二页正文
@@ -4485,17 +4497,22 @@ struct PostDetailLoginViewControllerTests {
             currentPage: 3,
             accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true)
         )
-        let floor21 = quoteSourceComment(id: "221", floor: 21, author: "erin", markdown: "第三页", editedAt: "2026-11-15 18:00:00")
-        let hot = quoteSourceComment(id: "131", floor: 31, author: "hot", markdown: "跨页热评")
+        let page3 = try CommentQuotePageFixture.parsePage(3, pageCount: 3, comments: [
+            .init(id: 221, floor: 21, author: "erin", markdown: "第三页", editedAt: "2026-11-15 18:00:00"),
+            .init(id: 222, floor: 22, author: "bob", markdown: "同页回复目标")
+        ])
 
         viewController.loadViewIfNeeded()
-        viewController.render(detail: quoteSourceDetail(page: 3, comments: [hot, floor21]))
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.view.layoutIfNeeded()
+        viewController.render(detail: page3)
         await waitForDetailContent(in: viewController)
 
-        viewController.handleQuote(floor21)
-        await Task.yield()
-        viewController.handleReply(to: hot)
-        await Task.yield()
+        try tapCommentAction("引用评论", floor: 21, in: viewController)
+        #expect(await waitUntil { viewController.replyComposerMode.quotes.last?.floorText == "#21" })
+        viewController.dismissReplyEditor()
+        try tapCommentAction("回复评论", floor: 22, in: viewController)
+        #expect(await waitUntil { viewController.replyComposerMode.replies.last?.floorText == "#22" })
         let replyTextView = try #require(viewController.view.firstTextView(accessibilityIdentifier: "post-detail-reply-text-view"))
         replyTextView.text = "收到"
         let sendButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-send-button"))
@@ -4503,45 +4520,25 @@ struct PostDetailLoginViewControllerTests {
         await Task.yield()
 
         #expect(presenter.sentReplyContent == """
-        > @erin [#21](https://www.nodeseek.com/post-703863-3#21) 发布于2026-11-15 17:00:21，编辑于2026-11-15 18:00:00
+        > @erin [#21](https://www.nodeseek.com/post-1016685-3#21) 发布于2026-11-15 17:00:21，编辑于2026-11-15 18:00:00
         > 第三页
 
-        @hot [#31](https://www.nodeseek.com/post-703863-4#31) 收到
+        @bob [#22](https://www.nodeseek.com/post-1016685-3#22) 收到
         """)
     }
 
-    private func quoteSourceComment(
-        id: String,
-        floor: Int,
-        author: String,
-        markdown: String,
-        editedAt: String? = nil
-    ) -> nodeseek.Comment {
-        nodeseek.Comment(
-            id: id,
-            anchorID: "\(floor)",
-            authorName: author,
-            avatarURL: nil,
-            floorText: "#\(floor)",
-            createdAtText: "刚刚",
-            createdAtTitleText: String(format: "2026-11-15 17:00:%02d", floor),
-            contentHTML: "<p>渲染后的内容不参与引用</p>",
-            markdown: markdown,
-            editedAtTitleText: editedAt
-        )
-    }
-
-    private func quoteSourceDetail(page: Int, comments: [nodeseek.Comment]) -> PostDetail {
-        PostDetail(
-            id: "703863",
-            title: "详情标题",
-            authorName: "ipv4",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            comments: comments,
-            page: page
-        )
+    private func tapCommentAction(_ label: String, floor: Int, in controller: PostDetailViewController) throws {
+        let table = controller.tableNode
+        table.waitUntilAllUpdatesAreProcessed()
+        let cells = (0..<table.numberOfRows(inSection: 0)).compactMap { row in
+            table.nodeForRow(at: IndexPath(row: row, section: 0)) as? CommentCellNode
+        }
+        let cell = try #require(cells.first { $0.debugHeaderTopLineText.split(separator: " ").last == "#\(floor)" })
+        _ = cell.view
+        cell.layoutIfNeeded()
+        let buttons = (cell.subnodes ?? []).compactMap { $0 as? ASButtonNode }
+        let button = try #require(buttons.first { $0.accessibilityLabel == label })
+        button.sendActions(forControlEvents: .touchUpInside, with: nil)
     }
 
     @Test func contextBarScrollsWhenTargetsOverflowVisibleRows() async throws {

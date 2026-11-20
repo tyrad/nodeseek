@@ -18,12 +18,10 @@ private typealias QuoteTestComment = nodeseek.Comment
 #endif
 
 struct CommentQuoteSourceTests {
-    private let postID = "1016685"
-
     // MARK: - 不分页
 
     @Test func singlePagePostQuotesSourceMarkdownLineByLine() throws {
-        let detail = try parsePage(1, comments: [
+        let detail = try CommentQuotePageFixture.parsePage(1, comments: [
             .init(id: 100, floor: 0, author: "楼主", markdown: "正文"),
             .init(id: 101, floor: 1, author: "alice", markdown: "line 1\nline 2\nline 3"),
             .init(
@@ -52,7 +50,7 @@ struct CommentQuoteSourceTests {
     }
 
     @Test func editedCommentHeaderAppendsEditedTime() throws {
-        let detail = try parsePage(1, comments: [
+        let detail = try CommentQuotePageFixture.parsePage(1, comments: [
             .init(id: 101, floor: 1, author: "alice", markdown: "改过", editedAt: "2026-11-15 18:00:00")
         ])
 
@@ -63,7 +61,7 @@ struct CommentQuoteSourceTests {
     }
 
     @Test func trailingBlankLinesInMarkdownAreKeptLikeWeb() throws {
-        let detail = try parsePage(1, comments: [
+        let detail = try CommentQuotePageFixture.parsePage(1, comments: [
             .init(id: 101, floor: 1, author: "alice", markdown: "~~\n\n")
         ])
 
@@ -76,7 +74,7 @@ struct CommentQuoteSourceTests {
     }
 
     @Test func commentMissingFromConfigKeepsOnlyHeader() throws {
-        let detail = try parsePage(
+        let detail = try CommentQuotePageFixture.parsePage(
             1,
             comments: [.init(id: 101, floor: 1, author: "alice", markdown: "有原文")],
             htmlOnlyComments: [.init(id: 999, floor: 2, author: "ghost", markdown: "")]
@@ -90,18 +88,18 @@ struct CommentQuoteSourceTests {
     // MARK: - 分页
 
     @Test func secondPageCommentsCarryTheirOwnPageMarkdownAndLinks() throws {
-        let page2 = try parsePage(2, comments: [
+        let page2 = try CommentQuotePageFixture.parsePage(2, comments: [
             .init(id: 211, floor: 11, author: "carol", markdown: "第二页\n第二行"),
             .init(id: 220, floor: 20, author: "dave", markdown: "第二页最后一楼")
         ])
 
         #expect(page2.page == 2)
-        #expect(quote(try comment("#11", in: page2), postURL: pageURL(2)) == """
+        #expect(quote(try comment("#11", in: page2), postURL: CommentQuotePageFixture.pageURL(2)) == """
         > @carol [#11](https://www.nodeseek.com/post-1016685-2#11) 发布于2026-11-15 17:00:11
         > 第二页
         > 第二行
         """)
-        #expect(quote(try comment("#20", in: page2), postURL: pageURL(2)) == """
+        #expect(quote(try comment("#20", in: page2), postURL: CommentQuotePageFixture.pageURL(2)) == """
         > @dave [#20](https://www.nodeseek.com/post-1016685-2#20) 发布于2026-11-15 17:00:20
         > 第二页最后一楼
         """)
@@ -109,10 +107,10 @@ struct CommentQuoteSourceTests {
 
     /// 从第 1 页进入后滚动加载第 2 页：详情页拼内容时用的是进入页 URL，链接仍要指向各楼层所在页。
     @Test func quotesAcrossLoadedPagesUseEachFloorsPage() throws {
-        let page1 = try parsePage(1, comments: [
+        let page1 = try CommentQuotePageFixture.parsePage(1, comments: [
             .init(id: 110, floor: 10, author: "alice", markdown: "第一页最后一楼")
         ])
-        let page2 = try parsePage(2, comments: [
+        let page2 = try CommentQuotePageFixture.parsePage(2, comments: [
             .init(id: 211, floor: 11, author: "carol", markdown: "第二页第一楼")
         ])
 
@@ -122,7 +120,7 @@ struct CommentQuoteSourceTests {
                 replies: [try comment("#11", in: page2)],
                 quotes: [try comment("#10", in: page1), try comment("#11", in: page2)]
             ),
-            postURL: pageURL(1)
+            postURL: CommentQuotePageFixture.pageURL(1)
         )
 
         #expect(content == """
@@ -138,25 +136,25 @@ struct CommentQuoteSourceTests {
 
     /// 从第 3 页进入时引用第 1 页置顶展示的楼层，链接也不能沿用进入页。
     @Test func enteringLaterPageStillLinksFloorToItsOwnPage() throws {
-        let page3 = try parsePage(3, comments: [
+        let page3 = try CommentQuotePageFixture.parsePage(3, comments: [
             .init(id: 221, floor: 21, author: "erin", markdown: "第三页")
         ])
 
-        #expect(quote(try comment("#21", in: page3), postURL: pageURL(3)) == """
+        #expect(quote(try comment("#21", in: page3), postURL: CommentQuotePageFixture.pageURL(3)) == """
         > @erin [#21](https://www.nodeseek.com/post-1016685-3#21) 发布于2026-11-15 17:00:21
         > 第三页
         """)
         let reply = CommentComposerContentBuilder.content(
             text: "hi",
             mode: .reply([try comment("#21", in: page3)]),
-            postURL: pageURL(1)
+            postURL: CommentQuotePageFixture.pageURL(1)
         )
         #expect(reply == "@erin [#21](https://www.nodeseek.com/post-1016685-3#21) hi")
     }
 
     /// 第 1 页置顶的跨页热评：原文也在第 1 页配置里，链接指向热评原本所在页。
     @Test func hotCommentFromLaterPageHasMarkdownAndLinksToItsPage() throws {
-        let page1 = try parsePage(1, comments: [
+        let page1 = try CommentQuotePageFixture.parsePage(1, comments: [
             .init(id: 100, floor: 0, author: "楼主", markdown: "正文"),
             .init(id: 131, floor: 31, author: "hot", markdown: "热评第一行\n热评第二行", hot: true),
             .init(id: 101, floor: 1, author: "alice", markdown: "一楼")
@@ -178,9 +176,23 @@ struct CommentQuoteSourceTests {
         }
     }
 
-    // MARK: - Helpers
+    private func comment(_ floorText: String, in detail: PostDetail) throws -> QuoteTestComment {
+        try #require(detail.comments.first { $0.floorText == floorText })
+    }
 
-    private struct SourceComment {
+    private func quote(_ comment: QuoteTestComment, postURL: URL? = nil) -> String {
+        CommentComposerContentBuilder.content(
+            text: "",
+            mode: .quote([comment]),
+            postURL: postURL ?? CommentQuotePageFixture.pageURL(1)
+        )
+    }
+}
+
+enum CommentQuotePageFixture {
+    private static let postID = "1016685"
+
+    struct SourceComment {
         let id: Int
         let floor: Int
         let author: String
@@ -192,12 +204,13 @@ struct CommentQuoteSourceTests {
         var createdAt: String { String(format: "2026-11-15 17:00:%02d", floor % 60) }
     }
 
-    private func pageURL(_ page: Int) -> URL {
+    static func pageURL(_ page: Int) -> URL {
         NodeSeekSite.postURL(id: postID, page: page)
     }
 
-    private func parsePage(
+    static func parsePage(
         _ page: Int,
+        pageCount: Int? = nil,
         comments: [SourceComment],
         htmlOnlyComments: [SourceComment] = []
     ) throws -> PostDetail {
@@ -206,6 +219,7 @@ struct CommentQuoteSourceTests {
             "postData": [
                 "postId": Int(postID)!,
                 "postPage": page,
+                "postPageCount": pageCount ?? page,
                 "comments": comments.map { comment -> [String: Any] in
                     [
                         "commentId": comment.id,
@@ -233,7 +247,21 @@ struct CommentQuoteSourceTests {
             </li>
             """
         }.joined(separator: "\n")
+        var pager = ""
+        if let pageCount, pageCount > 1 {
+            var links = (1...pageCount).map { number in
+                #"<a class="pager-pos" href="\#(pageURL(number).path)">\#(number)</a>"#
+            }
+            if page > 1 {
+                links.append(#"<a class="pager-prev" href="\#(pageURL(page - 1).path)">上一页</a>"#)
+            }
+            if page < pageCount {
+                links.append(#"<a class="pager-next" href="\#(pageURL(page + 1).path)">下一页</a>"#)
+            }
+            pager = #"<nav class="post-top-pager">\#(links.joined())</nav>"#
+        }
         let html = """
+        \(pager)
         <div class="post-title"><h1>测试贴</h1></div>
         <div class="nsk-post"><ul class="comments">\(items)</ul></div>
         <script id="temp-script" type="application/json">
@@ -242,17 +270,5 @@ struct CommentQuoteSourceTests {
         """
         return try KannaNodeSeekParser(baseURL: NodeSeekSite.baseURL)
             .parsePostDetail(html: html, url: pageURL(page))
-    }
-
-    private func comment(_ floorText: String, in detail: PostDetail) throws -> QuoteTestComment {
-        try #require(detail.comments.first { $0.floorText == floorText })
-    }
-
-    private func quote(_ comment: QuoteTestComment, postURL: URL? = nil) -> String {
-        CommentComposerContentBuilder.content(
-            text: "",
-            mode: .quote([comment]),
-            postURL: postURL ?? pageURL(1)
-        )
     }
 }
