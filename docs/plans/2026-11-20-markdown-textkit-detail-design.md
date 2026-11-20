@@ -61,9 +61,26 @@ Features/PostDetail（新页面）
 
 配套处理：
 
-- **拷贝**：复制所选范围的纯文本。表情按其代码（如 `:xhj003:`）还是按占位字符复制，在阶段 2 定。
+- **拷贝**：复制所选范围的纯文本。选区里的表情复制成它的代码（如 `:xhj003:`），粘贴到回复框里仍然显示为表情。
 - **链接点击**：单击手势在布局上命中测试。已有选区时单击先清除选区，不触发链接。
-- **句中表情 / GIF**：排版时用固定尺寸的附件占位，动图用覆盖在附件位置的图片视图播放，不重绘文字分块。
+- **表情**：显示为图片，效果与现状一致，规则见下一节。
+
+### 表情渲染（与现状一致）
+
+现有效果（DTCoreText 链路）：
+
+- 识别：`sticker` class，或地址包含 `/sticker/`（`StickerImageRules`）。Markdown 中的 `:代码:` 用 `NodeSeekStickerLibrary` 映射到同一地址。
+- 尺寸：固定高 65pt（`DetailImageLayout.fixedStickerHeight`），宽度按原图比例，不超过正文宽度。尺寸未知时先用 65×65 占位；`StickerAspectRatioCache` 记录已加载的原图尺寸，下次直接用真实比例，避免回流。
+- 位置：作为行内附件嵌在文字中，与正文同一行按基线排列。单独成行时独占一行。
+- 播放：GIF / WebP 用 `DetailInlineImageView`（Kingfisher `AnimatedImageView`）自动播放，滑出屏幕暂停；视频表情用 `DetailInlineVideoStickerView`（AVPlayer）循环播放，未播放时显示首帧。
+- 交互：点击行为与现状一致。
+
+新链路做法：
+
+- 尺寸计算直接复用 `DetailImageLayout.presentation(kind: .sticker)` 和 `StickerAspectRatioCache`，不另写规则。
+- 排版时插入同尺寸的附件占位，分块位图里不画表情。表情由覆盖在附件矩形上的 `DetailInlineImageView` / `DetailInlineVideoStickerView` 显示，复用现有的加载、播放、可见性暂停逻辑。
+- 原图尺寸加载后与缓存不同时，只更新该楼的布局，并按现有节流策略刷新。
+- 对比测试中，表情的数量、地址、显示尺寸和相对文字的位置列为硬断言；截图对照时单独检查句中表情的基线对齐。
 - **分块绘制**：超过一定高度的文本按行边界切块，在后台绘制成位图。选区高亮由 `UITextInteraction` 绘制在分块之上。
 - **无障碍**：整块文字作为 `accessibilityValue`，链接作为独立的无障碍元素。
 - **最低版本**：iOS 15。iOS 16 起拷贝菜单由 `UITextInteraction` 自动使用 `UIEditMenuInteraction`，需要在两个系统上分别验证。
