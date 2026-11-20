@@ -61,7 +61,8 @@ enum PostSummaryText {
     static func titleAttributedText(
         for post: PostSummary,
         isVisited: Bool = false,
-        specialFollowRules: [SpecialFollowKeywordRule] = []
+        specialFollowRules: [SpecialFollowKeywordRule] = [],
+        searchHighlightTerms: [String] = []
     ) -> NSAttributedString {
         let font = PostListCellStyle.Typography.titleFont
         let attributes: [NSAttributedString.Key: Any] = [
@@ -82,6 +83,8 @@ enum PostSummaryText {
         }
 
         title.append(NSAttributedString(string: post.title, attributes: attributes))
+        // 先标搜索词，特别关注后标，两者重叠时以特别关注的颜色为准
+        SearchKeywordHighlighter.applyHighlight(to: title, terms: searchHighlightTerms, font: font)
         SpecialFollowKeywordHighlighter.applyHighlight(to: title, rules: specialFollowRules)
 
         guard post.isLocked else {
@@ -363,5 +366,42 @@ private struct ListSymbolImageKey: Hashable {
         self.alpha = Int((alpha * 255).rounded())
         self.scale = Int((scale * 100).rounded())
         self.rotation = Int((rotationAngle * 1000).rounded())
+    }
+}
+
+/// 搜索结果标题里的关键词：加粗并铺一层半透明黄色底，像荧光笔标记，浅色和暗黑模式下文字都清晰。
+enum SearchKeywordHighlighter {
+    /// 搜索命中的语义色；用系统黄，深浅色下自动换成对应色值。
+    static let backgroundColor = UIColor.systemYellow.withAlphaComponent(0.35)
+
+    /// 按空白拆词并去重，空串不参与高亮。
+    static func terms(from query: String) -> [String] {
+        var seen = Set<String>()
+        return query
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
+    }
+
+    static func applyHighlight(to attributedText: NSMutableAttributedString, terms: [String], font: UIFont) {
+        guard attributedText.length > 0, !terms.isEmpty else { return }
+        // 标题本身是 medium，直接按字重加粗；symbolicTraits 的 bold 对系统字体不生效
+        let boldFont = UIFont(
+            descriptor: font.fontDescriptor.addingAttributes([.traits: [UIFontDescriptor.TraitKey.weight: UIFont.Weight.bold]]),
+            size: font.pointSize
+        )
+        let source = attributedText.string as NSString
+        for term in terms {
+            var searchRange = NSRange(location: 0, length: source.length)
+            while searchRange.length > 0 {
+                let range = source.range(of: term, options: [.caseInsensitive, .diacriticInsensitive], range: searchRange)
+                guard range.location != NSNotFound, range.length > 0 else { break }
+                attributedText.addAttributes([
+                    .font: boldFont,
+                    .backgroundColor: backgroundColor
+                ], range: range)
+                let next = range.location + range.length
+                searchRange = NSRange(location: next, length: source.length - next)
+            }
+        }
     }
 }

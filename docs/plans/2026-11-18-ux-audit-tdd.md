@@ -46,7 +46,7 @@
 | U33 | P2 | 「我的」页点「粉丝」进入个人主页而不是粉丝列表 | `AppUXAuditTests.test_U33_meFansStatOpensFollowersList`（已修复：鸡腿、星辰、粉丝、关注均可直接打开对应明细） |
 | U34 | P2 | 「添加探针」填了内容点关闭不确认 | `AppUXAuditTests.test_U34_probeEditorAsksBeforeDiscardingTypedAddress` |
 | U35 | P2 | 侧边栏菜单文字左边缘不齐（73~80pt） | `AppUXAuditTests.test_U35_sideMenuRowTitlesShareLeadingEdge`（已修复：菜单图标统一画进 28pt 宽画布居中，各行文字左边缘对齐） |
-| U36 | P2 | 搜索结果不高亮关键词 | `AppUXAuditTests.test_U36_searchResultTitleHighlightsKeyword` |
+| U36 | P2 | 搜索结果不高亮关键词 | `AppUXAuditTests.test_U36_searchResultTitleHighlightsKeyword`（已修复：搜索结果标题里的关键词加粗并带半透明黄色底，首页列表不受影响） |
 | U37 | P2 | 搜索切到「用户」tab 时不自动用已有关键字搜索 | `AppUXAuditTests.test_U37_switchingToUserScopeSearchesExistingKeyword`（已修复：从「帖子」切到「用户」时自动搜索已提交的同一关键词） |
 | U38 | P2 | 通知只显示帖子标题，看不到对方说了什么 | 不修。「@我」和「回复主题」通知继续只显示帖子标题。现有接口不返回评论正文，展示摘要需逐条请求。 |
 | U39 | P2 | 收藏后帖子操作栏图标整体左移（布局跳动） | `PostDetailUXAuditTests.test_U39_postActionRowStaysStableWhenFavoriteCountAppears` |

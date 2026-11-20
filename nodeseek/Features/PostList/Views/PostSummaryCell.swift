@@ -37,6 +37,8 @@ final class PostSummaryCell: UITableViewCell {
 
     private var item: PostListItem?
     private var layout: PostSummaryLayout?
+    /// 搜索结果的关键词；行自己补算排版（切换深浅色、宽度变化）时也要带上，首页始终为空。
+    private var searchHighlightTerms: [String] = []
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -53,6 +55,7 @@ final class PostSummaryCell: UITableViewCell {
         avatarImageView.image = nil
         item = nil
         layout = nil
+        searchHighlightTerms = []
     }
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -63,9 +66,10 @@ final class PostSummaryCell: UITableViewCell {
     }
 
     /// `layout` 由列表提供；为空时按当前宽度同步补算。
-    func configure(with item: PostListItem, layout: PostSummaryLayout? = nil) {
+    func configure(with item: PostListItem, layout: PostSummaryLayout? = nil, searchHighlightTerms: [String] = []) {
         let previousPostID = self.item?.post.id
         self.item = item
+        self.searchHighlightTerms = searchHighlightTerms
         apply(layout ?? makeLayout(for: item, width: contentView.bounds.width))
 
         let hasDisplayableAuthor = AuthorDisplayPolicy.isDisplayable(item.post.authorName)
@@ -105,7 +109,7 @@ final class PostSummaryCell: UITableViewCell {
     private func makeLayout(for item: PostListItem, width: CGFloat) -> PostSummaryLayout {
         PostSummaryLayout.make(
             item: item,
-            context: .current(width: width, traitCollection: traitCollection)
+            context: .current(width: width, traitCollection: traitCollection, searchHighlightTerms: searchHighlightTerms)
         )
     }
 

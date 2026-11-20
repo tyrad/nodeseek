@@ -45,6 +45,52 @@ struct PostTextureListViewTests {
         #expect(tableView.numberOfRows(inSection: 0) == 1)
     }
 
+    /// 首页用的列表默认不带关键词；搜索页设置后可见行重新排版出高亮，清空后恢复。
+    @Test func searchHighlightTermsRelayoutVisibleTitles() throws {
+        let view = PostTextureListView()
+        #expect(view.searchHighlightTerms.isEmpty)
+        view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        view.setItems([
+            PostListItem(post: PostSummary(
+                id: "1",
+                title: "出一台美西 VPS",
+                url: URL(string: "https://www.nodeseek.com/post-1-1")!,
+                authorName: "ipv4",
+                nodeName: "交易",
+                replyCount: 1,
+                lastActivityText: "刚刚",
+                isPinned: false
+            ), isVisited: false)
+        ])
+        view.layoutIfNeeded()
+        let tableView = try #require(view.firstSubview(of: UITableView.self))
+
+        func keywordBackground() throws -> Any? {
+            tableView.layoutIfNeeded()
+            let cell = try #require(tableView.visibleCells.first as? PostSummaryCell)
+            let label = try #require(Mirror(reflecting: cell).children.first { $0.label == "titleLabel" }?.value as? UILabel)
+            let text = try #require(label.attributedText)
+            let location = (text.string as NSString).range(of: "美西").location
+            return text.attribute(.backgroundColor, at: location, effectiveRange: nil)
+        }
+
+        #expect(try keywordBackground() == nil)
+        view.searchHighlightTerms = ["美西"]
+        #expect(try keywordBackground() as? UIColor == SearchKeywordHighlighter.backgroundColor)
+
+        // 切换深浅色、宽度变化时行会自己补算排版，高亮不能丢
+        let cell = try #require(tableView.visibleCells.first as? PostSummaryCell)
+        cell.overrideUserInterfaceStyle = .dark
+        cell.applyCurrentTheme()
+        #expect(try keywordBackground() as? UIColor == SearchKeywordHighlighter.backgroundColor)
+        cell.contentView.frame.size.width -= 40
+        cell.layoutIfNeeded()
+        #expect(try keywordBackground() as? UIColor == SearchKeywordHighlighter.backgroundColor)
+
+        view.searchHighlightTerms = []
+        #expect(try keywordBackground() == nil)
+    }
+
     @Test func loadingSkeletonRowsFillVisibleListHeight() throws {
         let view = PostTextureListView()
         view.frame = CGRect(x: 0, y: 0, width: 390, height: 806)
