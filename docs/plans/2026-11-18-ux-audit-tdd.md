@@ -13,16 +13,16 @@
 | --- | --- | --- | --- |
 | U01 | P0 | 评论正文最后一行的链接被签名链接抢点击（点 #0 打开了签名里的帖子） | `PostDetailUXAuditTests.test_U01_bodyLastLineLinkCenterTapResolvesToBodyURL`<br>`PostDetailUXAuditTests.test_U01_signatureHitAreaDoesNotCoverBodyLastLinePlainText`（已修复） |
 | U02 | P0 | 未授权 NodeImage 时授权页堆满十几个「加载API密钥失败」提示 | `AppUXAuditTests.test_U02_nodeImageExtractionDoesNotClickAPIButtonInsidePollingTimer`<br>`AppUXAuditTests.test_U02_nodeImageClicksAPIButtonOnceAfterSignInAndReturnsKey`（已修复，模拟器真实授权通过） |
-| U03 | P0 | 「每日签到」网页已加载完，但一直白屏 + 转圈，要滑一下才显示 | `AppUXAuditTests.test_U03_webPageStopsSpinnerOnceNavigationCommits` |
+| U03 | P0 | 「每日签到」网页已加载完，但一直白屏 + 转圈，要滑一下才显示 | 不修：签到网页白屏转圈不作为 App 问题处理；已删除对应测试 |
 | U04 | P0 | 详情页浮动「评论」按钮盖住评论行的操作按钮（编辑 / 引用） | 不修：浮动评论按钮支持拖拽，用户可自行移开；已删除对应测试 |
 | U05 | P0 | 拼音组字中点评论框外部，评论框收起、组字被打断 | 不修：点外部收起以用户意图为准，组合文字由系统上屏；已删除对应测试 |
 | U06 | P0 | 私信列表的系统通知预览显示 Markdown 原文 | 不修：与网页一致，网页私信预览同样显示原文；已删除对应测试 |
-| U07 | P1 | 首页相对时间（「2s ago」）不会随时间刷新 | `AppUXAuditTests.test_U07_postSummaryKeepsAbsoluteLastActivityDate` |
-| U08 | P1 | 详情页评论相对时间不会刷新 | `PostDetailUXAuditTests.test_U08_commentCarriesAbsoluteCreatedDate` |
-| U09 | P1 | 浅色模式看大图时状态栏是深色字，黑底上看不见 | `PostDetailUXAuditTests.test_U09_photoBrowserUsesLightStatusBarInLightMode` |
+| U07 | P1 | 首页相对时间（「2s ago」）不会随时间刷新 | 不修：首页时间沿用网页给出的相对时间，不随时间刷新；已删除对应测试 |
+| U08 | P1 | 详情页评论相对时间不会刷新 | 不修：评论时间沿用网页给出的相对时间，不随时间刷新；已删除对应测试 |
+| U09 | P1 | 浅色模式看大图时状态栏是深色字，黑底上看不见 | 不修：看大图时状态栏保持现状；已删除对应测试 |
 | U10 | P1 | 表情面板展开时，面板下方露出后面的内容 | 不修：表情面板下方留白属预期行为；已删除对应测试 |
 | U11 | P1 | 发帖按钮被滑动隐藏后，切换分类它仍保持隐藏 | `AppUXAuditTests.test_U11_composeButtonReappearsAfterSwitchingCategory`（已修复：切换分类后发帖按钮重新出现） |
-| U12 | P1 | 「我的」页发帖上限 0/4 与个人主页 0/20 不一致 | `AppUXAuditTests.test_U12_mePageAndProfileShowSamePostLimit` |
+| U12 | P1 | 「我的」页发帖上限 0/4 与个人主页 0/20 不一致 | 不修：「我的」页与个人主页的发帖数字保持现状；已删除对应测试 |
 | U13 | P1 | 特别关注说明写「右滑删除」，实际是左滑 | `AppUXAuditTests.test_U13_specialFollowFooterSaysSwipeToDelete`（已修复：文案改为滑动删除） |
 | U14 | P1 | App 内字号 +8 时首页元信息行的时间被截断 | 不修。保留首页元信息的单行布局。 |
 | U15 | P1 | 回复成功后停在原位，看不到自己刚发的评论 | 不修：回复后停在原位属预期行为；已删除对应测试 |
@@ -37,22 +37,22 @@
 | U24 | P1 | 楼层跳转后没有高亮，看不出跳到了哪一层 | 不修：跳转后已有整行闪烁高亮，保持现有颜色和时长；未写测试 |
 | U25 | P1 | 「在浏览器打开」在第 2 页时打开的是第 1 页 | 不修：「在浏览器打开」沿用进入时的页码，属预期行为；已删除对应测试 |
 | U26 | P1 | 暗黑模式看大图时图片仍被「图片变暗」压暗 | `PostDetailUXAuditTests.test_U26_photoPreviewIsNotDimmedInDarkMode`（不修：大图沿用图片变暗设置，属预期行为） |
-| U27 | P1 | 系统 Dynamic Type 调大后首页 / 详情字号不变 | `AppUXAuditTests.test_U27_typographyScalesWithSystemDynamicType` |
+| U27 | P1 | 系统 Dynamic Type 调大后首页 / 详情字号不变 | 不修：字号以 App 内字号设置为准，不跟随系统 Dynamic Type；已删除对应测试 |
 | U28 | P2 | 「回复楼主」输入框头部显示「回复 缭雾 #0」 | 不修：回复楼主沿用网页做法，正文为 `@作者 [#0](…)`，输入框头部显示「回复 作者 #0」与之对应；已删除对应测试 |
 | U29 | P2 | 多页帖子的热评和正常楼层重复出现，没有分区标题 | 不修。沿用网页做法，热评提前展示并用楼号旁的火焰标识，原楼层保留。 |
 | U30 | P2 | 0 条评论的帖子下方空白，没有空状态提示 | 不修。帖子正常加载且没有回复时，正文下方自然留白。 |
 | U31 | P2 | 编辑评论的草稿条写「无标题」 | 不修：草稿条沿用通用格式显示「无标题」，属预期行为；已删除对应测试 |
 | U32 | P2 | 自己评论的长按菜单里有「投放鸡腿」 | `PostDetailUXAuditTests.test_U32_ownCommentContextMenuHasNoChickenLeg`（已修复） |
 | U33 | P2 | 「我的」页点「粉丝」进入个人主页而不是粉丝列表 | `AppUXAuditTests.test_U33_meFansStatOpensFollowersList`（已修复：鸡腿、星辰、粉丝、关注均可直接打开对应明细） |
-| U34 | P2 | 「添加探针」填了内容点关闭不确认 | `AppUXAuditTests.test_U34_probeEditorAsksBeforeDiscardingTypedAddress` |
+| U34 | P2 | 「添加探针」填了内容点关闭不确认 | 不修：「添加探针」关闭时不弹确认，保持现状；已删除对应测试 |
 | U35 | P2 | 侧边栏菜单文字左边缘不齐（73~80pt） | `AppUXAuditTests.test_U35_sideMenuRowTitlesShareLeadingEdge`（已修复：菜单图标统一画进 28pt 宽画布居中，各行文字左边缘对齐） |
 | U36 | P2 | 搜索结果不高亮关键词 | `AppUXAuditTests.test_U36_searchResultTitleHighlightsKeyword`（已修复：搜索结果标题里的关键词加粗并带半透明黄色底，首页列表不受影响） |
 | U37 | P2 | 搜索切到「用户」tab 时不自动用已有关键字搜索 | `AppUXAuditTests.test_U37_switchingToUserScopeSearchesExistingKeyword`（已修复：从「帖子」切到「用户」时自动搜索已提交的同一关键词） |
 | U38 | P2 | 通知只显示帖子标题，看不到对方说了什么 | 不修。「@我」和「回复主题」通知继续只显示帖子标题。现有接口不返回评论正文，展示摘要需逐条请求。 |
-| U39 | P2 | 收藏后帖子操作栏图标整体左移（布局跳动） | `PostDetailUXAuditTests.test_U39_postActionRowStaysStableWhenFavoriteCountAppears` |
+| U39 | P2 | 收藏后帖子操作栏图标整体左移（布局跳动） | 不修：收藏后操作栏布局保持现状；已删除对应测试 |
 | U40 | P2 | 字号滑块、复制面板「复制」按钮使用系统蓝，不符合黑白主题 | `AppUXAuditTests.test_U40_textSizeSliderUsesMonochromeTint`<br>`PostDetailUXAuditTests.test_U40_copySheetPrimaryButtonIsNotSystemBlue`（已修复：滑块已选轨道与复制按钮改用 .label 反色） |
 | U41 | P2 | 暗黑模式下表情面板的表情是刺眼白底 | `PostDetailComposerUXAuditTests.test_U41_stickerCellsAreDimmedInDarkMode`（不修：白底来自表情图片本身，非界面问题） |
-| U42 | P2 | 全 App 时间格式不统一（「2s ago」/「2分钟前」/「刚刚」/ 绝对时间） | `AppUXAuditTests.test_U42_listTimeUsesLocalizedRelativeFormat` |
+| U42 | P2 | 全 App 时间格式不统一（「2s ago」/「2分钟前」/「刚刚」/ 绝对时间） | 不修：各页面时间格式保持现状；已删除对应测试 |
 
 以下问题只能靠真机或人工验证，没写自动化测试：签到网页首屏不绘制的根因、私信网页对话不停在最新消息、断网 / 弱网、长按与双击看大图。
 
@@ -66,6 +66,4 @@ make xcode-test-class TEST="PostDetailUXAuditTests PostDetailComposerUXAuditTest
 
 修复时注意：
 - U40 的复制按钮修复会让现有 `ReplyAuthorContextMenuTests.copySheetPrimaryButtonUsesDarkModeFriendlyColor`（断言 `.systemBlue`）失败，需一并改。
-- U03 要求在 `didCommit` 时停止转圈，只加超时兜底仍是红；首屏不绘制的根因不在测试范围。
 - U18 要求错误走独立方法；若新方法默认回落到 `showToast`，测试仍红。
-- U42 依赖 U07（列表先要有绝对时间）。

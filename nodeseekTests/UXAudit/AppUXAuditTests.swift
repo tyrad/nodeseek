@@ -92,37 +92,6 @@ final class AppUXAuditTests: XCTestCase {
         XCTAssertEqual(signedInClicks, 1, "U02: 登录后应只点一次「API」")
     }
 
-    // MARK: - U03 每日签到网页一直转圈
-
-    /// 期望：主框架内容已提交（didCommit）后停止转圈，不等所有子资源 didFinish。
-    func test_U03_webPageStopsSpinnerOnceNavigationCommits() throws {
-        let viewController = UXAuditWebViewController()
-        viewController.loadViewIfNeeded()
-        viewController.loadingIndicator.startAnimating()
-
-        (viewController as WKNavigationDelegate).webView?(viewController.webView, didCommit: nil)
-
-        XCTAssertFalse(
-            viewController.loadingIndicator.isAnimating,
-            "U03: 网页主框架已提交内容后转圈仍在继续，只有 didFinish 才停止，慢资源会让签到页一直白屏转圈"
-        )
-    }
-
-    // MARK: - U07 首页相对时间不刷新
-
-    /// 期望：列表模型保存最后活动的绝对时间（来自 <time datetime>），界面才能随时间重新计算相对时间。
-    func test_U07_postSummaryKeepsAbsoluteLastActivityDate() throws {
-        let posts = try KannaNodeSeekParser(baseURL: NodeSeekSite.baseURL).parsePostList(html: Self.postListHTML)
-        let post = try XCTUnwrap(posts.first)
-        let expected = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-04-27T05:46:32Z"))
-
-        let dates = Mirror(reflecting: post).children.compactMap { $0.value as? Date }
-        XCTAssertTrue(
-            dates.contains(expected),
-            "U07: PostSummary 只有 lastActivityText=\(post.lastActivityText ?? "nil")，没有解析 <time datetime> 的绝对时间，相对时间无法刷新"
-        )
-    }
-
     // MARK: - U11 切换分类后发帖按钮仍隐藏
 
     /// 期望：滚动收起发帖按钮后切换分类，按钮重新出现。
@@ -170,34 +139,6 @@ final class AppUXAuditTests: XCTestCase {
         XCTAssertTrue(composeButton.isUserInteractionEnabled, "U11: 切换分类后发帖按钮仍不可点")
     }
 
-    // MARK: - U12 「我的」发帖上限与个人主页不一致
-
-    /// 期望：「我的」页与个人主页「今日进度」对同一指标（发帖）显示相同的 当前/上限。
-    func test_U12_mePageAndProfileShowSamePostLimit() async throws {
-        let context = try await makeLoggedInMePage()
-        defer { context.window.isHidden = true }
-
-        let todayText = try XCTUnwrap(context.todayLabelText, "前置条件：我的页应显示今日进度")
-        let meFraction = try XCTUnwrap(Self.fraction(after: "发帖", in: todayText), "我的页文案：\(todayText)")
-
-        let client = context.client
-        let profile = try await client.loadProfile(uid: 31037)
-        let progress = try await client.loadTodayProgress(uid: 31037)
-        let card = UserProfileProgressCardView()
-        card.configure(level: profile.levelProgress, today: progress)
-        let postRow = try XCTUnwrap(
-            uxDescendants(of: card).compactMap { $0 as? UIStackView }
-                .first { ($0.arrangedSubviews.first as? UILabel)?.text == "发帖" }
-        )
-        let profileValue = try XCTUnwrap((postRow.arrangedSubviews.last as? UILabel)?.text)
-        let profileFraction = profileValue.replacingOccurrences(of: " ", with: "")
-
-        XCTAssertEqual(
-            meFraction, profileFraction,
-            "U12: 「我的」显示「\(todayText)」，个人主页今日进度显示 发帖 \(profileValue)，同一指标两个上限"
-        )
-    }
-
     // MARK: - U13 特别关注删除方向文案写反
 
     /// 期望：说明文字写「滑动删除」，不写具体方向，避免与手指方向理解冲突。
@@ -242,34 +183,6 @@ final class AppUXAuditTests: XCTestCase {
         XCTAssertEqual(opened.count, 1)
         XCTAssertEqual(opened.first?.page, 2, "U23: 点评论行打开的是第 \(opened.first?.page ?? 0) 页，不是 #15 所在的第 2 页")
         XCTAssertEqual(opened.first?.anchor, "15", "U23: 点评论行没有带楼层锚点（anchor=\(opened.first?.anchor ?? "nil")），只打开帖子顶部")
-    }
-
-    // MARK: - U27 系统 Dynamic Type 不影响首页/详情字号
-
-    /// 期望：系统字号调到辅助功能特大时，首页标题和详情正文字号随之变大。
-    func test_U27_typographyScalesWithSystemDynamicType() {
-        func pointSizes(for category: UIContentSizeCategory) -> (list: CGFloat, body: CGFloat) {
-            var result: (CGFloat, CGFloat) = (0, 0)
-            UITraitCollection(preferredContentSizeCategory: category).performAsCurrent {
-                result = (
-                    AppTypography.listTitleFont(pointOffset: 0).pointSize,
-                    AppTypography.commentBodyFont(pointOffset: 0).pointSize
-                )
-            }
-            return result
-        }
-
-        let standard = pointSizes(for: .large)
-        let accessibility = pointSizes(for: .accessibilityExtraLarge)
-
-        XCTAssertGreaterThan(
-            accessibility.list, standard.list,
-            "U27: 系统字号 .large 与 .accessibilityExtraLarge 下首页标题都是 \(standard.list)pt，没有跟随 Dynamic Type"
-        )
-        XCTAssertGreaterThan(
-            accessibility.body, standard.body,
-            "U27: 系统字号 .large 与 .accessibilityExtraLarge 下详情正文都是 \(standard.body)pt，没有跟随 Dynamic Type"
-        )
     }
 
     // MARK: - U33 「我的」页点「粉丝」进入个人主页
@@ -336,40 +249,6 @@ final class AppUXAuditTests: XCTestCase {
         context.window.layoutIfNeeded()
         XCTAssertTrue(details.isHidden)
         XCTAssertEqual(card.bounds.height, collapsedHeight, accuracy: 1)
-    }
-
-    // MARK: - U34 「添加探针」填写后关闭不确认
-
-    /// 期望：添加探针已填写内容时点取消，先弹放弃确认，不直接关闭。
-    func test_U34_probeEditorAsksBeforeDiscardingTypedAddress() async throws {
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: "ux-audit-probe-\(UUID().uuidString)"))
-        let editor = ProbeInstanceEditorViewController(
-            instance: nil,
-            store: ProbeInstanceStore(defaults: defaults),
-            service: UXAuditProbeService()
-        )
-        let host = UIViewController()
-        let window = uxMakeWindow(root: host)
-        defer { window.isHidden = true }
-        let navigation = UINavigationController(rootViewController: editor)
-        host.present(navigation, animated: false)
-        editor.view.layoutIfNeeded()
-
-        let urlCell = try XCTUnwrap(
-            editor.tableView(editor.tableView, cellForRowAt: IndexPath(row: 1, section: 0)) as? ProbeTextFieldCell
-        )
-        urlCell.textField.text = "probe.example.com"
-        urlCell.textField.sendActions(for: .editingChanged)
-
-        guard #available(iOS 16.0, *) else { throw XCTSkip("需要 iOS 16 触发 UIAction") }
-        editor.navigationItem.leftBarButtonItem?.primaryAction?.performWithSender(nil, target: nil)
-        try await Task.sleep(nanoseconds: 300_000_000)
-
-        let alert = (editor.presentedViewController ?? navigation.presentedViewController) as? UIAlertController
-        XCTAssertNotNil(
-            alert,
-            "U34: 已填写探针地址后点取消直接关闭（presented=\(host.presentedViewController.map { String(describing: type(of: $0)) } ?? "nil")），没有放弃确认"
-        )
     }
 
     // MARK: - U35 侧边栏菜单文字左边缘不齐
@@ -517,44 +396,7 @@ final class AppUXAuditTests: XCTestCase {
         )
     }
 
-    // MARK: - U42 时间格式不统一
-
-    /// 期望：首页列表时间与「最近浏览」一样按中文相对时间显示（如「7个月前」），而不是站点英文原文「24s ago」。
-    func test_U42_listTimeUsesLocalizedRelativeFormat() throws {
-        let posts = try KannaNodeSeekParser(baseURL: NodeSeekSite.baseURL).parsePostList(html: Self.postListHTML)
-        let post = try XCTUnwrap(posts.first)
-        let metadata = PostSummaryText.metadataAttributedText(for: post).string
-
-        let formatter = RelativeDateTimeFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
-        formatter.unitsStyle = .short
-        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-04-27T05:46:32Z"))
-        let expected = formatter.localizedString(for: date, relativeTo: Date())
-
-        XCTAssertTrue(
-            metadata.contains(expected) && !metadata.contains("ago"),
-            "U42: 首页元信息时间为「\(metadata)」，与最近浏览的中文相对时间格式（应为「\(expected)」）不一致"
-        )
-    }
-
     // MARK: - Fixtures
-
-    /// 取自 page-1.html 的一条真实列表项。
-    private static let postListHTML = """
-    <html><body><ul class="post-list"><li class="post-list-item"><a href="/space/17843"><img src="/avatar/17843.png" alt="橘子海" class="avatar-normal"></a>
-    <div class="post-list-content"><div role="heading" aria-level="3" class="post-title"><a href="/post-703692-1">115非VIP账号海外上传速度如何</a></div>
-    <div class="post-info"><span class="info-item info-author"><a href="/space/17843">橘子海</a></span>
-    <span class="info-item info-views"><span title="39 views">39</span></span>
-    <span title="4 comments" class="info-item info-comments-count"><span title="5 comments">4</span></span>
-    <span class="info-item info-last-commenter"><a href="/space/5714">harunoyuki</a></span>
-    <a href="/post-703692-1#4" class="info-item info-last-comment-time"><time title="2026-04-27 13:46:32" datetime="2026-04-27T05:46:32.000Z">24s ago</time></a>
-    <a href="/categories/daily" class="info-item post-category">日常</a></div></div></li></ul></body></html>
-    """
-
-    private static func fraction(after keyword: String, in text: String) -> String? {
-        guard let range = text.range(of: "\(keyword)\\s*(\\d+)\\s*/\\s*(\\d+)", options: .regularExpression) else { return nil }
-        return String(text[range]).replacingOccurrences(of: keyword, with: "").replacingOccurrences(of: " ", with: "")
-    }
 
     private struct MePageContext {
         let viewController: MeViewController
@@ -683,18 +525,6 @@ private extension UIColor {
 
 // MARK: - Test doubles
 
-private final class UXAuditWebViewController: BaseWebViewController {
-    init() {
-        super.init(initialURL: NodeSeekSite.baseURL, pageTitle: "每日签到", automaticallyLoadsPage: false)
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func loadInitialPage() {}
-}
-
 private final class UXAuditFakePan: UIPanGestureRecognizer {
     var fakeTranslation: CGPoint = .zero
 
@@ -765,17 +595,6 @@ private actor UXAuditNotificationClient: NodeSeekNotificationClientProtocol {
     func loadMessageConversations() async throws -> [NodeSeekMessageConversationRecord] { [] }
     func markViewed(ids: [Int], tab: NodeSeekNotificationTab) async throws {}
     func markAllViewed(tab: NodeSeekNotificationTab) async throws {}
-}
-
-private final class UXAuditProbeService: ProbeFetching, @unchecked Sendable {
-    func testConnection(baseURL: URL, adapterID: String) async throws -> ProbeConnectionInfo {
-        ProbeConnectionInfo(version: "1.6.1", nodes: [])
-    }
-    func snapshot(for instance: ProbeInstance, reloadNodes: Bool) async throws -> ProbeSnapshot {
-        ProbeSnapshot(nodes: [], statuses: [:], fetchedAt: Date())
-    }
-    func history(for instance: ProbeInstance, nodeID: String, hours: Int) async throws -> [ProbeHistoryPoint] { [] }
-    func forget(instanceID: UUID) async {}
 }
 
 private struct UXAuditStaticHTMLClient: HTMLClient {

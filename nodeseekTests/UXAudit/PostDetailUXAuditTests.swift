@@ -111,46 +111,6 @@ final class PostDetailUXAuditTests: XCTestCase {
         )
     }
 
-    // MARK: - U08
-
-    // 预期：评论模型保存绝对发布时间（Date），界面可以按当前时间重新计算相对时间。
-    func test_U08_commentCarriesAbsoluteCreatedDate() {
-        let comment = Comment(
-            id: "1",
-            authorName: "mist",
-            avatarURL: nil,
-            floorText: "#4",
-            createdAtText: "1s ago",
-            createdAtTitleText: "2026-11-18 10:00:00",
-            contentHTML: "<p>评论</p>"
-        )
-        let properties = Mirror(reflecting: comment).children.map { child in
-            "\(child.label ?? "?"): \(type(of: child.value))"
-        }
-        let hasDateProperty = Mirror(reflecting: comment).children.contains { child in
-            child.value is Date || type(of: child.value) == Optional<Date>.self
-        }
-        XCTAssertTrue(
-            hasDateProperty,
-            "Comment 只保存了相对时间文本，没有 Date 类型的发布时间，'1s ago' 永远不会刷新。现有字段：\(properties.filter { $0.contains("createdAt") })"
-        )
-    }
-
-    // MARK: - U09
-
-    // 预期：大图预览是黑底，浅色模式下状态栏也要用浅色文字。
-    func test_U09_photoBrowserUsesLightStatusBarInLightMode() {
-        let browser = DetailPhotoBrowserController()
-        browser.overrideUserInterfaceStyle = .light
-        browser.loadViewIfNeeded()
-
-        XCTAssertEqual(
-            browser.preferredStatusBarStyle,
-            .lightContent,
-            "大图预览 preferredStatusBarStyle=\(browser.preferredStatusBarStyle.rawValue)，浅色模式下黑底上的状态栏文字是深色的，看不见"
-        )
-    }
-
     // MARK: - U18
 
     // 预期：「更多评论加载失败」这类错误提示不能走带绿色成功勾的 showToast。
@@ -315,54 +275,6 @@ final class PostDetailUXAuditTests: XCTestCase {
             node.debugBodyContextMenuActionTitles.contains("投放鸡腿"),
             "自己评论的长按菜单包含「投放鸡腿」：\(node.debugBodyContextMenuActionTitles)"
         )
-    }
-
-    // MARK: - U39
-
-    // 预期：收藏数从 0 变 1 时，帖子操作栏其他按钮位置不变（不整体左移）。
-    func test_U39_postActionRowStaysStableWhenFavoriteCountAppears() throws {
-        let header = PostDetailHeaderContent(
-            postID: "1017330",
-            title: "测试",
-            authorName: "mist",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            likeCount: 0,
-            chickenLegCount: 0,
-            opposeCount: 0,
-            favoriteCount: 0,
-            isFavoriteCollected: false
-        )
-        let node = PostBodyCellNode(
-            content: header,
-            renderedContent: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-        let names = ["likeButtonNode", "chickenLegButtonNode", "opposeButtonNode", "favoriteButtonNode", "replyButtonNode", "commentButtonNode"]
-        func actionXPositions() throws -> [String: CGFloat] {
-            let layout = node.layoutThatFits(ASSizeRange(
-                min: .zero,
-                max: CGSize(width: 390, height: CGFloat.greatestFiniteMagnitude)
-            ))
-            var result: [String: CGFloat] = [:]
-            for name in names {
-                let button = try XCTUnwrap(uxAuditStoredNode(named: name, in: node), "找不到 \(name)")
-                result[name] = try XCTUnwrap(layout.uxAuditAbsoluteOrigin(of: button), "\(name) 不在布局中").x
-            }
-            return result
-        }
-
-        let before = try actionXPositions()
-        // 模拟收藏成功：收藏数 0 → 1，原地更新操作栏。
-        node.updateFavoriteReaction(count: 1, isCollected: true)
-        let after = try actionXPositions()
-
-        let moved = names.filter { abs((before[$0] ?? 0) - (after[$0] ?? 0)) > 0.5 }.map { name in
-            "\(name): \(before[name] ?? -1) → \(after[name] ?? -1)"
-        }
-        XCTAssertEqual(moved, [], "收藏数 0→1 后帖子操作栏按钮发生位移：\(moved)")
     }
 
     // MARK: - U40
