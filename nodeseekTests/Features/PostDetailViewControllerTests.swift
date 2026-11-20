@@ -4899,7 +4899,7 @@ private final class InMemoryFloatingControlPositionStore: FloatingControlPositio
     }
 }
 
-private final class SpyPostDetailPresenter: PostDetailPresenterProtocol {
+final class SpyPostDetailPresenter: PostDetailPresenterProtocol {
     private(set) var loadCount = 0
     private(set) var didTapLoginCount = 0
     private(set) var didApproachCommentEndCount = 0
