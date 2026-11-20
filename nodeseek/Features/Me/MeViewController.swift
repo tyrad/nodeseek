@@ -253,21 +253,21 @@ final class MeViewController: UIViewController {
     /// 下拉刷新：账号、资料、通知未读数重新请求；头像地址不变，
     /// 网页端换过头像时本地和 CDN 都还是旧图，需要回源后重新加载。
     @objc private func pullToRefresh() {
-        accountController.refreshIfNeeded(force: true)
-        guard account.isLoggedIn else {
-            refreshControl.endRefreshing()
-            return
-        }
-        refreshNotificationUnreadCount()
-        // 正在请求的资料作废，重新拉一次最新的
-        loadingUID = nil
-        loadProfile()
-        let profileTask = loadTask
-        let avatarURL = account.avatarURL
         Task { [weak self] in
-            await AvatarImageLoadingOptions.refreshFromOrigin(url: avatarURL)
-            await profileTask?.value
             guard let self else { return }
+            // 先等账号刷新回来，避免用游客或上一个账号去拉资料和头像
+            await accountController.refreshNow()
+            guard account.isLoggedIn else {
+                refreshControl.endRefreshing()
+                return
+            }
+            refreshNotificationUnreadCount()
+            // 正在请求的资料作废，重新拉一次最新的
+            loadingUID = nil
+            loadProfile()
+            let profileTask = loadTask
+            await AvatarImageLoadingOptions.refreshFromOrigin(url: account.avatarURL)
+            await profileTask?.value
             render()
             refreshControl.endRefreshing()
         }

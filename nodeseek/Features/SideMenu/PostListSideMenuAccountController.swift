@@ -53,12 +53,19 @@ final class PostListSideMenuAccountController {
         loadStoredAccount()
     }
 
-    func refreshIfNeeded(force: Bool = false) {
+    /// 强制刷新并等账号结果发布完；正在进行的普通刷新可能只读缓存，等它结束后再强制刷一次。
+    func refreshNow() async {
+        await refreshTask?.value
+        await refreshIfNeeded(force: true)?.value
+    }
+
+    @discardableResult
+    func refreshIfNeeded(force: Bool = false) -> Task<Void, Never>? {
         guard canRefresh() else {
-            return
+            return nil
         }
-        guard refreshTask == nil else {
-            return
+        if let refreshTask {
+            return refreshTask
         }
         let effectiveForce = force || shouldForceRefreshOnNextShow
         shouldForceRefreshOnNextShow = false
@@ -77,6 +84,7 @@ final class PostListSideMenuAccountController {
             let snapshot = await currentAccountStore.snapshot()
             publish(snapshot?.account ?? Self.guestAccount)
         }
+        return refreshTask
     }
 
     private func observeSessionChanges() {
