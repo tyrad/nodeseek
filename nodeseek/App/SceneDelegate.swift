@@ -30,7 +30,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
 
         if let response = connectionOptions.notificationResponse {
-            PushNotificationDeepLink.handle(userInfo: response.notification.request.content.userInfo)
+            PushNotificationDeepLink.handle(response)
         }
         handle(urlContexts: connectionOptions.urlContexts)
     }

@@ -61,9 +61,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        let userInfo = response.notification.request.content.userInfo
         Task { @MainActor in
-            PushNotificationDeepLink.handle(userInfo: userInfo)
+            PushNotificationDeepLink.handle(response)
             completionHandler()
         }
     }

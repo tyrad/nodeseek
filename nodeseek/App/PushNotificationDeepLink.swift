@@ -6,6 +6,8 @@ enum PushNotificationDeepLink {
     private static var pending: PushNotificationRoute?
     private static weak var navigator: PushNotificationNavigating?
 
+    private static var lastResponse: PushResponseIdentity?
+
     static func attach(_ navigator: PushNotificationNavigating) {
         self.navigator = navigator
         if let pending {
@@ -14,8 +16,15 @@ enum PushNotificationDeepLink {
         }
     }
 
-    static func handle(userInfo: [AnyHashable: Any]) {
-        guard let route = PushNotificationRoute(userInfo: userInfo) else { return }
+    static func handle(_ response: UNNotificationResponse) {
+        let notification = response.notification
+        guard let route = PushNotificationRoute(userInfo: notification.request.content.userInfo) else { return }
+        // 冷启动时 Scene 和通知代理可能同时收到同一次点按。
+        let identity = PushResponseIdentity(requestID: notification.request.identifier,
+                                            deliveredAt: notification.date,
+                                            actionID: response.actionIdentifier)
+        guard identity != lastResponse else { return }
+        lastResponse = identity
         handle(route)
     }
 
@@ -26,6 +35,12 @@ enum PushNotificationDeepLink {
             pending = route
         }
     }
+}
+
+private struct PushResponseIdentity: Equatable {
+    let requestID: String
+    let deliveredAt: Date
+    let actionID: String
 }
 
 @MainActor
