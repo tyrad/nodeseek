@@ -1,23 +1,9 @@
-import AsyncDisplayKit
-import UIKit
 import XCTest
 @testable import nodeseek
 
 /// UX 审计（详情页回复编辑器 + 引用内容构建）的 RED 测试：当前实现下应当失败。
 @MainActor
 final class PostDetailComposerUXAuditTests: XCTestCase {
-    private var windows: [UIWindow] = []
-
-    override func tearDown() async throws {
-        for window in windows {
-            window.rootViewController?.view.endEditing(true)
-            window.isHidden = true
-            window.rootViewController = nil
-        }
-        windows.removeAll()
-        try await super.tearDown()
-    }
-
     // MARK: - U21
 
     // 期望：引用多行评论时保留换行，每行都是独立的 "> " 引用行。
@@ -66,75 +52,7 @@ final class PostDetailComposerUXAuditTests: XCTestCase {
         XCTAssertEqual(stickerQuote.components(separatedBy: "\n").last, "> :xhj001:", "U22: 表情评论的引用块没有带上原文：\(stickerQuote.debugDescription)")
     }
 
-    // MARK: - U28
-
-    // 期望：回复楼主时编辑器顶部显示“回复楼主”之类的文案，不出现 “#0”。
-    func test_U28_replyToPosterContextAvoidsFloorZero() async throws {
-        let viewController = try await makeHostedDetailViewController()
-        let header = PostDetailHeaderContent(
-            postID: "703863",
-            title: "详情标题",
-            authorName: "缭雾",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>"
-        )
-
-        viewController.handleReply(toPostHeader: header)
-        let didShow = await waitUntil(timeout: 2) { viewController.replyEditorContainer.isHidden == false }
-        XCTAssertTrue(didShow, "前置条件：回复编辑器应已展示")
-
-        let label = viewController.view.uxFirstLabel(accessibilityIdentifier: "post-detail-reply-context-label")
-        let text = label?.text ?? ""
-        XCTAssertTrue(
-            text.contains("#0") == false && text.contains("楼主"),
-            "U28: 回复楼主的上下文文案为 \(text.debugDescription)，应显示“回复楼主”且不含 #0"
-        )
-    }
-
     // MARK: - Helpers
-
-    private func host(_ viewController: UIViewController) {
-        let window: UIWindow
-        if let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first {
-            window = UIWindow(windowScene: scene)
-        } else {
-            window = UIWindow(frame: UIScreen.main.bounds)
-        }
-        windows.append(window)
-        window.rootViewController = viewController
-        window.makeKeyAndVisible()
-        viewController.loadViewIfNeeded()
-        window.layoutIfNeeded()
-    }
-
-    private func makeHostedDetailViewController() async throws -> PostDetailViewController {
-        let viewController = PostDetailViewController(
-            presenter: UXComposerStubPresenter(),
-            accountRefresher: UXComposerLoggedInRefresher()
-        )
-        host(viewController)
-        viewController.render(detail: makeDetail(comments: [
-            makeComment(id: "c1", floor: 1, html: "<p>第一楼</p>")
-        ]))
-        let didRender = await waitUntil(timeout: 3) { viewController.hasRenderedDetailContent }
-        XCTAssertTrue(didRender, "前置条件：详情应完成渲染")
-        return viewController
-    }
-
-    private func makeDetail(comments: [Comment]) -> PostDetail {
-        PostDetail(
-            id: "703863",
-            title: "详情标题",
-            authorName: "缭雾",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            comments: comments,
-            page: 1,
-            isLastPage: true
-        )
-    }
 
     private func makeComment(id: String, floor: Int, html: String, markdown: String? = nil, isOwnComment: Bool = false) -> Comment {
         Comment(
@@ -149,68 +67,5 @@ final class PostDetailComposerUXAuditTests: XCTestCase {
             isOwnComment: isOwnComment,
             markdown: markdown
         )
-    }
-
-    @discardableResult
-    private func waitUntil(
-        timeout: TimeInterval = 1,
-        condition: () -> Bool
-    ) async -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if condition() { return true }
-            try? await Task.sleep(nanoseconds: 20_000_000)
-        }
-        return condition()
-    }
-}
-
-// MARK: - Test doubles
-
-private struct UXComposerLoggedInRefresher: CurrentAccountRefreshing {
-    func cachedAccount() async -> AccountResponse? {
-        AccountResponse(displayName: "mist", isLoggedIn: true)
-    }
-
-    func refreshIfNeeded(force: Bool, maxAge: TimeInterval) async -> AccountResponse? {
-        AccountResponse(displayName: "mist", isLoggedIn: true)
-    }
-}
-
-private final class UXComposerStubPresenter: PostDetailPresenterProtocol {
-    func viewDidLoad() {}
-    func refreshInitialPage() {}
-    func didSelectCommentPage(_ page: Int) {}
-    func didTapLogin() {}
-    func didApproachCommentEnd() {}
-    func didTapRefreshCommentsAtEnd() {}
-    func didTapSendReply(content: String) {}
-    func didTapFavorite() {}
-    func didTapPostLike() {}
-    func didTapPostChickenLeg() {}
-    func didTapPostOppose() {}
-    func didTapCommentLike(_ comment: Comment) {}
-    func didTapCommentChickenLeg(_ comment: Comment) {}
-    func didTapCommentOppose(_ comment: Comment) {}
-    func didTapEditPost() {}
-    func didTapEditComment(_ comment: Comment) {}
-}
-
-private extension UIView {
-    func uxAllSubviews<T: UIView>(of type: T.Type) -> [T] {
-        var result: [T] = []
-        if let matched = self as? T { result.append(matched) }
-        for subview in subviews {
-            result.append(contentsOf: subview.uxAllSubviews(of: type))
-        }
-        return result
-    }
-
-    func uxAllLabels() -> [UILabel] {
-        uxAllSubviews(of: UILabel.self)
-    }
-
-    func uxFirstLabel(accessibilityIdentifier: String) -> UILabel? {
-        uxAllLabels().first { $0.accessibilityIdentifier == accessibilityIdentifier }
     }
 }

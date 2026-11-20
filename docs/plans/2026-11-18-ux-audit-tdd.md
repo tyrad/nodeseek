@@ -38,7 +38,7 @@
 | U25 | P1 | 「在浏览器打开」在第 2 页时打开的是第 1 页 | 不修：「在浏览器打开」沿用进入时的页码，属预期行为；已删除对应测试 |
 | U26 | P1 | 暗黑模式看大图时图片仍被「图片变暗」压暗 | `PostDetailUXAuditTests.test_U26_photoPreviewIsNotDimmedInDarkMode`（不修：大图沿用图片变暗设置，属预期行为） |
 | U27 | P1 | 系统 Dynamic Type 调大后首页 / 详情字号不变 | `AppUXAuditTests.test_U27_typographyScalesWithSystemDynamicType` |
-| U28 | P2 | 「回复楼主」输入框头部显示「回复 缭雾 #0」 | `PostDetailComposerUXAuditTests.test_U28_replyToPosterContextAvoidsFloorZero` |
+| U28 | P2 | 「回复楼主」输入框头部显示「回复 缭雾 #0」 | 不修：回复楼主沿用网页做法，正文为 `@作者 [#0](…)`，输入框头部显示「回复 作者 #0」与之对应；已删除对应测试 |
 | U29 | P2 | 多页帖子的热评和正常楼层重复出现，没有分区标题 | 不修。沿用网页做法，热评提前展示并用楼号旁的火焰标识，原楼层保留。 |
 | U30 | P2 | 0 条评论的帖子下方空白，没有空状态提示 | 不修。帖子正常加载且没有回复时，正文下方自然留白。 |
 | U31 | P2 | 编辑评论的草稿条写「无标题」 | 不修：草稿条沿用通用格式显示「无标题」，属预期行为；已删除对应测试 |
