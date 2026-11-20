@@ -251,8 +251,10 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         heights[key] = height
         let context = UICollectionViewFlowLayoutInvalidationContext()
         context.invalidateFlowLayoutDelegateMetrics = true
-        if let attributes = flow.layoutAttributesForItem(at: index),
-           attributes.frame.maxY <= view.contentOffset.y + view.adjustedContentInset.top {
+        // 布局失效期间 flow 可能返回零尺寸。仅补偿确实位于视口上方、已经显示过的楼层。
+        let visibleTop = view.contentOffset.y + view.adjustedContentInset.top
+        if visibleTop > 0, view.indexPath(for: cell) == index, cell.frame.height > 0,
+           cell.frame.maxY <= visibleTop {
             context.contentOffsetAdjustment.y = height - old
         }
         flow.invalidateLayout(with: context)

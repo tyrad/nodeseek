@@ -85,6 +85,7 @@ private final class RefreshClock: NSObject {
 
     func start() {
         let link = CADisplayLink(target: self, selector: #selector(tick))
+        link.preferredFramesPerSecond = 60
         link.add(to: .main, forMode: .common)
         self.link = link
     }
@@ -202,6 +203,29 @@ class DetailBaselineTests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
         #endif
+    }
+
+    func testImagePostKeepsHeaderVisibleAfterMediaLoads() async throws {
+        let pages = try fixture("detail-replay-pages", as: [ReplayPage].self)
+        let page = try XCTUnwrap(pages.first { $0.path == "/post-832584-1" })
+        let header = try XCTUnwrap(page.items.first(where: \.main))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let media = try mediaMap(directory: directory, placeholders: false)
+        let window = try window(style: .light)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let vc = host(page: page, anchor: nil, in: window)
+        configureMedia(media, on: vc)
+        vc.render(detail: page.detail(using: media))
+        try await wait("图文主楼排版并显示图片") {
+            guard let (_, headerCell) = self.cell(for: header, in: vc),
+                  headerCell.bounds.height > vc.detailScrollView.bounds.height else { return false }
+            let placeholders = self.descendants(headerCell).compactMap { $0 as? DetailImagePlaceholderView }
+            return !placeholders.isEmpty && placeholders.allSatisfy(\.isHidden)
+        }
+        vc.detailScrollView.layoutIfNeeded()
+        XCTAssertEqual(vc.detailScrollView.contentOffset.y + vc.detailScrollView.adjustedContentInset.top,
+                       0, accuracy: 1, "首楼回填高度后仍应从顶部阅读")
     }
 
     func testFloorSnapshots() async throws {
@@ -438,6 +462,10 @@ extension DetailBaselineTests {
             if FileManager.default.fileExists(atPath: cachedReport.path) { try? FileManager.default.removeItem(at: cachedReport) }
             try? FileManager.default.moveItem(at: savedReport, to: cachedReport)
         }
+        let samples = try fixture("post-markdown-pages", as: [ReplayPage].self)
+        let ordinaryPages = try ["/post-1067504-1", "/post-893437-1", "/post-1067087-1", "/post-832584-1"].map { path in
+            try XCTUnwrap((pages + samples).first { $0.path == path })
+        }
         var runs = [Run]()
         for iteration in 1...20 {
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -445,6 +473,19 @@ extension DetailBaselineTests {
             defer { try? FileManager.default.removeItem(at: directory) }
             if FileManager.default.fileExists(atPath: cachedReport.path) {
                 try FileManager.default.removeItem(at: cachedReport)
+            }
+            await TerminalThumbnailCache.shared.removeAll()
+            for page in ordinaryPages {
+                let item = try XCTUnwrap(page.items.first(where: \.main))
+                let vc = host(page: page, anchor: nil, in: window)
+                configureMedia(media, on: vc)
+                let detail = page.detail(using: media)
+                _ = await clock.next()
+                clock.resetPeak()
+                let start = CACurrentMediaTime()
+                vc.render(detail: detail)
+                runs.append(try await observe(vc: vc, item: item, clock: clock, start: start, iteration: iteration,
+                                              scenario: page.path, expectsTabs: false))
             }
             for scenario in ["page2-anchor", "review", "review-cache-hit"] {
                 let isReview = scenario != "page2-anchor"
