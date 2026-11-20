@@ -92,6 +92,8 @@ final class PushNotificationSettingsViewController: UITableViewController {
         super.viewDidLoad()
         tableView.backgroundColor = UIColor.systemGroupedBackground
         title = "推送通知"
+        // 黑白主题：图标等跟随 tableView 着色，不用系统蓝
+        tableView.tintColor = .label
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 88
         tableView.accessibilityIdentifier = "push-notification-settings-table-view"

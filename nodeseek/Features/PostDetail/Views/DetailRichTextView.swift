@@ -336,6 +336,54 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         }
     }
 
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hitView = super.hitTest(point, with: event)
+        // 签名链接排在后面，会先于正文链接被询问；只靠扩大区命中时，让真正点在文字上的链接优先。
+        guard let hitButton = hitView as? DetailLinkOverlayButton,
+              hitButton.frame.contains(point) == false,
+              isSignatureLinkOverlay(hitButton) else {
+            return hitView
+        }
+        let exactButton = subviews.reversed()
+            .compactMap { $0 as? DetailLinkOverlayButton }
+            .first { button in
+                button.isHidden == false
+                    && button.isUserInteractionEnabled
+                    && button.alpha > 0.01
+                    && button.frame.contains(point)
+            }
+        return exactButton ?? hitView
+    }
+
+    /// 签名链接扩大点击区的上边界：不越过签名首个链接所在行的上一行，避免盖住正文最后一行。
+    /// 签名链接在首行时没有上一行，返回 nil，不做限制。
+    fileprivate var signatureHitAreaMinY: CGFloat? {
+        guard let firstSignatureLinkLocation = firstSignatureLinkLocation(),
+              let lines = layoutFrame?.lines?.compactMap({ $0 as? DTCoreTextLayoutLine }),
+              let signatureLineIndex = lines.firstIndex(where: { line in
+                  NSLocationInRange(firstSignatureLinkLocation, line.stringRange())
+              }),
+              signatureLineIndex > 0 else {
+            return nil
+        }
+        let signatureLineFrame = lines[signatureLineIndex].frame
+        let previousLineFrame = lines[signatureLineIndex - 1].frame
+        return min(previousLineFrame.maxY, signatureLineFrame.minY)
+    }
+
+    private func firstSignatureLinkLocation() -> Int? {
+        var location: Int?
+        attributedString.enumerateAttribute(
+            NodeSeekSignatureStyle.linkAttribute,
+            in: NSRange(location: 0, length: attributedString.length)
+        ) { value, range, stop in
+            guard (value as? Bool) == true else { return }
+            location = range.location
+            stop.pointee = true
+        }
+        return location
+    }
+
     private func drawStrikethroughDecorations(
         in layoutFrame: DTCoreTextLayoutFrame?,
         context: CGContext
@@ -907,13 +955,18 @@ private final class DetailLinkOverlayButton: UIButton {
     var expandedHitFrame: CGRect {
         let insetX = min(0, (frame.width - HitArea.minimumSize.width) / 2)
         let insetY = min(0, (frame.height - HitArea.minimumSize.height) / 2)
-        return frame.insetBy(dx: insetX, dy: insetY)
+        let expanded = frame.insetBy(dx: insetX, dy: insetY)
+        guard let minY = (superview as? DetailRichTextView)?.signatureHitAreaMinY,
+              expanded.minY < minY else {
+            return expanded
+        }
+        // 只裁扩大出来的部分，链接自身区域保持不变。
+        let clampedMinY = min(minY, frame.minY)
+        return CGRect(x: expanded.minX, y: clampedMinY, width: expanded.width, height: expanded.maxY - clampedMinY)
     }
 
     private var expandedHitBounds: CGRect {
-        let insetX = min(0, (bounds.width - HitArea.minimumSize.width) / 2)
-        let insetY = min(0, (bounds.height - HitArea.minimumSize.height) / 2)
-        return bounds.insetBy(dx: insetX, dy: insetY)
+        expandedHitFrame.offsetBy(dx: -frame.minX, dy: -frame.minY)
     }
 
     init(frame: CGRect, url: URL, onTapped: @escaping (DetailLinkOverlayButton, URL, CGPoint) -> Void) {

@@ -24,6 +24,8 @@ enum NodeSeekSite {
         baseURL.appendingPathComponent("new-discussion")
     }
 
+    nonisolated static let profileSettingsURL = URL(string: "/setting#introduction", relativeTo: baseURL)!.absoluteURL
+
     nonisolated static var boardURL: URL {
         baseURL.appendingPathComponent("board")
     }

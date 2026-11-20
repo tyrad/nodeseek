@@ -37,10 +37,9 @@ final class KeyboardDismissCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     func shouldDismiss(from view: UIView) -> Bool {
-        guard acceptsBackground(view), let rootView,
-              let input = focusedInput(in: rootView) else { return false }
-        // 中文等输入法仍在组合文字时，先保留候选与编辑焦点。
-        return input.markedTextRange == nil
+        guard acceptsBackground(view), let rootView else { return false }
+        // 点空白即表示要收起，组合文字不拦截，收起时先上屏。
+        return focusedInput(in: rootView) != nil
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
@@ -59,9 +58,9 @@ final class KeyboardDismissCoordinator: NSObject, UIGestureRecognizerDelegate {
     }
 
     @objc func dismissKeyboard() {
-        // 手势识别期间焦点可能已改变，再次保护组合文字与校验。
-        guard let rootView, let input = focusedInput(in: rootView),
-              input.markedTextRange == nil else { return }
+        // 手势识别期间焦点可能已改变；先把组合文字上屏，避免丢字，再按输入框的结束编辑校验收起。
+        guard let rootView, let input = focusedInput(in: rootView) else { return }
+        input.unmarkText()
         rootView.endEditing(false)
     }
 }

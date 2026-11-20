@@ -76,6 +76,16 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
             content.favoriteCount
         ].contains { $0 != nil }
     }
+    /// 不能给自己的帖子投票：有计数时只展示数字，没有计数就不占位。
+    private var visibleVoteButtonNodes: [ASButtonNode] {
+        let votes: [(ASButtonNode, Int?)] = [
+            (likeButtonNode, content.likeCount),
+            (chickenLegButtonNode, content.chickenLegCount),
+            (opposeButtonNode, content.opposeCount)
+        ]
+        guard content.isOwnPost else { return votes.map(\.0) }
+        return votes.filter { ($0.1 ?? 0) > 0 }.map(\.0)
+    }
     private var hasFooterActions: Bool {
         hasReactionActions || showsReplyActions || onEditTapped != nil
     }
@@ -346,6 +356,9 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         chickenLegButtonNode.addTarget(self, action: #selector(chickenLegTapped), forControlEvents: .touchUpInside)
         opposeButtonNode.addTarget(self, action: #selector(opposeTapped), forControlEvents: .touchUpInside)
         favoriteButtonNode.addTarget(self, action: #selector(favoriteTapped), forControlEvents: .touchUpInside)
+        if content.isOwnPost {
+            [likeButtonNode, chickenLegButtonNode, opposeButtonNode].forEach { $0.isEnabled = false }
+        }
         replyButtonNode.addTarget(self, action: #selector(replyTapped), forControlEvents: .touchUpInside)
         commentButtonNode.addTarget(self, action: #selector(commentTapped), forControlEvents: .touchUpInside)
         editButtonNode.addTarget(self, action: #selector(editTapped), forControlEvents: .touchUpInside)
@@ -380,12 +393,8 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         actionStack.alignItems = .center
         var actionChildren: [ASLayoutElement] = [spacer]
         if hasReactionActions {
-            actionChildren.append(contentsOf: [
-                likeButtonNode,
-                chickenLegButtonNode,
-                opposeButtonNode,
-                favoriteButtonNode
-            ])
+            actionChildren.append(contentsOf: visibleVoteButtonNodes)
+            actionChildren.append(favoriteButtonNode)
         }
         if showsReplyActions {
             actionChildren.append(contentsOf: [

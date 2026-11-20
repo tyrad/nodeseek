@@ -210,7 +210,7 @@ final class SeekMailComposeViewController: UIViewController {
     }
 
     @objc private func dismissComposeKeyboard() {
-        // 明确点击收起时先确认组合文字；点背景仍保留选字保护。
+        // 收起前先确认组合文字，避免丢字。
         for field in [toField, ccField, subjectField] where field.isFirstResponder {
             field.unmarkText()
         }

@@ -4,7 +4,6 @@
 //
 
 import Foundation
-import Kanna
 
 struct CommentComposerMode: Equatable {
     let replies: [Comment]
@@ -96,12 +95,15 @@ enum CommentComposerContentBuilder {
             .joined(separator: "\n\n")
     }
 
+    /// 与网页「引用」一致：标题行带发布（和编辑）时间，正文取原始 Markdown 逐行加 "> "。
     private static func quoteText(for comment: Comment, postURL: URL) -> String {
-        var lines = ["> \(replyPrefix(for: comment, postURL: postURL)) 发布于\(comment.createdAtTitleText ?? comment.createdAtText ?? "")"]
-        if let firstParagraph = firstQuotedParagraph(from: comment.contentHTML), !firstParagraph.isEmpty {
-            lines.append("> \(firstParagraph)")
+        var header = "> \(replyPrefix(for: comment, postURL: postURL)) 发布于\(comment.createdAtTitleText ?? comment.createdAtText ?? "")"
+        if let editedAt = comment.editedAtTitleText, !editedAt.isEmpty {
+            header += "，编辑于\(editedAt)"
         }
-        return lines.joined(separator: "\n")
+        // 只用服务端给的原文，不从渲染后的 HTML 反推；拿不到原文时只保留标题行
+        let bodyLines = comment.markdown?.components(separatedBy: "\n") ?? []
+        return ([header] + bodyLines.map { "> \($0)" }).joined(separator: "\n")
     }
 
     private static func floorText(for comment: Comment) -> String {
@@ -115,33 +117,23 @@ enum CommentComposerContentBuilder {
     }
 
     private static func anchorURL(for comment: Comment, postURL: URL) -> URL {
+        let floor = comment.anchorID ?? comment.floorText?.replacingOccurrences(of: "#", with: "")
         var components = URLComponents(url: postURL, resolvingAgainstBaseURL: true)
-        components?.fragment = comment.anchorID ?? comment.floorText?.replacingOccurrences(of: "#", with: "")
+        if let floorNumber = floor.flatMap({ Int($0.trimmingCharacters(in: .whitespaces)) }),
+           let path = components?.path {
+            // 链接指向楼层所在页，而不是当前浏览的页，和网页一致
+            components?.path = path.replacingOccurrences(
+                of: #"^(/post-\d+)-\d+$"#,
+                with: "$1-\(commentPage(forFloor: floorNumber))",
+                options: .regularExpression
+            )
+        }
+        components?.fragment = floor
         return components?.url ?? postURL
     }
 
-    private static func firstQuotedParagraph(from html: String) -> String? {
-        let normalizedHTML = html.replacingOccurrences(
-            of: #"<br\s*/?>"#,
-            with: " ",
-            options: .regularExpression
-        )
-        guard let document = try? HTML(html: normalizedHTML, encoding: .utf8) else {
-            return html.normalizedQuoteText
-        }
-
-        let paragraphText = document.xpath("//p")
-            .compactMap { $0.text?.normalizedQuoteText }
-            .first { !$0.isEmpty }
-
-        return paragraphText ?? document.text?.normalizedQuoteText
-    }
-}
-
-private extension String {
-    var normalizedQuoteText: String {
-        components(separatedBy: .whitespacesAndNewlines)
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
+    /// 网页规则：0 楼在第 1 页，其余每 10 楼一页。
+    static func commentPage(forFloor floor: Int) -> Int {
+        floor <= 0 ? 1 : (floor - 1) / 10 + 1
     }
 }

@@ -71,17 +71,28 @@ extension PostDetailViewController: PostDetailViewProtocol {
     }
 
     func showToast(message: String) {
-        presentToast(message: message, showsIcon: true)
+        presentToast(message: message, style: .success)
     }
 
     func showProgressToast(message: String) {
-        presentToast(message: message, showsIcon: false)
+        presentToast(message: message, style: .progress)
     }
 
-    private func presentToast(message: String, showsIcon: Bool) {
+    func showFailureToast(message: String) {
+        presentToast(message: message, style: .failure)
+    }
+
+    /// 图标与全局 BottomToast 一致：成功绿勾、失败橙色感叹号、进行中不显示图标。
+    private func presentToast(message: String, style: BottomToast.Style) {
         toastHideWorkItem?.cancel()
         toastLabel.text = message
-        // 进行中的提示不显示完成勾，收起图标后左右留白与右侧一致
+        // 三种提示共用一个图标视图，每次都要重设图标和颜色
+        let showsIcon = style != .progress
+        if showsIcon {
+            toastIconView.image = style.image
+            toastIconView.tintColor = style.tintColor
+        }
+        // 收起图标后左右留白与右侧一致
         toastIconView.isHidden = !showsIcon
         toastIconWidthConstraint.constant = showsIcon ? 18 : 0
         toastLabelLeadingConstraint.constant = showsIcon ? 8 : 2

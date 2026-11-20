@@ -18,6 +18,8 @@ protocol PostDetailViewProtocol: AnyObject {
     func showToast(message: String)
     /// 进行中的提示，不带完成图标。
     func showProgressToast(message: String)
+    /// 失败提示，带警示图标；不给默认实现，避免退回成功样式。
+    func showFailureToast(message: String)
     func setReplySubmitting(_ isSubmitting: Bool)
     func setFavoriteSubmitting(_ isSubmitting: Bool)
     func finishReplySubmission()

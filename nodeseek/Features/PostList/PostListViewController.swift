@@ -469,6 +469,7 @@ class PostListViewController: UIViewController {
         applySelectedCategory(category, syncPage: true, pageAnimated: true)
         renderSortMode(pageContainerViewController.sortMode(for: category))
         presenter.didSelectCategory(category)
+        setComposeButtonHidden(false, animated: true)
     }
 
     func rebuildCategoryButtons() {

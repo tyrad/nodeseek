@@ -17,7 +17,7 @@ final class PostListSortToggleButton: UIButton {
     private enum Layout {
         static let minimumExpandedWidth: CGFloat = 168
         static let cornerRadius: CGFloat = 14
-        static let collapsedAlpha: CGFloat = 0.62
+        static let collapsedAlpha: CGFloat = 0.3
         static let expandedAlpha: CGFloat = 1
         static let jellyAnimationKey = "sortToggleJelly"
         static let jellyDuration: TimeInterval = 0.42

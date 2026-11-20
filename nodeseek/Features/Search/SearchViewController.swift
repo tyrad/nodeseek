@@ -617,7 +617,15 @@ final class SearchViewController: UIViewController {
     @objc private func scopeControlChanged() {
         let index = scopeControl.selectedSegmentIndex
         guard SearchScope.allCases.indices.contains(index) else { return }
+        let previousScope = selectedScope
         applyScope(SearchScope.allCases[index])
+
+        guard previousScope == .post, selectedScope == .user,
+              keywordTextField.markedTextRange == nil,
+              let query = activeRequest?.query,
+              keywordTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) == query,
+              activeUserQuery != query else { return }
+        submitSearch()
     }
 
     @objc private func keywordTextChanged() {
@@ -644,6 +652,7 @@ final class SearchViewController: UIViewController {
                 listView.hideRefreshing()
             }
             listView.setItems([])
+            listView.searchHighlightTerms = []
             listView.hideLoadingSkeleton()
             listView.hideFirstPageError()
             listView.hideLoadingMore()
@@ -741,6 +750,8 @@ final class SearchViewController: UIViewController {
         isRefreshing = false
         isLoadingMore = false
         listView.setItems([])
+        // 先清空旧结果再换词，旧结果不会按新词整批重排
+        listView.searchHighlightTerms = SearchKeywordHighlighter.terms(from: request.query)
         listView.hideFirstPageError()
         listView.hideLoadingMore()
         listView.showLoadingSkeleton()

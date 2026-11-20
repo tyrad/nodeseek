@@ -29,6 +29,8 @@ final class PostCategoryPreferencesViewController: UITableViewController {
         super.viewDidLoad()
         tableView.backgroundColor = UIColor.systemGroupedBackground
         title = "首页分类"
+        // 黑白主题：图标等跟随 tableView 着色，不用系统蓝
+        tableView.tintColor = .label
         tableView.accessibilityIdentifier = "post-category-preferences-table-view"
         tableView.allowsSelectionDuringEditing = true
         navigationItem.rightBarButtonItems = [editButtonItem]

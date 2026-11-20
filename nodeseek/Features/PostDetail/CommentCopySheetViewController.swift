@@ -98,11 +98,19 @@ final class CommentCopySheetViewController: UIViewController {
     private func configureFilledButton(_ button: UIButton, title: String) {
         var configuration = UIButton.Configuration.filled()
         configuration.title = title
-        configuration.baseBackgroundColor = .systemBlue
-        configuration.baseForegroundColor = .white
+        // 黑白主题：主按钮用 .label 反色
+        configuration.baseBackgroundColor = .label
+        configuration.baseForegroundColor = Self.opaqueInverseLabelColor
         configuration.cornerStyle = .medium
         button.configuration = configuration
         button.translatesAutoresizingMaskIntoConstraints = false
+    }
+
+    /// 面板里的 .systemBackground 会随玻璃材质变半透明，文字压在 .label 底色上发灰；
+    /// 固定按页面层级取色，保证反色文字不透明。
+    private static let opaqueInverseLabelColor = UIColor { traitCollection in
+        let baseLevel = UITraitCollection(traitsFrom: [traitCollection, UITraitCollection(userInterfaceLevel: .base)])
+        return UIColor.systemBackground.resolvedColor(with: baseLevel)
     }
 
     private func configurePlainButton(_ button: UIButton, title: String) {

@@ -2856,6 +2856,49 @@ struct PostDetailViewControllerTests {
         #expect(richTextView.point(inside: CGPoint(x: 92, y: -12), with: nil))
     }
 
+    @Test func richTextViewPrefersExactLinkOverOverlappingSignatureHitArea() throws {
+        let bodyURL = try #require(URL(string: "https://body.example.com"))
+        let signatureURL = try #require(URL(string: "https://signature.example.com"))
+        let attributedText = NSMutableAttributedString(string: "正文链接 签名链接")
+        attributedText.addAttributes(
+            NodeSeekLinkStyle.attributes(url: bodyURL),
+            range: NSRange(location: 0, length: 4)
+        )
+        attributedText.addAttributes(
+            NodeSeekSignatureStyle.linkAttributes(url: signatureURL),
+            range: NSRange(location: 5, length: 4)
+        )
+
+        let richTextView = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 320, height: 80))
+        richTextView.configure(
+            attributedText,
+            onImageTapped: nil,
+            onLinkTapped: nil,
+            onLayoutInvalidated: nil
+        )
+        // 同一行内，签名链接扩大后的点击区（x 6...78）覆盖正文链接中心；签名在首行，不受上边界裁剪影响。
+        let bodyOverlay = try #require(richTextView.attributedTextContentView(
+            richTextView,
+            viewForLink: bodyURL,
+            identifier: "body",
+            frame: CGRect(x: 0, y: 0, width: 24, height: 14)
+        ))
+        let signatureOverlay = try #require(richTextView.attributedTextContentView(
+            richTextView,
+            viewForLink: signatureURL,
+            identifier: "signature",
+            frame: CGRect(x: 30, y: 0, width: 24, height: 14)
+        ))
+        bodyOverlay.tag = 0
+        signatureOverlay.tag = 5
+        richTextView.addSubview(bodyOverlay)
+        richTextView.addSubview(signatureOverlay)
+
+        #expect(signatureOverlay.point(inside: CGPoint(x: -18, y: 7), with: nil))
+        #expect(richTextView.hitTest(CGPoint(x: 12, y: 7), with: nil) === bodyOverlay)
+        #expect(richTextView.hitTest(CGPoint(x: 66, y: 7), with: nil) === signatureOverlay)
+    }
+
     @Test func richTextViewReturnsMultipleNearbySignatureLinkCandidatesOnly() throws {
         let bodyURL = try #require(URL(string: "https://body.example.com"))
         let firstSignatureURL = try #require(URL(string: "https://t.me/nodefans"))
@@ -3873,7 +3916,11 @@ struct PostDetailLoginViewControllerTests {
 
     @Test func detailUsesOnlyFloatingReplyEntry() async throws {
         let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
+        // 不读模拟器里保存过的拖动位置，只验证默认位置
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            floatingPositionStore: InMemoryFloatingControlPositionStore()
+        )
 
         viewController.loadViewIfNeeded()
         viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
@@ -4125,7 +4172,8 @@ struct PostDetailLoginViewControllerTests {
             floorText: "#10",
             createdAtText: "1min ago",
             createdAtTitleText: "2026-04-29 13:58:43",
-            contentHTML: "<p>第一段</p><p>第二段</p>"
+            contentHTML: "<p>第一段</p><p>第二段</p>",
+            markdown: "第一段\n\n第二段"
         )
 
         viewController.loadViewIfNeeded()
@@ -4158,7 +4206,7 @@ struct PostDetailLoginViewControllerTests {
         await Task.yield()
         #expect(presenter.sentReplyContent?.contains("> @netcup [#10]") == true)
         #expect(presenter.sentReplyContent?.contains("第一段") == true)
-        #expect(presenter.sentReplyContent?.contains("第二段") == false)
+        #expect(presenter.sentReplyContent?.contains("> 第一段\n> \n> 第二段") == true)
     }
 
     @Test func hiddenReplyContextCanCollapseWithoutRequiredPaddingConflict() throws {
@@ -4267,7 +4315,8 @@ struct PostDetailLoginViewControllerTests {
             floorText: "#10",
             createdAtText: "1min ago",
             createdAtTitleText: "2026-04-29 13:58:43",
-            contentHTML: "<p>第一段</p>"
+            contentHTML: "<p>第一段</p>",
+            markdown: "第一段"
         )
         let second = Comment(
             id: "2",
@@ -4277,7 +4326,8 @@ struct PostDetailLoginViewControllerTests {
             floorText: "#11",
             createdAtText: "2min ago",
             createdAtTitleText: "2026-04-29 14:00:00",
-            contentHTML: "<p>第二段</p>"
+            contentHTML: "<p>第二段</p>",
+            markdown: "第二段"
         )
 
         viewController.loadViewIfNeeded()
@@ -4352,7 +4402,8 @@ struct PostDetailLoginViewControllerTests {
             floorText: "#11",
             createdAtText: "2min ago",
             createdAtTitleText: "2026-04-29 14:00:00",
-            contentHTML: "<p>引用段落</p>"
+            contentHTML: "<p>引用段落</p>",
+            markdown: "引用段落"
         )
 
         viewController.loadViewIfNeeded()
@@ -4383,11 +4434,115 @@ struct PostDetailLoginViewControllerTests {
         await Task.yield()
 
         #expect(presenter.sentReplyContent == """
-        > @alice [#11](https://www.nodeseek.com/post-703863-1#11) 发布于2026-04-29 14:00:00
+        > @alice [#11](https://www.nodeseek.com/post-703863-2#11) 发布于2026-04-29 14:00:00
         > 引用段落
 
         @netcup [#10](https://www.nodeseek.com/post-703863-1#10) 正文
         """)
+    }
+
+    /// 第 1 页进入后滚动加载第 2 页，再分别引用两页的楼层：正文用各自原文，链接指向各自所在页。
+    @Test func quotesFromAppendedPageUseSourceMarkdownAndFloorPage() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true)
+        )
+        let page1 = try CommentQuotePageFixture.parsePage(1, pageCount: 4, comments: [
+            .init(id: 131, floor: 31, author: "hot", markdown: "来自第四页的热评", hot: true),
+            .init(id: 110, floor: 10, author: "alice", markdown: "第一页最后一楼\n第二行")
+        ])
+        let nextPage = try #require(page1.pagination?.nextPage)
+        #expect(nextPage == 2)
+        let page2 = try CommentQuotePageFixture.parsePage(nextPage, pageCount: 4, comments: [
+            .init(id: 211, floor: 11, author: "carol", markdown: "> 嵌套引用\n\n第二页正文")
+        ])
+
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.view.layoutIfNeeded()
+        viewController.render(detail: page1)
+        await waitForDetailContent(in: viewController)
+        viewController.appendCommentPage(detail: page2)
+
+        for floor in [10, 31, 11] {
+            try tapCommentAction("引用评论", floor: floor, in: viewController)
+            #expect(await waitUntil { viewController.replyComposerMode.quotes.last?.floorText == "#\(floor)" })
+            if floor != 11 { viewController.dismissReplyEditor() }
+        }
+        let replyTextView = try #require(viewController.view.firstTextView(accessibilityIdentifier: "post-detail-reply-text-view"))
+        replyTextView.text = "看看"
+        let sendButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-send-button"))
+        sendButton.sendActions(for: .touchUpInside)
+        await Task.yield()
+
+        #expect(presenter.sentReplyContent == """
+        > @alice [#10](https://www.nodeseek.com/post-1016685-1#10) 发布于2026-11-15 17:00:10
+        > 第一页最后一楼
+        > 第二行
+
+        > @hot [#31](https://www.nodeseek.com/post-1016685-4#31) 发布于2026-11-15 17:00:31
+        > 来自第四页的热评
+
+        > @carol [#11](https://www.nodeseek.com/post-1016685-2#11) 发布于2026-11-15 17:00:11
+        > > 嵌套引用
+        >\u{20}
+        > 第二页正文
+
+        看看
+        """)
+    }
+
+    /// 直接从第 3 页进入（例如通知跳楼层），引用和回复都按楼层算页码。
+    @Test func quoteAndReplyAfterEnteringLaterPageUseFloorPage() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            currentPage: 3,
+            accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true)
+        )
+        let page3 = try CommentQuotePageFixture.parsePage(3, pageCount: 3, comments: [
+            .init(id: 221, floor: 21, author: "erin", markdown: "第三页", editedAt: "2026-11-15 18:00:00"),
+            .init(id: 222, floor: 22, author: "bob", markdown: "同页回复目标")
+        ])
+
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.view.layoutIfNeeded()
+        viewController.render(detail: page3)
+        await waitForDetailContent(in: viewController)
+
+        try tapCommentAction("引用评论", floor: 21, in: viewController)
+        #expect(await waitUntil { viewController.replyComposerMode.quotes.last?.floorText == "#21" })
+        viewController.dismissReplyEditor()
+        try tapCommentAction("回复评论", floor: 22, in: viewController)
+        #expect(await waitUntil { viewController.replyComposerMode.replies.last?.floorText == "#22" })
+        let replyTextView = try #require(viewController.view.firstTextView(accessibilityIdentifier: "post-detail-reply-text-view"))
+        replyTextView.text = "收到"
+        let sendButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-send-button"))
+        sendButton.sendActions(for: .touchUpInside)
+        await Task.yield()
+
+        #expect(presenter.sentReplyContent == """
+        > @erin [#21](https://www.nodeseek.com/post-1016685-3#21) 发布于2026-11-15 17:00:21，编辑于2026-11-15 18:00:00
+        > 第三页
+
+        @bob [#22](https://www.nodeseek.com/post-1016685-3#22) 收到
+        """)
+    }
+
+    private func tapCommentAction(_ label: String, floor: Int, in controller: PostDetailViewController) throws {
+        let table = controller.tableNode
+        table.waitUntilAllUpdatesAreProcessed()
+        let cells = (0..<table.numberOfRows(inSection: 0)).compactMap { row in
+            table.nodeForRow(at: IndexPath(row: row, section: 0)) as? CommentCellNode
+        }
+        let cell = try #require(cells.first { $0.debugHeaderTopLineText.split(separator: " ").last == "#\(floor)" })
+        _ = cell.view
+        cell.layoutIfNeeded()
+        let buttons = (cell.subnodes ?? []).compactMap { $0 as? ASButtonNode }
+        let button = try #require(buttons.first { $0.accessibilityLabel == label })
+        button.sendActions(forControlEvents: .touchUpInside, with: nil)
     }
 
     @Test func contextBarScrollsWhenTargetsOverflowVisibleRows() async throws {

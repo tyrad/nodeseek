@@ -22,6 +22,31 @@ enum AvatarImageLoadingOptions {
         return cache
     }()
 
+    /// 头像地址不变、内容变了（比如刚上传新头像）时，清掉缓存才能重新下载。
+    static func removeCachedAvatar(for url: URL?) {
+        guard let url = ImageURLResolver.resolve(url) else { return }
+        cache.removeImage(
+            forKey: url.absoluteString,
+            processorIdentifier: AvatarImageProcessor(size: targetSize).identifier
+        )
+    }
+
+    /// 站点头像经 CDN 缓存（max-age 4 小时），地址不变时换头像后仍会拿到旧图。
+    /// 和网页上传后一样带 no-cache 请求一次让 CDN 回源，再清掉本地缓存。
+    /// 用于 App 内上传后，以及「我的」页下拉刷新（网页端换过头像的情况）。
+    static func refreshFromOrigin(url: URL?) async {
+        guard let resolved = ImageURLResolver.resolve(url) else { return }
+        var request = URLRequest(url: resolved, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
+        WebRequestFingerprint.applyImageHeaders(to: &request)
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.setValue("no-cache", forHTTPHeaderField: "Pragma")
+        let session = URLSession(configuration: makeSessionConfiguration())
+        // 临时会话用完要释放，否则会一直留着。
+        defer { session.finishTasksAndInvalidate() }
+        _ = try? await session.data(for: request)
+        removeCachedAvatar(for: resolved)
+    }
+
     static func makeDownloader() -> ImageDownloader {
         let downloader = ImageDownloader(name: "NodeSeekAvatarDownloader")
         downloader.sessionConfiguration = makeSessionConfiguration()

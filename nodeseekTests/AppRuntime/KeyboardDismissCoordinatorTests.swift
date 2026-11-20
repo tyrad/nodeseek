@@ -23,11 +23,9 @@ final class KeyboardDismissCoordinatorTests: XCTestCase {
         XCTAssertTrue(field.becomeFirstResponder())
         XCTAssertTrue(coordinator.shouldDismiss(from: root))
         XCTAssertFalse(coordinator.shouldDismiss(from: field))
+        // 组合文字未上屏时点空白同样收起，文字由系统上屏保留。
         field.setMarkedText("中文", selectedRange: NSRange(location: 2, length: 0))
-        XCTAssertFalse(coordinator.shouldDismiss(from: root))
-        coordinator.dismissKeyboard()
-        XCTAssertTrue(field.isFirstResponder)
-        field.unmarkText()
+        XCTAssertTrue(coordinator.shouldDismiss(from: root))
         let delegate = EditingDelegate()
         field.delegate = delegate
         coordinator.dismissKeyboard()
@@ -35,6 +33,7 @@ final class KeyboardDismissCoordinatorTests: XCTestCase {
         delegate.allowsEnd = true
         coordinator.dismissKeyboard()
         XCTAssertFalse(field.isFirstResponder)
+        XCTAssertNil(field.markedTextRange)
         XCTAssertEqual(field.text, "中文")
     }
 

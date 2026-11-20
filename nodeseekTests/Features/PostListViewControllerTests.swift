@@ -23,6 +23,31 @@ struct PostListViewControllerTests {
         #expect(composeButton.accessibilityLabel == "发帖")
     }
 
+    @Test func composeButtonStaysHiddenWhenSwipingToAnotherCategory() throws {
+        let viewController = makePostListViewController(presenter: SpyPostListPresenter(), layout: .tabs)
+        viewController.loadViewIfNeeded()
+        viewController.renderCategories([.all, .daily, .tech], selected: .all)
+        let composeButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-compose-button"))
+        let onListScroll = try #require(viewController.pageContainerViewController.onListScroll)
+        let animationsWereEnabled = UIView.areAnimationsEnabled
+        UIView.setAnimationsEnabled(false)
+        defer { UIView.setAnimationsEnabled(animationsWereEnabled) }
+
+        // 手指上推超过阈值，收起发帖按钮
+        let scrollView = ComposeTrackingScrollView(frame: CGRect(x: 0, y: 0, width: 390, height: 700))
+        scrollView.contentSize = CGSize(width: 390, height: 5000)
+        scrollView.contentOffset = CGPoint(x: 0, y: 600)
+        onListScroll(scrollView)
+        scrollView.fakePan.fakeTranslation = CGPoint(x: 0, y: -80)
+        onListScroll(scrollView)
+        #expect(composeButton.alpha == 0)
+
+        // 左右滑动切换分类：保持隐藏
+        viewController.postPageContainerViewController(viewController.pageContainerViewController, didScrollTo: .daily)
+        #expect(composeButton.alpha == 0)
+        #expect(composeButton.isUserInteractionEnabled == false)
+    }
+
     @Test func readingLayoutKeepsSideMenuWithoutComposeButton() throws {
         let presenter = SpyPostListPresenter()
         let viewController = makePostListViewController(presenter: presenter)
@@ -50,7 +75,7 @@ struct PostListViewControllerTests {
         #expect(button.bounds.width >= 56)
         #expect(button.bounds.width <= 60)
         #expect(button.alpha < 1)
-        #expect(button.alpha >= 0.5)
+        #expect(button.alpha >= 0.2)
         #expect(button.titleLabel?.font.pointSize ?? 0 >= 13)
         #expect(button.titleLabel?.numberOfLines == 1)
         #expect(button.titleLabel?.lineBreakMode == .byTruncatingTail)
@@ -1261,4 +1286,20 @@ private func waitUntil(
         try await Task.sleep(nanoseconds: step)
         waited += step
     }
+}
+
+private final class ComposeFakePan: UIPanGestureRecognizer {
+    var fakeTranslation: CGPoint = .zero
+
+    override func translation(in view: UIView?) -> CGPoint {
+        fakeTranslation
+    }
+}
+
+/// 模拟手指正在拖动的列表。
+private final class ComposeTrackingScrollView: UIScrollView {
+    let fakePan = ComposeFakePan()
+
+    override var isTracking: Bool { true }
+    override var panGestureRecognizer: UIPanGestureRecognizer { fakePan }
 }

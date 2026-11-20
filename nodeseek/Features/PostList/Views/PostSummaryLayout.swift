@@ -17,15 +17,22 @@ struct PostSummaryLayout: @unchecked Sendable {
         let userInterfaceStyle: UIUserInterfaceStyle
         let displayScale: CGFloat
         let specialFollowRules: [SpecialFollowKeywordRule]
+        /// 搜索结果里要高亮的关键词；首页等普通列表为空。
+        var searchHighlightTerms: [String] = []
 
         @MainActor
-        static func current(width: CGFloat, traitCollection: UITraitCollection) -> Context {
+        static func current(
+            width: CGFloat,
+            traitCollection: UITraitCollection,
+            searchHighlightTerms: [String] = []
+        ) -> Context {
             Context(
                 width: width,
                 pointOffset: AppTextSizeSettings.shared.pointOffset,
                 userInterfaceStyle: traitCollection.userInterfaceStyle,
                 displayScale: traitCollection.displayScale > 0 ? traitCollection.displayScale : UIScreen.main.scale,
-                specialFollowRules: SpecialFollowKeywordStore.shared.rules
+                specialFollowRules: SpecialFollowKeywordStore.shared.rules,
+                searchHighlightTerms: searchHighlightTerms
             )
         }
     }
@@ -66,7 +73,8 @@ struct PostSummaryLayout: @unchecked Sendable {
             title = PostSummaryText.titleAttributedText(
                 for: item.post,
                 isVisited: item.isVisited,
-                specialFollowRules: context.specialFollowRules
+                specialFollowRules: context.specialFollowRules,
+                searchHighlightTerms: context.searchHighlightTerms
             )
             metadata = PostSummaryText.metadataAttributedText(
                 for: item.post,

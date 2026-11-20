@@ -246,6 +246,7 @@ final class PostListSideMenuViewController: UIViewController {
         let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
         var configuration = UIButton.Configuration.plain()
         configuration.image = UIImage(systemName: systemImageName, withConfiguration: symbolConfiguration)
+            .map { fixedWidthMenuIcon($0) }
         configuration.imagePadding = 10
         configuration.baseForegroundColor = .label
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)
@@ -254,6 +255,18 @@ final class PostListSideMenuViewController: UIViewController {
         button.contentHorizontalAlignment = .leading
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
+    }
+
+    /// 菜单图标宽度不一，文字会跟着错位；统一画进固定宽度的画布里居中，让各行文字左边缘对齐。
+    private static let menuIconWidth: CGFloat = 28
+
+    private static func fixedWidthMenuIcon(_ image: UIImage) -> UIImage {
+        let size = CGSize(width: max(menuIconWidth, image.size.width), height: image.size.height)
+        let rendered = UIGraphicsImageRenderer(size: size).image { _ in
+            image.draw(at: CGPoint(x: (size.width - image.size.width) / 2, y: 0))
+        }
+        // 保持模板渲染，未读时变红等着色逻辑照常生效
+        return rendered.withRenderingMode(.alwaysTemplate)
     }
 
     private static func makeExtensionEntryButton(label: String, systemImageName: String) -> UIButton {

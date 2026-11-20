@@ -436,7 +436,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
                 }
             } catch {
                 isLoadingEditablePost = false
-                view?.showToast(message: error.localizedDescription)
+                view?.showFailureToast(message: error.localizedDescription)
             }
         }
     }
@@ -467,7 +467,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
                 }
             } catch {
                 isLoadingEditablePost = false
-                view?.showToast(message: error.localizedDescription)
+                view?.showFailureToast(message: error.localizedDescription)
             }
         }
     }
@@ -814,7 +814,7 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
         if failedRequest?.showsFooterLoading == true {
             AppLog.warning(.postDetail, "详情评论加载更多失败: \(error)")
             view?.hideLoadingMoreComments()
-            view?.showToast(message: "更多评论加载失败")
+            view?.showFailureToast(message: "更多评论加载失败")
             return
         }
         view?.hideLoading()

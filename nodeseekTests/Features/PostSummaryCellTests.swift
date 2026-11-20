@@ -70,7 +70,7 @@ struct PostSummaryCellTests {
 
         #expect(PostListCellStyle.Typography.titleMaximumNumberOfLines == 0)
         #expect(titleText.string == post.title)
-        #expect(titleText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor == .label)
+        #expect(titleText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor == ReadingColors.unreadTitle)
         #expect((titleText.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize == AppTextSizeSettings.adjustedPointSize(basePointSize: 17))
         #expect(PostListCellStyle.Typography.titleWeight == .medium)
         #expect(PostListCellStyle.Typography.metadataMaximumNumberOfLines == 1)
@@ -108,6 +108,72 @@ struct PostSummaryCellTests {
         #expect(titleText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor == .secondaryLabel)
     }
 
+    // MARK: - 搜索关键词高亮
+
+    private func searchPost(title: String = "出一台美西 VPS，年付 10 刀") -> PostSummary {
+        PostSummary(
+            id: "1047296",
+            title: title,
+            url: URL(string: "https://www.nodeseek.com/post-1047296-1")!,
+            authorName: "mist",
+            nodeName: "交易",
+            replyCount: 3,
+            lastActivityText: "1min ago"
+        )
+    }
+
+    @Test func searchTermsAreBoldWithSubtleBackgroundIgnoringCase() throws {
+        let title = PostSummaryText.titleAttributedText(for: searchPost(), searchHighlightTerms: ["美西", "vps"])
+        let source = title.string as NSString
+
+        for term in ["美西", "VPS"] {
+            let location = source.range(of: term).location
+            let font = try #require(title.attribute(.font, at: location, effectiveRange: nil) as? UIFont)
+            #expect(fontWeight(font) > fontWeight(PostListCellStyle.Typography.titleFont), "\(term) 应加粗")
+            #expect(title.attribute(.backgroundColor, at: location, effectiveRange: nil) as? UIColor == SearchKeywordHighlighter.backgroundColor)
+        }
+        let plain = source.range(of: "出").location
+        #expect(title.attribute(.backgroundColor, at: plain, effectiveRange: nil) == nil)
+        let plainFont = try #require(title.attribute(.font, at: plain, effectiveRange: nil) as? UIFont)
+        #expect(fontWeight(plainFont) == fontWeight(PostListCellStyle.Typography.titleFont))
+    }
+
+    private func fontWeight(_ font: UIFont) -> CGFloat {
+        let traits = font.fontDescriptor.object(forKey: .traits) as? [UIFontDescriptor.TraitKey: Any]
+        return (traits?[.weight] as? CGFloat) ?? 0
+    }
+
+    /// 首页不传关键词：标题和改动前完全一致，即使标题里含有搜过的词。
+    @Test func titleWithoutSearchTermsIsUnchanged() {
+        let post = searchPost()
+        let plain = PostSummaryText.titleAttributedText(for: post)
+        let emptyTerms = PostSummaryText.titleAttributedText(for: post, searchHighlightTerms: [])
+
+        #expect(plain.isEqual(to: emptyTerms))
+        var hasBackground = false
+        plain.enumerateAttribute(.backgroundColor, in: NSRange(location: 0, length: plain.length)) { value, _, _ in
+            if value != nil { hasBackground = true }
+        }
+        #expect(hasBackground == false)
+    }
+
+    @Test func specialFollowColorWinsWhenOverlappingSearchTerm() throws {
+        let rules = [try SpecialFollowKeywordRule(keyword: "美西", colorHex: "#34C759")]
+        let title = PostSummaryText.titleAttributedText(
+            for: searchPost(),
+            specialFollowRules: rules,
+            searchHighlightTerms: ["美西"]
+        )
+        let location = (title.string as NSString).range(of: "美西").location
+        let background = try #require(title.attribute(.backgroundColor, at: location, effectiveRange: nil) as? UIColor)
+        #expect(background != SearchKeywordHighlighter.backgroundColor)
+    }
+
+    @Test func searchTermsSplitOnWhitespaceAndDeduplicate() {
+        #expect(SearchKeywordHighlighter.terms(from: "  美西  VPS vps\n年付 ") == ["美西", "VPS", "年付"])
+        #expect(SearchKeywordHighlighter.terms(from: "   ") == [])
+    }
+
     @Test func postTitleHighlightsSpecialFollowKeywordBackground() throws {
         let post = PostSummary(
             id: "7",
@@ -130,7 +196,7 @@ struct PostSummaryCellTests {
         #expect(hitBackgroundColor.isEqual(UIColor(hex: "#34C759")))
         #expect(hitTextColor.isEqual(UIColor.white))
         #expect(titleText.attribute(.backgroundColor, at: 10, effectiveRange: nil) == nil)
-        #expect(normalTextColor.isEqual(UIColor.label))
+        #expect(normalTextColor.isEqual(ReadingColors.unreadTitle))
     }
 
     @Test func metadataHighlightsSpecialFollowAuthorNameBackground() throws {

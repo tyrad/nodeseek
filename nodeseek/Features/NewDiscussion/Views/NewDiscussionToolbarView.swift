@@ -73,6 +73,12 @@ final class NewDiscussionToolbarView: UIView {
         buttons.values.forEach { $0.isEnabled = isEnabled }
     }
 
+    func setHiddenItems(_ items: Set<Item>) {
+        for (item, button) in buttons {
+            button.isHidden = items.contains(item)
+        }
+    }
+
     private func setupUI() {
         backgroundColor = .clear
 

@@ -140,6 +140,27 @@ struct SettingsViewControllerTests {
         }
     }
 
+    @Test func settingsIconsUseMonochromeTint() throws {
+        let defaults = try #require(UserDefaults(suiteName: "settings-tint-\(UUID().uuidString)"))
+        let viewController = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 4_096),
+            sessionManager: FakeSettingsSessionManager(),
+            currentAccountStore: CurrentAccountStore(userDefaults: defaults, storageKey: "account"),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore()
+        )
+        viewController.loadViewIfNeeded()
+
+        let cell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: IndexPath(row: 0, section: 0)
+        ))
+        #expect(cell.imageView?.image != nil)
+        viewController.tableView.addSubview(cell)
+        let light = UITraitCollection(userInterfaceStyle: .light)
+        let iconTint = try #require(cell.imageView?.tintColor).resolvedColor(with: light)
+        #expect(iconTint.cgColor.components == UIColor.label.resolvedColor(with: light).cgColor.components)
+    }
+
     @Test func settingsPageHidesLogoutWhenNotLoggedIn() async throws {
         let defaults = try #require(UserDefaults(suiteName: "settings-account-\(UUID().uuidString)"))
         let accountStore = CurrentAccountStore(userDefaults: defaults, storageKey: "account")
@@ -635,7 +656,7 @@ struct SettingsViewControllerTests {
             viewController.tableView,
             titleForFooterInSection: 0
         )
-        #expect(footerText?.contains("右滑删除") == true)
+        #expect(footerText?.contains("滑动删除") == true)
 
         try viewController.saveKeywordForTesting(keyword: "nodeimage", colorHex: "#007AFF")
         #expect(store.keywords == [

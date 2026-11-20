@@ -116,27 +116,35 @@ private enum NodeImageAuthorizationScripts {
         if (apiKey) post({ type: 'api-key', api_key: apiKey });
         return apiKey || '';
       };
-      const showAPI = () => {
+      // NodeImage 登录后才显示用户区；未登录时点「API」必然失败并弹「加载API密钥失败」。
+      // 页面结构变化找不到用户区时，按已登录处理，保留原来的点按钮行为。
+      const isSignedIn = () => {
+        const userControls = document.getElementById('userControls');
+        return !userControls || getComputedStyle(userControls).display !== 'none';
+      };
+      // 每个页面登录后只点一次「API」，之后只读输入框，避免失败提示堆积。
+      const showAPIOnce = () => {
+        if (window.__nodeSeekAPIButtonClicked || !isSignedIn()) return;
         const apiButton = document.getElementById('apiBtn');
-        if (apiButton) apiButton.click();
+        if (!apiButton) return;
+        window.__nodeSeekAPIButtonClicked = true;
+        apiButton.click();
       };
       const readInput = () => {
         const input = document.getElementById('apiKeyInput');
         return input && input.value ? input.value : '';
       };
-      const readCurrentPage = () => {
-        showAPI();
-        return emitAPIKey(readInput());
-      };
 
-      const immediate = readCurrentPage();
+      showAPIOnce();
+      const immediate = emitAPIKey(readInput());
       if (immediate) return immediate;
 
+      clearInterval(window.__nodeSeekAPIKeyPolling);
       let attempts = 0;
-      const interval = setInterval(() => {
+      window.__nodeSeekAPIKeyPolling = setInterval(() => {
         attempts += 1;
-        const apiKey = readCurrentPage();
-        if (apiKey || attempts >= 20) clearInterval(interval);
+        const apiKey = emitAPIKey(readInput());
+        if (apiKey || attempts >= 20) clearInterval(window.__nodeSeekAPIKeyPolling);
       }, 250);
 
       fetch('/api/user/status', { credentials: 'include' })
@@ -294,6 +302,7 @@ final class NodeImageAuthViewController: UIViewController, WKNavigationDelegate,
         popupWebView?.removeFromSuperview()
         popupWebView = nil
         extractAPIKeyIfPossible()
+        scheduleFollowUpExtractions()
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -302,7 +311,15 @@ final class NodeImageAuthViewController: UIViewController, WKNavigationDelegate,
             completeAuthorization(with: apiKey)
             return
         }
+        // 读取脚本每次都会回传 user-status；据此再读取会形成循环，只对授权进展和页面重新可见做出响应。
+        let messageType = (message.body as? [String: Any])?["type"] as? String
+        if messageType == "user-status" {
+            return
+        }
         scheduleAPIKeyExtraction(after: 0.25)
+        if messageType == "auth-message" {
+            scheduleFollowUpExtractions()
+        }
     }
 
     private func startNodeImageAuthorizationIfNeeded() {
@@ -311,11 +328,15 @@ final class NodeImageAuthViewController: UIViewController, WKNavigationDelegate,
         didRequestNodeSeekAuthorization = true
         webView.evaluateJavaScript(NodeImageAuthorizationScripts.startAuthorization)
         scheduleAPIKeyExtraction(after: 0.8)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
-            self?.extractAPIKeyIfPossible()
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
-            self?.extractAPIKeyIfPossible()
+        scheduleFollowUpExtractions()
+    }
+
+    /// NodeImage 收到授权或加载完成后，要过一两秒才切到登录状态；分几次再读，登录后的那次会点一次「API」。
+    private func scheduleFollowUpExtractions() {
+        for delay in [1.0, 2.5, 5.0, 8.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.extractAPIKeyIfPossible()
+            }
         }
     }
 

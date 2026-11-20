@@ -108,6 +108,28 @@ struct AppNavigationLayoutTests {
         #expect(settings.hasConfirmedChoice)
     }
 
+    @Test func mePageSupportsPullToRefresh() async throws {
+        let defaults = try #require(UserDefaults(suiteName: "me-pull-refresh-\(UUID().uuidString)"))
+        let accountController = PostListSideMenuAccountController(
+            currentAccountStore: CurrentAccountStore(userDefaults: defaults, storageKey: "account"),
+            accountRefresher: GuestAccountRefresher()
+        )
+        let viewController = MeViewController(accountController: accountController)
+        viewController.loadViewIfNeeded()
+        let scrollView = try #require(viewController.view.subviews.compactMap { $0 as? UIScrollView }.first)
+        let refreshControl = try #require(scrollView.refreshControl)
+        #expect(refreshControl.allTargets.contains(viewController))
+
+        // 游客下拉等账号刷新回来后也要及时收起，不能一直转圈
+        refreshControl.beginRefreshing()
+        refreshControl.sendActions(for: .valueChanged)
+        let deadline = Date().addingTimeInterval(2)
+        while refreshControl.isRefreshing, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        #expect(refreshControl.isRefreshing == false)
+    }
+
     @Test func mePageShowsGuestStateWithLoginButtonAndEntries() throws {
         let viewController = MeViewController()
         viewController.loadViewIfNeeded()
@@ -372,5 +394,15 @@ private extension UIView {
 
     func layoutTestButton(identifier: String) -> UIButton? {
         layoutTestView(identifier: identifier) as? UIButton
+    }
+}
+
+private struct GuestAccountRefresher: CurrentAccountRefreshing {
+    func cachedAccount() async -> AccountResponse? {
+        nil
+    }
+
+    func refreshIfNeeded(force: Bool, maxAge: TimeInterval) async -> AccountResponse? {
+        nil
     }
 }

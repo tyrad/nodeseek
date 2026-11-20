@@ -366,8 +366,14 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             ?? restrictedNotice.flatMap(Self.firstInteger(in:))
 
         let ownCommentIDs = ownCommentIDs(in: document)
+        let commentSources = commentSources(in: document)
         let comments = document.xpath(XPathRules.postDetailComments).compactMap { item -> Comment? in
-            parseComment(item, reactionConfiguration: reactionConfiguration, ownCommentIDs: ownCommentIDs)
+            parseComment(
+                item,
+                reactionConfiguration: reactionConfiguration,
+                ownCommentIDs: ownCommentIDs,
+                commentSources: commentSources
+            )
         }
         let page = Self.postPage(from: url) ?? 1
         let pagination = parsePostDetailPagination(in: document, pageURL: url)
@@ -448,6 +454,25 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             })
         }
         return []
+    }
+
+    /// 网页引用评论时直接取页面配置里的原始 Markdown 和编辑时间，这里按 commentId 收集。
+    private func commentSources(in document: HTMLDocument) -> [String: CommentSource] {
+        for root in configRoots(in: document) {
+            guard let postData = root["postData"] as? [String: Any],
+                  let comments = postData["comments"] as? [[String: Any]] else { continue }
+            var sources: [String: CommentSource] = [:]
+            for comment in comments {
+                guard let commentID = intValue(in: comment, keys: ["commentId"]) else { continue }
+                let time = comment["time"] as? [String: Any]
+                sources[String(commentID)] = CommentSource(
+                    markdown: comment["markdown"] as? String,
+                    editedAtText: (time?["editedDateFormated"] as? String)?.trimmedNonEmpty
+                )
+            }
+            return sources
+        }
+        return [:]
     }
 
     private func lowLevelWarningAuthorID(in document: HTMLDocument, bodyItem: Kanna.XMLElement?) -> Int? {
@@ -622,7 +647,8 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
     private func parseComment(
         _ item: Kanna.XMLElement,
         reactionConfiguration: PostReactionConfiguration?,
-        ownCommentIDs: Set<String> = []
+        ownCommentIDs: Set<String> = [],
+        commentSources: [String: CommentSource] = [:]
     ) -> Comment? {
         guard let authorName = firstText(in: item, xpaths: [XPathRules.contentAuthor]) else {
             return nil
@@ -669,7 +695,9 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             isChickenLegClicked: parseReactionClicked(in: item, kind: .chickenLeg),
             opposeCount: opposeCount,
             isOpposeClicked: parseReactionClicked(in: item, kind: .oppose),
-            isOwnComment: ownCommentIDs.contains(id)
+            isOwnComment: ownCommentIDs.contains(id),
+            markdown: commentSources[id]?.markdown,
+            editedAtTitleText: commentSources[id]?.editedAtText
         )
     }
 
@@ -1030,4 +1058,9 @@ nonisolated private extension Kanna.XMLElement {
             .split(whereSeparator: { $0.isWhitespace })
             .contains { $0 == className }
     }
+}
+
+nonisolated private struct CommentSource {
+    let markdown: String?
+    let editedAtText: String?
 }

@@ -142,6 +142,23 @@ struct PostDetailPresenterTests {
         )
     }
 
+    @Test func editPostLoadFailureUsesFailureToast() async throws {
+        let view = SpyPostDetailView()
+        let editor = StubDiscussionEditor()
+        editor.loadError = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "读取原文失败"])
+        let presenter = PostDetailPresenter(interactor: SpyPostDetailInteractor(), router: SpyPostDetailRouter(), initialPage: 1, discussionEditor: editor)
+        presenter.setView(view)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: makeEditableDetail(isOwnPost: true)))
+
+        presenter.didTapEditPost()
+        for _ in 0..<200 where view.failureToastMessages.isEmpty {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        #expect(view.failureToastMessages == ["读取原文失败"])
+        #expect(view.toastMessage != "读取原文失败")
+    }
+
     @Test func editOwnPostLoadsOriginalThenRefreshesAfterSaving() async throws {
         let interactor = SpyPostDetailInteractor()
         let router = SpyPostDetailRouter()
@@ -1075,6 +1092,8 @@ struct PostDetailPresenterTests {
 
         #expect(interactor.postLikeSubmitCount == 0)
         #expect(view.toastMessage == "该帖子已点赞")
+        // 重复操作只是提醒，不算失败
+        #expect(view.failureToastMessages.isEmpty)
     }
 
     @Test func tappingCommentLikeSubmitsUpvoteAndShowsToastOnSuccess() {
@@ -1455,9 +1474,11 @@ private final class SpyPostDetailRouter: PostDetailRouterProtocol {
 
 private final class StubDiscussionEditor: NodeSeekDiscussionEditing {
     private(set) var loadedPostIDs: [Int] = []
+    var loadError: Error?
 
     func loadEditableDiscussion(postID: Int) async throws -> EditableDiscussion {
         loadedPostIDs.append(postID)
+        if let loadError { throw loadError }
         return EditableDiscussion(postID: postID, title: "标题", content: "正文", category: .daily, rank: .everyone, userLevel: 2)
     }
 
@@ -1493,6 +1514,7 @@ private final class SpyPostDetailView: PostDetailViewProtocol {
     private(set) var hideLoadingMoreCommentsCount = 0
     var errorMessage: String?
     var toastMessage: String?
+    private(set) var failureToastMessages: [String] = []
     private(set) var replySubmittingStates: [Bool] = []
     private(set) var favoriteSubmittingStates: [Bool] = []
     private(set) var finishReplySubmissionCount = 0
@@ -1511,6 +1533,7 @@ private final class SpyPostDetailView: PostDetailViewProtocol {
     func hideLoading() { hideLoadingCount += 1 }
     func showError(message: String) { errorMessage = message }
     func showToast(message: String) { toastMessage = message }
+    func showFailureToast(message: String) { failureToastMessages.append(message) }
     func setReplySubmitting(_ isSubmitting: Bool) { replySubmittingStates.append(isSubmitting) }
     func setFavoriteSubmitting(_ isSubmitting: Bool) {
         favoriteSubmittingStates.append(isSubmitting)

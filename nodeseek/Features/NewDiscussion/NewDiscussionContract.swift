@@ -38,6 +38,8 @@ enum NewDiscussionCloseDecision: Equatable {
     case askReplaceOldDraft
     /// 编辑帖子有改动：保存修改 / 留着下次继续 / 放弃修改。
     case askSaveEdit
+    /// 编辑资料字段有改动，不存本机草稿：保存修改 / 放弃修改。
+    case askSaveOrDiscardEdit
 }
 
 struct NewDiscussionViewState: Equatable {
@@ -51,6 +53,12 @@ struct NewDiscussionViewState: Equatable {
     let saveStatus: NewDiscussionSaveStatus
     let canPublish: Bool
     let isSubmitting: Bool
+    /// 编辑资料里的签名、Readme 时的字段名：中间只显示它，没有标题和发布设置。
+    var fieldTitle: String? = nil
+    var bodyPlaceholder: String? = nil
+    /// 签名不允许图片和引用，对应的插入入口直接隐藏。
+    var hiddenToolbarItems: Set<NewDiscussionToolbarView.Item> = []
+    var allowsQuote = true
 }
 
 protocol NewDiscussionViewProtocol: AnyObject {

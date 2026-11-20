@@ -80,8 +80,8 @@ struct ReplyAuthorContextMenuTests {
         let backgroundColor = try #require(copyButton.configuration?.baseBackgroundColor)
         let foregroundColor = try #require(copyButton.configuration?.baseForegroundColor)
         let darkTrait = UITraitCollection(userInterfaceStyle: .dark)
-        #expect(backgroundColor.resolvedColor(with: darkTrait).isSameColor(as: UIColor.systemBlue.resolvedColor(with: darkTrait)))
-        #expect(foregroundColor.resolvedColor(with: darkTrait).isSameColor(as: UIColor.white))
+        #expect(backgroundColor.resolvedColor(with: darkTrait).isSameColor(as: UIColor.label.resolvedColor(with: darkTrait)))
+        #expect(foregroundColor.resolvedColor(with: darkTrait).isSameColor(as: UIColor.systemBackground.resolvedColor(with: darkTrait)))
     }
 
     @Test func avatarContextMenuOnlyShowsProfilePreviewAndBodyMenuOnlyShowsReplyActions() {
