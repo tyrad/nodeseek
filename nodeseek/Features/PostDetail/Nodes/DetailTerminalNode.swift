@@ -1,5 +1,4 @@
 import AsyncDisplayKit
-import ImageIO
 import UIKit
 
 final class DetailTerminalNode: ASDisplayNode {
@@ -100,11 +99,10 @@ final class DetailTerminalView: UIView {
                 guard let first = result.pages.first else { return }
                 let previewWidth = max(host.bounds.width * host.traitCollection.displayScale, 640)
                 let previewLongestSide = min(2048, previewWidth * max(1, first.height / first.width))
-                guard let image = Self.thumbnail(first.url, pixelWidth: previewLongestSide) else {
-                    throw TerminalSnapshotRenderer.SnapshotError.invalidOutput
-                }
+                let image = try await TerminalThumbnailCache.shared.thumbnail(for: first.url, maxPixelSize: Int(previewLongestSide))
+                try Task.checkCancellation()
                 host.snapshot = result
-                host.imageView.image = image
+                host.imageView.image = UIImage(cgImage: image)
                 host.openButton.isEnabled = true
                 host.statusLabel.text = nil
                 host.onImageLoaded(CGSize(width: first.width, height: first.height))
@@ -121,16 +119,6 @@ final class DetailTerminalView: UIView {
                 host.task = nil
             }
         }
-    }
-
-    private static func thumbnail(_ url: URL, pixelWidth: CGFloat) -> UIImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                kCGImageSourceCreateThumbnailFromImageAlways: true,
-                kCGImageSourceThumbnailMaxPixelSize: Int(pixelWidth),
-                kCGImageSourceCreateThumbnailWithTransform: true
-              ] as CFDictionary) else { return nil }
-        return UIImage(cgImage: image)
     }
 
     @objc private func retry() {

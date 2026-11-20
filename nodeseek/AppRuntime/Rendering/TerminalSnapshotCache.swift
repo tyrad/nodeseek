@@ -115,3 +115,31 @@ actor TerminalSnapshotCache {
         }
     }
 }
+
+/// 报告文件位于按内容散列划分的目录，同一文件在不同显示尺寸下分别缓存预览。
+actor TerminalThumbnailCache {
+    static let shared = TerminalThumbnailCache()
+    private let images = NSCache<NSString, CGImage>()
+
+    init() {
+        images.totalCostLimit = 24 * 1024 * 1024
+    }
+
+    func removeAll() { images.removeAllObjects() }
+
+    func thumbnail(for url: URL, maxPixelSize: Int) throws -> CGImage {
+        try Task.checkCancellation()
+        let key = "\(url.absoluteString)#\(maxPixelSize)" as NSString
+        if let cached = images.object(forKey: key) { return cached }
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceShouldCacheImmediately: true
+              ] as CFDictionary) else { throw TerminalSnapshotRenderer.SnapshotError.invalidOutput }
+        try Task.checkCancellation()
+        images.setObject(image, forKey: key, cost: image.bytesPerRow * image.height)
+        return image
+    }
+}

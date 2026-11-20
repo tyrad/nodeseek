@@ -63,6 +63,28 @@ final class MagicTabIntegrationTests: XCTestCase {
         web.stopLoading()
     }
 
+    func testReportViewsReusePreviewOnlyForSameContentAndSize() async throws {
+        let window = makeWindow(controller: UIViewController())
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let host = try XCTUnwrap(window.rootViewController?.view)
+        func preview(_ text: String, width: CGFloat) async throws -> CGImage {
+            let view = DetailTerminalView(terminal: .init(ansi: text), onImageTapped: { _, _ in }, onImageLoaded: { _ in })
+            view.frame = CGRect(x: 0, y: 0, width: width, height: 120)
+            host.addSubview(view)
+            defer { view.removeFromSuperview() }
+            for _ in 0..<400 where view.snapshot == nil { try await Task.sleep(nanoseconds: 10_000_000) }
+            return try XCTUnwrap(view.detailPhotoThumbnailView.image?.cgImage)
+        }
+        let text = "同一份报告"
+        let first = try await preview(text, width: 160)
+        let repeatImage = try await preview(text, width: 160)
+        let larger = try await preview(text, width: 600)
+        let other = try await preview("另一份报告", width: 160)
+        XCTAssertTrue(first === repeatImage)
+        XCTAssertGreaterThan(larger.width, first.width)
+        XCTAssertFalse(first === other)
+    }
+
     func testMergedSnapshotContainsLastLineAndReusesDiskCache() async throws {
         let window = makeWindow(controller: UIViewController())
         defer { window.rootViewController = nil; window.isHidden = true }
