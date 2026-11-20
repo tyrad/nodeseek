@@ -4168,7 +4168,8 @@ struct PostDetailLoginViewControllerTests {
             floorText: "#10",
             createdAtText: "1min ago",
             createdAtTitleText: "2026-04-29 13:58:43",
-            contentHTML: "<p>第一段</p><p>第二段</p>"
+            contentHTML: "<p>第一段</p><p>第二段</p>",
+            markdown: "第一段\n\n第二段"
         )
 
         viewController.loadViewIfNeeded()
@@ -4201,7 +4202,7 @@ struct PostDetailLoginViewControllerTests {
         await Task.yield()
         #expect(presenter.sentReplyContent?.contains("> @netcup [#10]") == true)
         #expect(presenter.sentReplyContent?.contains("第一段") == true)
-        #expect(presenter.sentReplyContent?.contains("第二段") == false)
+        #expect(presenter.sentReplyContent?.contains("> 第一段\n> \n> 第二段") == true)
     }
 
     @Test func hiddenReplyContextCanCollapseWithoutRequiredPaddingConflict() throws {
@@ -4310,7 +4311,8 @@ struct PostDetailLoginViewControllerTests {
             floorText: "#10",
             createdAtText: "1min ago",
             createdAtTitleText: "2026-04-29 13:58:43",
-            contentHTML: "<p>第一段</p>"
+            contentHTML: "<p>第一段</p>",
+            markdown: "第一段"
         )
         let second = Comment(
             id: "2",
@@ -4320,7 +4322,8 @@ struct PostDetailLoginViewControllerTests {
             floorText: "#11",
             createdAtText: "2min ago",
             createdAtTitleText: "2026-04-29 14:00:00",
-            contentHTML: "<p>第二段</p>"
+            contentHTML: "<p>第二段</p>",
+            markdown: "第二段"
         )
 
         viewController.loadViewIfNeeded()
@@ -4395,7 +4398,8 @@ struct PostDetailLoginViewControllerTests {
             floorText: "#11",
             createdAtText: "2min ago",
             createdAtTitleText: "2026-04-29 14:00:00",
-            contentHTML: "<p>引用段落</p>"
+            contentHTML: "<p>引用段落</p>",
+            markdown: "引用段落"
         )
 
         viewController.loadViewIfNeeded()
@@ -4426,11 +4430,118 @@ struct PostDetailLoginViewControllerTests {
         await Task.yield()
 
         #expect(presenter.sentReplyContent == """
-        > @alice [#11](https://www.nodeseek.com/post-703863-1#11) 发布于2026-04-29 14:00:00
+        > @alice [#11](https://www.nodeseek.com/post-703863-2#11) 发布于2026-04-29 14:00:00
         > 引用段落
 
         @netcup [#10](https://www.nodeseek.com/post-703863-1#10) 正文
         """)
+    }
+
+    /// 第 1 页进入后滚动加载第 2 页，再分别引用两页的楼层：正文用各自原文，链接指向各自所在页。
+    @Test func quotesFromAppendedPageUseSourceMarkdownAndFloorPage() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true)
+        )
+        let lastOfPage1 = quoteSourceComment(id: "110", floor: 10, author: "alice", markdown: "第一页最后一楼\n第二行")
+        let firstOfPage2 = quoteSourceComment(id: "211", floor: 11, author: "carol", markdown: "> 嵌套引用\n\n第二页正文")
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: quoteSourceDetail(page: 1, comments: [lastOfPage1]))
+        await waitForDetailContent(in: viewController)
+        viewController.appendCommentPage(detail: quoteSourceDetail(page: 2, comments: [firstOfPage2]))
+        await Task.yield()
+
+        viewController.handleQuote(lastOfPage1)
+        await Task.yield()
+        viewController.handleQuote(firstOfPage2)
+        await Task.yield()
+        let replyTextView = try #require(viewController.view.firstTextView(accessibilityIdentifier: "post-detail-reply-text-view"))
+        replyTextView.text = "看看"
+        let sendButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-send-button"))
+        sendButton.sendActions(for: .touchUpInside)
+        await Task.yield()
+
+        #expect(presenter.sentReplyContent == """
+        > @alice [#10](https://www.nodeseek.com/post-703863-1#10) 发布于2026-11-15 17:00:10
+        > 第一页最后一楼
+        > 第二行
+
+        > @carol [#11](https://www.nodeseek.com/post-703863-2#11) 发布于2026-11-15 17:00:11
+        > > 嵌套引用
+        >\u{20}
+        > 第二页正文
+
+        看看
+        """)
+    }
+
+    /// 直接从第 3 页进入（例如通知跳楼层），引用和回复都按楼层算页码。
+    @Test func quoteAndReplyAfterEnteringLaterPageUseFloorPage() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            currentPage: 3,
+            accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true)
+        )
+        let floor21 = quoteSourceComment(id: "221", floor: 21, author: "erin", markdown: "第三页", editedAt: "2026-11-15 18:00:00")
+        let hot = quoteSourceComment(id: "131", floor: 31, author: "hot", markdown: "跨页热评")
+
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: quoteSourceDetail(page: 3, comments: [hot, floor21]))
+        await waitForDetailContent(in: viewController)
+
+        viewController.handleQuote(floor21)
+        await Task.yield()
+        viewController.handleReply(to: hot)
+        await Task.yield()
+        let replyTextView = try #require(viewController.view.firstTextView(accessibilityIdentifier: "post-detail-reply-text-view"))
+        replyTextView.text = "收到"
+        let sendButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-send-button"))
+        sendButton.sendActions(for: .touchUpInside)
+        await Task.yield()
+
+        #expect(presenter.sentReplyContent == """
+        > @erin [#21](https://www.nodeseek.com/post-703863-3#21) 发布于2026-11-15 17:00:21，编辑于2026-11-15 18:00:00
+        > 第三页
+
+        @hot [#31](https://www.nodeseek.com/post-703863-4#31) 收到
+        """)
+    }
+
+    private func quoteSourceComment(
+        id: String,
+        floor: Int,
+        author: String,
+        markdown: String,
+        editedAt: String? = nil
+    ) -> nodeseek.Comment {
+        nodeseek.Comment(
+            id: id,
+            anchorID: "\(floor)",
+            authorName: author,
+            avatarURL: nil,
+            floorText: "#\(floor)",
+            createdAtText: "刚刚",
+            createdAtTitleText: String(format: "2026-11-15 17:00:%02d", floor),
+            contentHTML: "<p>渲染后的内容不参与引用</p>",
+            markdown: markdown,
+            editedAtTitleText: editedAt
+        )
+    }
+
+    private func quoteSourceDetail(page: Int, comments: [nodeseek.Comment]) -> PostDetail {
+        PostDetail(
+            id: "703863",
+            title: "详情标题",
+            authorName: "ipv4",
+            avatarURL: nil,
+            metadataText: "刚刚",
+            contentHTML: "<p>正文</p>",
+            comments: comments,
+            page: page
+        )
     }
 
     @Test func contextBarScrollsWhenTargetsOverflowVisibleRows() async throws {
