@@ -42,31 +42,28 @@ final class PostDetailComposerUXAuditTests: XCTestCase {
 
     // MARK: - U22
 
-    // 期望：引用只有图片/表情的评论时，引用块里有 “[图片]”/“[表情]” 之类的占位，而不是只有标题行。
-    func test_U22_quoteOfImageOnlyCommentHasPlaceholder() {
+    // 期望：引用只有图片/表情的评论时，引用块里带上原文（图片 Markdown、表情代码），和网页一致，而不是只有标题行。
+    func test_U22_quoteOfImageOnlyCommentCarriesSourceMarkdown() {
+        let imageMarkdown = "![image](https://cdn.nodeimage.com/i/FBICDKhbCSRbkZ5Kx5qyiyit927K3vCg.webp)"
         let imageComment = makeComment(
             id: "1",
             floor: 1,
-            html: #"<p><img src="https://cdn.nodeimage.com/i/FBICDKhbCSRbkZ5Kx5qyiyit927K3vCg.webp" alt="image"></p>"#
+            html: #"<p><img src="https://cdn.nodeimage.com/i/FBICDKhbCSRbkZ5Kx5qyiyit927K3vCg.webp" alt="image"></p>"#,
+            markdown: imageMarkdown
         )
         let stickerComment = makeComment(
             id: "2",
             floor: 2,
-            html: #"<p><img class="sticker" src="/static/image/sticker/xhj/001.png" loading="lazy" alt="xhj001"></p>"#
+            html: #"<p><img class="sticker" src="/static/image/sticker/xhj/001.png" loading="lazy" alt="xhj001"></p>"#,
+            markdown: ":xhj001:"
         )
         let postURL = URL(string: "https://www.nodeseek.com/post-1-1")!
 
-        let results = [imageComment, stickerComment].map { comment -> (String, Bool) in
-            let content = CommentComposerContentBuilder.content(text: "", mode: .quote([comment]), postURL: postURL)
-            let bodyLines = content.components(separatedBy: "\n").dropFirst()
-            let hasPlaceholder = bodyLines.contains { $0.hasPrefix(">") && ($0.contains("[图片]") || $0.contains("[表情]")) }
-            return (content, hasPlaceholder)
-        }
+        let imageQuote = CommentComposerContentBuilder.content(text: "", mode: .quote([imageComment]), postURL: postURL)
+        let stickerQuote = CommentComposerContentBuilder.content(text: "", mode: .quote([stickerComment]), postURL: postURL)
 
-        XCTAssertTrue(
-            results.allSatisfy(\.1),
-            "U22: 图片/表情评论的引用块只有标题行，没有占位内容：\(results.map(\.0).map(\.debugDescription))"
-        )
+        XCTAssertEqual(imageQuote.components(separatedBy: "\n").last, "> \(imageMarkdown)", "U22: 图片评论的引用块没有带上原文：\(imageQuote.debugDescription)")
+        XCTAssertEqual(stickerQuote.components(separatedBy: "\n").last, "> :xhj001:", "U22: 表情评论的引用块没有带上原文：\(stickerQuote.debugDescription)")
     }
 
     // MARK: - U28
