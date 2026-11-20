@@ -369,10 +369,10 @@ private struct ListSymbolImageKey: Hashable {
     }
 }
 
-/// 搜索结果标题里的关键词：加粗并铺一层半透明黄色底，像荧光笔标记，浅色和暗黑模式下文字都清晰。
+/// 搜索结果标题里的关键词：加粗并铺一层半透明荧光绿底，像荧光笔标记，浅色和暗黑模式下文字都清晰。
 enum SearchKeywordHighlighter {
-    /// 搜索命中的语义色；用系统黄，深浅色下自动换成对应色值。
-    static let backgroundColor = UIColor.systemYellow.withAlphaComponent(0.35)
+    /// 搜索命中的语义色；系统绿偏暗不像荧光笔，改用 Assets 里分深浅色调过透明度的荧光绿。
+    static let backgroundColor = UIColor(named: "SearchKeywordHighlight") ?? UIColor.systemGreen.withAlphaComponent(0.35)
 
     /// 按空白拆词并去重，空串不参与高亮。
     static func terms(from query: String) -> [String] {
