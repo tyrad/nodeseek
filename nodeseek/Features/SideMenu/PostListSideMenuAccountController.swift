@@ -50,7 +50,7 @@ final class PostListSideMenuAccountController {
 
     func start() {
         observeSessionChanges()
-        loadStoredAccount()
+        Task { [weak self] in await self?.publishStoredAccount() }
     }
 
     /// 强制刷新并等账号结果发布完；正在进行的普通刷新可能只读缓存，等它结束后再强制刷一次。
@@ -96,8 +96,9 @@ final class PostListSideMenuAccountController {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.shouldForceRefreshOnNextShow = true
-                let currentAccountStore = self.currentAccountStore
-                await currentAccountStore.markStale()
+                // 登录页关闭前已保存账号，退出时也已清空。隐藏的「我的」同样需要更新首屏。
+                await self.publishStoredAccount()
+                await self.currentAccountStore.markStale()
                 if self.isSideMenuVisible() {
                     self.refreshIfNeeded(force: true)
                 }
@@ -105,12 +106,9 @@ final class PostListSideMenuAccountController {
         }
     }
 
-    private func loadStoredAccount() {
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            let snapshot = await currentAccountStore.snapshot()
-            publish(snapshot?.account ?? Self.guestAccount)
-        }
+    private func publishStoredAccount() async {
+        let snapshot = await currentAccountStore.snapshot()
+        publish(snapshot?.account ?? Self.guestAccount)
     }
 
     private func publish(_ account: AccountResponse) {

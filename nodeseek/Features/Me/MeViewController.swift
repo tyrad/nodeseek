@@ -400,12 +400,6 @@ final class MeViewController: UIViewController {
 
     private func showLogin() {
         router.navigateToLogin { [weak self] in
-            // 登录页关闭时已把账号写进缓存，先用缓存立刻切换，再后台强制刷新确认
-            Task { [weak self] in
-                guard let account = await CurrentAccountStore.shared.snapshot()?.account,
-                      account.isLoggedIn else { return }
-                self?.accountDidChange(account)
-            }
             self?.accountController.refreshIfNeeded(force: true)
             self?.reloadHomeList()
         }

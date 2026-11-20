@@ -9,6 +9,35 @@ import Testing
 
 @MainActor
 struct PostListSideMenuAccountControllerTests {
+    @Test func hiddenPagePublishesStoredIdentityOnLoginAndLogout() async throws {
+        let suite = "side-menu-session-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = CurrentAccountStore(userDefaults: defaults)
+        let member = AccountResponse(displayName: "测试账号", isLoggedIn: true)
+        let refresher = ForceOnlyAccountRefresher(forcedAccount: member)
+        let controller = PostListSideMenuAccountController(currentAccountStore: store, accountRefresher: refresher)
+        var lastAccount: AccountResponse?
+        controller.onAccountChanged = { lastAccount = $0 }
+        controller.start()
+
+        func expectPublished(_ expected: AccountResponse) async throws {
+            for _ in 0..<100 where lastAccount != expected {
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+            #expect(lastAccount == expected)
+        }
+        let guest = AccountResponse(displayName: "游客", isLoggedIn: false)
+        try await expectPublished(guest)
+        await store.save(member)
+        NotificationCenter.default.post(name: .nodeSeekLoginSessionDidClose, object: nil)
+        try await expectPublished(member)
+        await store.clear()
+        NotificationCenter.default.post(name: .nodeSeekLoginSessionDidClose, object: nil)
+        try await expectPublished(guest)
+        #expect(refresher.forcedCallCount() == 0)
+    }
+
     @Test func refreshNowWaitsForForcedAccountEvenWhenNormalRefreshIsRunning() async throws {
         let defaults = try #require(UserDefaults(suiteName: "side-menu-account-\(UUID().uuidString)"))
         let store = CurrentAccountStore(userDefaults: defaults, storageKey: "account")
