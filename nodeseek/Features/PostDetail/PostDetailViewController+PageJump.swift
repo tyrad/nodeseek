@@ -35,12 +35,15 @@ extension PostDetailViewController {
         return max(maxItemPage, pagination.nextPage ?? 1, currentPage)
     }
 
-    /// 屏幕上第一条可见评论所在的页；只看到主楼时取已加载的第一页。
+    /// 平时按首条可见评论定位，滚到底部时按末条可见评论定位。
     var visibleCommentPage: Int {
         let firstLoadedPage = loadedCommentPageRanges.keys.min() ?? currentPage
         guard isViewLoaded else { return firstLoadedPage }
         let rows = detailRows
-        let visibleRows = tableNode.indexPathsForVisibleRows().map(\.row).sorted()
+        let table = tableNode.view
+        let atBottom = table.contentSize.height > 0
+            && table.bounds.maxY - table.adjustedContentInset.bottom >= table.contentSize.height - 1
+        let visibleRows = tableNode.indexPathsForVisibleRows().map(\.row).sorted(by: atBottom ? (>) : (<))
         for row in visibleRows where row < rows.count {
             guard case .comment(let commentIndex) = rows[row] else { continue }
             if let page = loadedCommentPageRanges.first(where: { $0.value.contains(commentIndex) })?.key {
