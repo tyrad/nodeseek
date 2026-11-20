@@ -173,6 +173,8 @@ final class LoginWebViewController: BaseWebViewController {
             } else {
                 await saveAccountFromCurrentPage()
             }
+            // 回复回调可能立即提交，先丢弃登录前预载的帖子页面。
+            HiddenWebViewPostActionPageScheduler.invalidatePreparedPage()
             NotificationCenter.default.post(name: .nodeSeekLoginSessionDidClose, object: nil)
             onClose()
             closeSelf()
