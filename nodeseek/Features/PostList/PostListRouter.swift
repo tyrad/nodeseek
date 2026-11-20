@@ -51,8 +51,7 @@ class PostListRouter: PostListRouterProtocol {
     }
 
     func navigateToLogin(onClose: @escaping @MainActor () -> Void) {
-        let loginViewController = LoginWebViewController(onClose: onClose)
-        show(loginViewController)
+        LoginWebViewController.open(from: viewController, onClose: onClose)
     }
 
     func navigateToUserProfile(profileURL: URL) {

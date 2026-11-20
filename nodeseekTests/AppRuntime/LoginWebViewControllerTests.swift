@@ -33,6 +33,40 @@ struct LoginWebViewControllerTests {
         #expect(closeButton.tintColor == .label)
     }
 
+    @Test(.serialized, arguments: [false, true])
+    func closeRestoresSourceBeforeResumingAction(pushed: Bool) async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        let source = UIViewController()
+        let navigation = UINavigationController(rootViewController: source)
+        window.rootViewController = navigation
+        window.isHidden = false
+        defer { window.isHidden = true }
+
+        var sourceWasReady: Bool?
+        let login = LoginWebViewController(
+            cookieSession: SpyLoginCookieSession(), automaticallyLoadsPage: false, readsAccountOnClose: false
+        ) {
+            sourceWasReady = navigation.visibleViewController === source && navigation.presentedViewController == nil
+        }
+        if pushed {
+            navigation.pushViewController(login, animated: false)
+        } else {
+            await withCheckedContinuation { continuation in
+                navigation.present(UINavigationController(rootViewController: login), animated: false) {
+                    continuation.resume()
+                }
+            }
+        }
+        login.loadViewIfNeeded()
+        let close = try #require(login.navigationItem.rightBarButtonItem)
+        _ = (close.target as AnyObject).perform(try #require(close.action))
+        for _ in 0..<150 where sourceWasReady == nil {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        #expect(sourceWasReady == true)
+    }
+
     @Test func successfulLoginClosesOnlyOnce() async throws {
         let cookieSession = SpyLoginCookieSession()
         var closeCount = 0

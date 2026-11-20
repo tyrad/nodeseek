@@ -64,6 +64,18 @@ final class LoginWebViewController: BaseWebViewController {
         fatalError("init(coder:) has not been implemented")
     }
 
+    static func open(from source: UIViewController?, onClose: @escaping @MainActor () -> Void = {}) {
+        guard let source, source.presentedViewController == nil else { return }
+        if let navigation = source.navigationController {
+            guard !navigation.viewControllers.contains(where: { $0 is LoginWebViewController }),
+                  navigation.presentedViewController == nil else { return }
+            navigation.pushViewController(LoginWebViewController(onClose: onClose), animated: true)
+        } else {
+            let login = LoginWebViewController(onClose: onClose)
+            source.present(UINavigationController(rootViewController: login), animated: true)
+        }
+    }
+
     override func configureNavigationItems() {
         let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
         let closeButton = UIBarButtonItem(
@@ -176,7 +188,6 @@ final class LoginWebViewController: BaseWebViewController {
             // 回复回调可能立即提交，先丢弃登录前预载的帖子页面。
             HiddenWebViewPostActionPageScheduler.invalidatePreparedPage()
             NotificationCenter.default.post(name: .nodeSeekLoginSessionDidClose, object: nil)
-            onClose()
             closeSelf()
         }
     }
@@ -218,9 +229,19 @@ final class LoginWebViewController: BaseWebViewController {
     private func closeSelf() {
         if let navigationController, navigationController.viewControllers.first !== self {
             navigationController.popViewController(animated: true)
+            if let coordinator = navigationController.transitionCoordinator {
+                coordinator.animate(alongsideTransition: nil) { [onClose] _ in onClose() }
+            } else {
+                onClose()
+            }
             return
         }
 
-        dismiss(animated: true)
+        let container = navigationController ?? self
+        if container.presentingViewController != nil {
+            container.dismiss(animated: true, completion: onClose)
+        } else {
+            onClose()
+        }
     }
 }
