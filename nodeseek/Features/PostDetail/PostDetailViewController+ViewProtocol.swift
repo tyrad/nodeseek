@@ -37,7 +37,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
         loginButton.isHidden = true
         replyButton.isHidden = true
         hideLoadingMoreComments()
-        if hasRenderedDetailContent {
+        if hasRenderedDetailContent || collectionList != nil {
             loadingIndicator.startAnimating()
         } else {
             loadingIndicator.stopAnimating()
@@ -132,6 +132,31 @@ extension PostDetailViewController: PostDetailViewProtocol {
         title = nil
         loginButton.isHidden = true
         showsReplyEntry = detail.isRestricted == false
+        if let collectionList {
+            if currentHeaderContent?.postID != detail.id || detail.isRestricted { authorFilter = nil }
+            resetAuthorFilterAutoLoad()
+            let keepHeader = !detail.isRestricted && detail.page > 1 && detail.contentHTML.isEmpty && currentHeaderContent?.postID == detail.id
+            if !keepHeader {
+                collectionList.headerSource = .init(post: detail)
+                configureHeader(.init(detail: detail), renderedContent: nil)
+            }
+            displayMode = .content
+            hasRenderedDetailContent = true
+            currentPage = max(1, detail.page)
+            comments = detail.comments
+            loadedCommentPageRanges = [currentPage: 0..<comments.count]
+            pagination = detail.pagination
+            collectionList.reload()
+            updateLoadMoreCommentsFooter()
+            updateReplyButtonVisibility()
+            if pendingPageJumpScroll {
+                pendingPageJumpScroll = false
+                collectionList.scroll(to: currentPage == 1 ? 0 : pageCompletionScrollRow(), position: .top)
+            }
+            consumeInitialAnchorIfNeeded()
+            if authorFilter != nil { scheduleAuthorFilterAutoLoadIfNeeded(newMatchCount: authorFilterMatchedCount) }
+            return
+        }
         let targetPage = max(1, detail.page)
         if shouldPrepareInitialContentReveal {
             prepareInitialContentReveal(for: detail, targetPage: targetPage)
@@ -190,6 +215,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
     }
 
     func appendCommentPage(detail: PostDetail) {
+        if collectionList != nil, detail.isRestricted { render(detail: detail); return }
         guard hasRenderedDetailContent else {
             render(detail: detail)
             return
@@ -204,6 +230,13 @@ extension PostDetailViewController: PostDetailViewProtocol {
         pagination = detail.pagination
         comments.append(contentsOf: detail.comments)
         loadedCommentPageRanges[detail.page] = oldCommentCount..<comments.count
+        if let collectionList {
+            collectionList.reload(refresh: false)
+            updateLoadMoreCommentsFooter()
+            updateReplyButtonVisibility()
+            if let authorFilter { scheduleAuthorFilterAutoLoadIfNeeded(newMatchCount: detail.comments.filter(authorFilter.matches).count) }
+            return
+        }
         if let authorFilter {
             appendAuthorFilteredRows(
                 fromRowCount: oldRowCount,
@@ -238,6 +271,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
     }
 
     func refreshCurrentCommentPage(detail: PostDetail) {
+        if collectionList != nil, detail.isRestricted { render(detail: detail); return }
         guard hasRenderedDetailContent else {
             render(detail: detail)
             return
@@ -249,6 +283,16 @@ extension PostDetailViewController: PostDetailViewProtocol {
             return
         }
 
+        if let collectionList {
+            let delta = detail.comments.count - oldRange.count
+            comments.replaceSubrange(oldRange, with: detail.comments)
+            loadedCommentPageRanges[detail.page] = oldRange.lowerBound..<(oldRange.lowerBound + detail.comments.count)
+            shiftLoadedCommentPageRanges(after: detail.page, delta: delta)
+            if detail.page == currentPage { pagination = detail.pagination }
+            collectionList.reload()
+            updateLoadMoreCommentsFooter()
+            return
+        }
         let oldComments = Array(comments[oldRange])
         let newComments = detail.comments
         let commonCount = min(oldComments.count, newComments.count)
@@ -327,6 +371,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
         let wasVisible = authorRiskWarningPostID == postID
         authorRiskWarningPostID = isVisible ? postID : nil
         guard wasVisible != isVisible, isViewLoaded, displayMode == .content else { return }
+        if let collectionList { collectionList.reload(); return }
         // 等待 Texture 完成在途的 cell 创建，避免查询结果早于正文节点就绪。
         tableNode.onDidFinishProcessingUpdates { [weak self] in
             guard let self, self.currentHeaderContent?.postID == postID,
@@ -342,6 +387,12 @@ extension PostDetailViewController: PostDetailViewProtocol {
             return
         }
         let nextContent = PostDetailHeaderContent(detail: detail)
+        if let collectionList {
+            collectionList.headerSource = .init(post: detail)
+            configureHeader(nextContent, renderedContent: nil)
+            collectionList.reload()
+            return
+        }
         guard let previousContent = currentHeaderContent else {
             configureHeader(nextContent, renderedContent: headerRenderedContent)
             scheduleHeaderReload()
@@ -365,6 +416,13 @@ extension PostDetailViewController: PostDetailViewProtocol {
     }
 
     func updateCommentLike(commentID: String, count: Int?, isClicked: Bool) {
+        if let collectionList {
+            for index in comments.indices where comments[index].id == commentID {
+                comments[index] = comments[index].updatingLikeReaction(count: count, isClicked: isClicked)
+            }
+            collectionList.refresh(commentID: commentID)
+            return
+        }
         guard let commentIndex = comments.firstIndex(where: { $0.id == commentID }) else { return }
         comments[commentIndex] = comments[commentIndex].updatingLikeReaction(count: count, isClicked: isClicked)
 
@@ -385,6 +443,13 @@ extension PostDetailViewController: PostDetailViewProtocol {
     }
 
     func updateCommentChickenLeg(commentID: String, count: Int?, isClicked: Bool) {
+        if let collectionList {
+            for index in comments.indices where comments[index].id == commentID {
+                comments[index] = comments[index].updatingChickenLegReaction(count: count, isClicked: isClicked)
+            }
+            collectionList.refresh(commentID: commentID)
+            return
+        }
         guard let commentIndex = comments.firstIndex(where: { $0.id == commentID }) else { return }
         comments[commentIndex] = comments[commentIndex].updatingChickenLegReaction(count: count, isClicked: isClicked)
 
@@ -405,6 +470,13 @@ extension PostDetailViewController: PostDetailViewProtocol {
     }
 
     func updateCommentOppose(commentID: String, count: Int?, isClicked: Bool) {
+        if let collectionList {
+            for index in comments.indices where comments[index].id == commentID {
+                comments[index] = comments[index].updatingOpposeReaction(count: count, isClicked: isClicked)
+            }
+            collectionList.refresh(commentID: commentID)
+            return
+        }
         guard let commentIndex = comments.firstIndex(where: { $0.id == commentID }) else { return }
         comments[commentIndex] = comments[commentIndex].updatingOpposeReaction(count: count, isClicked: isClicked)
 
@@ -681,8 +753,14 @@ extension PostDetailViewController: PostDetailViewProtocol {
         commentRenderedCache.removeAll(keepingCapacity: true)
         renderedCommentIDs.removeAll(keepingCapacity: true)
         commentRenderInFlight.removeAll(keepingCapacity: true)
-        reloadTableData()
-        scheduleHeaderRender(for: headerContent)
+        loadedCommentPageRanges.removeAll()
+        if let collectionList {
+            collectionList.headerSource = .init(html: message, visibleMarkdown: nil)
+            collectionList.invalidate()
+        } else {
+            reloadTableData()
+            scheduleHeaderRender(for: headerContent)
+        }
         updateLoadMoreCommentsFooter()
     }
 
@@ -708,6 +786,7 @@ extension PostDetailViewController: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         guard gestureRecognizer is UITapGestureRecognizer else { return true }
         guard let touchedView = touch.view else { return true }
+        if let list = collectionList?.view, touchedView.isDescendant(of: list) { return false }
         return touchedView.isDescendant(of: replyEditorContainer) == false
     }
 }

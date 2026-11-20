@@ -40,7 +40,7 @@ extension PostDetailViewController {
         let firstLoadedPage = loadedCommentPageRanges.keys.min() ?? currentPage
         guard isViewLoaded else { return firstLoadedPage }
         let rows = detailRows
-        let visibleRows = tableNode.indexPathsForVisibleRows().map(\.row).sorted()
+        let visibleRows = (collectionList?.view.indexPathsForVisibleItems ?? tableNode.indexPathsForVisibleRows()).map(\.row).sorted()
         for row in visibleRows where row < rows.count {
             guard case .comment(let commentIndex) = rows[row] else { continue }
             if let page = loadedCommentPageRanges.first(where: { $0.value.contains(commentIndex) })?.key {

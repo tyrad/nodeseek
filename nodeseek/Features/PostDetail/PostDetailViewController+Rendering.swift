@@ -80,7 +80,7 @@ extension PostDetailViewController {
         return styledSignatureBlocks(blocks)
     }
 
-    private static func styledSignatureBlocks(_ blocks: [RenderedContentBlock]) -> [RenderedContentBlock] {
+    static func styledSignatureBlocks(_ blocks: [RenderedContentBlock]) -> [RenderedContentBlock] {
         blocks.compactMap { styledSignatureBlock($0) }
     }
 

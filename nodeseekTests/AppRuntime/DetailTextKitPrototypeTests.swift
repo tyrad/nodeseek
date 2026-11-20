@@ -33,7 +33,7 @@ final class DetailTextKitPrototypeTests: XCTestCase {
     func testBackgroundWorkAndMainActorDeliveryThroughController() async throws {
         let cases: [(String, DetailFloorSource)] = [
             ("post-97", .init(html: "<p>旧正文</p>", visibleMarkdown: "正文 **主帖**")),
-            ("reply-37", .init(html: "<p>旧回复</p>", visibleMarkdown: "回复 :xhj003:")),
+            ("reply-37", .init(html: "<p>旧回复</p>", visibleMarkdown: "回复 [站点](/member?t=test)")),
             ("web-92", .init(html: "<blockquote>网页提示</blockquote>", visibleMarkdown: nil))
         ]
         for (id, source) in cases {

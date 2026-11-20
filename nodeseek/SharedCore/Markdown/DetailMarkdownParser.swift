@@ -6,6 +6,7 @@ nonisolated struct DetailMarkdownParser: Sendable {
     typealias Inline = DetailDocument.Inline
     typealias Style = DetailDocument.Style
     let baseURL: URL
+    var mediaURLs: [URL: URL] = [:]
 
     nonisolated private enum ParseError: Error { case unsupported }
 
@@ -144,7 +145,7 @@ nonisolated struct DetailMarkdownParser: Sendable {
         case is Strikethrough: style.insert(.strike)
         case let image as Markdown.Image:
             guard link == nil, let url = destination(image.source) else { throw ParseError.unsupported }
-            return [.block(.image(alt: image.plainText, url: url))]
+            return [.block(.image(alt: image.plainText, url: mediaURLs[url] ?? url))]
         case let anchor as Markdown.Link:
             if let raw = anchor.destination, let url = URL(string: raw), let id = NodeSeekVoteParser.voteID(in: url) {
                 return [.block(.vote(id))]
@@ -191,7 +192,7 @@ nonisolated struct DetailMarkdownParser: Sendable {
                 guard let url = URL(string: token), let id = NodeSeekVoteParser.voteID(in: url) else { throw ParseError.unsupported }
                 result.append(.block(.vote(id)))
             } else if token.first == ":", let url = NodeSeekStickerLibrary.urlsByToken[String(token.dropFirst().dropLast())] {
-                result.append(.inline(.sticker(token: token, url: url)))
+                result.append(.inline(.sticker(token: token, url: mediaURLs[url] ?? url)))
             } else if token.first == "@" {
                 var member = URLComponents(url: baseURL.appendingPathComponent("member"), resolvingAgainstBaseURL: true)
                 member?.queryItems = [URLQueryItem(name: "t", value: String(token.dropFirst()))]

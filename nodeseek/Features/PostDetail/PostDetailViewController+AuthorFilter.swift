@@ -134,6 +134,10 @@ extension PostDetailViewController {
 
         DispatchQueue.main.async { [weak self] in
             guard let self, self.isViewLoaded else { return }
+            if let list = self.collectionList {
+                list.scroll(to: targetRow, position: position == .middle ? .centeredVertically : .top)
+                return
+            }
             guard targetRow < self.tableNode(self.tableNode, numberOfRowsInSection: 0) else { return }
             self.tableNode.scrollToRow(at: IndexPath(row: targetRow, section: 0), at: position, animated: false)
         }

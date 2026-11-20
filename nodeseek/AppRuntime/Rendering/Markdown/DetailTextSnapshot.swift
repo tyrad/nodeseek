@@ -77,6 +77,9 @@ nonisolated struct DetailTextSegment: Sendable {
 }
 
 nonisolated enum DetailTextTypesetter {
+    // 使用自有属性保存跳转目标，避免 NSLayoutManager 强制覆盖站点链接颜色及下划线。
+    private static let linkTarget = NSAttributedString.Key("DetailTextLinkTarget")
+
     // 附件只负责预留空间。显式透明图避免 TextKit 在媒体视图下绘制默认文件图标。
     private static let attachmentPlaceholder: UIImage = {
         let format = UIGraphicsImageRendererFormat()
@@ -109,7 +112,7 @@ nonisolated enum DetailTextTypesetter {
                         font = UIFont(descriptor: descriptor, size: pointSize)
                     }
                     var attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: url == nil ? color : linkColor]
-                    if let url { attrs[.link] = url }
+                    if let url { attrs[linkTarget] = url }
                     if style.contains(.strike) { attrs[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
                     storage.append(NSAttributedString(string: string, attributes: attrs))
                 case let .sticker(token, url):
@@ -123,6 +126,9 @@ nonisolated enum DetailTextTypesetter {
                 }
             }
         }
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = DTCoreTextHTMLContentRenderer.Layout.bodyLineSpacing
+        storage.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: storage.length))
         let layout = NSLayoutManager()
         let container = NSTextContainer(size: CGSize(width: max(1, width), height: .greatestFiniteMagnitude))
         container.lineFragmentPadding = 0
@@ -160,7 +166,7 @@ nonisolated enum DetailTextTypesetter {
                 rect.size.height = max(0, min(lineRect.maxY, baseline - font.descender) - rect.minY)
             }
             rect.size.width = max(1, rect.width)
-            characters.append(.init(range: range, rect: rect, line: line.location, rtl: level % 2 == 1, link: storage.attribute(.link, at: index, effectiveRange: nil) as? URL))
+            characters.append(.init(range: range, rect: rect, line: line.location, rtl: level % 2 == 1, link: storage.attribute(linkTarget, at: index, effectiveRange: nil) as? URL))
             index = NSMaxRange(range)
         }
 

@@ -170,23 +170,20 @@ extension PostDetailViewController {
     private func loadedComment(matchingAnchorID anchorID: String) -> Comment? {
         let normalizedTarget = normalizedAnchorText(anchorID)
         guard normalizedTarget.isEmpty == false else { return nil }
-        return comments.first { comment in
+        let matches = comments.filter { comment in
             normalizedAnchorText(comment.anchorID) == normalizedTarget
                 || normalizedAnchorText(comment.floorText) == normalizedTarget
         }
+        return matches.first(where: { !$0.isHot }) ?? matches.first
     }
 
     private func indexPathForLoadedComment(_ comment: Comment) -> IndexPath? {
-        guard let commentIndex = comments.firstIndex(where: { $0.id == comment.id }),
-              let row = detailRows.firstIndex(where: {
-                  if case .comment(let index) = $0 {
-                      return index == commentIndex
-                  }
-                  return false
-              }) else {
-            return nil
+        let row = detailRows.firstIndex {
+            guard case .comment(let index) = $0 else { return false }
+            let candidate = comments[index]
+            return candidate.id == comment.id && candidate.isHot == comment.isHot
         }
-        return IndexPath(row: row, section: 0)
+        return row.map { IndexPath(row: $0, section: 0) }
     }
 
     private func isLoadedCommentVisible(anchorID: String, indexPath: IndexPath) -> Bool {
@@ -195,7 +192,7 @@ extension PostDetailViewController {
             return testVisibleAnchorIDs.contains(normalizedAnchorText(anchorID))
         }
         #endif
-        return tableNode.indexPathsForVisibleRows().contains(indexPath)
+        return (collectionList?.view.indexPathsForVisibleItems ?? tableNode.indexPathsForVisibleRows()).contains(indexPath)
     }
 
     private func presentLoadedCommentPreview(comment: Comment, anchorID: String) {
@@ -335,6 +332,7 @@ extension PostDetailViewController {
         testHighlightedAnchorID = normalizedAnchorText(anchorID)
         testPresentedLoadedCommentID = nil
         #endif
+        if let collectionList { collectionList.scroll(to: indexPath.row, position: .centeredVertically); return }
         tableNode.scrollToRow(at: indexPath, at: .middle, animated: true)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
             guard let self else { return }
@@ -350,15 +348,9 @@ extension PostDetailViewController {
     }
 
     func indexPathForCurrentPageAnchor(_ anchorID: String) -> IndexPath? {
-        if let commentIndex = comments.firstIndex(where: { comment in
-            comment.anchorID == anchorID || comment.floorText == "#\(anchorID)"
-        }), let row = detailRows.firstIndex(where: {
-            if case .comment(let index) = $0 {
-                return index == commentIndex
-            }
-            return false
-        }) {
-            return IndexPath(row: row, section: 0)
+        if let comment = loadedComment(matchingAnchorID: anchorID),
+           let index = indexPathForLoadedComment(comment) {
+            return index
         }
 
         guard anchorID == "0", currentHeaderContent != nil,

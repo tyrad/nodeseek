@@ -1,3 +1,17 @@
 "copy" = "复制正文";
 "cancel" = "取消";
 "close" = "关闭";
+"use-list" = "详情页使用 TextKit 列表";
+"more" = "更多";
+"open-first" = "查看第一页";
+"reply" = "回复";
+"quote" = "引用";
+"like" = "点赞";
+"chicken" = "投放鸡腿";
+"oppose" = "反对";
+"author" = "只看作者";
+"all" = "查看全部回复";
+"edit" = "编辑";
+"favorite" = "收藏";
+"poster" = "楼主";
+"hot" = "热评";

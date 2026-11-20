@@ -31,11 +31,11 @@ private struct ReplayPage: Decodable {
         let comments = items.filter { !$0.main }.map { item in
             Comment(id: item.id, anchorID: String(item.floor), authorName: "NodeSeek", avatarURL: nil,
                     floorText: "#\(item.floor)", createdAtText: nil, contentHTML: body(item),
-                    isHot: item.hot, markdown: item.markdown)
+                    isHot: item.hot, markdown: item.markdown, hasVisibleMarkdown: item.markdown != nil)
         }
         return PostDetail(id: String(path.split(separator: "-")[1]), title: title ?? path,
                           authorName: "NodeSeek", avatarURL: nil, metadataText: nil,
-                          contentHTML: items.first(where: \.main).map(body) ?? "", comments: comments,
+                          contentHTML: items.first(where: \.main).map(body) ?? "", visibleMarkdown: items.first(where: \.main)?.markdown, comments: comments,
                           page: page, pagination: .init(currentPage: page, items: [], previousPage: previous, nextPage: next))
     }
 }
@@ -102,7 +102,19 @@ private final class RefreshClock: NSObject {
 }
 
 @MainActor
-final class DetailBaselineTests: XCTestCase {
+class DetailBaselineTests: XCTestCase {
+    var usesTextKit: Bool { false }
+
+    private func configureMedia(_ urls: [String: String], on vc: PostDetailViewController) {
+        guard let list = vc.collectionList else { return }
+        for (raw, replacement) in urls {
+            if let original = URL(string: raw, relativeTo: NodeSeekSite.baseURL)?.absoluteURL,
+               let local = URL(string: replacement) {
+                list.renderer.mediaURLs[original] = local
+            }
+        }
+    }
+
     private func fixture<T: Decodable>(_ name: String, as: T.Type) throws -> T {
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: name, withExtension: "json"))
         return try JSONDecoder().decode(T.self, from: Data(contentsOf: url))
@@ -138,7 +150,7 @@ final class DetailBaselineTests: XCTestCase {
 
     private func host(page: ReplayPage, anchor: Int?, in window: UIWindow) -> PostDetailViewController {
         let vc = PostDetailViewController(presenter: SpyPostDetailPresenter(), currentPage: page.page,
-                                          initialAnchorID: anchor.map(String.init))
+                                          initialAnchorID: anchor.map(String.init), usesTextKitList: usesTextKit)
         window.rootViewController = UINavigationController(rootViewController: vc)
         window.makeKeyAndVisible()
         window.layoutIfNeeded()
@@ -149,20 +161,25 @@ final class DetailBaselineTests: XCTestCase {
         [root] + root.subviews.flatMap(descendants)
     }
 
-    private func bodyViews(_ cell: ASCellNode) -> [UIView] {
-        descendants(cell.view).filter { view in
+    private func bodyViews(_ cell: UIView) -> [UIView] {
+        descendants(cell).filter { view in
             if let rich = view as? DetailRichTextView { return (rich.debugAttributedString?.length ?? 0) > 0 }
-            return view is DetailImageBlockView || view is DetailVoteView || view is DetailCodeBlockView ||
+            return view is DetailSelectableTextView || view is DetailImageBlockView || view is DetailVoteView || view is DetailCodeBlockView ||
                 view is DetailTerminalView || view.accessibilityIdentifier == "detail-magic-tab-content" ||
                 String(describing: type(of: view)) == "DetailTableScrollView"
         }
     }
 
-    private func cell(for item: ReplayPage.Item, in vc: PostDetailViewController) -> (IndexPath, ASCellNode)? {
+    private func cell(for item: ReplayPage.Item, in vc: PostDetailViewController) -> (IndexPath, UIView)? {
+        if let list = vc.collectionList {
+            guard let index = vc.indexPathForCurrentPageAnchor(String(item.floor)),
+                  let cell = list.view.cellForItem(at: index) as? DetailFloorListCell, cell.contentInstalled, cell.bounds.height > 0 else { return nil }
+            return (index, cell)
+        }
         guard (item.main ? vc.headerRenderedContent != nil : vc.renderedCommentIDs.contains(item.id)),
               let index = vc.indexPathForCurrentPageAnchor(String(item.floor)),
               let node = vc.tableNode.nodeForRow(at: index), node.bounds.height > 0 else { return nil }
-        return (index, node)
+        return (index, node.view)
     }
 
     private func wait(_ label: String, timeout: Double = 12, until ready: () -> Bool) async throws {
@@ -176,7 +193,7 @@ final class DetailBaselineTests: XCTestCase {
     private func save(_ data: Data, name: String, type: String) throws {
         #if targetEnvironment(simulator)
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent(".build/detail-baseline/results")
+            .deletingLastPathComponent().appendingPathComponent(usesTextKit ? ".build/detail-list/results" : ".build/detail-baseline/results")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try data.write(to: root.appendingPathComponent(name), options: .atomic)
         #else
@@ -219,6 +236,7 @@ final class DetailBaselineTests: XCTestCase {
         }
 
         var heights = [String: CGFloat]()
+        var layerCaptures = [String]()
         for style in [UIUserInterfaceStyle.light, .dark] {
             let window = try window(style: style)
             defer { window.isHidden = true; window.rootViewController = nil }
@@ -232,33 +250,42 @@ final class DetailBaselineTests: XCTestCase {
                         }
                         guard !targets.isEmpty else { continue }
                         let vc = host(page: page, anchor: nil, in: window)
+                        configureMedia(placeholder ? waiting : loaded, on: vc)
                         vc.render(detail: page.detail(using: placeholder ? waiting : loaded))
                         for item in targets {
                             let name = "\(page.path.dropFirst())-\(item.floor)-\(style == .dark ? "dark" : "light")-\(size)-\(placeholder ? "placeholder" : "body")"
+                            if let list = vc.collectionList, let index = vc.indexPathForCurrentPageAnchor(String(item.floor)) {
+                                list.scroll(to: index.row, position: .top)
+                            }
                             try await wait(name) { self.cell(for: item, in: vc) != nil }
-                            let (index, _) = try XCTUnwrap(cell(for: item, in: vc))
-                            vc.tableNode.scrollToRow(at: index, at: .top, animated: false)
+                            let (index, renderedCell) = try XCTUnwrap(cell(for: item, in: vc))
+                            if let floor = renderedCell as? DetailFloorListCell {
+                                XCTAssertTrue(floor.request?.source.visibleMarkdown == item.markdown, name)
+                                if let markdown = item.markdown { XCTAssertTrue(floor.copyText == markdown, name) }
+                            }
+                            if let list = vc.collectionList { list.scroll(to: index.row, position: .top) }
+                            else { vc.tableNode.scrollToRow(at: index, at: .top, animated: false) }
                             try await wait(name + "-visible") {
-                                guard let (_, cell) = self.cell(for: item, in: vc), cell.view.window === window else { return false }
+                                guard let (_, cell) = self.cell(for: item, in: vc), cell.window === window else { return false }
                                 return !self.bodyViews(cell).isEmpty
                             }
                             if page.path == votePage.path {
                                 try await wait(name + "-vote", timeout: 60) {
                                     guard let (_, cell) = self.cell(for: item, in: vc) else { return false }
-                                    return self.descendants(cell.view).compactMap { $0 as? DetailVoteView }.first?.model.vote?.id == 3108
+                                    return self.descendants(cell).compactMap { $0 as? DetailVoteView }.first?.model.vote?.id == 3108
                                 }
                             }
                             if !placeholder && page.path == "/post-1067722-1" && item.main {
                                 try await wait(name + "-terminal", timeout: 45) {
                                     guard let (_, cell) = self.cell(for: item, in: vc) else { return false }
-                                    return self.descendants(cell.view).contains { ($0 as? DetailTerminalView)?.snapshot != nil }
+                                    return self.descendants(cell).contains { ($0 as? DetailTerminalView)?.snapshot != nil }
                                 }
                             }
                             let promotedReport = item.html.contains(reportURL.absoluteString)
                             if !placeholder, promotedReport || loaded.keys.contains(where: item.html.contains) {
                                 try await wait(name + "-media") {
                                     guard let (_, cell) = self.cell(for: item, in: vc) else { return false }
-                                    let placeholders = self.descendants(cell.view).compactMap { $0 as? DetailImagePlaceholderView }
+                                    let placeholders = self.descendants(cell).compactMap { $0 as? DetailImagePlaceholderView }
                                     if promotedReport && placeholders.isEmpty { return false }
                                     return placeholders.allSatisfy(\.isHidden)
                                 }
@@ -277,8 +304,15 @@ final class DetailBaselineTests: XCTestCase {
                             let (_, cell) = try XCTUnwrap(self.cell(for: item, in: vc))
                             let format = UIGraphicsImageRendererFormat()
                             format.scale = 1
-                            let image = UIGraphicsImageRenderer(bounds: cell.view.bounds, format: format).image { _ in
-                                XCTAssertTrue(cell.view.drawHierarchy(in: cell.view.bounds, afterScreenUpdates: true), name)
+                            let renderer = UIGraphicsImageRenderer(bounds: cell.bounds, format: format)
+                            var complete = false
+                            var image = renderer.image { _ in
+                                complete = cell.drawHierarchy(in: cell.bounds, afterScreenUpdates: true)
+                            }
+                            if !complete {
+                                // UIKit 无法一次捕获部分超长楼层，另存捕获方式以便逐项复核。
+                                layerCaptures.append(name)
+                                image = renderer.image { context in cell.layer.render(in: context.cgContext) }
                             }
                             try save(XCTUnwrap(image.pngData()), name: name + ".png", type: "public.png")
                             heights[name] = cell.bounds.height
@@ -287,6 +321,7 @@ final class DetailBaselineTests: XCTestCase {
                 }
             }
         }
+        try save(JSONEncoder().encode(layerCaptures), name: "layer-captures.json", type: "public.json")
         try save(JSONEncoder().encode(heights), name: "floor-heights.json", type: "public.json")
     }
 }
@@ -324,7 +359,7 @@ extension DetailBaselineTests {
             let surfaces = bodyViews(cell).filter { view in
                 if view.accessibilityIdentifier == "detail-magic-tab-content" { return false }
                 if let terminal = view as? DetailTerminalView, terminal.snapshot == nil { return false }
-                return isVisible(view, within: vc.tableNode.view)
+                return isVisible(view, within: vc.detailScrollView)
             }
             if surfaces.isEmpty {
                 firstVisibleRefresh = nil
@@ -334,12 +369,12 @@ extension DetailBaselineTests {
                 visible = now
             }
             if expectsTabs && tabs == nil {
-                if let tab = descendants(cell.view).first(where: { $0.accessibilityIdentifier == "detail-magic-tab-content" }) {
+                if let tab = descendants(cell).first(where: { $0.accessibilityIdentifier == "detail-magic-tab-content" }) {
                     let image = descendants(tab).compactMap { $0 as? DetailTerminalView }.first?.detailPhotoThumbnailView
-                    if let image, image.image != nil, isVisible(image, within: vc.tableNode.view) { tabs = now }
-                    else if !isVisible(tab, within: vc.tableNode.view) {
+                    if let image, image.image != nil, isVisible(image, within: vc.detailScrollView) { tabs = now }
+                    else if !isVisible(tab, within: vc.detailScrollView) {
                         // 长帖的标签页在首屏以下，两个入口都用相同的定位动作。
-                        vc.tableNode.view.scrollRectToVisible(tab.convert(tab.bounds, to: vc.tableNode.view), animated: false)
+                        vc.detailScrollView.scrollRectToVisible(tab.convert(tab.bounds, to: vc.detailScrollView), animated: false)
                     }
                 }
             }
@@ -348,7 +383,7 @@ extension DetailBaselineTests {
             let intervals = zip(samples, samples.dropFirst()).map { ($1 - $0) * 1000 }
             return Run(iteration: iteration, scenario: scenario, layoutMS: (layout-start)*1000,
                        visibleMS: (visible-start)*1000, complexVisibleMS: tabs.map { ($0-start)*1000 },
-                       longestFrameMS: intervals.max() ?? 0, peakSampledBytes: clock.peakBytes, width: vc.tableNode.view.bounds.width)
+                       longestFrameMS: intervals.max() ?? 0, peakSampledBytes: clock.peakBytes, width: vc.detailScrollView.bounds.width)
         }
         throw NSError(domain: "目标未显示 \(scenario) #\(item.floor) layout=\(String(describing: layout)) visible=\(String(describing: visible))", code: 1)
     }
@@ -370,15 +405,31 @@ extension DetailBaselineTests {
         defer { clock.stop() }
         // 由现有渲染器取得这个样本实际使用的目录，保留原文件，测完恢复。
         let seed = host(page: review, anchor: nil, in: window)
-        let blocks = DTCoreTextHTMLContentRenderer().render(fragment: main.html, baseURL: NodeSeekSite.baseURL)
-        let sections = blocks.compactMap { block -> RenderedMagicTabsBlock? in
-            if case .tabs(let tabs) = block { return tabs }
-            return nil
+        let ansi: RenderedTerminalBlock
+        if usesTextKit {
+            let source = DetailFloorSource(html: main.html, visibleMarkdown: main.markdown)
+            guard case .native(let document) = DetailMarkdownParser(baseURL: NodeSeekSite.baseURL).render(source) else {
+                throw NSError(domain: "测评未使用 Markdown", code: 1)
+            }
+            let tabs = document.blocks.compactMap { block -> [DetailDocument.Tab]? in
+                if case .tabs(let sections) = block { return sections }
+                return nil
+            }
+            ansi = try XCTUnwrap(tabs.first?.first?.blocks.compactMap { block -> RenderedTerminalBlock? in
+                if case .terminal(let text) = block { return .init(ansi: text) }
+                return nil
+            }.first)
+        } else {
+            let blocks = DTCoreTextHTMLContentRenderer().render(fragment: main.html, baseURL: NodeSeekSite.baseURL)
+            let sections = blocks.compactMap { block -> RenderedMagicTabsBlock? in
+                if case .tabs(let tabs) = block { return tabs }
+                return nil
+            }
+            ansi = try XCTUnwrap(sections.first?.sections.first?.blocks.compactMap { block -> RenderedTerminalBlock? in
+                if case .terminal(let terminal) = block { return terminal }
+                return nil
+            }.first)
         }
-        let ansi = try XCTUnwrap(sections.first?.sections.first?.blocks.compactMap { block -> RenderedTerminalBlock? in
-            if case .terminal(let terminal) = block { return terminal }
-            return nil
-        }.first)
         let snapshot = try await TerminalSnapshotRenderer.shared.render(ansi, in: seed.view)
         let cachedReport = try XCTUnwrap(snapshot.pages.first?.url.deletingLastPathComponent())
         let savedReport = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -400,6 +451,7 @@ extension DetailBaselineTests {
                 let page = isReview ? review : second
                 let item = isReview ? main : target
                 let vc = host(page: page, anchor: isReview ? nil : target.floor, in: window)
+                configureMedia(media, on: vc)
                 let detail = page.detail(using: media)
                 _ = await clock.next()
                 clock.resetPeak()
@@ -409,12 +461,15 @@ extension DetailBaselineTests {
                                               scenario: scenario, expectsTabs: isReview))
                 if !isReview {
                     vc.appendCommentPage(detail: third.detail(using: media))
-                    let table = vc.tableNode.view
+                    let table = vc.detailScrollView
                     try await wait("第 3 页完成布局") {
-                        guard let lastItem = third.items.last, let last = self.cell(for: lastItem, in: vc) else { return false }
-                        return last.0.row < table.numberOfRows(inSection: 0)
+                        guard let lastItem = third.items.last, let path = vc.indexPathForCurrentPageAnchor(String(lastItem.floor)) else { return false }
+                        if let list = vc.collectionList {
+                            return list.view.layoutAttributesForItem(at: path) != nil
+                        }
+                        return self.cell(for: lastItem, in: vc) != nil && path.row < vc.tableNode.view.numberOfRows(inSection: 0)
                     }
-                    let base = vc.tableNode.contentOffset.y
+                    let base = table.contentOffset.y
                     let end = max(base, table.contentSize.height - table.bounds.height + table.adjustedContentInset.bottom)
                     XCTAssertGreaterThan(end, base)
                     _ = await clock.next()
@@ -422,7 +477,7 @@ extension DetailBaselineTests {
                     let scrollStart = CACurrentMediaTime()
                     for frame in 1...24 {
                         let fraction = CGFloat(frame <= 12 ? frame : 24-frame) / 12
-                        vc.tableNode.setContentOffset(CGPoint(x: 0, y: base + fraction * (end-base)), animated: false)
+                        table.setContentOffset(CGPoint(x: 0, y: base + fraction * (end-base)), animated: false)
                         _ = await clock.next()
                     }
                     runs.append(try await observe(vc: vc, item: target, clock: clock, start: scrollStart, iteration: iteration,
@@ -434,4 +489,9 @@ extension DetailBaselineTests {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try save(encoder.encode(runs), name: "page-timing.json", type: "public.json")
     }
+}
+
+@MainActor
+final class DetailCollectionBaselineTests: DetailBaselineTests {
+    override var usesTextKit: Bool { true }
 }

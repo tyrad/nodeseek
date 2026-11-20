@@ -1240,7 +1240,12 @@ struct PostDetailViewControllerTests {
             currentPage: 2
         )
         let navigationController = UINavigationController(rootViewController: viewController)
-        viewController.loadViewIfNeeded()
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = navigationController
+        window.makeKeyAndVisible()
+        window.layoutIfNeeded()
+        defer { window.isHidden = true; window.rootViewController = nil }
         viewController.render(detail: PostDetail(
             id: "703863",
             title: "详情标题",

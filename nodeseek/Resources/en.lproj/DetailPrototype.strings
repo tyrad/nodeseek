@@ -1,3 +1,17 @@
 "copy" = "Copy Markdown";
 "cancel" = "Cancel";
 "close" = "Close";
+"use-list" = "Use TextKit in post details";
+"more" = "More";
+"open-first" = "Go to first page";
+"reply" = "Reply";
+"quote" = "Quote";
+"like" = "Upvote";
+"chicken" = "Give a chicken leg";
+"oppose" = "Downvote";
+"author" = "Filter by author";
+"all" = "Show all replies";
+"edit" = "Edit";
+"favorite" = "Favorite";
+"poster" = "Author";
+"hot" = "Hot";

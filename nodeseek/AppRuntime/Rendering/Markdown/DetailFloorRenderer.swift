@@ -23,13 +23,14 @@ nonisolated enum DetailFloorLayout {
 nonisolated struct DetailFloorRenderer: Sendable {
     typealias Delivery = @MainActor @Sendable (DetailFloorRequest, sending DetailFloorLayout) -> Void
     enum Step: Sendable { case parse, layout }
+    var mediaURLs: [URL: URL] = [:]
     var onStep: (@Sendable (Step, DetailFloorRequest) -> Void)?
 
     @MainActor
     func start(_ request: DetailFloorRequest, deliver: @escaping Delivery) -> Task<Void, Never> {
         Task.detached(priority: .userInitiated) {
             onStep?(.parse, request)
-            let parsed = DetailMarkdownParser(baseURL: request.baseURL).render(request.source)
+            let parsed = DetailMarkdownParser(baseURL: request.baseURL, mediaURLs: mediaURLs).render(request.source)
             guard !Task.isCancelled else { return }
             let result: DetailFloorLayout
             switch parsed {
@@ -70,6 +71,12 @@ nonisolated struct DetailFloorRenderer: Sendable {
             switch block {
             case .paragraph(let runs):
                 paragraphs.append(.init(runs: runs, pointSize: appearance.pointSize))
+                // 网页保留报告链接，详情页另在链接下展示可预览的报告图。
+                if runs.count == 1, case let .text(label, _, url?) = runs[0],
+                   label == url.absoluteString, DetailImageURLRules.isCheckPlaceReportSVG(url) {
+                    try flush()
+                    result.append(.widget(.image(alt: "", url: url)))
+                }
             case .heading(let level, let runs):
                 paragraphs.append(.init(runs: runs.map { run in
                     if case let .text(text, style, link) = run { return .text(text, style.union(.bold), link) }

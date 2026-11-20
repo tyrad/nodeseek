@@ -343,7 +343,7 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
         }
     }
 
-    private func canRequestCommentBatchFetch() -> Bool {
+    func canRequestCommentBatchFetch() -> Bool {
         guard displayMode == .content else { return false }
         guard pagination?.nextPage != nil else { return false }
         guard !comments.isEmpty else { return false }

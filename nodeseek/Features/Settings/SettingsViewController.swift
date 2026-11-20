@@ -1207,13 +1207,20 @@ final class PostDetailDebugLinksViewController: UITableViewController {
         var actions = [UIAction(title: "TextKit") { [weak self] _ in
             self?.navigationController?.pushViewController(DetailMarkdownPrototypeController.demo(), animated: true)
         }]
+        let listSwitch = UIDeferredMenuElement.uncached { completion in
+            let key = PostDetailViewController.textKitListKey
+            let enabled = UserDefaults.standard.bool(forKey: key)
+            completion([UIAction(title: DetailListStrings.text("use-list"), state: enabled ? .on : .off) { _ in
+                UserDefaults.standard.set(!enabled, forKey: key)
+            }])
+        }
         let targets = ["1067722", "917518"] + links.compactMap { $0.target?.post.id }
         for id in targets {
             actions.append(UIAction(title: "#\(id)") { [weak self] _ in
                 Task { await self?.openPrototypePost(id) }
             })
         }
-        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "TextKit", image: nil, primaryAction: nil, menu: UIMenu(children: actions))
+        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "TextKit", image: nil, primaryAction: nil, menu: UIMenu(children: [listSwitch] + actions))
     }
 
     private func showPrototype(id: String, source: DetailFloorSource) {

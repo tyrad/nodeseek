@@ -180,6 +180,8 @@ enum PostDetailLinkResolver {
 }
 
 class PostDetailViewController: UIViewController {
+    static let textKitListKey = "postDetail.useTextKitList"
+
     enum DisplayMode {
         case content
         case pageSkeleton
@@ -271,7 +273,9 @@ class PostDetailViewController: UIViewController {
     )
     let initialContentRevealTimeout: TimeInterval = 0.6
 
-    let tableNode = ASTableNode(style: .plain)
+    lazy var tableNode = ASTableNode(style: .plain)
+    private(set) var collectionList: PostDetailCollectionList?
+    var detailScrollView: UIScrollView { collectionList?.view ?? tableNode.view }
     var toastHideWorkItem: DispatchWorkItem?
     lazy var toastIconWidthConstraint = toastIconView.widthAnchor.constraint(equalToConstant: 18)
     lazy var toastLabelLeadingConstraint = toastLabel.leadingAnchor.constraint(equalTo: toastIconView.trailingAnchor, constant: 8)
@@ -587,6 +591,7 @@ class PostDetailViewController: UIViewController {
         sourcePostURL: URL? = nil,
         currentPage: Int = 1,
         initialAnchorID: String? = nil,
+        usesTextKitList: Bool = false,
         accountRefresher: (any CurrentAccountRefreshing)? = nil,
         nodeImageAPIKeyStore: NodeImageAPIKeyStoring = KeychainNodeImageAPIKeyStore(),
         nodeImageUploadClient: NodeImageUploading = NodeImageUploadClient(),
@@ -611,10 +616,13 @@ class PostDetailViewController: UIViewController {
         self.pasteboardStringWriter = pasteboardStringWriter
         super.init(nibName: nil, bundle: nil)
 
+        if usesTextKitList {
+            collectionList = PostDetailCollectionList(page: self)
+        }
         if let initialHeader {
             currentHeaderContent = initialHeader
             headerRenderedContent = nil
-            scheduleHeaderRender(for: initialHeader)
+            if collectionList == nil { scheduleHeaderRender(for: initialHeader) }
         }
     }
 
@@ -646,6 +654,7 @@ class PostDetailViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        collectionList?.updateAppearance()
         floatingReplyButtonContainer.updateFloatingEdgeInsets(
             in: view,
             horizontalAnchorView: replyButtonAnchorView
@@ -713,25 +722,28 @@ class PostDetailViewController: UIViewController {
 
     func updateTableContentInsets() {
         let bottomInset = view.safeAreaInsets.bottom
-        tableNode.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: bottomInset, right: 0)
-        tableNode.view.verticalScrollIndicatorInsets.bottom = bottomInset
+        let insets = UIEdgeInsets(top: 0, left: 0, bottom: bottomInset, right: 0)
+        if let collectionList { collectionList.view.contentInset = insets } else { tableNode.contentInset = insets }
+        detailScrollView.verticalScrollIndicatorInsets.bottom = bottomInset
     }
 
     func setupUI() {
         view.backgroundColor = UIColor.systemBackground
-        tableNode.dataSource = self
-        tableNode.delegate = self
-        tableNode.leadingScreensForBatching = leadingScreensForBatching
-        // 屏幕上方的图片加载后变高时，保持当前可见内容位置不动。
-        tableNode.automaticallyAdjustsContentOffset = true
-        tableNode.view.backgroundColor = UIColor.systemBackground
-        tableNode.view.separatorStyle = .none
-        tableNode.view.showsVerticalScrollIndicator = true
-        tableNode.view.tableFooterView = loadMoreCommentsContainer
+        if collectionList == nil {
+            tableNode.dataSource = self
+            tableNode.delegate = self
+            tableNode.leadingScreensForBatching = leadingScreensForBatching
+            // 屏幕上方的图片加载后变高时，保持当前可见内容位置不动。
+            tableNode.automaticallyAdjustsContentOffset = true
+            tableNode.view.backgroundColor = UIColor.systemBackground
+            tableNode.view.separatorStyle = .none
+            tableNode.view.showsVerticalScrollIndicator = true
+            tableNode.view.tableFooterView = loadMoreCommentsContainer
+        }
         updateTableContentInsets()
-        tableNode.view.translatesAutoresizingMaskIntoConstraints = false
+        detailScrollView.translatesAutoresizingMaskIntoConstraints = false
 
-        view.addSubview(tableNode.view)
+        view.addSubview(detailScrollView)
         view.addSubview(loadingIndicator)
         loginButton.addTarget(self, action: #selector(loginButtonTapped), for: .touchUpInside)
         loadMoreCommentsRefreshButton.addTarget(self, action: #selector(refreshCommentsAtEndTapped), for: .touchUpInside)
@@ -762,10 +774,10 @@ class PostDetailViewController: UIViewController {
         self.replyContextBarHeightConstraint = replyContextBarHeightConstraint
         self.replyStickerPickerHeightConstraint = replyStickerPickerHeightConstraint
         NSLayoutConstraint.activate([
-            tableNode.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableNode.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableNode.view.topAnchor.constraint(equalTo: view.topAnchor),
-            tableNode.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            detailScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            detailScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            detailScrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            detailScrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
             loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
@@ -891,6 +903,7 @@ class PostDetailViewController: UIViewController {
     }
 
     private func invalidateRenderedContentAndReload() {
+        if let collectionList { collectionList.invalidate(); return }
         renderGeneration += 1
         commentRenderInFlight.removeAll(keepingCapacity: true)
         commentRenderedCache.removeAll(keepingCapacity: true)
@@ -938,14 +951,14 @@ class PostDetailViewController: UIViewController {
         tapGesture.cancelsTouchesInView = false
         tapGesture.delegate = self
         view.addGestureRecognizer(tapGesture)
-        tableNode.view.keyboardDismissMode = .onDrag
+        detailScrollView.keyboardDismissMode = .onDrag
     }
 
     func configureHeader(_ content: PostDetailHeaderContent, renderedContent: [RenderedContentBlock]?) {
         currentHeaderContent = content
         headerRenderedContent = renderedContent
         configureNavigationAuthorTitle(with: content)
-        updateNavigationAuthorVisibility(contentOffsetY: tableNode.contentOffset.y, animated: false)
+        updateNavigationAuthorVisibility(contentOffsetY: detailScrollView.contentOffset.y, animated: false)
     }
 
     func configureNavigationAuthorTitle(with content: PostDetailHeaderContent) {
@@ -980,7 +993,7 @@ class PostDetailViewController: UIViewController {
         tableReloadWorkItem?.cancel()
         pendingReloadIndexPaths.removeAll()
         guard isViewLoaded else { return }
-        tableNode.reloadData()
+        if let collectionList { collectionList.reload() } else { tableNode.reloadData() }
     }
 
     func cachedDetailImageSize(for url: URL) -> CGSize? {
@@ -1031,6 +1044,7 @@ class PostDetailViewController: UIViewController {
     }
 
     func scheduleRowsReload(_ indexPaths: [IndexPath]) {
+        if let collectionList { collectionList.reload(); return }
         guard isViewLoaded else { return }
         let rowCount = tableNode(self.tableNode, numberOfRowsInSection: 0)
         let validIndexPaths = indexPaths.filter { $0.section == 0 && $0.row >= 0 && $0.row < rowCount }
