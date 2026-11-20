@@ -1,0 +1,152 @@
+{
+  "read-history": {
+    "title": "冷启动、阅读正文、返回首页并从最近浏览重开同一帖",
+    "profiles": [
+      "guest",
+      "member"
+    ],
+    "setup": "游客或已登录，打开帖子会更新本机浏览记录"
+  },
+  "search-navigation": {
+    "title": "切换搜索范围、输入中文并返回首页",
+    "profiles": [
+      "guest",
+      "member"
+    ],
+    "setup": "游客或已登录，仅输入关键词"
+  },
+  "guest-login": {
+    "title": "游客进入通知、打开登录页、取消后回到游客状态",
+    "profiles": [
+      "guest"
+    ],
+    "setup": "游客，只读"
+  },
+  "member-search": {
+    "title": "已登录测试账号按已知关键词搜索并打开匹配帖子",
+    "profiles": [
+      "member"
+    ],
+    "setup": "已登录，搜索并阅读结果帖"
+  },
+  "category-comments": {
+    "title": "切换技术分类、打开有回复的帖子并阅读评论",
+    "profiles": [
+      "guest",
+      "member"
+    ],
+    "setup": "游客或已登录，打开帖子会更新本机浏览记录"
+  },
+  "member-compose": {
+    "title": "已登录账号打开发帖编辑器并退出",
+    "profiles": [
+      "member"
+    ],
+    "setup": "已登录阅读布局，打开编辑器并空白退出"
+  },
+  "draft-save": {
+    "title": "手动保存草稿，冷启动后恢复完整内容，放弃后重开为空",
+    "profiles": [
+      "draft"
+    ],
+    "setup": "已登录，读写本机测试草稿"
+  },
+  "draft-autosave": {
+    "title": "编辑器提示已存本机后直接冷启动，恢复自动保存的草稿",
+    "profiles": [
+      "draft"
+    ],
+    "setup": "已登录，读写本机测试草稿"
+  },
+  "draft-autosave-idle": {
+    "title": "编辑器提示已存本机后停留两秒再冷启动，恢复自动保存的草稿",
+    "profiles": [
+      "draft"
+    ],
+    "setup": "已登录，读写本机测试草稿"
+  },
+  "member-login": {
+    "title": "从游客登录 NodeSeek，核对账号并在冷启动后再次确认",
+    "profiles": [
+      "login"
+    ],
+    "setup": "游客阅读布局，运行后保留登录"
+  },
+  "login-me": {
+    "title": "游客登录后首次打开我的，首帧应有账号名",
+    "profiles": [
+      "login"
+    ],
+    "setup": "游客多 Tab 设备，运行后保留登录"
+  },
+  "real-comment": {
+    "title": "指定帖真实回帖、修改同一楼，并从服务端重读原文",
+    "profiles": [
+      "comment"
+    ],
+    "setup": "已登录，在指定帖公开回帖并编辑"
+  },
+  "member-comment-jump": {
+    "title": "我的评论点击回复定位第 18 楼，点击帖子标题打开首页，再返回原列表",
+    "profiles": [
+      "member"
+    ],
+    "setup": "已登录阅读布局，测试账号已有指定评论；只读，会更新本机浏览记录"
+  },
+  "push-warm": {
+    "title": "后台时点一次系统回复通知，直达目标楼层，返回一次到首页",
+    "profiles": [
+      "push"
+    ],
+    "setup": "已登录阅读布局；在专用模拟器上允许通知并投递一条带唯一标题的模拟推送"
+  },
+  "push-cold": {
+    "title": "进程已退出时点一次系统回复通知，直达目标楼层，返回一次到首页",
+    "profiles": [
+      "push"
+    ],
+    "setup": "已登录阅读布局；在专用模拟器上允许通知并投递一条带唯一标题的模拟推送"
+  },
+  "home-paging": {
+    "title": "首页下拉刷新、切换排序、加载第二页，读帖后返回原列表",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "已登录阅读布局；恢复测试前排序"
+  },
+  "quote-cancel": {
+    "title": "引用固定评论，取消引用后保留自己输入的正文",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "已登录阅读布局；只在本机输入，退出时丢弃"
+  },
+  "photo-return": {
+    "title": "从正文图片进入大图，关闭后回到原帖原图",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "已登录阅读布局；只读，固定含图帖子"
+  },
+  "last-page-filter": {
+    "title": "只看楼主、恢复全部，再从页码面板直达末页",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "已登录阅读布局；只读，固定多页多作者帖子"
+  },
+  "inbox-reply": {
+    "title": "点回复通知定位对应楼层，返回后重读同一条的已读状态",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "已登录阅读布局；会读一条回复通知，缺少记录时报告跳过"
+  },
+  "favorite-sync": {
+    "title": "收藏指定帖，从我的收藏重开，取消后重新核对",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "已登录阅读布局；短暂修改测试账号的私人收藏，恢复原状态"
+  }
+}

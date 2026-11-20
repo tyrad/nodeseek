@@ -543,6 +543,12 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
             count: count,
             color: Self.favoriteActionColor(isCollected: isCollected)
         )
+        favoriteButtonNode.accessibilityIdentifier = "post-detail-favorite"
+        if isCollected {
+            favoriteButtonNode.accessibilityTraits.insert(.selected)
+        } else {
+            favoriteButtonNode.accessibilityTraits.remove(.selected)
+        }
     }
 
     func updateLikeReaction(count: Int?, isClicked: Bool) {

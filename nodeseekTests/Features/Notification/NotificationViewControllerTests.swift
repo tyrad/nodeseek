@@ -223,6 +223,28 @@ struct NotificationViewControllerTests {
         #expect(rollbackButton.isHidden == false)
     }
 
+    @Test func openingUnreadReplyMarksOnlyThatRowViewed() async throws {
+        let records = [makeNotificationRecord(id: 101, viewed: 0), makeNotificationRecord(id: 102, viewed: 0)]
+        let client = StubNotificationViewClient(
+            unreadCount: NodeSeekNotificationUnreadCount(message: 0, atMe: 0, reply: 2, all: 2),
+            replyRecords: records
+        )
+        let screen = try makeNotificationScreen(client: client, initialTab: .reply)
+        defer { screen.window.isHidden = true }
+        try await waitUntil { screen.table.numberOfRows(inSection: 0) == 2 }
+        let first = IndexPath(row: 0, section: 0)
+        screen.controller.tableView(screen.table, didSelectRowAt: first)
+        try await waitUntilAsync {
+            await client.markViewedCalls() == [StubNotificationViewClient.MarkViewedCall(ids: [101], tab: .reply)]
+        }
+        #expect(screen.controller.navigationController?.topViewController is PostDetailViewController)
+        for (index, expectedHidden) in [true, false].enumerated() {
+            let cell = screen.controller.tableView(screen.table, cellForRowAt: IndexPath(row: index, section: 0))
+            let button = try #require(cell.firstButton(accessibilityIdentifier: "notification-mark-read-button"))
+            #expect(button.isHidden == expectedHidden)
+        }
+    }
+
     @Test func selectingUnreadMessageConversationMarksMessageViewedBeforeOpeningConversation() async throws {
         let client = StubNotificationViewClient(
             unreadCount: NodeSeekNotificationUnreadCount(message: 1, atMe: 0, reply: 0, all: 1),

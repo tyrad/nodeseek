@@ -61,6 +61,7 @@ final class NotificationMentionCell: UITableViewCell {
         onMarkReadTapped: @escaping () -> Void
     ) {
         updateTypography()
+        accessibilityIdentifier = "notification-record-\(record.id)-\(record.postID)-\(record.floorID)"
         representedID = record.id
         self.onProfileTapped = onProfileTapped
         self.onMarkReadTapped = onMarkReadTapped

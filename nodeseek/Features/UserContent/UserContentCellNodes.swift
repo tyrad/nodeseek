@@ -129,6 +129,7 @@ final class UserCollectionCellNode: ASCellNode {
         backgroundColor = .clear
         selectionStyle = .default
         titleNode.maximumNumberOfLines = 2
+        titleNode.accessibilityIdentifier = "user-collection-post-\(record.postID)"
         titleNode.attributedText = UserContentText.title(record.title)
     }
 

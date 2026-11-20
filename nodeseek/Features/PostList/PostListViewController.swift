@@ -221,7 +221,10 @@ class PostListViewController: UIViewController {
             )
         },
         detailTestURLProvider: @escaping () -> String = {
-            UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string ?? ""
+            #if DEBUG
+            if let url = ProcessInfo.processInfo.environment["NODESEEK_E2E_DETAIL_URL"] { return url }
+            #endif
+            return UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string ?? ""
         }
     ) {
         self.presenter = presenter
