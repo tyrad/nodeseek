@@ -3916,7 +3916,11 @@ struct PostDetailLoginViewControllerTests {
 
     @Test func detailUsesOnlyFloatingReplyEntry() async throws {
         let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
+        // 不读模拟器里保存过的拖动位置，只验证默认位置
+        let viewController = PostDetailViewController(
+            presenter: presenter,
+            floatingPositionStore: InMemoryFloatingControlPositionStore()
+        )
 
         viewController.loadViewIfNeeded()
         viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)

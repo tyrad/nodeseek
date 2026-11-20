@@ -70,7 +70,7 @@ struct PostSummaryCellTests {
 
         #expect(PostListCellStyle.Typography.titleMaximumNumberOfLines == 0)
         #expect(titleText.string == post.title)
-        #expect(titleText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor == .label)
+        #expect(titleText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor == ReadingColors.unreadTitle)
         #expect((titleText.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize == AppTextSizeSettings.adjustedPointSize(basePointSize: 17))
         #expect(PostListCellStyle.Typography.titleWeight == .medium)
         #expect(PostListCellStyle.Typography.metadataMaximumNumberOfLines == 1)
@@ -196,7 +196,7 @@ struct PostSummaryCellTests {
         #expect(hitBackgroundColor.isEqual(UIColor(hex: "#34C759")))
         #expect(hitTextColor.isEqual(UIColor.white))
         #expect(titleText.attribute(.backgroundColor, at: 10, effectiveRange: nil) == nil)
-        #expect(normalTextColor.isEqual(UIColor.label))
+        #expect(normalTextColor.isEqual(ReadingColors.unreadTitle))
     }
 
     @Test func metadataHighlightsSpecialFollowAuthorNameBackground() throws {
