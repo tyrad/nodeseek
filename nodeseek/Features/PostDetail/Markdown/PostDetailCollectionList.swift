@@ -16,10 +16,11 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     private weak var page: PostDetailViewController?
     private let flow = UICollectionViewFlowLayout()
     let view: UICollectionView
-    private var rows: [PostDetailViewController.DetailRow] = []
+    private(set) var rows: [PostDetailViewController.DetailRow] = []
     private var keys: [String] = []
     private var heights: [String: CGFloat] = [:]
     private let cache = NSCache<NSString, CachedText>()
+    private var batchCheckScheduled = false
     private var generation = 0
     private var previousAppearance: DetailTextAppearance?
     var renderer = DetailFloorRenderer()
@@ -102,7 +103,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             let previous = Set(data.snapshot().itemIdentifiers)
             snapshot.reconfigureItems(keys.filter(previous.contains))
         }
-        data.apply(snapshot, animatingDifferences: false)
+        data.apply(snapshot, animatingDifferences: false) { [weak self] in self?.scheduleBatchFetchCheck() }
     }
 
     private func cell(in list: UICollectionView, at path: IndexPath, key: String) -> UICollectionViewCell {
@@ -277,14 +278,27 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
 
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         (cell as? DetailFloorListCell)?.body.refreshPlayback()
-        if indexPath.item >= keys.count - 3 {
-            DispatchQueue.main.async { [weak self] in
-                guard let self, let page = self.page, page.authorFilter == nil, page.canRequestCommentBatchFetch(),
-                      self.view.indexPathsForVisibleItems.contains(where: { $0.item >= self.keys.count - 3 }) else { return }
-                page.lastBatchFetchRequestedCommentCount = page.comments.count
-                page.presenter.didApproachCommentEnd()
-            }
+        scheduleBatchFetchCheck()
+    }
+
+    private func scheduleBatchFetchCheck() {
+        guard !batchCheckScheduled, let page, page.authorFilter == nil, page.canRequestCommentBatchFetch() else { return }
+        batchCheckScheduled = true
+        // 等这一轮布局和 presenter 的页码更新完成，再根据最新剩余距离发请求。
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.batchCheckScheduled = false
+            self.requestNextPageIfNeeded()
         }
+    }
+
+    private func requestNextPageIfNeeded() {
+        guard let page, page.authorFilter == nil, page.canRequestCommentBatchFetch(),
+              view.window != nil, view.contentSize.height > 0 else { return }
+        let viewport = view.bounds.inset(by: view.adjustedContentInset)
+        guard viewport.height > 0, view.contentSize.height - viewport.maxY <= page.leadingScreensForBatching * viewport.height else { return }
+        page.lastBatchFetchRequestedCommentCount = page.comments.count
+        page.presenter.didApproachCommentEnd()
     }
 
     func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
@@ -292,6 +306,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        scheduleBatchFetchCheck()
         page?.scrollViewDidScroll(scrollView)
         for case let floor as DetailFloorListCell in view.visibleCells { floor.body.refreshPlayback() }
     }

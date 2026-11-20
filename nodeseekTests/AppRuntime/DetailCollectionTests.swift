@@ -183,6 +183,59 @@ final class DetailCollectionTests: XCTestCase {
         deliver(request, .native([]))
     }
 
+    func testPaginationRequestsNextPageWithinTwoScreensAndKeepsVisibleFloor() async throws {
+        let spy = SpyPostDetailPresenter()
+        let page = PostDetailViewController(presenter: spy, usesTextKitList: true)
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = page
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+
+        func detail(_ range: ClosedRange<Int>, pageNumber: Int, next: Int?) -> PostDetail {
+            let replies = range.map { number in
+                Comment(id: String(number), anchorID: String(number), authorName: "Alice", avatarURL: nil,
+                        floorText: "#\(number)", createdAtText: nil, contentHTML: "短回复",
+                        markdown: "短回复", hasVisibleMarkdown: true)
+            }
+            return PostDetail(id: "10", title: "分页", authorName: "Bob", avatarURL: nil, metadataText: nil,
+                              contentHTML: "主楼", visibleMarkdown: "主楼", comments: replies, page: pageNumber,
+                              pagination: .init(currentPage: pageNumber, items: [], previousPage: nil, nextPage: next))
+        }
+        page.render(detail: detail(1...45, pageNumber: 1, next: 2))
+        let list = try XCTUnwrap(page.collectionList?.view)
+        window.layoutIfNeeded()
+        func scroll(remainingScreens: CGFloat) {
+            let y = list.contentSize.height + list.adjustedContentInset.bottom - list.bounds.height * (1 + remainingScreens)
+            list.setContentOffset(CGPoint(x: 0, y: y), animated: false)
+            list.layoutIfNeeded()
+        }
+        scroll(remainingScreens: 3)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(spy.didApproachCommentEndCount, 0)
+        scroll(remainingScreens: 1.5)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertGreaterThan(list.numberOfItems(inSection: 0) - 1 - (list.indexPathsForVisibleItems.map(\.item).max() ?? 0), 3)
+        XCTAssertEqual(spy.didApproachCommentEndCount, 1)
+        scroll(remainingScreens: 1.4)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(spy.didApproachCommentEndCount, 1)
+        let visible = try XCTUnwrap(list.indexPathsForVisibleItems.sorted().first)
+        let anchor = try XCTUnwrap(list.cellForItem(at: visible) as? DetailFloorListCell)
+        let binding = try XCTUnwrap(anchor.request)
+        let top = anchor.convert(anchor.bounds, to: window).minY
+        page.appendCommentPage(detail: detail(46...65, pageNumber: 2, next: nil))
+        page.hideLoadingMoreComments()
+        list.layoutIfNeeded()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(anchor.request, binding)
+        XCTAssertEqual(anchor.convert(anchor.bounds, to: window).minY, top, accuracy: 1)
+        XCTAssertEqual(page.comments.count, 65)
+        scroll(remainingScreens: 0)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(spy.didApproachCommentEndCount, 1)
+    }
+
     func testDuplicateHotAndPagedReplyKeepSeparateSourcesAndTargetThePagedRow() throws {
         func reply(_ text: String, hot: Bool) -> Comment {
             Comment(id: "150", anchorID: "21", authorName: "Alice", avatarURL: nil, floorText: "#21", createdAtText: nil,
