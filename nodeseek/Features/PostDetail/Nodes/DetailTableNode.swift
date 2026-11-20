@@ -679,7 +679,7 @@ enum DetailCodeBlockLayout {
     }
 }
 
-private final class DetailTableScrollView: UIScrollView {
+final class DetailTableScrollView: UIScrollView {
     private let table: RenderedTableBlock
     private let tableImageURLs: [URL]
     private let onImageTapped: ([URL], Int) -> Void

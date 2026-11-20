@@ -9,7 +9,7 @@ import DTCoreText
 import Foundation
 import UIKit
 
-extension DTCoreTextHTMLContentRenderer {
+nonisolated extension DTCoreTextHTMLContentRenderer {
     func normalizeImageSources(in fragment: String, baseURL: URL) -> String {
         let source = fragment as NSString
         let fullRange = NSRange(location: 0, length: source.length)

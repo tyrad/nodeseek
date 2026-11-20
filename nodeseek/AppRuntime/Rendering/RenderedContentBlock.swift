@@ -7,13 +7,13 @@
 
 import Foundation
 
-struct RenderedTableBlock: Equatable {
+nonisolated struct RenderedTableBlock: Equatable {
     struct Row: Equatable {
         let cells: [Cell]
         let isHeader: Bool
     }
 
-    struct Cell: Equatable {
+    nonisolated struct Cell: Equatable {
         struct Link: Equatable {
             let location: Int
             let length: Int

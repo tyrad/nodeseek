@@ -8,7 +8,7 @@
 import Foundation
 import UIKit
 
-final class AppTextSizeSettings {
+nonisolated final class AppTextSizeSettings {
     static let didChangeNotification = Notification.Name("AppTextSizeSettings.didChange")
     static let shared = AppTextSizeSettings()
 
@@ -73,7 +73,7 @@ final class AppTextSizeSettings {
     }
 }
 
-enum AppTypography {
+nonisolated enum AppTypography {
     static func font(
         basePointSize: CGFloat,
         weight: UIFont.Weight = .regular,

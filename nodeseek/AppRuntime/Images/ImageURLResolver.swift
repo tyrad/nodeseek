@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum ImageURLResolver {
+nonisolated enum ImageURLResolver {
     static let defaultBaseURL = NodeSeekSite.baseURL
 
     static func resolve(

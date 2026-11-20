@@ -19,11 +19,11 @@ struct NodeSeekDebugConfig {
     #if DEBUG
     static let enablePostDetailTestEntry = true
     static let enableWebViewDebugOverlay = false
-    static let enableDetailRenderDiagnostics = false
+    nonisolated static let enableDetailRenderDiagnostics = false
     #else
     static let enablePostDetailTestEntry = false
     static let enableWebViewDebugOverlay = false
-    static let enableDetailRenderDiagnostics = false
+    nonisolated static let enableDetailRenderDiagnostics = false
     #endif
 
     nonisolated static var enableFileLogging: Bool {

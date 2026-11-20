@@ -8,12 +8,12 @@
 import CoreGraphics
 import Foundation
 
-protocol StickerAspectRatioProviding: AnyObject {
+nonisolated protocol StickerAspectRatioProviding: AnyObject {
     func cachedSourceSize(for url: URL) -> CGSize?
     func recordLoadedSize(_ imageSize: CGSize, for url: URL)
 }
 
-final class StickerAspectRatioCache: StickerAspectRatioProviding, @unchecked Sendable {
+nonisolated final class StickerAspectRatioCache: StickerAspectRatioProviding, @unchecked Sendable {
     static let shared = StickerAspectRatioCache()
 
     private struct Entry: Codable {
@@ -189,7 +189,7 @@ final class StickerAspectRatioCache: StickerAspectRatioProviding, @unchecked Sen
 }
 
 private extension NSLock {
-    func nsLocked<T>(_ body: () throws -> T) rethrows -> T {
+    nonisolated func nsLocked<T>(_ body: () throws -> T) rethrows -> T {
         lock()
         defer { unlock() }
         return try body()

@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum StickerImageRules {
+nonisolated enum StickerImageRules {
     static func isStickerURL(_ url: URL?) -> Bool {
         guard let url else { return false }
         let path = url.path.lowercased()
