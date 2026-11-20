@@ -131,6 +131,25 @@ struct KannaNodeSeekParserTests {
         #expect(detail.isOwnPost == false)
     }
 
+    @Test func commentsCarrySourceMarkdownAndEditedTimeFromPageConfig() throws {
+        let config = #"{"postData":{"comments":[{"commentId":13684926,"floorIndex":1,"markdown":"第一行\n\n第二行","time":{"editedDateFormated":"2026-10-29 15:08:30"}},{"commentId":13684999,"floorIndex":2,"markdown":"路过","time":{}}]}}"#
+        let payload = Data(config.utf8).base64EncodedString()
+        let html = """
+        <div class="post-title"><h1>测试</h1></div>
+        <div class="nsk-post"><ul class="comments">
+          <li class="content-item" id="1" data-comment-id="13684926"><a class="author-name" href="/space/31037">我</a><article class="post-content">你好</article></li>
+          <li class="content-item" id="2" data-comment-id="13684999"><a class="author-name" href="/space/999">别人</a><article class="post-content">路过</article></li>
+          <li class="content-item" id="3" data-comment-id="1"><a class="author-name" href="/space/1">热评</a><article class="post-content">其他页</article></li>
+        </ul></div>
+        <script id="temp-script">\(payload)</script>
+        """
+        let parser = KannaNodeSeekParser(baseURL: NodeSeekSite.baseURL)
+        let detail = try parser.parsePostDetail(html: html, url: NodeSeekSite.postURL(id: "1016685", page: 1))
+
+        #expect(detail.comments.map(\.markdown) == ["第一行\n\n第二行", "路过", nil])
+        #expect(detail.comments.map(\.editedAtTitleText) == ["2026-10-29 15:08:30", nil, nil])
+    }
+
     @Test func lowLevelWarningFallsBackToBodyAuthorWithoutUsingCommentAuthor() throws {
         let html = """
         <div class="post-title"><h1>测试帖子</h1></div>

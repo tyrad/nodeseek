@@ -67,11 +67,11 @@ struct CommentComposerContentBuilderTests {
         )
 
         #expect(content == """
-        @netcup [#10](https://www.nodeseek.com/post-706576-1#10) @alice [#11](https://www.nodeseek.com/post-706576-1#11) bdbd
+        @netcup [#10](https://www.nodeseek.com/post-706576-1#10) @alice [#11](https://www.nodeseek.com/post-706576-2#11) bdbd
         """)
     }
 
-    @Test func quoteCommentUsesOnlyFirstParagraphAsMarkdownQuote() {
+    @Test func quoteCommentWithoutMarkdownKeepsParagraphAndLineBreaks() {
         let comment = makeComment(
             id: "9727591",
             anchorID: "10",
@@ -79,7 +79,7 @@ struct CommentComposerContentBuilderTests {
             floorText: "#10",
             createdAtText: "1min ago",
             createdAtTitleText: "2026-04-29 13:58:43",
-            contentHTML: "<p>第一段<br>第二行</p><p>第二段不引用</p>"
+            contentHTML: "<p>第一段<br>第二行</p><p>第二段</p>"
         )
 
         let content = CommentComposerContentBuilder.content(
@@ -90,10 +90,58 @@ struct CommentComposerContentBuilderTests {
 
         #expect(content == """
         > @netcup [#10](https://www.nodeseek.com/post-706576-1#10) 发布于2026-04-29 13:58:43
-        > 第一段 第二行
+        > 第一段
+        > 第二行
+        > 第二段
 
         bb
         """)
+    }
+
+    // 与网页「引用」一致：正文取原始 Markdown 逐行加 "> "，空行也保留；编辑过的评论标题行带编辑时间。
+    @Test func quoteCommentUsesSourceMarkdownLikeWeb() {
+        let comment = ComposerTestComment(
+            id: "14144966",
+            anchorID: "4",
+            authorName: "缭雾",
+            avatarURL: nil,
+            floorText: "#4",
+            createdAtText: "4days ago",
+            createdAtTitleText: "2026-11-15 17:03:24",
+            contentHTML: "<p>渲染后的 HTML 不应被使用</p>",
+            markdown: "> @缭雾 [#3](https://www.nodeseek.com/post-1016685-1#3) 发布于2026-11-15 16:59:19\n> 旧引用\n\n**Bold** and `code`.\nSecond.",
+            editedAtTitleText: "2026-11-15 17:05:01"
+        )
+
+        let content = CommentComposerContentBuilder.content(
+            text: "",
+            mode: .quote([comment]),
+            postURL: URL(string: "https://www.nodeseek.com/post-1016685-1")!
+        )
+
+        #expect(content == """
+        > @缭雾 [#4](https://www.nodeseek.com/post-1016685-1#4) 发布于2026-11-15 17:03:24，编辑于2026-11-15 17:05:01
+        > > @缭雾 [#3](https://www.nodeseek.com/post-1016685-1#3) 发布于2026-11-15 16:59:19
+        > > 旧引用
+        > 
+        > **Bold** and `code`.
+        > Second.
+        """)
+    }
+
+    @Test func floorLinkPointsToPageContainingFloor() {
+        #expect(CommentComposerContentBuilder.commentPage(forFloor: 0) == 1)
+        #expect(CommentComposerContentBuilder.commentPage(forFloor: 10) == 1)
+        #expect(CommentComposerContentBuilder.commentPage(forFloor: 11) == 2)
+        #expect(CommentComposerContentBuilder.commentPage(forFloor: 31) == 4)
+
+        let comment = makeComment(id: "1", anchorID: "31", authorName: "a", floorText: "#31")
+        let content = CommentComposerContentBuilder.content(
+            text: "hi",
+            mode: .reply([comment]),
+            postURL: URL(string: "https://www.nodeseek.com/post-706576-1")!
+        )
+        #expect(content == "@a [#31](https://www.nodeseek.com/post-706576-4#31) hi")
     }
 
     @Test func quoteCommentsRenderMultipleMarkdownQuoteBlocks() {
@@ -124,7 +172,7 @@ struct CommentComposerContentBuilderTests {
         > @netcup [#10](https://www.nodeseek.com/post-706576-1#10) 发布于2026-04-29 13:58:43
         > 第一段
 
-        > @alice [#11](https://www.nodeseek.com/post-706576-1#11) 发布于2026-04-29 14:00:00
+        > @alice [#11](https://www.nodeseek.com/post-706576-2#11) 发布于2026-04-29 14:00:00
         > 第二条
 
         bb
@@ -154,7 +202,7 @@ struct CommentComposerContentBuilderTests {
         )
 
         #expect(content == """
-        > @alice [#11](https://www.nodeseek.com/post-706576-1#11) 发布于2026-04-29 14:00:00
+        > @alice [#11](https://www.nodeseek.com/post-706576-2#11) 发布于2026-04-29 14:00:00
         > 引用段落
 
         @netcup [#10](https://www.nodeseek.com/post-706576-1#10) 正文

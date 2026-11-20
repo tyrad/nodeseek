@@ -274,6 +274,9 @@ nonisolated struct Comment: Equatable, Sendable {
     let isOpposeClicked: Bool
     /// 当前登录用户发的评论，可以编辑。
     let isOwnComment: Bool
+    /// 页面配置里的原始 Markdown，引用时按网页逻辑逐行加 "> "；热评等不在当前页配置里的评论为 nil。
+    let markdown: String?
+    let editedAtTitleText: String?
 
     init(
         id: String,
@@ -295,7 +298,9 @@ nonisolated struct Comment: Equatable, Sendable {
         isChickenLegClicked: Bool = false,
         opposeCount: Int? = nil,
         isOpposeClicked: Bool = false,
-        isOwnComment: Bool = false
+        isOwnComment: Bool = false,
+        markdown: String? = nil,
+        editedAtTitleText: String? = nil
     ) {
         self.id = id
         self.anchorID = anchorID
@@ -317,6 +322,8 @@ nonisolated struct Comment: Equatable, Sendable {
         self.opposeCount = opposeCount
         self.isOpposeClicked = isOpposeClicked
         self.isOwnComment = isOwnComment
+        self.markdown = markdown
+        self.editedAtTitleText = editedAtTitleText
     }
 
     func updatingLikeReaction(count: Int?, isClicked: Bool) -> Comment {
@@ -340,7 +347,9 @@ nonisolated struct Comment: Equatable, Sendable {
             isChickenLegClicked: isChickenLegClicked,
             opposeCount: opposeCount,
             isOpposeClicked: isOpposeClicked,
-            isOwnComment: isOwnComment
+            isOwnComment: isOwnComment,
+            markdown: markdown,
+            editedAtTitleText: editedAtTitleText
         )
     }
 
@@ -365,7 +374,9 @@ nonisolated struct Comment: Equatable, Sendable {
             isChickenLegClicked: isClicked,
             opposeCount: opposeCount,
             isOpposeClicked: isOpposeClicked,
-            isOwnComment: isOwnComment
+            isOwnComment: isOwnComment,
+            markdown: markdown,
+            editedAtTitleText: editedAtTitleText
         )
     }
 
@@ -390,7 +401,9 @@ nonisolated struct Comment: Equatable, Sendable {
             isChickenLegClicked: isChickenLegClicked,
             opposeCount: count,
             isOpposeClicked: isClicked,
-            isOwnComment: isOwnComment
+            isOwnComment: isOwnComment,
+            markdown: markdown,
+            editedAtTitleText: editedAtTitleText
         )
     }
 }
