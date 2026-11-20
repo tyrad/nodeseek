@@ -606,6 +606,23 @@ struct KannaNodeSeekParserTests {
         #expect(detail.favoriteCount == 10)
     }
 
+    @Test func favoriteCountIgnoresEditorNameAndYearBeforeMenuIsMounted() throws {
+        let url = URL(string: "https://www.nodeseek.com/post-1068729-1")!
+        let parser = KannaNodeSeekParser(baseURL: url)
+        for count in [nil, 0, 2026] as [Int?] {
+            let config = count.map { "<script id='nodeseek-captured-config' type='application/json'>{\"postData\":{\"collectionCount\":\($0)}}</script>" } ?? ""
+            let html = """
+            <div class="nsk-post"><div class="post-title"><h1><a class="post-title-link">主题</a></h1></div>
+            <div id="0" data-comment-id="1" class="content-item">
+            <span class="date-updated" title="Edited 2026-11-20 22:06:19 by 珍宝收藏家">edited 8min ago</span>
+            <article class="post-content"><a title="收藏教程 2019">第 2 章</a></article>
+            <div class="comment-menu-mount"></div></div></div>\(config)
+            """
+            let detail = try parser.parsePostDetail(html: html, url: url)
+            #expect(detail.favoriteCount == count)
+        }
+    }
+
     @Test func parsesFavoriteCountFromRenderedMenuBeforeGenericStarMatches() throws {
         let html = """
         <div class="nsk-post">
