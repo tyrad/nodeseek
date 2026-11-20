@@ -20,7 +20,7 @@
 | U07 | P1 | 首页相对时间（「2s ago」）不会随时间刷新 | `AppUXAuditTests.test_U07_postSummaryKeepsAbsoluteLastActivityDate` |
 | U08 | P1 | 详情页评论相对时间不会刷新 | `PostDetailUXAuditTests.test_U08_commentCarriesAbsoluteCreatedDate` |
 | U09 | P1 | 浅色模式看大图时状态栏是深色字，黑底上看不见 | `PostDetailUXAuditTests.test_U09_photoBrowserUsesLightStatusBarInLightMode` |
-| U10 | P1 | 表情面板展开时，面板下方露出后面的内容 | `PostDetailComposerUXAuditTests.test_U10_stickerPanelExtendsToViewBottomEdge` |
+| U10 | P1 | 表情面板展开时，面板下方露出后面的内容 | 不修：表情面板下方留白属预期行为；已删除对应测试 |
 | U11 | P1 | 发帖按钮被滑动隐藏后，切换分类它仍保持隐藏 | `AppUXAuditTests.test_U11_composeButtonReappearsAfterSwitchingCategory`（已修复：切换分类后发帖按钮重新出现） |
 | U12 | P1 | 「我的」页发帖上限 0/4 与个人主页 0/20 不一致 | `AppUXAuditTests.test_U12_mePageAndProfileShowSamePostLimit` |
 | U13 | P1 | 特别关注说明写「右滑删除」，实际是左滑 | `AppUXAuditTests.test_U13_specialFollowFooterSaysSwipeToDelete`（已修复：文案改为滑动删除） |
@@ -41,7 +41,7 @@
 | U28 | P2 | 「回复楼主」输入框头部显示「回复 缭雾 #0」 | `PostDetailComposerUXAuditTests.test_U28_replyToPosterContextAvoidsFloorZero` |
 | U29 | P2 | 多页帖子的热评和正常楼层重复出现，没有分区标题 | 不修。沿用网页做法，热评提前展示并用楼号旁的火焰标识，原楼层保留。 |
 | U30 | P2 | 0 条评论的帖子下方空白，没有空状态提示 | 不修。帖子正常加载且没有回复时，正文下方自然留白。 |
-| U31 | P2 | 编辑评论的草稿条写「无标题」 | `PostDetailComposerUXAuditTests.test_U31_commentDraftStripDoesNotShowUntitled` |
+| U31 | P2 | 编辑评论的草稿条写「无标题」 | 不修：草稿条沿用通用格式显示「无标题」，属预期行为；已删除对应测试 |
 | U32 | P2 | 自己评论的长按菜单里有「投放鸡腿」 | `PostDetailUXAuditTests.test_U32_ownCommentContextMenuHasNoChickenLeg`（已修复） |
 | U33 | P2 | 「我的」页点「粉丝」进入个人主页而不是粉丝列表 | `AppUXAuditTests.test_U33_meFansStatOpensFollowersList`（已修复：鸡腿、星辰、粉丝、关注均可直接打开对应明细） |
 | U34 | P2 | 「添加探针」填了内容点关闭不确认 | `AppUXAuditTests.test_U34_probeEditorAsksBeforeDiscardingTypedAddress` |

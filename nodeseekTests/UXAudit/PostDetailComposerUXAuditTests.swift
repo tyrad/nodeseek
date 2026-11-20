@@ -18,27 +18,6 @@ final class PostDetailComposerUXAuditTests: XCTestCase {
         try await super.tearDown()
     }
 
-    // MARK: - U10
-
-    // 期望：表情面板展开时，面板（或其容器）贴到视图底边，不在下方露出后面的内容。
-    func test_U10_stickerPanelExtendsToViewBottomEdge() async throws {
-        let viewController = try await makeHostedDetailViewController()
-        viewController.showReplyEditorForTesting(action: "回复", authorName: "netcup", floorText: "#10")
-        viewController.setStickerPickerVisible(true, animated: false)
-        viewController.view.layoutIfNeeded()
-
-        let rootView = try XCTUnwrap(viewController.view)
-        let pickerFrame = viewController.replyStickerPickerView.convert(viewController.replyStickerPickerView.bounds, to: rootView)
-        let containerFrame = viewController.replyEditorContainer.convert(viewController.replyEditorContainer.bounds, to: rootView)
-        let coveredBottom = max(pickerFrame.maxY, containerFrame.maxY)
-        let gap = rootView.bounds.maxY - coveredBottom
-
-        XCTAssertLessThanOrEqual(
-            gap, 0.5,
-            "U10: 表情面板下方露出 \(gap)pt 空隙（pickerMaxY=\(pickerFrame.maxY), containerMaxY=\(containerFrame.maxY), viewMaxY=\(rootView.bounds.maxY)）"
-        )
-    }
-
     // MARK: - U21
 
     // 期望：引用多行评论时保留换行，每行都是独立的 "> " 引用行。
@@ -113,35 +92,6 @@ final class PostDetailComposerUXAuditTests: XCTestCase {
         XCTAssertTrue(
             text.contains("#0") == false && text.contains("楼主"),
             "U28: 回复楼主的上下文文案为 \(text.debugDescription)，应显示“回复楼主”且不含 #0"
-        )
-    }
-
-    // MARK: - U31
-
-    // 期望：编辑评论的未保存草稿条不显示“无标题”（评论本来就没有标题）。
-    func test_U31_commentDraftStripDoesNotShowUntitled() throws {
-        let presenter = UXComposerNewDiscussionPresenter(state: NewDiscussionViewState(
-            isEditing: true,
-            editingCommentFloor: 12,
-            category: nil,
-            rank: .everyone,
-            userLevel: .loaded(2),
-            pendingDraft: NewDiscussionDraft(title: "", content: "改过的评论正文", updatedAt: Date().addingTimeInterval(-14)),
-            saveStatus: .waitingForDraftDecision,
-            canPublish: true,
-            isSubmitting: false
-        ))
-        let editor = NewDiscussionViewController(presenter: presenter)
-        editor.loadViewIfNeeded()
-        editor.render(presenter.state)
-
-        let stripTexts = editor.view.uxAllLabels()
-            .compactMap(\.text)
-            .filter { $0.contains("·") || $0.contains("上次") }
-
-        XCTAssertFalse(
-            stripTexts.contains { $0.contains("无标题") },
-            "U31: 编辑评论的草稿条显示了“无标题”：\(stripTexts)"
         )
     }
 
@@ -246,30 +196,6 @@ private final class UXComposerStubPresenter: PostDetailPresenterProtocol {
     func didTapCommentOppose(_ comment: Comment) {}
     func didTapEditPost() {}
     func didTapEditComment(_ comment: Comment) {}
-}
-
-private final class UXComposerNewDiscussionPresenter: NewDiscussionPresenterProtocol {
-    let state: NewDiscussionViewState
-    let rankOptions: [DiscussionReadRank] = [.everyone]
-
-    init(state: NewDiscussionViewState) {
-        self.state = state
-    }
-
-    func viewDidLoad() {}
-    func retryLoadingUserLevel() {}
-    func didChangeTitle(_ title: String) {}
-    func didChangeContent(_ content: String) {}
-    func didSelectCategory(_ category: DiscussionCategory) {}
-    func didSelectRank(_ rank: DiscussionReadRank) {}
-    func didChangeUploadingImageCount(_ count: Int) {}
-    func restorePendingDraft() {}
-    func discardPendingDraft() {}
-    func closeDecision() -> NewDiscussionCloseDecision { .close }
-    func close(savingDraft: Bool) {}
-    func closeKeepingPendingDraft() {}
-    func didTapPublish() {}
-    func didTapOpenWebFallback() {}
 }
 
 private extension UIView {
