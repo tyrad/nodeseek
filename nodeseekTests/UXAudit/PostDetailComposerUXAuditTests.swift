@@ -22,7 +22,7 @@ final class PostDetailComposerUXAuditTests: XCTestCase {
 
     // 期望：引用多行评论时保留换行，每行都是独立的 "> " 引用行。
     func test_U21_quotePreservesLineBreaks() {
-        let comment = makeComment(id: "1", floor: 3, html: "<p>line 1<br>line 2<br>line 3</p>")
+        let comment = makeComment(id: "1", floor: 3, html: "<p>line 1<br>line 2<br>line 3</p>", markdown: "line 1\nline 2\nline 3")
 
         let content = CommentComposerContentBuilder.content(
             text: "",
@@ -139,7 +139,7 @@ final class PostDetailComposerUXAuditTests: XCTestCase {
         )
     }
 
-    private func makeComment(id: String, floor: Int, html: String, isOwnComment: Bool = false) -> Comment {
+    private func makeComment(id: String, floor: Int, html: String, markdown: String? = nil, isOwnComment: Bool = false) -> Comment {
         Comment(
             id: id,
             anchorID: "\(floor)",
@@ -149,7 +149,8 @@ final class PostDetailComposerUXAuditTests: XCTestCase {
             createdAtText: "1min ago",
             createdAtTitleText: "2026-11-18 10:00:00",
             contentHTML: html,
-            isOwnComment: isOwnComment
+            isOwnComment: isOwnComment,
+            markdown: markdown
         )
     }
 

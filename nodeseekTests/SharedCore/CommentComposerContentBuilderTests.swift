@@ -71,7 +71,7 @@ struct CommentComposerContentBuilderTests {
         """)
     }
 
-    @Test func quoteCommentWithoutMarkdownKeepsParagraphAndLineBreaks() {
+    @Test func quoteCommentWithoutMarkdownKeepsOnlyHeaderInsteadOfParsingHTML() {
         let comment = makeComment(
             id: "9727591",
             anchorID: "10",
@@ -90,9 +90,6 @@ struct CommentComposerContentBuilderTests {
 
         #expect(content == """
         > @netcup [#10](https://www.nodeseek.com/post-706576-1#10) 发布于2026-04-29 13:58:43
-        > 第一段
-        > 第二行
-        > 第二段
 
         bb
         """)
@@ -151,7 +148,8 @@ struct CommentComposerContentBuilderTests {
             authorName: "netcup",
             floorText: "#10",
             createdAtTitleText: "2026-04-29 13:58:43",
-            contentHTML: "<p>第一段</p>"
+            contentHTML: "<p>第一段</p>",
+            markdown: "第一段"
         )
         let second = makeComment(
             id: "9727592",
@@ -159,7 +157,8 @@ struct CommentComposerContentBuilderTests {
             authorName: "alice",
             floorText: "#11",
             createdAtTitleText: "2026-04-29 14:00:00",
-            contentHTML: "<p>第二条</p>"
+            contentHTML: "<p>第二条</p>",
+            markdown: "第二条"
         )
 
         let content = CommentComposerContentBuilder.content(
@@ -192,7 +191,8 @@ struct CommentComposerContentBuilderTests {
             authorName: "alice",
             floorText: "#11",
             createdAtTitleText: "2026-04-29 14:00:00",
-            contentHTML: "<p>引用段落</p>"
+            contentHTML: "<p>引用段落</p>",
+            markdown: "引用段落"
         )
 
         let content = CommentComposerContentBuilder.content(
@@ -252,7 +252,8 @@ struct CommentComposerContentBuilderTests {
         floorText: String?,
         createdAtText: String? = "1min ago",
         createdAtTitleText: String? = nil,
-        contentHTML: String = "<p>正文</p>"
+        contentHTML: String = "<p>正文</p>",
+        markdown: String? = nil
     ) -> ComposerTestComment {
         ComposerTestComment(
             id: id,
@@ -262,7 +263,8 @@ struct CommentComposerContentBuilderTests {
             floorText: floorText,
             createdAtText: createdAtText,
             createdAtTitleText: createdAtTitleText,
-            contentHTML: contentHTML
+            contentHTML: contentHTML,
+            markdown: markdown
         )
     }
 }

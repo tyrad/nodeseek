@@ -31,7 +31,7 @@
 | U18 | P1 | 错误提示（如「更多评论加载失败」）也带绿色成功勾 | `PostDetailUXAuditTests.test_U18_loadMoreFailureDoesNotUseSuccessToast`（已修复：失败提示改用橙色警示图标） |
 | U19 | P1 | 自己的帖子和评论仍显示点赞 / 鸡腿 / 反对按钮，点了才报错 | `PostDetailUXAuditTests.test_U19_ownContentHidesSelfVoteButtons`（已修复：自己的内容计数为 0 的投票按钮不显示，已有计数只显示数字不可点） |
 | U20 | P1 | 评论框内容为空时「发送」仍可点，点了弹错误框 | 不修：空内容点「发送」给出提示属预期行为；已删除对应测试 |
-| U21 | P1 | 引用多行评论时换行被压成一行 | `PostDetailComposerUXAuditTests.test_U21_quotePreservesLineBreaks`（已修复：与网页一致，引用正文取页面配置里的原始 Markdown 逐行加 `> `，编辑过带编辑时间，楼层链接指向楼层所在页；无 Markdown 时按 HTML 段落和换行保留行） |
+| U21 | P1 | 引用多行评论时换行被压成一行 | `PostDetailComposerUXAuditTests.test_U21_quotePreservesLineBreaks`（已修复：与网页一致，引用正文取页面配置里的原始 Markdown 逐行加 `> `，编辑过带编辑时间，楼层链接指向楼层所在页；不解析 HTML，拿不到原文时只保留标题行） |
 | U22 | P1 | 引用纯表情 / 图片评论时引用块没有内容 | `PostDetailComposerUXAuditTests.test_U22_quoteOfImageOnlyCommentHasPlaceholder` |
 | U23 | P1 | 「我的评论」点评论文字只打开帖子顶部，不跳到对应楼层 | `AppUXAuditTests.test_U23_userCommentRowTapOpensCommentFloor`（已修复：点回复文字整行跳到对应楼层，点标题仍打开帖子开头） |
 | U24 | P1 | 楼层跳转后没有高亮，看不出跳到了哪一层 | 不写：代码已在跳转后 0.35s 闪烁高亮，测试中可观察到；属于高亮颜色、时长、停靠位置的设计问题 |
