@@ -242,14 +242,43 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
 
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
         if interaction.view === menuSurface {
-            guard !floorActions.isEmpty else { return nil }
+            guard let request, !floorActions.isEmpty else { return nil }
             let actions = floorActions
-            return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in
+            return UIContextMenuConfiguration(identifier: request.id as NSString, previewProvider: nil) { _ in
                 UIMenu(children: actions.map { action in UIAction(title: action.title) { _ in _ = action.perform() } })
             }
         }
         guard interaction.view === avatar, let authorURL else { return nil }
         return UIContextMenuConfiguration(identifier: nil, previewProvider: { UserProfileRouter.makeViewController(profileURL: authorURL) })
+    }
+
+    private func floorPreview(_ interaction: UIContextMenuInteraction, _ configuration: UIContextMenuConfiguration) -> UITargetedPreview? {
+        guard interaction.view === menuSurface, let request,
+              configuration.identifier as? String == request.id, contentView.window != nil else { return nil }
+        // 手势挂在空白层上，系统浮起和放回的快照应包含整层回复。
+        return UITargetedPreview(view: contentView)
+    }
+
+    @available(iOS 16.0, *)
+    func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configuration: UIContextMenuConfiguration,
+                                highlightPreviewForItemWithIdentifier identifier: NSCopying) -> UITargetedPreview? {
+        floorPreview(interaction, configuration)
+    }
+
+    @available(iOS 16.0, *)
+    func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configuration: UIContextMenuConfiguration,
+                                dismissalPreviewForItemWithIdentifier identifier: NSCopying) -> UITargetedPreview? {
+        floorPreview(interaction, configuration)
+    }
+
+    func contextMenuInteraction(_ interaction: UIContextMenuInteraction,
+                                previewForHighlightingMenuWithConfiguration configuration: UIContextMenuConfiguration) -> UITargetedPreview? {
+        floorPreview(interaction, configuration)
+    }
+
+    func contextMenuInteraction(_ interaction: UIContextMenuInteraction,
+                                previewForDismissingMenuWithConfiguration configuration: UIContextMenuConfiguration) -> UITargetedPreview? {
+        floorPreview(interaction, configuration)
     }
 
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willPerformPreviewActionForMenuWith configuration: UIContextMenuConfiguration, animator: UIContextMenuInteractionCommitAnimating) {

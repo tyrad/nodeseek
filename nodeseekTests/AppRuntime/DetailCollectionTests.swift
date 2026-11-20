@@ -53,7 +53,18 @@ final class DetailCollectionTests: XCTestCase {
         let space = try XCTUnwrap(text.snapshot.characters.first { (text.snapshot.string as NSString).substring(with: $0.range) == " " })
         XCTAssertTrue(hit(space.rect.midX) === text)
         let blank = try XCTUnwrap(hit(text.bounds.maxX - 8))
-        XCTAssertTrue(blank.interactions.contains { $0 is UIContextMenuInteraction })
+        let menu = try XCTUnwrap(blank.interactions.compactMap { $0 as? UIContextMenuInteraction }.first)
+        let delegate = try XCTUnwrap(menu.delegate)
+        let config = try XCTUnwrap(delegate.contextMenuInteraction(menu, configurationForMenuAtLocation: .zero))
+        func previews() -> [UITargetedPreview?] {
+            if #available(iOS 16.0, *) {
+                return [delegate.contextMenuInteraction?(menu, configuration: config, highlightPreviewForItemWithIdentifier: config.identifier) ?? nil,
+                        delegate.contextMenuInteraction?(menu, configuration: config, dismissalPreviewForItemWithIdentifier: config.identifier) ?? nil]
+            }
+            return [delegate.contextMenuInteraction?(menu, previewForHighlightingMenuWithConfiguration: config) ?? nil,
+                    delegate.contextMenuInteraction?(menu, previewForDismissingMenuWithConfiguration: config) ?? nil]
+        }
+        XCTAssertTrue(previews().allSatisfy { $0?.view === cell.contentView }, "展开、收起都应使用有正文的完整楼层")
         let floor = try XCTUnwrap(cell.contentView.subviews.flatMap(allLabels).first { $0.text == "#1" })
         let floorPoint = floor.convert(CGPoint(x: floor.bounds.midX, y: floor.bounds.midY), to: cell)
         XCTAssertTrue(cell.hitTest(floorPoint, with: nil) === blank)
@@ -67,6 +78,7 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertTrue(hit(text.bounds.maxX - 8) === text)
         XCTAssertEqual(text.text(in: try XCTUnwrap(text.selectedTextRange)), "短 链！")
         cell.prepareForReuse()
+        XCTAssertTrue(previews().allSatisfy { $0 == nil })
         XCTAssertEqual(copy.actionHandler?(copy), false)
     }
 
