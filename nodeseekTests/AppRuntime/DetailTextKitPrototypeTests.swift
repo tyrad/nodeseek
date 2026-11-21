@@ -13,6 +13,44 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         (root as? T).map { [$0] } ?? root.subviews.flatMap { descendants($0, type) }
     }
 
+    private func tabButton(_ index: Int, in root: UIView) -> UIButton? {
+        descendants(root, UIButton.self).first { $0.accessibilityIdentifier == "detail-magic-tab-\(index)" }
+    }
+
+    func testTabsKeepTextureStripHeightAndOldPageUntilNewIsReady() async throws {
+        let long = String(repeating: "第二页很长。", count: 400)
+        let markdown = ":::: tabs\n::: tab-item 一\n首页\n:::\n::: tab-item 二\n" + long + "\n:::\n::::"
+        let page = DetailMarkdownPrototypeController(id: "strip", source: .init(html: "", visibleMarkdown: markdown))
+        let window = try host(page)
+        defer { window.isHidden = true }
+        func visibleText() -> [String] { descendants(page.view, DetailSelectableTextView.self).map { $0.snapshot.string } }
+        try await waitFor { visibleText() == ["首页"] }
+        // 与 Texture 一致：文字标签条，选中项加粗加下划线，不用系统分段控件。
+        XCTAssertTrue(descendants(page.view, UISegmentedControl.self).isEmpty)
+        let first = try XCTUnwrap(tabButton(0, in: page.view))
+        let second = try XCTUnwrap(tabButton(1, in: page.view))
+        func underlined(_ button: UIButton) -> Bool {
+            (button.attributedTitle(for: .normal)?.attribute(.underlineStyle, at: 0, effectiveRange: nil) as? Int ?? 0) != 0
+        }
+        XCTAssertTrue(underlined(first))
+        XCTAssertFalse(underlined(second))
+        func all(_ view: UIView) -> [UIView] { [view] + view.subviews.flatMap(all) }
+        let viewport = try XCTUnwrap(all(page.view).first { $0.accessibilityIdentifier == "detail-magic-tab-content" } as? UIScrollView)
+        page.view.layoutIfNeeded()
+        let height = viewport.bounds.height
+        XCTAssertGreaterThan(height, 0)
+
+        second.sendActions(for: .touchUpInside)
+        // 新页排好前保留旧页，避免切换时出现空白闪烁。
+        XCTAssertEqual(visibleText(), ["首页"])
+        XCTAssertTrue(underlined(second))
+        try await waitFor { visibleText() == [long] }
+        page.view.layoutIfNeeded()
+        // 高度以第一栏为准，长内容在栏内滚动，楼层高度不随切换变化。
+        XCTAssertEqual(viewport.bounds.height, height, accuracy: 0.5)
+        XCTAssertGreaterThan(viewport.contentSize.height, height)
+    }
+
     private func waitFor(_ predicate: @escaping () -> Bool) async throws {
         let deadline = Date().addingTimeInterval(12)
         while !predicate(), Date() < deadline { try await Task.sleep(nanoseconds: 20_000_000) }
@@ -219,11 +257,7 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         defer { window.isHidden = true }
         func visibleText() -> [String] { descendants(page.view, DetailSelectableTextView.self).map { $0.snapshot.string } }
         try await waitFor { visibleText() == ["首页"] }
-        let control = try XCTUnwrap(descendants(page.view, UISegmentedControl.self).first)
-        func select(_ index: Int) {
-            control.selectedSegmentIndex = index
-            control.sendActions(for: .valueChanged)
-        }
+        func select(_ index: Int) { tabButton(index, in: page.view)?.sendActions(for: .touchUpInside) }
         select(1)
         select(2)
         try await waitFor { visibleText() == ["末页"] }
@@ -293,12 +327,12 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         let window = try host(review)
         defer { window.isHidden = true }
         try await waitFor { review.installedRequest != nil }
-        let tabs = try XCTUnwrap(descendants(review.view, UISegmentedControl.self).first)
-        XCTAssertEqual((0..<tabs.numberOfSegments).compactMap(tabs.titleForSegment(at:)), ["💻基本信息", "🎬IP质量", "🌐网络质量", "📍回程路由"])
+        XCTAssertEqual((0..<4).compactMap { tabButton($0, in: review.view)?.accessibilityLabel }, ["💻基本信息", "🎬IP质量", "🌐网络质量", "📍回程路由"])
         var terminalPages = 0
-        for index in 0..<tabs.numberOfSegments {
-            tabs.selectedSegmentIndex = index
-            tabs.sendActions(for: .valueChanged)
+        for index in 0..<4 {
+            tabButton(index, in: review.view)?.sendActions(for: .touchUpInside)
+            // 切换后旧页留到新页排好再替换；等待当前页的终端出现。
+            try await waitFor { self.descendants(review.view, DetailTerminalView.self).count <= 1 }
             if index < 2 {
                 try await waitFor { !self.descendants(review.view, DetailTerminalView.self).isEmpty }
                 let terminal = try XCTUnwrap(descendants(review.view, DetailTerminalView.self).first)

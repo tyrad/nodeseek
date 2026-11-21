@@ -37,13 +37,13 @@ final class DetailBlockStack: UIStackView {
             case .tabs(let sections, let firstPage):
                 tabs(sections.map(\.title), in: stack, initial: { page in
                     self.append(firstPage, to: page, width: width)
-                }) { [weak self] index, page in
+                }) { [weak self] index, page, ready in
                     guard let self, let appearance = self.appearance else { return }
                     page.layoutTask = self.renderer.startTab(sections[index], appearance: appearance, width: width) { [weak self, weak page] blocks in
                         guard !Task.isCancelled, let self, let page else { return }
                         self.append(blocks, to: page, width: width)
+                        ready()
                         self.refreshPlayback()
-                        self.onSizeChange?()
                     }
                 }
             case .widget(let block):
@@ -112,39 +112,132 @@ final class DetailBlockStack: UIStackView {
         deinit { layoutTask?.cancel() }
     }
 
+    /// 文字标签条，样式同 Texture 版 `DetailMagicTabsNode`：选中项加粗、加下划线，其余用次级文字色。
+    private final class TabStrip: UIScrollView {
+        private let row = UIStackView()
+        private(set) var buttons: [UIButton] = []
+        private(set) var selectedIndex = 0
+        var onSelect: ((Int) -> Void)?
+
+        init(titles: [String]) {
+            super.init(frame: .zero)
+            showsHorizontalScrollIndicator = false
+            row.spacing = 4
+            row.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(row)
+            NSLayoutConstraint.activate([
+                row.leadingAnchor.constraint(equalTo: contentLayoutGuide.leadingAnchor),
+                row.trailingAnchor.constraint(equalTo: contentLayoutGuide.trailingAnchor),
+                row.topAnchor.constraint(equalTo: contentLayoutGuide.topAnchor),
+                row.bottomAnchor.constraint(equalTo: contentLayoutGuide.bottomAnchor),
+                row.heightAnchor.constraint(equalTo: frameLayoutGuide.heightAnchor)
+            ])
+            for (index, title) in titles.enumerated() {
+                var config = UIButton.Configuration.plain()
+                config.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
+                let button = UIButton(configuration: config)
+                button.accessibilityIdentifier = "detail-magic-tab-\(index)"
+                button.accessibilityLabel = title
+                button.addAction(UIAction { [weak self] _ in self?.onSelect?(index) }, for: .touchUpInside)
+                // 按文字自身宽度排列，不被栈视图拉伸，间距与 Texture 版一致。
+                button.setContentHuggingPriority(.required, for: .horizontal)
+                button.setContentCompressionResistancePriority(.required, for: .horizontal)
+                button.titleLabel?.numberOfLines = 1
+                buttons.append(button)
+                row.addArrangedSubview(button)
+            }
+            select(0)
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+        func select(_ index: Int) {
+            selectedIndex = index
+            for (offset, button) in buttons.enumerated() {
+                let selected = offset == index
+                button.setAttributedTitle(NSAttributedString(string: button.accessibilityLabel ?? "", attributes: [
+                    .font: UIFont.systemFont(ofSize: 15, weight: selected ? .semibold : .regular),
+                    .foregroundColor: selected ? UIColor.label : UIColor.secondaryLabel,
+                    .underlineStyle: selected ? NSUnderlineStyle.single.rawValue : 0
+                ]), for: .normal)
+                button.accessibilityTraits = selected ? [.button, .selected] : [.button]
+            }
+        }
+    }
+
+    /// 标签页与 Texture 版一致：内容区高度以第一栏为准，较长的栏在区内滚动，切换时楼层高度不变；
+    /// 新栏排好后才替换旧栏，避免切换瞬间出现空白。只保留当前栏，未选中的栏不占用正文位图。
     private func tabs(_ titles: [String], in parent: UIStackView, initial: ((TabPage) -> Void)? = nil,
-                      show: @escaping (Int, TabPage) -> Void) {
+                      show: @escaping (Int, TabPage, @escaping () -> Void) -> Void) {
         guard !titles.isEmpty else { return }
-        let page = TabPage()
-        page.accessibilityIdentifier = "detail-magic-tab-content"
-        page.axis = .vertical
-        page.spacing = 8
-        let scroller = UIScrollView()
-        scroller.showsHorizontalScrollIndicator = false
-        let control = UISegmentedControl(items: titles)
-        control.apportionsSegmentWidthsByContent = true
-        control.selectedSegmentIndex = 0
-        let font = UIFont.preferredFont(forTextStyle: .subheadline, compatibleWith: traitCollection)
-        control.setTitleTextAttributes([.font: font], for: .normal)
-        scroller.addSubview(control)
-        control.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            control.leadingAnchor.constraint(equalTo: scroller.contentLayoutGuide.leadingAnchor),
-            control.trailingAnchor.constraint(equalTo: scroller.contentLayoutGuide.trailingAnchor),
-            control.topAnchor.constraint(equalTo: scroller.contentLayoutGuide.topAnchor),
-            control.bottomAnchor.constraint(equalTo: scroller.contentLayoutGuide.bottomAnchor),
-            control.heightAnchor.constraint(equalTo: scroller.frameLayoutGuide.heightAnchor)
-        ])
-        control.addAction(UIAction { [weak self, weak page, weak control] _ in
-            guard let page, let index = control?.selectedSegmentIndex, titles.indices.contains(index) else { return }
-            page.layoutTask?.cancel()
-            page.arrangedSubviews.forEach { $0.removeFromSuperview() }
-            show(index, page)
-            self?.onSizeChange?()
-        }, for: .valueChanged)
-        attach(scroller, to: parent, height: max(44, font.lineHeight + 16))
-        parent.addArrangedSubview(page)
-        if let initial { initial(page) } else { show(0, page) }
+        let strip = TabStrip(titles: titles)
+        let viewport = UIScrollView()
+        viewport.accessibilityIdentifier = "detail-magic-tab-content"
+        viewport.contentInsetAdjustmentBehavior = .never
+        viewport.alwaysBounceVertical = false
+        attach(strip, to: parent, height: 46)
+        parent.addArrangedSubview(viewport)
+        parent.setCustomSpacing(10, after: strip)
+        // 第一栏显示时高度跟随它（图片回填也会同步）；离开第一栏时冻结为当时的高度。
+        viewport.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+        let frozen = viewport.heightAnchor.constraint(equalToConstant: 44)
+        var followFirst: NSLayoutConstraint?
+        var current: TabPage?
+        var pending: TabPage?
+
+        func install(_ page: TabPage, index: Int) {
+            if let current, current !== page {
+                if let followFirst, followFirst.isActive {
+                    frozen.constant = max(44, ceil(current.bounds.height))
+                    followFirst.isActive = false
+                    frozen.isActive = true
+                }
+                current.layoutTask?.cancel()
+                current.removeFromSuperview()
+            }
+            page.translatesAutoresizingMaskIntoConstraints = false
+            viewport.addSubview(page)
+            NSLayoutConstraint.activate([
+                page.leadingAnchor.constraint(equalTo: viewport.contentLayoutGuide.leadingAnchor),
+                page.trailingAnchor.constraint(equalTo: viewport.contentLayoutGuide.trailingAnchor),
+                page.topAnchor.constraint(equalTo: viewport.contentLayoutGuide.topAnchor),
+                page.bottomAnchor.constraint(equalTo: viewport.contentLayoutGuide.bottomAnchor),
+                page.widthAnchor.constraint(equalTo: viewport.frameLayoutGuide.widthAnchor)
+            ])
+            if index == 0 {
+                frozen.isActive = false
+                let follow = viewport.heightAnchor.constraint(equalTo: page.heightAnchor)
+                follow.priority = .defaultHigh
+                follow.isActive = true
+                followFirst = follow
+            }
+            viewport.contentOffset = .zero
+            current = page
+        }
+
+        func makePage() -> TabPage {
+            let page = TabPage()
+            page.axis = .vertical
+            page.spacing = 10
+            return page
+        }
+
+        strip.onSelect = { [weak self, weak strip] index in
+            guard let strip, titles.indices.contains(index), index != strip.selectedIndex else { return }
+            strip.select(index)
+            pending?.layoutTask?.cancel()
+            let page = makePage()
+            pending = page
+            show(index, page) { [weak self, weak page] in
+                guard let page, pending === page else { return }
+                pending = nil
+                install(page, index: index)
+                self?.onSizeChange?()
+            }
+        }
+        let first = makePage()
+        install(first, index: 0)
+        if let initial { initial(first) } else { show(0, first) {} }
     }
 
     @discardableResult
@@ -167,8 +260,9 @@ final class DetailBlockStack: UIStackView {
                 stack.addArrangedSubview(rich)
             case .quote(let children): appendLegacy(children.children, to: quote(in: stack), width: DetailQuoteLayout.contentWidth(width))
             case .tabs(let content):
-                tabs(content.sections.map(\.title), in: stack) { [weak self] index, page in
+                tabs(content.sections.map(\.title), in: stack) { [weak self] index, page, ready in
                     self?.appendLegacy(content.sections[index].blocks, to: page, width: width)
+                    ready()
                 }
             case .table(let table):
                 attach(DetailTableScrollView(table: table, onImageTapped: photos, onLinkTapped: open), to: stack,
