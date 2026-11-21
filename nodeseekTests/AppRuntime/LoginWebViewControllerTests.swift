@@ -139,6 +139,47 @@ struct LoginWebViewControllerTests {
         #expect(closeCount == 1)
     }
 
+    @Test(arguments: [false, true])
+    func closingBeforeAccountDetectionKeepsCleanupUntilRefreshConfirmsLogin(member: Bool) async throws {
+        let suite = "login-close-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = CurrentAccountStore(userDefaults: defaults)
+        let session = SpyLoginCookieSession()
+        let manager = DefaultSettingsSessionManager(
+            cookieSession: session, currentAccountStore: store,
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(), defaults: defaults
+        )
+        await manager.logout()
+        var closed = false
+        let controller = LoginWebViewController(
+            cookieSession: session, automaticallyLoadsPage: false, readsAccountOnClose: false
+        ) { closed = true }
+        controller.loadViewIfNeeded()
+        let button = try #require(controller.navigationItem.rightBarButtonItem)
+        _ = (button.target as AnyObject).perform(try #require(button.action))
+        for _ in 0..<100 where !closed { try await Task.sleep(nanoseconds: 10_000_000) }
+        try #require(closed)
+        #expect(defaults.bool(forKey: CurrentAccountStore.pendingLogoutCleanupKey))
+
+        let html = member
+            ? #"<div id="nsk-right-panel-container"><div class="user-card"><a class="Username" href="/space/123">回归账号</a></div></div>"#
+            : #"<a href="/signIn.html">登录</a>"#
+        let response = HTMLResponse(statusCode: 200, headers: [:], finalURL: NodeSeekSite.baseURL, html: html)
+        let refresher = CurrentAccountRefresher(htmlClient: StaticHTMLClient(response: response), store: store)
+        let account = await refresher.refreshIfNeeded(force: true, maxAge: 0)
+        #expect(account?.isLoggedIn == member)
+        if member {
+            #expect(manager.startPendingCleanup() == nil)
+            let reloaded = CurrentAccountStore(userDefaults: defaults)
+            #expect(await reloaded.snapshot()?.account.displayName == "回归账号")
+        } else {
+            let cleanup = try #require(manager.startPendingCleanup())
+            await cleanup.value
+            #expect(await store.snapshot() == nil)
+        }
+    }
+
     @Test func closeCancelsPendingInitialCookieSync() async throws {
         let cookieSession = SpyLoginCookieSession()
         cookieSession.suspendWebViewPreparation = true

@@ -32,6 +32,10 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         delegate = self
         applyTabItems(layoutSettings.tabItems)
         observeTabItems()
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(accountSessionChanged),
+            name: .nodeSeekAccountSessionDidChange, object: nil
+        )
     }
 
     required init?(coder: NSCoder) {
@@ -99,6 +103,19 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
     func applyTabItems(_ items: [MainTabItem]) {
         let items = MainTabItem.normalized(items)
         guard items != tabItems else { return }
+        updateTabControllers(items)
+    }
+
+    @objc private func accountSessionChanged() {
+        // 这些页面持有上一会话的列表和在途请求，不能等下次切回时才刷新。
+        for item in [MainTabItem.collections, .discussions, .comments, .notification] {
+            rootViewControllersByItem.removeValue(forKey: item)
+        }
+        latestUnreadCount = nil
+        updateTabControllers(tabItems)
+    }
+
+    private func updateTabControllers(_ items: [MainTabItem]) {
         let selectedItem = tabItems.indices.contains(selectedIndex) ? tabItems[selectedIndex] : nil
         tabItems = items
 

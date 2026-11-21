@@ -54,23 +54,42 @@ final class DefaultSettingsSessionManager: SettingsSessionManaging {
     private let cookieSession: NodeSeekCookieSessionManaging
     private let currentAccountStore: CurrentAccountStore
     private let nodeImageAPIKeyStore: NodeImageAPIKeyStoring
+    private let defaults: UserDefaults
 
     init(
         cookieBridge: CookieBridge? = nil,
         cookieSession: NodeSeekCookieSessionManaging? = nil,
         currentAccountStore: CurrentAccountStore = .shared,
-        nodeImageAPIKeyStore: NodeImageAPIKeyStoring = KeychainNodeImageAPIKeyStore()
+        nodeImageAPIKeyStore: NodeImageAPIKeyStoring = KeychainNodeImageAPIKeyStore(),
+        defaults: UserDefaults = .standard
     ) {
         self.cookieSession = cookieSession ?? NodeSeekCookieSession(bridge: cookieBridge ?? CookieBridge())
         self.currentAccountStore = currentAccountStore
         self.nodeImageAPIKeyStore = nodeImageAPIKeyStore
+        self.defaults = defaults
+    }
+
+    // 退出时 Cookie 删除可能尚未落盘，进程就被终止。下次启动先补清，再预热 WebView。
+    func startPendingCleanup() -> Task<Void, Never>? {
+        guard defaults.bool(forKey: CurrentAccountStore.pendingLogoutCleanupKey) else { return nil }
+        return Task { @MainActor in
+            AppLog.debug(.account, "开始冷启动退出清理")
+            await clearLocalSession(atLaunch: true)
+            AppLog.debug(.account, "完成冷启动退出清理")
+        }
     }
 
     func logout() async {
-        await cookieSession.clearLoginSession()
-        await currentAccountStore.clear()
-        nodeImageAPIKeyStore.clear()
+        await clearLocalSession(atLaunch: false)
+        NotificationCenter.default.post(name: .nodeSeekAccountSessionDidChange, object: nil)
         NotificationCenter.default.post(name: .nodeSeekLoginSessionDidClose, object: nil)
+    }
+
+    private func clearLocalSession(atLaunch: Bool) async {
+        await currentAccountStore.beginLogoutCleanup()
+        await cookieSession.clearLoginSession()
+        nodeImageAPIKeyStore.clear()
+        await currentAccountStore.finishLogoutCleanup(atLaunch: atLaunch)
     }
 }
 

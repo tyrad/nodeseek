@@ -33,9 +33,10 @@ case "$profile" in
   push) device_profile=member; suite=push.test.mjs ;;
   draft) device_profile=member; suite=draft.test.mjs ;;
   comment) device_profile=member; suite=comment.test.mjs ;;
+  logout) suite=logout.test.mjs ;;
   login) device_profile=member; suite=login.test.mjs ;;
   guest|member) ;;
-  *) echo "E2E_PROFILE 只接受 guest、member、login、draft、daily、push 或 comment" >&2; exit 2 ;;
+  *) echo "E2E_PROFILE 只接受 guest、member、login、logout、draft、daily、push 或 comment" >&2; exit 2 ;;
 esac
 config=${E2E_CONFIG_FILE:-"$HOME/.config/nodeseek/e2e.json"}
 settings='{}'
@@ -47,7 +48,7 @@ if [[ -z ${E2E_ENV_FILE:-} && -z ${OPENAI_API_KEY:-} ]]; then
   export E2E_ENV_FILE
 fi
 node "$tool_dir/api-key.mjs"
-if [[ $device_profile == member ]]; then
+if [[ $device_profile == member || $profile == logout ]]; then
   device_name="NodeSeek E2E Member"
   E2E_MEMBER_USERNAME=${E2E_MEMBER_USERNAME:-$(jq -r '.memberDisplayName // empty' <<<"$settings")}
   member_env_file=$(jq -r '.memberEnvFile // empty' <<<"$settings")
@@ -61,7 +62,8 @@ if [[ $device_profile == member ]]; then
     ' "$member_env_file")
   fi
   export E2E_MEMBER_USERNAME
-  if [[ $profile == login ]]; then
+  if [[ $profile == logout ]]; then device_name="NodeSeek E2E Profile"; fi
+  if [[ $profile == login || $profile == logout ]]; then
     [[ -r "$member_env_file" ]] || { echo "登录测试需要可读的 memberEnvFile" >&2; exit 2; }
     export E2E_MEMBER_ENV_FILE="$member_env_file"
   fi

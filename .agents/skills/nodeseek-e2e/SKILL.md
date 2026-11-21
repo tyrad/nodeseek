@@ -1,6 +1,6 @@
 ---
 name: nodeseek-e2e
-description: 为 NodeSeek iOS 客户端编写和无人值守运行 Midscene 发布前回归，验证读帖、最近浏览、分类评论、游客登录入口、系统推送与站内通知跳转、收藏、引用、看图、翻页筛选、已登录搜索、发帖草稿恢复及指定帖真实回帖与编辑，定位失败并报告发布风险。
+description: 为 NodeSeek iOS 客户端编写和无人值守运行 Midscene 发布前回归，验证读帖、最近浏览、分类评论、游客登录入口、退出后会话清理、系统推送与站内通知跳转、收藏、引用、看图、翻页筛选、已登录搜索、发帖草稿恢复及指定帖真实回帖与编辑，定位失败并报告发布风险。
 ---
 
 # NodeSeek iOS 发布前回归
@@ -66,6 +66,14 @@ E2E_PROFILE=member make e2e-smoke
 用游客态的专用模拟器执行 `E2E_LOGIN_ME=1 SIMULATOR_ID=<UDID> make e2e-login`。使用默认多 Tab 栏，先在「我的」确认游客资料卡，切到「通知」登录，自动返回后立即切回「我的」。该分支保留登录会话。按帧验证需要本机的 FFmpeg、ffprobe 和 Python Pillow。
 
 设备录像从提交登录前开始。`me-timing.json` 记录「我的」导航标题和「我的帖子」行均可辨认的首帧、首次出现该账号名的帧及两者间隔。使用同设备的游客资料卡截图和无障碍标签已确认账号的截图匹配文字。两者同帧且后续未闪现游客文字才通过；慢速的模型调用和 UI 查询只用于操作或确认最终账号，不作为首屏计时。
+
+### 退出后会话清理
+
+`make e2e-case CASE=logout-session` 默认使用「NodeSeek E2E Profile」专用设备，也可在本机配置中指定 `logoutUDID`。脚本用启动参数临时显示「我的收藏」标签。测试账号需要已有收藏；设备为游客时复用官方表单和本机 `memberEnvFile` 登录。用例结束后这台设备保留游客状态。
+
+先核对账号并打开真实收藏，转到「我的」确认退出，再返回同一个收藏标签。旧收藏行必须消失，重新从「我的」点收藏必须进入站点登录表单。冷启动复查「我的」、收藏和通知的游客状态，再用阅读模式核对侧栏。查看运行目录的 `junit.xml`、`report/logout-session.html` 与截图。
+
+排查「提交登录后立刻关闭」可跑 `make xcode-test-class TEST="LoginWebViewControllerTests CurrentAccountStoreTests NodeSeekServiceTests"`。固定网页样本分别模拟后台刷新确认会员和游客，也覆盖退出前的列表请求晚到。真实设备日志中搜索「冷启动退出清理」和「Cookie 清理前」「Cookie 清理后」，可分别核对 URLSession、WebKit 中的 Cookie 名。
 
 ## 指定帖真实回帖与编辑
 

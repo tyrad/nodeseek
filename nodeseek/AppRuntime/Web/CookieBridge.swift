@@ -92,14 +92,24 @@ final class CookieBridge {
     func clearSession() async {
         let webCookieStore = resolvedWebCookieStore()
         let urlCookies = urlCookieStorage.cookies ?? []
+        let webCookies = await webCookieStore.allCookies()
+        logCleanupCookies("清理前", urlCookies: urlCookies, webCookies: webCookies)
         for cookie in urlCookies where isAllowed(cookie) {
             urlCookieStorage.deleteCookie(cookie)
         }
 
-        let webCookies = await webCookieStore.allCookies()
         for cookie in webCookies where isAllowed(cookie) {
             await webCookieStore.deleteCookie(cookie)
         }
+        let remaining = await webCookieStore.allCookies()
+        logCleanupCookies("清理后", urlCookies: urlCookieStorage.cookies ?? [], webCookies: remaining)
+    }
+
+    private func logCleanupCookies(_ stage: String, urlCookies: [HTTPCookie], webCookies: [HTTPCookie]) {
+        func names(_ cookies: [HTTPCookie]) -> String {
+            Set(cookies.filter(isAllowed).map(\.name)).sorted().joined(separator: ",")
+        }
+        AppLog.debug(.account, "Cookie \(stage) URLSession=[\(names(urlCookies))] WebKit=[\(names(webCookies))]")
     }
 
     private func resolvedWebCookieStore() -> WebCookieStore {

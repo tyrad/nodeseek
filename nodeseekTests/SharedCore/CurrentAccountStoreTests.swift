@@ -70,6 +70,23 @@ struct CurrentAccountStoreTests {
         #expect(snapshot == nil)
     }
 
+    @Test func responseFromBeforeLogoutCannotRestoreAccountOrCancelCleanup() async throws {
+        let suite = "account-logout-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = CurrentAccountStore(userDefaults: defaults)
+        let member = AccountResponse(displayName: "上个账号", isLoggedIn: true)
+        let oldSession = await store.sessionID
+        await store.beginLogoutCleanup()
+        let duringCleanup = await store.sessionID
+        await store.finishLogoutCleanup(atLaunch: false)
+
+        #expect(await !store.save(member, for: oldSession))
+        #expect(await !store.save(member, for: duringCleanup))
+        #expect(await store.snapshot() == nil)
+        #expect(defaults.bool(forKey: CurrentAccountStore.pendingLogoutCleanupKey))
+    }
+
     @Test func refreshFrequencyUsesStoredUpdatedAt() async throws {
         let defaults = try #require(UserDefaults(suiteName: "CurrentAccountStoreTests.refresh-age"))
         defaults.removePersistentDomain(forName: "CurrentAccountStoreTests.refresh-age")

@@ -15,6 +15,17 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
+        if let cleanup = (UIApplication.shared.delegate as? AppDelegate)?.logoutCleanup {
+            Task { @MainActor [weak self] in
+                await cleanup.value
+                self?.connectWindow(to: windowScene, options: connectionOptions)
+            }
+        } else {
+            connectWindow(to: windowScene, options: connectionOptions)
+        }
+    }
+
+    private func connectWindow(to windowScene: UIWindowScene, options connectionOptions: UIScene.ConnectionOptions) {
         let window = UIWindow(windowScene: windowScene)
         appRouter.window = window
         let launchedFromPush = connectionOptions.notificationResponse != nil || !connectionOptions.urlContexts.isEmpty
@@ -63,6 +74,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func sceneDidBecomeActive(_ scene: UIScene) {
         Task { @MainActor [weak self] in
             guard let self else { return }
+            await (UIApplication.shared.delegate as? AppDelegate)?.logoutCleanup?.value
             guard let presentationContext = self.autoCheckInPresentationContext() else { return }
             await AutoCheckInModule.runIfNeeded(
                 presentationContext: presentationContext,
