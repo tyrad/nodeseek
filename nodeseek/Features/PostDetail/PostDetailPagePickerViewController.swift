@@ -227,7 +227,7 @@ private final class PageCell: UICollectionViewCell {
         contentView.layer.cornerRadius = 10
         contentView.layer.cornerCurve = .continuous
 
-        label.font = .monospacedDigitSystemFont(ofSize: 15, weight: .medium)
+        label.textColor = .label
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(label)
@@ -256,10 +256,9 @@ private final class PageCell: UICollectionViewCell {
 
     func configure(page: Int, isCurrent: Bool, isLoaded: Bool) {
         label.text = "\(page)"
-        // 当前页用 label 反色块，和 App 的黑白主题一致。
-        contentView.backgroundColor = isCurrent ? .label : .secondarySystemBackground
-        label.textColor = isCurrent ? .systemBackground : .label
-        loadedDot.backgroundColor = isCurrent ? .systemBackground : .secondaryLabel
+        label.font = .monospacedDigitSystemFont(ofSize: 15, weight: isCurrent ? .semibold : .medium)
+        contentView.backgroundColor = isCurrent ? .systemGray3 : .secondarySystemBackground
+        loadedDot.backgroundColor = isCurrent ? .label : .secondaryLabel
         loadedDot.isHidden = isLoaded == false
         accessibilityLabel = isCurrent ? "第 \(page) 页，当前页" : "第 \(page) 页"
         accessibilityTraits = isCurrent ? [.button, .selected] : .button
