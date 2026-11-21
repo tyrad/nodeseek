@@ -140,6 +140,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
                 collectionList.headerSource = .init(post: detail)
                 configureHeader(.init(detail: detail), renderedContent: nil)
             }
+            if displayMode == .skeleton { collectionList.coverUntilSettled(timeout: initialContentRevealTimeout) }
             displayMode = .content
             hasRenderedDetailContent = true
             currentPage = max(1, detail.page)
@@ -285,11 +286,16 @@ extension PostDetailViewController: PostDetailViewProtocol {
 
         if let collectionList {
             let delta = detail.comments.count - oldRange.count
+            let previous = Dictionary(comments[oldRange].map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             comments.replaceSubrange(oldRange, with: detail.comments)
             loadedCommentPageRanges[detail.page] = oldRange.lowerBound..<(oldRange.lowerBound + detail.comments.count)
             shiftLoadedCommentPageRanges(after: detail.page, delta: delta)
             if detail.page == currentPage { pagination = detail.pagination }
-            collectionList.reload()
+            // 只重配内容有变化的楼层：全量重配会清空正文和签名再异步回填，高度先缩后涨，把底部位置顶回去。
+            collectionList.reload(refresh: false)
+            for comment in detail.comments where previous[comment.id].map({ $0 != comment }) == true {
+                collectionList.refresh(commentID: comment.id)
+            }
             updateLoadMoreCommentsFooter()
             return
         }

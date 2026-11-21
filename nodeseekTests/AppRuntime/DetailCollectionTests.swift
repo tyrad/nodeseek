@@ -484,4 +484,52 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertFalse(allLabels(cell.contentView).contains { $0 !== allLabels(warning).first && $0.text?.contains("温馨提醒") == true })
         XCTAssertEqual(allViews(cell).filter { $0.accessibilityIdentifier == "detail-author-badge" && !$0.isHidden }.map(\.accessibilityLabel), ["Lv0"])
     }
+
+    func testRefreshingUnchangedLastPageKeepsFloorsAndPosition() async throws {
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let detail = makePagedDetail(1...20, pageNumber: 1, next: nil)
+        page.render(detail: detail)
+        let list = try XCTUnwrap(page.collectionList?.view)
+        window.layoutIfNeeded()
+        try await Task.sleep(nanoseconds: 300_000_000)
+        let end = list.contentSize.height - list.bounds.height + list.adjustedContentInset.bottom
+        list.setContentOffset(CGPoint(x: 0, y: end), animated: false)
+        window.layoutIfNeeded()
+        try await Task.sleep(nanoseconds: 200_000_000)
+        let before = list.visibleCells.compactMap { $0 as? DetailFloorListCell }.compactMap(\.request)
+        let offset = list.contentOffset.y
+        XCTAssertFalse(before.isEmpty)
+
+        // 点「加载新评论」后服务端返回同一页、无新回复：已显示的楼层不应重配，位置不变。
+        page.refreshCurrentCommentPage(detail: detail)
+        window.layoutIfNeeded()
+        try await Task.sleep(nanoseconds: 200_000_000)
+        let after = list.visibleCells.compactMap { $0 as? DetailFloorListCell }.compactMap(\.request)
+        XCTAssertEqual(Set(after.map(\.version)), Set(before.map(\.version)))
+        XCTAssertEqual(list.contentOffset.y, offset, accuracy: 0.5)
+    }
+
+    func testFirstRenderKeepsSkeletonUntilVisibleFloorsInstall() async throws {
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        page.showLoading()
+        window.layoutIfNeeded()
+        page.render(detail: makePagedDetail(1...12, pageNumber: 1, next: nil))
+        window.layoutIfNeeded()
+        // 与 Texture 首屏一致：内容排好前继续盖着骨架，不露出空楼层和预估高度。
+        XCTAssertNotNil(view("post-detail-reveal-cover", in: page.view))
+        var waited = 0
+        while view("post-detail-reveal-cover", in: page.view) != nil, waited < 100 {
+            try await Task.sleep(nanoseconds: 10_000_000)
+            waited += 1
+        }
+        XCTAssertNil(view("post-detail-reveal-cover", in: page.view))
+        let list = try XCTUnwrap(page.collectionList?.view)
+        let floors = list.visibleCells.compactMap { $0 as? DetailFloorListCell }
+        XCTAssertFalse(floors.isEmpty)
+        XCTAssertTrue(floors.allSatisfy(\.contentInstalled))
+    }
 }

@@ -64,6 +64,9 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     private(set) var body = DetailBlockStack()
     private(set) var request: DetailFloorRequest?
     private(set) var contentInstalled = false
+    private var signatureLoading = false
+    /// 正文和签名都已装入，楼层高度不会再因异步内容变化。
+    var isSettled: Bool { contentInstalled && !signatureLoading }
     private(set) var copyText: String?
     var onNative: (([DetailLayoutBlock]) -> Void)?
     private var signatureStack: DetailBlockStack?
@@ -384,6 +387,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         renderTask = nil
         signatureTask?.cancel()
         signatureTask = nil
+        signatureLoading = false
         signatureStack?.removeFromSuperview()
         signatureStack = nil
         onNative = nil
@@ -440,8 +444,11 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     func loadSignature(_ html: String, for floor: DetailFloorRequest) {
         let request = DetailFloorRequest(id: floor.id, version: floor.version, source: .init(html: html, visibleMarkdown: nil),
                                          appearance: floor.appearance, baseURL: floor.baseURL)
+        signatureLoading = true
         signatureTask = body.renderer.start(request) { [weak self] _, layout in
-            guard let self, self.request == floor, case .webpage(let blocks) = layout else { return }
+            guard let self, self.request == floor else { return }
+            self.signatureLoading = false
+            guard case .webpage(let blocks) = layout else { self.didInstall?(); return }
             let signature = DetailBlockStack()
             signature.axis = .vertical
             signature.spacing = 4

@@ -23,6 +23,9 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     private var batchCheckScheduled = false
     private var generation = 0
     private var previousAppearance: DetailTextAppearance?
+    private var revealCover: UIView?
+    private var revealDeadline: CFTimeInterval = 0
+    private var settledChecks = 0
     var renderer = DetailFloorRenderer()
     var headerSource: DetailFloorSource?
     private lazy var data = UICollectionViewDiffableDataSource<Int, String>(collectionView: view) { [weak self] collection, path, key in
@@ -347,6 +350,39 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         page?.scrollViewDidEndDragging(scrollView, willDecelerate: decelerate)
     }
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) { page?.scrollViewDidEndDecelerating(scrollView) }
+}
+
+extension PostDetailCollectionList {
+    /// 首次从骨架切到内容前调用：用骨架快照盖住列表，等首屏楼层装好正文、签名且高度稳定后再揭开，
+    /// 最长等待 timeout，与 Texture 首屏揭示一致，避免露出空楼层和预估高度后再跳动。
+    func coverUntilSettled(timeout: TimeInterval) {
+        guard revealCover == nil, let superview = view.superview, view.window != nil,
+              let cover = view.snapshotView(afterScreenUpdates: false) ?? view.snapshotView(afterScreenUpdates: true) else {
+            AppLog.debug(.postDetail, "首屏遮盖跳过: superview=\(view.superview != nil) window=\(view.window != nil)")
+            return
+        }
+        cover.frame = view.frame
+        cover.accessibilityIdentifier = "post-detail-reveal-cover"
+        superview.insertSubview(cover, aboveSubview: view)
+        revealCover = cover
+        revealDeadline = CACurrentMediaTime() + timeout
+        settledChecks = 0
+        DispatchQueue.main.async { [weak self] in self?.checkReveal() }
+    }
+
+    private func checkReveal() {
+        guard let cover = revealCover else { return }
+        view.layoutIfNeeded()
+        let floors = view.visibleCells.compactMap { $0 as? DetailFloorListCell }
+        // 高度回写在装入后的下一轮主队列执行，连续两次检查都稳定才算排好。
+        settledChecks = !floors.isEmpty && floors.allSatisfy(\.isSettled) ? settledChecks + 1 : 0
+        guard settledChecks >= 2 || CACurrentMediaTime() >= revealDeadline else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0 / 60) { [weak self] in self?.checkReveal() }
+            return
+        }
+        revealCover = nil
+        UIView.animate(withDuration: 0.15, animations: { cover.alpha = 0 }, completion: { _ in cover.removeFromSuperview() })
+    }
 }
 
 private extension PostDetailCollectionList {
