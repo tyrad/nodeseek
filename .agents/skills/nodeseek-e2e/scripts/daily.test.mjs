@@ -35,9 +35,10 @@ function daily(id, run) {
         await ui.tap(home);
         await assertSidebarAccount(ui.session, process.env.E2E_MEMBER_USERNAME);
       }
-      async function fixture(post, page, anchor) {
+      async function fixture(post, page, anchor, { publicPost = false } = {}) {
         await start(post, page, anchor);
-        await sidebar();
+        if (publicPost) await ui.tap(home);
+        else await sidebar();
         await ui.tap('post-list-side-menu-settings-button');
         for (const name of ['settings-debug-cell', 'settings-detail-test-cell']) {
           const el = await waitFor(async () => (await ids('name == ' + JSON.stringify(name)))[0], '缺少调试入口 ' + name);
@@ -215,4 +216,69 @@ daily('favorite-sync', async ({ ui, agent, fixture, start, sidebar, log, t }) =>
     await fixture(testPost);
     assert.equal(await collected(), false, '服务器重读后收藏状态未恢复');
   }
+});
+
+daily('thread-pagination', async ({ t, ui, wda, click, scroll, fixture, log, agent }) => {
+  const post = '1069173';
+  const indicator = 'post-detail-page-indicator';
+  await fixture(post, 1, undefined, { publicPost: true });
+  const offset = log().length;
+  const floors = async () => {
+    // 翻页会复用评论节点，从同一帧读取楼层，避免逐个查询已失效的 WDA 元素。
+    const xml = await wda('/source');
+    return [...xml.matchAll(/<XCUIElementTypeStaticText\b[^>]*>/g)]
+      .filter(([tag]) => tag.includes('visible="true"'))
+      .flatMap(([tag]) => {
+        const floor = /\bname="#(\d+)"/.exec(tag);
+        return floor ? [Number(floor[1])] : [];
+      });
+  };
+  const shot = name => simctl('io', device, 'screenshot', join(out, 'thread-pagination-' + name + '.png'));
+  async function openPicker() {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await scroll(.65, .48);
+      const button = await ui.find(indicator);
+      if (button) { await click(button); await ui.get('post-detail-page-picker-grid'); return; }
+    }
+    throw new Error('滚动后没有可用的页码入口，可见楼层 ' + (await floors()).join(','));
+  }
+  await openPicker();
+  const lastLabel = await ui.element('post-detail-page-picker-last', '/attribute/label');
+  const last = Number(lastLabel.match(/\d+/)?.[0]);
+  assert.ok(last >= 2, '页码面板未列出多页：' + lastLabel);
+  t.diagnostic('站内页码面板末页为 ' + last);
+  shot('picker');
+  await ui.tap('post-detail-page-picker-first');
+  let second = [];
+  for (let i = 0; i < 45; i++) {
+    second = await floors();
+    if (second.some(n => n >= 11 && n <= 20)) break;
+    await scroll(.83, .31);
+  }
+  assert.ok(second.some(n => n >= 11 && n <= 20), '连续阅读没有出现第二页楼层：' + second);
+  assert.match(log().slice(offset), /详情评论加载更多完成: page=2, appended=[1-9]/);
+  shot('continuous');
+  async function verifyEnd(name) {
+    for (let i = 0; i < 30 && !await ui.find('post-detail-refresh-comments-at-end-button'); i++) await scroll(.81, .33);
+    await ui.get('post-detail-refresh-comments-at-end-button');
+    await scroll(.82, .31);
+    const label = await ui.element(indicator, '/attribute/label');
+    assert.equal(label, '第 ' + last + ' 页，共 ' + last + ' 页', name + '：到底后页码错误');
+    shot(name);
+    const bottom = await floors();
+    assert.ok(bottom.some(n => n > (last - 1) * 10 && n <= last * 10), '到底后楼层不属于末页：' + bottom);
+    t.diagnostic(name + '：底部显示 ' + bottom.join(',') + ' 楼，' + label);
+  }
+  // 两页同时在列表中时，底部可能还露着第一页的最后几楼。
+  if (last === 2) await verifyEnd('continuous-end');
+  await openPicker();
+  await ui.tap('post-detail-page-picker-last');
+  const low = (last - 1) * 10 + 1;
+  await waitFor(async () => (await floors()).some(n => n >= low && n < low + 10), '末页没有显示对应楼层');
+  await verifyEnd('jump-end');
+  await openPicker();
+  await ui.tap('post-detail-page-picker-first');
+  await waitFor(async () => (await floors()).some(n => n >= 1 && n <= 10), '返回第一页没有显示首批评论');
+  await agent.aiAssert('已回到原帖详情，可以阅读首批评论，页码面板已关闭。');
+  shot('first');
 });

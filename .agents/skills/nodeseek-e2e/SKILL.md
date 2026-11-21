@@ -13,6 +13,7 @@ description: 为 NodeSeek iOS 客户端编写和无人值守运行 Midscene 发�
 
 | 要验证的问题 | 单跑命令 | 如何判断 |
 | --- | --- | --- |
+| 短末页滑到底时是否仍显示上一页 | `make e2e-case CASE=thread-pagination` | 在公开帖 1069173 连续滑过第 10 楼，核对底部楼层及页码，再从面板跳到末页并回到第一页 |
 | 已登录用户能否打开发帖页再返回 | `make e2e-case CASE=member-compose` | 原生标题、正文和发布按钮出现，关闭后首页列表恢复 |
 | 看到「已存本机」时杀进程会不会丢稿 | `make e2e-case CASE=draft-autosave` | 冷启动后恢复本轮标题和完整正文 |
 | 搜「搬瓦工」能否打开对应的帖子 | `make e2e-case CASE=member-search` | 结果标题命中关键词，详情标题与选中的结果一致 |
