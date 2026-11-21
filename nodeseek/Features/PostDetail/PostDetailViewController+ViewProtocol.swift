@@ -37,7 +37,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
         loginButton.isHidden = true
         replyButton.isHidden = true
         hideLoadingMoreComments()
-        if hasRenderedDetailContent || collectionList != nil {
+        if hasRenderedDetailContent {
             loadingIndicator.startAnimating()
         } else {
             loadingIndicator.stopAnimating()

@@ -42,6 +42,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         view.delegate = self
         view.register(DetailFloorListCell.self, forCellWithReuseIdentifier: "floor")
         view.register(UICollectionViewListCell.self, forCellWithReuseIdentifier: "notice")
+        view.register(DetailSkeletonListCell.self, forCellWithReuseIdentifier: "skeleton")
         view.register(UICollectionReusableView.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter, withReuseIdentifier: "footer")
         data.supplementaryViewProvider = { [weak page] list, kind, path in
             let footer = list.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "footer", for: path)
@@ -76,7 +77,11 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
 
     func reload(refresh: Bool = true) {
         guard let page else { return }
-        rows = page.displayMode == .content ? page.detailRows : []
+        switch page.displayMode {
+        // 首次加载：与 Texture 相同，一个主楼骨架加若干回复骨架；-1 表示主楼。
+        case .skeleton: rows = (-1..<page.skeletonCommentRowCount).map(PostDetailViewController.DetailRow.skeletonComment)
+        case .content, .pageSkeleton: rows = page.detailRows
+        }
         var occurrences = [String: Int]()
         keys = rows.map { row in
             switch row {
@@ -91,7 +96,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             case .authorFilterBanner: return "filter"
             case .entryHint: return "entry"
             case .postRepliesDivider: return "divider"
-            case .skeletonComment(let index): return "skeleton-\(index)"
+            case .skeletonComment(let index): return index < 0 ? "skeleton-header" : "skeleton-\(index)"
             }
         }
         let currentKeys = Set(keys)
@@ -113,6 +118,9 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         var title: String?
         let author: String
         let badges: [String]
+        var isPoster = false
+        var isHot = false
+        var showsRiskWarning = false
         let time: String?
         var floor: String?
         var signature: String?
@@ -123,7 +131,8 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             source = headerSource ?? .init(html: header.contentHTML, visibleMarkdown: nil)
             title = header.title + (header.requiredReadingLevel.map { " 🔒 \($0)" } ?? "")
             author = header.authorName
-            badges = header.authorBadgeTexts + (page.authorRiskWarningPostID == header.postID ? [PostAuthorRiskWarningNode.message] : [])
+            badges = header.authorBadgeTexts
+            showsRiskWarning = page.authorRiskWarningPostID == header.postID
             time = header.metadataText
             signature = header.signatureHTML
         case .comment(let index):
@@ -131,10 +140,16 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             comment = value
             source = .init(comment: value)
             author = value.authorName
-            badges = (value.isPoster ? [DetailListStrings.text("poster")] : []) + value.authorBadgeTexts
-            floor = [value.isHot ? DetailListStrings.text("hot") : nil, value.floorText].compactMap { $0 }.joined(separator: " ")
+            badges = value.authorBadgeTexts
+            isPoster = value.isPoster
+            isHot = value.isHot
+            floor = value.floorText?.trimmingCharacters(in: .whitespacesAndNewlines)
             time = value.createdAtText
             signature = value.signatureHTML
+        case .skeletonComment:
+            let cell = list.dequeueReusableCell(withReuseIdentifier: "skeleton", for: path) as! DetailSkeletonListCell
+            cell.configure(key == "skeleton-header" ? .header : .comment)
+            return cell
         default:
             let cell = list.dequeueReusableCell(withReuseIdentifier: "notice", for: path) as! UICollectionViewListCell
             var content = UIListContentConfiguration.cell()
@@ -156,7 +171,8 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         cell.body.isLayoutMarginsRelativeArrangement = true
         cell.textIndent = indent
         cell.body.directionalLayoutMargins = .init(top: 0, leading: indent, bottom: 0, trailing: 0)
-        cell.configureHeader(title: title, name: author, badges: badges, time: time, floor: floor)
+        cell.configureHeader(title: title, name: author, isPoster: isPoster, badges: badges, time: time,
+                             floor: floor, isHot: isHot, showsRiskWarning: showsRiskWarning)
         cell.body.onLink = { [weak page] in page?.handleContentLinkTap($0) }
         cell.body.onSignatureLinks = { [weak page] in page?.handleSignatureLinkCandidatesTap($0) }
         cell.body.onPhotos = { [weak page] in page?.presentPhotoBrowser(imageURLs: $0, initialIndex: $1) }
@@ -263,6 +279,10 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
 
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let key = keys.indices.contains(indexPath.item) ? keys[indexPath.item] : ""
+        if key.hasPrefix("skeleton") {
+            let height = DetailSkeletonListCell.height(for: key == "skeleton-header" ? .header : .comment)
+            return CGSize(width: max(1, collectionView.bounds.width), height: height)
+        }
         let estimate: CGFloat = key == "divider" ? 8 : ["filter", "entry"].contains(key) ? 48 : 100
         return CGSize(width: max(1, collectionView.bounds.width), height: heights[key] ?? estimate)
     }

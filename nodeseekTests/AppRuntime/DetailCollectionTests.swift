@@ -414,4 +414,74 @@ final class DetailCollectionTests: XCTestCase {
         let list = try XCTUnwrap(page.view.subviews.compactMap { $0 as? UICollectionView }.first)
         XCTAssertTrue(list.indexPathsForVisibleItems.contains(try XCTUnwrap(page.indexPathForCurrentPageAnchor("21"))))
     }
+
+    private func allViews(_ root: UIView) -> [UIView] {
+        [root] + root.subviews.flatMap(allViews)
+    }
+
+    private func view(_ id: String, in root: UIView) -> UIView? {
+        allViews(root).first { $0.accessibilityIdentifier == id }
+    }
+
+    func testInitialLoadShowsTextureSkeletonLayout() throws {
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        page.showLoading()
+        window.layoutIfNeeded()
+        let list = try XCTUnwrap(page.collectionList?.view)
+        let skeletons = list.visibleCells.filter { $0.accessibilityIdentifier?.hasPrefix("post-detail-skeleton") == true }
+        // 与 Texture 一致：1 个主楼骨架 + 4 个回复骨架。
+        XCTAssertEqual(skeletons.map(\.accessibilityIdentifier), ["post-detail-skeleton-header"] + Array(repeating: "post-detail-skeleton-comment", count: 4))
+        XCTAssertEqual(skeletons.first?.bounds.height ?? 0, 354, accuracy: 0.5)
+        XCTAssertEqual(skeletons.last?.bounds.height ?? 0, 136, accuracy: 0.5)
+
+        page.render(detail: makePagedDetail(1...3, pageNumber: 1, next: nil))
+        window.layoutIfNeeded()
+        XCTAssertFalse(list.visibleCells.contains { $0.accessibilityIdentifier?.hasPrefix("post-detail-skeleton") == true })
+    }
+
+    func testReplyHeaderKeepsTexturePosterHotAndStatusBadges() async throws {
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let reply = Comment(id: "2", anchorID: "1", authorName: "Alice", isPoster: true, avatarURL: nil,
+                            authorBadgeTexts: ["禁言", "Lv3"], floorText: "#1", createdAtText: "1 小时前",
+                            contentHTML: "回复", isHot: true, markdown: "回复", hasVisibleMarkdown: true)
+        page.render(detail: PostDetail(id: "1", title: "主题", authorName: "Bob", avatarURL: nil,
+                                       metadataText: nil, contentHTML: "主帖", visibleMarkdown: "主帖", comments: [reply]))
+        window.layoutIfNeeded()
+        let list = try XCTUnwrap(page.collectionList?.view)
+        let cell = try XCTUnwrap(list.cellForItem(at: try XCTUnwrap(page.indexPathForCurrentPageAnchor("1"))) as? DetailFloorListCell)
+        XCTAssertEqual(cell.metadata.text, "Alice")
+        let poster = try XCTUnwrap(view("detail-poster-badge", in: cell) as? UILabel)
+        XCTAssertFalse(poster.isHidden)
+        XCTAssertEqual(poster.text, "楼主")
+        XCTAssertEqual(poster.textColor, .systemOrange)
+        let badges = allViews(cell).filter { $0.accessibilityIdentifier == "detail-author-badge" && !$0.isHidden }
+        XCTAssertEqual(badges.map(\.accessibilityLabel), ["禁言", "Lv3"])
+        XCTAssertEqual(badges.first?.layer.borderColor, UIColor.systemRed.cgColor)
+        XCTAssertEqual(badges.last?.layer.borderColor, UIColor.separator.cgColor)
+        let hot = try XCTUnwrap(view("detail-hot-badge", in: cell) as? UIImageView)
+        XCTAssertFalse(hot.isHidden)
+        XCTAssertEqual(hot.accessibilityLabel, "热门评论")
+        XCTAssertEqual(allLabels(cell).first { $0.text == "#1" }?.isHidden, false)
+        XCTAssertFalse(allLabels(cell).contains { $0.text?.contains("热评") == true })
+    }
+
+    func testPostRiskWarningIsCardInsteadOfHeaderText() throws {
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        page.render(detail: PostDetail(id: "1", title: "主题", authorName: "Bob", authorBadgeTexts: ["Lv0"], avatarURL: nil,
+                                       metadataText: "发布于 1 小时前", contentHTML: "主帖", visibleMarkdown: "主帖", comments: []))
+        page.updateAuthorRiskWarning(postID: "1", isVisible: true)
+        window.layoutIfNeeded()
+        let list = try XCTUnwrap(page.collectionList?.view)
+        let cell = try XCTUnwrap(list.visibleCells.compactMap { $0 as? DetailFloorListCell }.first)
+        let warning = try XCTUnwrap(view("detail-risk-warning", in: cell))
+        XCTAssertFalse(warning.isHidden)
+        XCTAssertFalse(allLabels(cell.contentView).contains { $0 !== allLabels(warning).first && $0.text?.contains("温馨提醒") == true })
+        XCTAssertEqual(allViews(cell).filter { $0.accessibilityIdentifier == "detail-author-badge" && !$0.isHidden }.map(\.accessibilityLabel), ["Lv0"])
+    }
 }

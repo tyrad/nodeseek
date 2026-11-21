@@ -29,6 +29,11 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     private let header = UIStackView()
     private let floorNumber = UILabel()
     private let timestamp = UILabel()
+    private let posterBadge = UILabel()
+    private let badgeRow = UIStackView()
+    private var badgeLabels: [AuthorBadgeLabel] = []
+    private let hotBadge = UIImageView()
+    private let riskWarning = DetailRiskWarningView()
     private var topInset: NSLayoutConstraint!
     private var headerHeight: NSLayoutConstraint!
     private var bottomInset: CGFloat = 0
@@ -115,10 +120,32 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         avatar.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(showAuthor)))
         avatar.addInteraction(UIContextMenuInteraction(delegate: self))
         metadata.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(showAuthor)))
+        // 与 Texture 楼层一致：作者名、楼主、状态标签各自独立，作者名过长时先换行，标签保持完整。
+        metadata.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        posterBadge.accessibilityIdentifier = "detail-poster-badge"
+        posterBadge.text = DetailListStrings.text("poster")
+        posterBadge.textColor = .systemOrange
+        posterBadge.adjustsFontForContentSizeCategory = true
+        badgeRow.spacing = 5
+        badgeRow.alignment = .center
+        hotBadge.accessibilityIdentifier = "detail-hot-badge"
+        hotBadge.isAccessibilityElement = true
+        hotBadge.accessibilityLabel = DetailListStrings.text("hot-comment")
+        hotBadge.contentMode = .scaleAspectFit
+        hotBadge.image = UIImage(systemName: "flame.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold))
+        hotBadge.tintColor = .systemOrange
+        for view in [posterBadge, badgeRow, hotBadge] as [UIView] {
+            view.setContentHuggingPriority(.required, for: .horizontal)
+            view.setContentCompressionResistancePriority(.required, for: .horizontal)
+        }
         identity.spacing = 5
         identity.alignment = .center
         identity.addArrangedSubview(metadata)
+        identity.addArrangedSubview(posterBadge)
+        identity.addArrangedSubview(badgeRow)
         identity.addArrangedSubview(UIView())
+        identity.addArrangedSubview(hotBadge)
+        identity.setCustomSpacing(4, after: hotBadge)
         identity.addArrangedSubview(floorNumber)
         header.axis = .vertical
         header.distribution = .equalCentering
@@ -133,6 +160,8 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         stack.addArrangedSubview(body)
         body.axis = .vertical
         body.spacing = 8
+        riskWarning.isHidden = true
+        stack.addArrangedSubview(riskWarning)
 
         contentView.addSubview(avatar)
         avatar.translatesAutoresizingMaskIntoConstraints = false
@@ -170,28 +199,45 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         footer.isHidden = true
     }
 
-    func configureHeader(title: String?, name: String, badges: [String], time: String?, floor: String?) {
+    func configureHeader(title: String?, name: String, isPoster: Bool = false, badges: [String], time: String?,
+                         floor: String?, isHot: Bool = false, showsRiskWarning: Bool = false) {
         let isReply = title == nil
         let hasAuthor = AuthorDisplayPolicy.isDisplayable(name)
         let metrics = UIFontMetrics(forTextStyle: .subheadline)
         let small = metrics.scaledFont(for: AppTypography.commentMetadataFont(), compatibleWith: traitCollection)
+        let badgeFont = metrics.scaledFont(for: AppTypography.commentBadgeFont(), compatibleWith: traitCollection)
         let authorFont = metrics.scaledFont(for: isReply ? AppTypography.commentAuthorFont() : AppTypography.detailMetadataFont(), compatibleWith: traitCollection)
         let author = NSMutableAttributedString(string: hasAuthor ? name : "", attributes: [
             .font: authorFont, .foregroundColor: isReply ? ReadingColors.text : UIColor.secondaryLabel
         ])
-        let details = badges + (!isReply && badges.isEmpty ? [time].compactMap { $0 } : [])
-        for detail in details where !detail.isEmpty {
-            author.append(NSAttributedString(string: (author.length == 0 ? "" : "  ") + detail,
-                                             attributes: [.font: small, .foregroundColor: UIColor.secondaryLabel]))
+        // 主楼没有状态标签时，发布信息跟在作者名后；有标签时移到第二行。
+        if !isReply, badges.isEmpty, let time, !time.isEmpty {
+            author.append(NSAttributedString(string: (author.length == 0 ? "" : "  ") + time,
+                                             attributes: [.font: authorFont, .foregroundColor: UIColor.secondaryLabel]))
         }
         metadata.accessibilityLabel = nil
         metadata.attributedText = author
+        metadata.isHidden = author.length == 0
+        posterBadge.font = badgeFont
+        posterBadge.isHidden = !isPoster
+        while badgeLabels.count < badges.count {
+            let label = AuthorBadgeLabel()
+            badgeLabels.append(label)
+            badgeRow.addArrangedSubview(label)
+        }
+        for (index, label) in badgeLabels.enumerated() {
+            label.isHidden = index >= badges.count
+            if index < badges.count { label.configure(badges[index], font: badgeFont) }
+        }
+        badgeRow.isHidden = badges.isEmpty
+        riskWarning.isHidden = !showsRiskWarning
         floorNumber.font = small
         floorNumber.text = floor
         floorNumber.isHidden = floor?.isEmpty != false
         timestamp.font = small
         timestamp.text = time
         timestamp.isHidden = time?.isEmpty != false || (!isReply && badges.isEmpty)
+        hotBadge.isHidden = !isHot || floorNumber.isHidden
         header.directionalLayoutMargins = .init(top: 0, leading: hasAuthor ? PostDetailContentLayout.avatarSize + PostDetailContentLayout.avatarSpacing : 0, bottom: 0, trailing: 0)
         headerHeight.constant = !isReply && hasAuthor ? PostDetailContentLayout.avatarSize : 0
         heading.text = title
@@ -418,6 +464,86 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         let measured = stack.systemLayoutSizeFitting(size, withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel)
         return ceil(measured.height + topInset.constant + bottomInset)
     }
+}
+
+/// 作者状态标签，样式同 `AuthorStatusBadgeNode`：禁言、封禁标红，其余用分隔线色描边。
+final class AuthorBadgeLabel: UILabel {
+    private let insets = UIEdgeInsets(top: 2, left: 5, bottom: 2, right: 5)
+    private var isMuted = false
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        accessibilityIdentifier = "detail-author-badge"
+        adjustsFontForContentSizeCategory = true
+        layer.cornerRadius = 4
+        layer.borderWidth = 1
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func configure(_ text: String, font: UIFont) {
+        self.text = text
+        self.font = font
+        accessibilityLabel = text
+        isMuted = text.contains("禁言") || text.contains("封禁")
+        applyColors()
+    }
+
+    private func applyColors() {
+        textColor = isMuted ? .systemRed : .label
+        layer.borderColor = (isMuted ? UIColor.systemRed : UIColor.separator).resolvedColor(with: traitCollection).cgColor
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        applyColors()
+    }
+
+    override func drawText(in rect: CGRect) { super.drawText(in: rect.inset(by: insets)) }
+
+    override var intrinsicContentSize: CGSize {
+        let size = super.intrinsicContentSize
+        return CGSize(width: size.width + insets.left + insets.right, height: size.height + insets.top + insets.bottom)
+    }
+}
+
+/// 楼主等级过低时的交易提醒卡片，样式同 `PostAuthorRiskWarningNode`。
+final class DetailRiskWarningView: UIView {
+    private let label = UILabel()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        accessibilityIdentifier = "detail-risk-warning"
+        backgroundColor = UIColor.systemOrange.withAlphaComponent(0.12)
+        layer.cornerRadius = 12
+        layer.cornerCurve = .continuous
+        clipsToBounds = true
+        let icon = UIImageView(image: UIImage(systemName: "exclamationmark.shield.fill"))
+        icon.tintColor = .systemOrange
+        icon.isAccessibilityElement = false
+        label.text = PostAuthorRiskWarningNode.message
+        label.font = .preferredFont(forTextStyle: .subheadline)
+        label.adjustsFontForContentSizeCategory = true
+        label.textColor = .label
+        label.numberOfLines = 0
+        for view in [icon, label] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(view)
+        }
+        NSLayoutConstraint.activate([
+            icon.widthAnchor.constraint(equalToConstant: 20),
+            icon.heightAnchor.constraint(equalToConstant: 20),
+            icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            icon.topAnchor.constraint(equalTo: topAnchor, constant: 14),
+            label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            label.topAnchor.constraint(equalTo: topAnchor, constant: 12),
+            label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12),
+            icon.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -12)
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
 enum DetailListStrings {
