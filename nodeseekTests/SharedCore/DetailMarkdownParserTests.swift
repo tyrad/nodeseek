@@ -198,6 +198,19 @@ struct DetailMarkdownParserTests {
         return try #require(link).absoluteString
     }
 
+    @Test func onlyDoubleTildesStrikeTextInTheDetail() throws {
+        let share = "/~99423cRA5z~:/"
+        #expect(try parse(share) == [.paragraph([.text(share, [], nil)])])
+        #expect(try parse("~单~ 和 ~~双~~") == [.paragraph([.text("~单~ 和 ", [], nil), .text("双", .strike, nil)])])
+        #expect(try parse("中文 ~**强调**~") == [.paragraph([.text("中文 ~", [], nil), .text("强调", .bold, nil), .text("~", [], nil)])])
+        #expect(try parse("> ~跨\r\n> 行~") == [.quote([.paragraph([.text("~跨", [], nil), .text("\n", [], nil), .text("行~", [], nil)])])])
+        #expect(try parse("~x~ [链接](/~user~/)") == [.paragraph([.text("~x~ ", [], nil), .text("链接", [], NodeSeekSite.baseURL.appendingPathComponent("~user~/"))])])
+        #expect(try parse(#"\~原样\~"#) == [.paragraph([.text("~原样~", [], nil)])])
+        #expect(try parse("`~原样~`") == [.paragraph([.text("~原样~", .code, nil)])])
+        #expect(try bareLinkTarget("https://example.com/~user~/file") == "https://example.com/~user~/file")
+        #expect(try parse("~~~swift\n~x~\n~~~") == [.code(language: "swift", text: "~x~\n")])
+    }
+
     @Test func mixedEscapesSurviveNavigation() throws {
         let raw = "https://example.com/a%2Fb中文?q=%23）&raw=%xx#段"
         let target = "https://example.com/a%2Fb%E4%B8%AD%E6%96%87?q=%23%EF%BC%89&raw=%25xx#%E6%AE%B5"

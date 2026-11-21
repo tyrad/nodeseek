@@ -282,7 +282,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     }
 
     private func scheduleBatchFetchCheck() {
-        guard !batchCheckScheduled, let page, page.authorFilter == nil, page.canRequestCommentBatchFetch() else { return }
+        guard !batchCheckScheduled, let page, page.canRequestCommentBatchFetch() else { return }
         batchCheckScheduled = true
         // 等这一轮布局和 presenter 的页码更新完成，再根据最新剩余距离发请求。
         DispatchQueue.main.async { [weak self] in
@@ -292,10 +292,15 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         }
     }
 
-    private func requestNextPageIfNeeded() {
-        guard let page, page.authorFilter == nil, page.canRequestCommentBatchFetch(),
+    private func requestNextPageIfNeeded(at offsetY: CGFloat? = nil) {
+        // 跳页、刷新和筛选自动补页期间，旧列表的滚动回调不能抢占下一次请求。
+        guard let page, !page.pendingPageJumpScroll, !page.loadingIndicator.isAnimating,
+              !page.loadMoreCommentsIndicator.isAnimating, page.authorFilterAutoLoadStreak == 0,
+              page.canRequestCommentBatchFetch(),
               view.window != nil, view.contentSize.height > 0 else { return }
-        let viewport = view.bounds.inset(by: view.adjustedContentInset)
+        var bounds = view.bounds
+        if let offsetY { bounds.origin.y = offsetY }
+        let viewport = bounds.inset(by: view.adjustedContentInset)
         guard viewport.height > 0, view.contentSize.height - viewport.maxY <= page.leadingScreensForBatching * viewport.height else { return }
         page.lastBatchFetchRequestedCommentCount = page.comments.count
         page.presenter.didApproachCommentEnd()
@@ -310,6 +315,14 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         page?.scrollViewDidScroll(scrollView)
         for case let floor as DetailFloorListCell in view.visibleCells { floor.body.refreshPlayback() }
     }
+    func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint,
+                                   targetContentOffset: UnsafeMutablePointer<CGPoint>) {
+        let targetY = targetContentOffset.pointee.y
+        guard velocity.y > 0, targetY > scrollView.contentOffset.y else { return }
+        // 快速上滑时按系统预计的停靠位置提前加载，保留系统给出的惯性落点。
+        requestNextPageIfNeeded(at: targetY)
+    }
+
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
         page?.scrollViewDidEndDragging(scrollView, willDecelerate: decelerate)
     }

@@ -40,7 +40,12 @@ extension PostDetailViewController {
         let firstLoadedPage = loadedCommentPageRanges.keys.min() ?? currentPage
         guard isViewLoaded else { return firstLoadedPage }
         let rows = collectionList?.rows ?? detailRows
-        let visibleRows = (collectionList?.view.indexPathsForVisibleItems ?? tableNode.indexPathsForVisibleRows()).map(\.row).sorted()
+        var visibleRows = (collectionList?.view.indexPathsForVisibleItems ?? tableNode.indexPathsForVisibleRows()).map(\.row).sorted()
+        // 仅新版列表：末页不足一屏时，滑到全文底部按最后一条可见评论计页。
+        if let list = collectionList?.view, pagination?.nextPage == nil {
+            let endY = list.contentSize.height - list.bounds.height + list.adjustedContentInset.bottom
+            if endY > -list.adjustedContentInset.top, list.contentOffset.y >= endY - 1 { visibleRows.reverse() }
+        }
         for row in visibleRows where row < rows.count {
             guard case .comment(let commentIndex) = rows[row] else { continue }
             if let page = loadedCommentPageRanges.first(where: { $0.value.contains(commentIndex) })?.key {

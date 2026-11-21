@@ -110,7 +110,7 @@ nonisolated struct DetailMarkdownParser: Sendable {
     }
 
     private func inlineOnly(_ parent: Markup) throws -> [Inline] {
-        try parent.children.flatMap { try pieces($0) }.map {
+        try inlineChildren(parent).flatMap { try pieces($0) }.map {
             guard case .inline(let value) = $0 else { throw ParseError.unsupported }
             return value
         }
@@ -119,7 +119,7 @@ nonisolated struct DetailMarkdownParser: Sendable {
     private func inlineBlocks(_ parent: Markup) throws -> [Block] {
         var result: [Block] = []
         var run: [Inline] = []
-        for child in parent.children {
+        for child in try inlineChildren(parent) {
             for piece in try pieces(child) {
                 switch piece {
                 case .inline(let inline): run.append(inline)
@@ -131,6 +131,33 @@ nonisolated struct DetailMarkdownParser: Sendable {
         }
         if !run.isEmpty { result.append(.paragraph(run)) }
         return result
+    }
+
+    // cmark-gfm 也把单波浪号当删除线，网页只认 ~~文字~~。单波浪号展开回原文并与相邻文字合并，
+    // 让分享口令、裸链接和表情代码保持完整，后续按同一段文字识别。
+    private func inlineChildren(_ parent: Markup) throws -> [Markup] {
+        var result: [Markup] = []
+        func append(_ node: Markup) {
+            if let text = node as? Markdown.Text, let last = result.last as? Markdown.Text {
+                result[result.count - 1] = Markdown.Text(last.string + text.string)
+            } else {
+                result.append(node)
+            }
+        }
+        for child in parent.children {
+            guard let strike = child as? Strikethrough, try isSingleTilde(strike) else { append(child); continue }
+            append(Markdown.Text("~"))
+            try inlineChildren(strike).forEach(append)
+            append(Markdown.Text("~"))
+        }
+        return result
+    }
+
+    // 开始标记到首个子节点的列差就是波浪号个数。
+    private func isSingleTilde(_ strike: Strikethrough) throws -> Bool {
+        guard let opener = strike.range?.lowerBound, let content = strike.child(at: 0)?.range?.lowerBound,
+              opener.line == content.line else { throw ParseError.unsupported }
+        return content.column - opener.column == 1
     }
 
     private func pieces(_ node: Markup, style: Style = [], link: URL? = nil) throws -> [Piece] {
@@ -156,7 +183,7 @@ nonisolated struct DetailMarkdownParser: Sendable {
             return [.inline(.text(html.rawHTML, style, link))]
         default: throw ParseError.unsupported
         }
-        return try node.children.flatMap { try pieces($0, style: style, link: link) }
+        return try inlineChildren(node).flatMap { try pieces($0, style: style, link: link) }
     }
 
     // 网页在正文及表格中把这些标记转义为可见文字。

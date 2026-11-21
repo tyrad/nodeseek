@@ -33,9 +33,10 @@ final class DetailCollectionTests: XCTestCase {
         window.rootViewController = page
         window.makeKeyAndVisible()
         defer { window.isHidden = true; window.rootViewController = nil }
-        let raw = "短 [链](https://example.com)！"
+        let raw = "/~99423cRA5z~:/ [链](https://example.com)！"
+        let visible = "/~99423cRA5z~:/ 链！"
         let comment = Comment(id: "2", anchorID: "1", authorName: "Alice", avatarURL: nil, floorText: "#1",
-                              createdAtText: nil, contentHTML: "<p>短 链！</p>", markdown: raw, hasVisibleMarkdown: true)
+                              createdAtText: nil, contentHTML: "<p>\(visible)</p>", markdown: raw, hasVisibleMarkdown: true)
         page.render(detail: PostDetail(id: "1", title: "主题", authorName: "Bob", avatarURL: nil,
                                        metadataText: nil, contentHTML: "主帖", visibleMarkdown: "主帖", comments: [comment]))
         let list = try XCTUnwrap(page.collectionList?.view)
@@ -76,7 +77,7 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertTrue(cell.hitTest(CGPoint(x: cell.stack.frame.minX + 2, y: footerBlank.y), with: nil) === blank)
         text.selectAll(nil)
         XCTAssertTrue(hit(text.bounds.maxX - 8) === text)
-        XCTAssertEqual(text.text(in: try XCTUnwrap(text.selectedTextRange)), "短 链！")
+        XCTAssertEqual(text.text(in: try XCTUnwrap(text.selectedTextRange)), visible)
         cell.prepareForReuse()
         XCTAssertTrue(previews().allSatisfy { $0 == nil })
         XCTAssertEqual(copy.actionHandler?(copy), false)
@@ -195,26 +196,32 @@ final class DetailCollectionTests: XCTestCase {
         deliver(request, .native([]))
     }
 
-    func testPaginationRequestsNextPageWithinTwoScreensAndKeepsVisibleFloor() async throws {
-        let spy = SpyPostDetailPresenter()
-        let page = PostDetailViewController(presenter: spy, usesTextKitList: true)
+    private func makePagedDetail(_ range: ClosedRange<Int>, pageNumber: Int, next: Int?) -> PostDetail {
+        let replies = range.map { number in
+            Comment(id: String(number), anchorID: String(number), authorName: "Alice", avatarURL: nil,
+                    floorText: "#\(number)", createdAtText: nil, contentHTML: "短回复",
+                    markdown: "短回复", hasVisibleMarkdown: true)
+        }
+        return PostDetail(id: "10", title: "分页", authorName: "Bob", avatarURL: nil, metadataText: nil,
+                          contentHTML: "主楼", visibleMarkdown: "主楼", comments: replies, page: pageNumber,
+                          pagination: .init(currentPage: pageNumber, items: [], previousPage: nil, nextPage: next))
+    }
+
+    private func pagingWindow(for page: PostDetailViewController) throws -> UIWindow {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
         window.rootViewController = page
         window.makeKeyAndVisible()
+        return window
+    }
+
+    func testPaginationRequestsNextPageWithinTwoScreensAndKeepsVisibleFloor() async throws {
+        let spy = SpyPostDetailPresenter()
+        let page = PostDetailViewController(presenter: spy, usesTextKitList: true)
+        let window = try pagingWindow(for: page)
         defer { window.isHidden = true; window.rootViewController = nil }
 
-        func detail(_ range: ClosedRange<Int>, pageNumber: Int, next: Int?) -> PostDetail {
-            let replies = range.map { number in
-                Comment(id: String(number), anchorID: String(number), authorName: "Alice", avatarURL: nil,
-                        floorText: "#\(number)", createdAtText: nil, contentHTML: "短回复",
-                        markdown: "短回复", hasVisibleMarkdown: true)
-            }
-            return PostDetail(id: "10", title: "分页", authorName: "Bob", avatarURL: nil, metadataText: nil,
-                              contentHTML: "主楼", visibleMarkdown: "主楼", comments: replies, page: pageNumber,
-                              pagination: .init(currentPage: pageNumber, items: [], previousPage: nil, nextPage: next))
-        }
-        page.render(detail: detail(1...45, pageNumber: 1, next: 2))
+        page.render(detail: makePagedDetail(1...45, pageNumber: 1, next: 2))
         let list = try XCTUnwrap(page.collectionList?.view)
         window.layoutIfNeeded()
         func scroll(remainingScreens: CGFloat) {
@@ -236,7 +243,7 @@ final class DetailCollectionTests: XCTestCase {
         let anchor = try XCTUnwrap(list.cellForItem(at: visible) as? DetailFloorListCell)
         let binding = try XCTUnwrap(anchor.request)
         let top = anchor.convert(anchor.bounds, to: window).minY
-        page.appendCommentPage(detail: detail(46...65, pageNumber: 2, next: nil))
+        page.appendCommentPage(detail: makePagedDetail(46...65, pageNumber: 2, next: nil))
         page.hideLoadingMoreComments()
         list.layoutIfNeeded()
         try await Task.sleep(nanoseconds: 100_000_000)
@@ -244,6 +251,111 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(anchor.convert(anchor.bounds, to: window).minY, top, accuracy: 1)
         XCTAssertEqual(page.comments.count, 65)
         scroll(remainingScreens: 0)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(spy.didApproachCommentEndCount, 1)
+    }
+
+    func testShortLastPageShowsItsNumberAtTheBottom() async throws {
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let list = try XCTUnwrap(page.collectionList?.view)
+        page.render(detail: makePagedDetail(1...10, pageNumber: 1, next: 2))
+        page.appendCommentPage(detail: makePagedDetail(11...12, pageNumber: 2, next: nil))
+        window.layoutIfNeeded()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(page.visibleCommentPage, 1)
+
+        let end = list.contentSize.height - list.bounds.height + list.adjustedContentInset.bottom
+        list.setContentOffset(CGPoint(x: 0, y: end), animated: false)
+        list.layoutIfNeeded()
+        let visible = list.indexPathsForVisibleItems
+        XCTAssertTrue(visible.contains(try XCTUnwrap(page.indexPathForCurrentPageAnchor("10"))))
+        XCTAssertTrue(visible.contains(try XCTUnwrap(page.indexPathForCurrentPageAnchor("12"))))
+        XCTAssertEqual(page.visibleCommentPage, 2)
+        XCTAssertTrue(list.alwaysBounceVertical)
+
+        list.setContentOffset(CGPoint(x: 0, y: -list.adjustedContentInset.top), animated: false)
+        list.layoutIfNeeded()
+        XCTAssertEqual(page.visibleCommentPage, 1)
+    }
+
+    func testFastFlickRequestsUpcomingPageBeforeDecelerationReachesTheEnd() async throws {
+        let spy = SpyPostDetailPresenter()
+        let page = PostDetailViewController(presenter: spy, usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+
+        page.render(detail: makePagedDetail(1...45, pageNumber: 1, next: 2))
+        window.layoutIfNeeded()
+        let list = try XCTUnwrap(page.collectionList?.view)
+        let end = list.contentSize.height - list.bounds.height + list.adjustedContentInset.bottom
+        let start = CGPoint(x: 0, y: end - 3 * list.bounds.height)
+        list.setContentOffset(start, animated: false)
+        list.layoutIfNeeded()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        func release(at destination: CGFloat, velocity: CGFloat) {
+            var target = CGPoint(x: 0, y: destination)
+            list.delegate?.scrollViewWillEndDragging?(list, withVelocity: CGPoint(x: 0, y: velocity), targetContentOffset: &target)
+            XCTAssertEqual(target.y, destination)
+        }
+        release(at: start.y - 120, velocity: -1)
+        release(at: start.y + 120, velocity: 0.3)
+        XCTAssertEqual(spy.didApproachCommentEndCount, 0)
+        release(at: end - 80, velocity: 3)
+        XCTAssertEqual(spy.didApproachCommentEndCount, 1)
+        list.setContentOffset(CGPoint(x: 0, y: end - 80), animated: false)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(spy.didApproachCommentEndCount, 1)
+    }
+
+    func testScrollDuringPageJumpDoesNotConsumeNewPagesPrefetch() async throws {
+        let spy = SpyPostDetailPresenter()
+        let page = PostDetailViewController(presenter: spy, usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+
+        let list = try XCTUnwrap(page.collectionList?.view)
+        func scrollToEnd() {
+            let y = list.contentSize.height - list.bounds.height + list.adjustedContentInset.bottom
+            list.setContentOffset(CGPoint(x: 0, y: y), animated: false)
+            list.layoutIfNeeded()
+        }
+        page.render(detail: makePagedDetail(1...30, pageNumber: 1, next: 2))
+        window.layoutIfNeeded()
+        page.jumpToCommentPage(5)
+        page.showLoading()
+        scrollToEnd()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(spy.didApproachCommentEndCount, 0, "等待跳页时旧列表仍可滑动")
+
+        let beforeNewPage = spy.didApproachCommentEndCount
+        page.render(detail: makePagedDetail(121...150, pageNumber: 5, next: 6))
+        page.hideLoading()
+        list.layoutIfNeeded()
+        scrollToEnd()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(spy.didApproachCommentEndCount, 1)
+        XCTAssertEqual(spy.didApproachCommentEndCount - beforeNewPage, 1, "新页回复数相同时也应继续分页")
+        XCTAssertEqual(page.currentPage, 5)
+    }
+
+    func testFilteredRepliesCanScrollIntoTheNextPageAfterInitialMatches() async throws {
+        let spy = SpyPostDetailPresenter()
+        let page = PostDetailViewController(presenter: spy, usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+
+        let detail = makePagedDetail(1...45, pageNumber: 1, next: 2)
+        page.render(detail: detail)
+        window.layoutIfNeeded()
+        page.toggleAuthorFilter(.author(of: detail.comments[0]), focusingCommentID: nil)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(spy.didApproachCommentEndCount, 0)
+        let list = try XCTUnwrap(page.collectionList?.view)
+        let end = list.contentSize.height - list.bounds.height + list.adjustedContentInset.bottom
+        list.setContentOffset(CGPoint(x: 0, y: end), animated: false)
+        list.layoutIfNeeded()
         try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertEqual(spy.didApproachCommentEndCount, 1)
     }
