@@ -49,6 +49,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     }
 
     private let menuSurface = UIView()
+    private weak var anchorHighlight: UIView?
     var floorActions: [FloorAction] = [] {
         didSet {
             for label in [heading, floorNumber, metadata] { label.accessibilityCustomActions = nil }
@@ -113,6 +114,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         menuSurface.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         menuSurface.frame = contentView.bounds
         menuSurface.addInteraction(UIContextMenuInteraction(delegate: self))
+        menuSurface.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapNearBodyLink(_:))))
         contentView.insertSubview(menuSurface, at: 0)
         avatar.widthAnchor.constraint(equalToConstant: PostDetailContentLayout.avatarSize).isActive = true
         avatar.heightAnchor.constraint(equalToConstant: PostDetailContentLayout.avatarSize).isActive = true
@@ -266,6 +268,46 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         if let authorURL { openAuthor?(authorURL) }
     }
 
+    // 行末和段落边缘可能落在菜单背景上。仅补单击；长按仍由选字或楼层菜单处理。
+    @objc private func tapNearBodyLink(_ tap: UITapGestureRecognizer) {
+        let padding = DetailSelectableTextView.linkHitPadding
+        var closest: (url: URL, distance: CGFloat)?
+        func visit(_ view: UIView) {
+            let point = tap.location(in: view)
+            guard !view.isHidden, view.alpha > 0.01,
+                  view.bounds.insetBy(dx: -padding, dy: -padding).contains(point),
+                  !view.clipsToBounds || view.bounds.contains(point) else { return }
+            if let text = view as? DetailSelectableTextView {
+                if let hit = text.linkHit(at: point), hit.distance < closest?.distance ?? .infinity {
+                    closest = hit
+                }
+            } else {
+                for child in view.subviews { visit(child) }
+            }
+        }
+        visit(body)
+        if let closest { body.onLink?(closest.url) }
+    }
+
+    func flashAnchorHighlight() {
+        clearAnchorHighlight()
+        let overlay = UIView(frame: contentView.bounds)
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        overlay.isUserInteractionEnabled = false
+        overlay.accessibilityIdentifier = "detail-anchor-highlight"
+        overlay.backgroundColor = NodeSeekLinkStyle.color.withAlphaComponent(0.16)
+        contentView.addSubview(overlay)
+        anchorHighlight = overlay
+        UIView.animate(withDuration: 0.35, delay: 0.8, options: [.curveEaseOut, .allowUserInteraction]) {
+            overlay.alpha = 0
+        } completion: { _ in overlay.removeFromSuperview() }
+    }
+
+    func clearAnchorHighlight() {
+        anchorHighlight?.removeFromSuperview()
+        anchorHighlight = nil
+    }
+
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         guard let hit = super.hitTest(point, with: event) else { return nil }
         guard !floorActions.isEmpty else { return hit }
@@ -383,6 +425,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     }
 
     func clear() {
+        clearAnchorHighlight()
         renderTask?.cancel()
         renderTask = nil
         signatureTask?.cancel()

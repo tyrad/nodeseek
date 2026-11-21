@@ -332,7 +332,7 @@ extension PostDetailViewController {
         testHighlightedAnchorID = normalizedAnchorText(anchorID)
         testPresentedLoadedCommentID = nil
         #endif
-        if let collectionList { collectionList.scroll(to: indexPath.row, position: .centeredVertically); return }
+        if let collectionList { collectionList.scrollToAnchor(at: indexPath.row); return }
         tableNode.scrollToRow(at: indexPath, at: .middle, animated: true)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
             guard let self else { return }

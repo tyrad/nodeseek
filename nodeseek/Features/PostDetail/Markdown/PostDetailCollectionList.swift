@@ -23,6 +23,8 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     private var batchCheckScheduled = false
     private var generation = 0
     private var previousAppearance: DetailTextAppearance?
+    private weak var highlightedFloor: DetailFloorListCell?
+    private var pendingAnchorKey: String?
     private var revealCover: UIView?
     private var revealDeadline: CFTimeInterval = 0
     private var settledChecks = 0
@@ -103,6 +105,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             }
         }
         let currentKeys = Set(keys)
+        if let key = pendingAnchorKey, !currentKeys.contains(key) { pendingAnchorKey = nil }
         heights = heights.filter { currentKeys.contains($0.key) }
         var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
         snapshot.appendSections([0])
@@ -301,6 +304,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
 
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         (cell as? DetailFloorListCell)?.body.refreshPlayback()
+        showPendingHighlight(on: cell)
         scheduleBatchFetchCheck()
     }
 
@@ -381,6 +385,9 @@ extension PostDetailCollectionList {
             return
         }
         revealCover = nil
+        if let key = pendingAnchorKey, let path = data.indexPath(for: key) {
+            showPendingHighlight(on: view.cellForItem(at: path))
+        }
         UIView.animate(withDuration: 0.15, animations: { cover.alpha = 0 }, completion: { _ in cover.removeFromSuperview() })
     }
 }
@@ -421,6 +428,27 @@ private extension PostDetailCollectionList {
 }
 
 extension PostDetailCollectionList {
+    func scrollToAnchor(at row: Int) {
+        guard keys.indices.contains(row) else { return }
+        highlightedFloor?.clearAnchorHighlight()
+        pendingAnchorKey = keys[row]
+        scroll(to: row, position: .centeredVertically)
+        view.layoutIfNeeded()
+        showPendingHighlight(on: view.cellForItem(at: IndexPath(item: row, section: 0)))
+    }
+
+    private func showPendingHighlight(on cell: UICollectionViewCell?) {
+        guard let key = pendingAnchorKey, revealCover == nil,
+              let floor = cell as? DetailFloorListCell, floor.request?.id == key else { return }
+        pendingAnchorKey = nil
+        highlightedFloor = floor
+        floor.flashAnchorHighlight()
+    }
+
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        pendingAnchorKey = nil
+    }
+
     func scroll(to row: Int, position: UICollectionView.ScrollPosition) {
         guard keys.indices.contains(row), row < view.numberOfItems(inSection: 0) else { return }
         view.layoutIfNeeded()

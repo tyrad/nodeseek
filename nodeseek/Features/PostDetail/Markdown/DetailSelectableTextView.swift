@@ -161,9 +161,7 @@ final class DetailSelectableTextView: UIView, UITextInput, UITextInteractionDele
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        let point = touch.location(in: self)
-        guard let hit = nearest(point) else { return false }
-        return hit.link != nil && hit.rect.contains(point)
+        linkHit(at: touch.location(in: self)) != nil
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
@@ -171,9 +169,34 @@ final class DetailSelectableTextView: UIView, UITextInput, UITextInteractionDele
     }
 
     @objc private func openLink(_ tap: UITapGestureRecognizer) {
-        guard selection?.isEmpty != false else { return }
-        let point = tap.location(in: self)
-        if let hit = nearest(point), hit.rect.contains(point), let url = hit.link { onLink(url) }
+        if let hit = linkHit(at: tap.location(in: self)) { onLink(hit.url) }
+    }
+
+    static let linkHitPadding: CGFloat = 12
+
+    /// 实际点中的文字优先；落在空隙时，才在邻近的排版行里找最近的链接。
+    func linkHit(at point: CGPoint) -> (url: URL, distance: CGFloat)? {
+        let padding = Self.linkHitPadding
+        guard selection?.isEmpty != false,
+              let first = snapshot.line(at: point.y - padding)?.lowerBound,
+              let last = snapshot.line(at: point.y + padding)?.upperBound else { return nil }
+        var closest: (url: URL, distance: CGFloat)?
+        let string = snapshot.string as NSString
+        for box in snapshot.characters[first..<last] {
+            let rect = box.rect
+            if rect.contains(point), box.link == nil {
+                let unit = string.character(at: box.range.location)
+                if !(CharacterSet.whitespacesAndNewlines as NSCharacterSet).characterIsMember(unit) { return nil }
+            }
+            guard let url = box.link else { continue }
+            let dx = max(rect.minX - point.x, point.x - rect.maxX, 0)
+            let dy = max(rect.minY - point.y, point.y - rect.maxY, 0)
+            let distance = dx * dx + dy * dy
+            if distance <= padding * padding, distance < closest?.distance ?? .infinity {
+                closest = (url, distance)
+            }
+        }
+        return closest
     }
 
     func interactionWillBegin(_ interaction: UITextInteraction) { becomeFirstResponder() }
