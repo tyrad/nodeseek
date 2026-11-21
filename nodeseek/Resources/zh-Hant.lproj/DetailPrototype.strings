@@ -3,7 +3,10 @@
 "close" = "關閉";
 "use-list" = "詳情頁使用 TextKit 列表";
 "more" = "樓層操作";
-"open-first" = "查看第一頁";
+"entry-opened-on-page" = "目前從第 %ld 頁進入";
+"entry-starts-at-page" = "目前從第 %ld 頁開始";
+"entry-open-full-post" = "查看完整貼文";
+"entry-return-first" = "回到第 1 頁";
 "reply" = "回覆";
 "quote" = "引用";
 "like" = "讚好";
