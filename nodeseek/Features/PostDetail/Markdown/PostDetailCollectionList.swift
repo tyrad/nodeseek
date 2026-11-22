@@ -306,7 +306,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
                               onChicken: { [weak page] in page?.handlePostChickenLegTap(header) },
                               onOppose: { [weak page] in page?.handlePostOpposeTap(header) })
                 cell.addAction("favorite", symbol: header.isFavoriteCollected ? "star.fill" : "star", count: header.favoriteCount,
-                               selected: header.isFavoriteCollected, enabled: !header.isFavoriteSubmitting) { [weak page] in page?.presenter.didTapFavorite() }
+                               selected: header.isFavoriteCollected, enabled: !header.isFavoriteSubmitting) { [weak page] in page?.handleFavoriteTap() }
             }
             if page.showsReplyEntry {
                 cell.addAction("reply", symbol: "arrowshape.turn.up.left", label: "reply-post") { [weak page] in page?.handleReply(toPostHeader: header) }

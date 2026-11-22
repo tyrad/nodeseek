@@ -110,12 +110,21 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
         context: PostDetailActionConfirmationContext,
         onConfirm: @escaping @MainActor () -> Void
     ) {
-        guard isAlreadyApplied == false else {
-            onConfirm()
-            return
+        // 与回复、引用一致：游客先提示登录，登录后再继续原操作。
+        ensureNodeSeekLoggedIn(context: "reaction", allowCachedLogin: true) { [weak self] in
+            guard let self else { return }
+            guard isAlreadyApplied == false else {
+                onConfirm()
+                return
+            }
+            actionConfirmationPresenter(self, context, onConfirm)
         }
+    }
 
-        actionConfirmationPresenter(self, context, onConfirm)
+    func handleFavoriteTap() {
+        ensureNodeSeekLoggedIn(context: "favorite", allowCachedLogin: true) { [weak self] in
+            self?.presenter.didTapFavorite()
+        }
     }
 
     func tableNode(_ tableNode: ASTableNode, numberOfRowsInSection section: Int) -> Int {
@@ -173,7 +182,7 @@ extension PostDetailViewController: ASTableDataSource, ASTableDelegate {
                         self?.handlePostOpposeTap(header)
                     },
                     onFavoriteTapped: {
-                        self?.presenter.didTapFavorite()
+                        self?.handleFavoriteTap()
                     },
                     onReplyTapped: {
                         self?.handleReply(toPostHeader: header)

@@ -932,9 +932,9 @@ struct PostDetailViewControllerTests {
         #expect(viewController.testRowCount(inSection: 0) == 3)
     }
 
-    @Test func tappingPostChickenLegRequiresConfirmationBeforeSubmitting() throws {
+    @Test func tappingPostChickenLegRequiresConfirmationBeforeSubmitting() async throws {
         let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
+        let viewController = PostDetailViewController(presenter: presenter, accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true))
         let header = PostDetailHeaderContent(
             postID: "710379",
             title: "带操作区的主题",
@@ -952,6 +952,8 @@ struct PostDetailViewControllerTests {
         }
 
         viewController.handlePostChickenLegTap(header)
+        // 先确认已登录，再弹出确认框。
+        _ = await waitUntil(timeout: 2) { confirmationContext != nil }
 
         #expect(confirmationContext == .postChickenLeg)
         #expect(presenter.didTapPostChickenLegCount == 0)
@@ -962,9 +964,9 @@ struct PostDetailViewControllerTests {
         #expect(presenter.didTapPostChickenLegCount == 1)
     }
 
-    @Test func tappingCommentChickenLegRequiresConfirmationBeforeSubmitting() throws {
+    @Test func tappingCommentChickenLegRequiresConfirmationBeforeSubmitting() async throws {
         let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
+        let viewController = PostDetailViewController(presenter: presenter, accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true))
         let comment = Comment(
             id: "9835758",
             authorName: "mist",
@@ -982,6 +984,8 @@ struct PostDetailViewControllerTests {
         }
 
         viewController.handleCommentChickenLegTap(comment)
+        // 先确认已登录，再弹出确认框。
+        _ = await waitUntil(timeout: 2) { confirmationContext != nil }
 
         #expect(confirmationContext == .commentChickenLeg)
         #expect(presenter.chickenLeggedCommentIDs.isEmpty)
@@ -992,9 +996,9 @@ struct PostDetailViewControllerTests {
         #expect(presenter.chickenLeggedCommentIDs == ["9835758"])
     }
 
-    @Test func tappingPostLikeRequiresConfirmationBeforeSubmitting() throws {
+    @Test func tappingPostLikeRequiresConfirmationBeforeSubmitting() async throws {
         let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
+        let viewController = PostDetailViewController(presenter: presenter, accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true))
         let header = PostDetailHeaderContent(
             postID: "710379",
             title: "带操作区的主题",
@@ -1012,6 +1016,8 @@ struct PostDetailViewControllerTests {
         }
 
         viewController.handlePostLikeTap(header)
+        // 先确认已登录，再弹出确认框。
+        _ = await waitUntil(timeout: 2) { confirmationContext != nil }
 
         #expect(confirmationContext == .postLike)
         #expect(presenter.didTapPostLikeCount == 0)
@@ -1022,9 +1028,9 @@ struct PostDetailViewControllerTests {
         #expect(presenter.didTapPostLikeCount == 1)
     }
 
-    @Test func tappingCommentLikeRequiresConfirmationBeforeSubmitting() throws {
+    @Test func tappingCommentLikeRequiresConfirmationBeforeSubmitting() async throws {
         let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
+        let viewController = PostDetailViewController(presenter: presenter, accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true))
         let comment = Comment(
             id: "9835758",
             authorName: "mist",
@@ -1042,6 +1048,8 @@ struct PostDetailViewControllerTests {
         }
 
         viewController.handleCommentLikeTap(comment)
+        // 先确认已登录，再弹出确认框。
+        _ = await waitUntil(timeout: 2) { confirmationContext != nil }
 
         #expect(confirmationContext == .commentLike)
         #expect(presenter.likedCommentIDs.isEmpty)
@@ -1052,9 +1060,9 @@ struct PostDetailViewControllerTests {
         #expect(presenter.likedCommentIDs == ["9835758"])
     }
 
-    @Test func tappingPostOpposeRequiresConfirmationBeforeSubmitting() throws {
+    @Test func tappingPostOpposeRequiresConfirmationBeforeSubmitting() async throws {
         let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
+        let viewController = PostDetailViewController(presenter: presenter, accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true))
         let header = PostDetailHeaderContent(
             postID: "710379",
             title: "带操作区的主题",
@@ -1072,6 +1080,8 @@ struct PostDetailViewControllerTests {
         }
 
         viewController.handlePostOpposeTap(header)
+        // 先确认已登录，再弹出确认框。
+        _ = await waitUntil(timeout: 2) { confirmationContext != nil }
 
         #expect(confirmationContext == .postOppose)
         #expect(presenter.didTapPostOpposeCount == 0)
@@ -1082,9 +1092,9 @@ struct PostDetailViewControllerTests {
         #expect(presenter.didTapPostOpposeCount == 1)
     }
 
-    @Test func tappingCommentOpposeRequiresConfirmationBeforeSubmitting() throws {
+    @Test func tappingCommentOpposeRequiresConfirmationBeforeSubmitting() async throws {
         let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
+        let viewController = PostDetailViewController(presenter: presenter, accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true))
         let comment = Comment(
             id: "9835758",
             authorName: "mist",
@@ -1102,6 +1112,8 @@ struct PostDetailViewControllerTests {
         }
 
         viewController.handleCommentOpposeTap(comment)
+        // 先确认已登录，再弹出确认框。
+        _ = await waitUntil(timeout: 2) { confirmationContext != nil }
 
         #expect(confirmationContext == .commentOppose)
         #expect(presenter.opposedCommentIDs.isEmpty)
@@ -3854,6 +3866,28 @@ struct PostDetailViewControllerTests {
 
 @MainActor
 struct ReplyLoginNavigationRegressionTests {
+    @Test func guestReactionAndFavoriteOpenLoginWithoutSubmitting() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let detail = PostDetailViewController(presenter: presenter, accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: false))
+        let navigation = UINavigationController(rootViewController: detail)
+        detail.loadViewIfNeeded()
+        var confirmations = 0
+        detail.actionConfirmationPresenter = { _, _, _ in confirmations += 1 }
+        let header = PostDetailHeaderContent(postID: "1", title: "主题", authorName: "mist", avatarURL: nil,
+                                             metadataText: nil, contentHTML: "<p>正文</p>", likeCount: 1)
+        // 与回复、引用一致：游客点赞、收藏先提示登录，不弹确认框也不提交。
+        detail.handlePostLikeTap(header)
+        let likeOpensLogin = await waitUntil(timeout: 3) { navigation.topViewController is LoginWebViewController }
+        try #require(likeOpensLogin)
+        navigation.popViewController(animated: false)
+        detail.handleFavoriteTap()
+        let favoriteOpensLogin = await waitUntil(timeout: 3) { navigation.topViewController is LoginWebViewController }
+        #expect(favoriteOpensLogin)
+        #expect(confirmations == 0)
+        #expect(presenter.didTapPostLikeCount == 0)
+        #expect(presenter.didTapFavoriteCount == 0)
+    }
+
     @Test func doubleTapWhileWaitingForGuestAccountOpensOneLoginPage() async throws {
         let detail = PostDetailViewController(
             presenter: SpyPostDetailPresenter(),
