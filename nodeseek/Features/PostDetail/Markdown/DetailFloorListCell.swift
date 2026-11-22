@@ -130,6 +130,9 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         avatar.layer.cornerRadius = PostDetailContentLayout.avatarCornerRadius
         avatar.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(showAuthor)))
         avatar.addInteraction(UIContextMenuInteraction(delegate: self))
+        // 与旧版标识一致，E2E 按它们定位作者。
+        avatar.accessibilityIdentifier = "comment-author-avatar"
+        metadata.accessibilityIdentifier = "comment-author-name"
         metadata.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(showAuthor)))
         metadata.addInteraction(UIContextMenuInteraction(delegate: self))
         // 与 Texture 楼层一致：作者名、楼主、状态标签各自独立，作者名过长时先换行，标签保持完整。

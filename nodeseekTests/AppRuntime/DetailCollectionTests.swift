@@ -164,6 +164,9 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertNotNil(menu.delegate?.contextMenuInteraction(menu, configurationForMenuAtLocation: .zero))
         XCTAssertEqual(name.accessibilityLabel, String(format: DetailListStrings.text("view-profile"), "Alice"))
         XCTAssertTrue(name.accessibilityTraits.contains(.button))
+        // E2E 按旧版标识定位作者名和头像。
+        XCTAssertEqual(name.accessibilityIdentifier, "comment-author-name")
+        XCTAssertTrue(allViews(cell.contentView).contains { $0.accessibilityIdentifier == "comment-author-avatar" })
     }
 
     func testPostCountsUseCompactUnitsLikeTexture() {

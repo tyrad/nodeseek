@@ -403,6 +403,12 @@ final class DetailBlockStack: UIStackView {
                 // 与旧版一致：同一进程内加载过的图按已知尺寸占位，复用或重新进入时不再先缩后撑。
                 let placeholder = imageSize?(image.url).map { DetailImageLayout.presentation(for: $0, maxWidth: width, kind: kind).size }
                     ?? (kind == .report ? DetailImageLayout.reportPlaceholderSize(maxWidth: width) : DetailImageLayout.normalPlaceholderSize(maxWidth: width))
+                // 正文图片可被读屏点按，E2E 按地址定位。
+                view.isAccessibilityElement = true
+                view.accessibilityTraits = [.image, .button]
+                view.accessibilityLabel = image.altText.flatMap { $0.isEmpty ? nil : $0 } ?? DetailListStrings.text("image")
+                view.accessibilityValue = image.url.absoluteString
+                view.accessibilityIdentifier = "detail-content-image"
                 height = attach(view, to: stack, height: placeholder.height)
             case .iframeLink(let link):
                 // 与旧版一致：嵌入内容显示为带标题和来源的卡片。

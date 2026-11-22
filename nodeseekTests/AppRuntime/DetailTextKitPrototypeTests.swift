@@ -66,6 +66,11 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         descendants(page.view, DetailImageBlockView.self)[1].handleTap()
         XCTAssertEqual(opened?.0, [first, second])
         XCTAssertEqual(opened?.1, 1)
+        // 正文图片可被读屏和 E2E 找到，值为图片地址。
+        let images = descendants(page.view, DetailImageBlockView.self)
+        XCTAssertEqual(images.map(\.accessibilityIdentifier), ["detail-content-image", "detail-content-image"])
+        XCTAssertEqual(images.map(\.accessibilityValue), [first.absoluteString, second.absoluteString])
+        XCTAssertEqual(images.first?.accessibilityLabel, "甲")
     }
 
     func testTabImageOpensGalleryAcrossAllTabs() async throws {
