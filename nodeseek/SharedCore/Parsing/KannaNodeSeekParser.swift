@@ -830,7 +830,7 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
         }
 
         // 当前页面先输出空菜单，稍后才挂载按钮。此时计数来自配置，作者名和编辑时间也可能含“收藏”等字样。
-        if item.at_xpath(".//*[contains(concat(' ', normalize-space(@class), ' '), ' comment-menu-mount ') or contains(concat(' ', normalize-space(@class), ' '), ' comment-menu ')]") != nil {
+        if item.at_xpath(".//*[contains(concat(' ', normalize-space(@class), ' '), ' comment-menu-mount ') or contains(concat(' ', normalize-space(@class), ' '), ' comment-menu ')]" + Self.outsidePostText) != nil {
             return nil
         }
 

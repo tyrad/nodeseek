@@ -674,7 +674,7 @@ struct KannaNodeSeekParserTests {
     func legacyFavoriteButtonReadsOnlyStandaloneSiblingCounts(text: String, expected: Int?) throws {
         let html = """
         <div class="nsk-post"><div class="post-title"><h1>测试</h1></div>
-          <div id="0" class="content-item"><article class="post-content">正文</article>
+          <div id="0" class="content-item"><article class="post-content">正文<span class="comment-menu-mount"></span></article>
             <button title="收藏"></button><span>\(text)</span>
           </div>
         </div>
