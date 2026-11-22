@@ -534,8 +534,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     private func install(_ delivered: DetailFloorRequest, _ layout: consuming DetailFloorLayout) {
         guard request == delivered else { return }
         contentInstalled = true
-        body.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        body.nextTabOrdinal = 0
+        body.removeAllBlocks()
         switch layout {
         case .native(let blocks):
             onNative?(blocks)
@@ -562,6 +561,8 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
             signature.onLink = self.body.onLink
             signature.onSignatureLinks = self.body.onSignatureLinks
             signature.onPhotos = self.body.onPhotos
+            signature.imageSize = self.body.imageSize
+            signature.onImageSize = self.body.onImageSize
             signature.onSizeChange = self.body.onSizeChange
             signature.viewport = self.body.viewport
             self.signatureStack = signature

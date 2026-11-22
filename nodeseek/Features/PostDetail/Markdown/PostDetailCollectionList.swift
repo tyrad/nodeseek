@@ -22,7 +22,9 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     private var keys: [String] = []
     private var heights: [String: CGFloat] = [:]
     private var headerEstimate: CGFloat = 100
-    private var tabSelections: [String: Int] = [:]
+    /// 测评标签选中栏，按楼层 key 和楼层内第几个标签组记录。
+    private struct TabGroup: Hashable { let floor: String; let ordinal: Int }
+    private var tabSelections: [TabGroup: Int] = [:]
     private let cache = NSCache<NSString, CachedText>()
     private var requestedPage: Int?
     private var retryOnNextDrag = false
@@ -118,6 +120,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         let currentKeys = Set(keys)
         if let key = pendingAnchorKey, !currentKeys.contains(key) { pendingAnchorKey = nil }
         heights = heights.filter { currentKeys.contains($0.key) }
+        tabSelections = tabSelections.filter { currentKeys.contains($0.key.floor) }
         // 预估值在一次加载内保持不变，否则视图尺寸变化会挪动已定位的锚点。
         // 带锚点或翻页打开时主楼可能横跨视口顶部，量完缩短会把目标楼层挤出屏幕，仍按小值预估。
         let opensAtTop = page.currentPage == 1 && page.pendingInitialAnchorID == nil && !page.pendingPageJumpScroll
@@ -257,6 +260,8 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         cell.body.onLink = { [weak page] in page?.handleContentLinkTap($0) }
         cell.body.onSignatureLinks = { [weak page] in page?.handleSignatureLinkCandidatesTap($0) }
         cell.body.onPhotos = { [weak page] in page?.presentPhotoBrowser(imageURLs: $0, initialIndex: $1) }
+        cell.body.imageSize = { [weak page] in page?.cachedDetailImageSize(for: $0) }
+        cell.body.onImageSize = { [weak page] in page?.cacheDetailImageSize($1, for: $0) }
         cell.body.viewport = list
         let resized = { [weak self, weak cell] in
             DispatchQueue.main.async { [weak self, weak cell] in
@@ -265,8 +270,8 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             }
         }
         cell.body.onSizeChange = resized
-        cell.body.savedTab = { [weak self] in self?.tabSelections["\(key)#\($0)"] ?? 0 }
-        cell.body.onTabSelected = { [weak self] in self?.tabSelections["\(key)#\($0)"] = $1 }
+        cell.body.savedTab = { [weak self] in self?.tabSelections[.init(floor: key, ordinal: $0)] ?? 0 }
+        cell.body.onTabSelected = { [weak self] in self?.tabSelections[.init(floor: key, ordinal: $0)] = $1 }
         cell.didInstall = resized
         cell.body.onStickerSizeChange = { [weak self, weak cell] in
             guard let self, cell?.request == request else { return }
@@ -524,9 +529,11 @@ private extension PostDetailCollectionList {
         let editIcon = UIImage(systemName: "square.and.pencil")
         add("copy", UIImage(systemName: "doc.on.doc")) { [weak cell] page in
             // 正文排好前用网页内容兜底，与旧版一样复制后提示，没有内容时直接说明。
-            let fallback = comment.map { CommentCopyTextFormatter.plainText(for: $0, baseURL: page.baseURL) }
-                ?? page.currentHeaderContent.map { CommentCopyTextFormatter.plainText(for: $0, baseURL: page.baseURL) }
-            guard let text = cell?.copyText ?? fallback, !text.isEmpty else {
+            func fallback() -> String? {
+                comment.map { CommentCopyTextFormatter.plainText(for: $0, baseURL: page.baseURL) }
+                    ?? page.currentHeaderContent.map { CommentCopyTextFormatter.plainText(for: $0, baseURL: page.baseURL) }
+            }
+            guard let text = cell?.copyText ?? fallback(), !text.isEmpty else {
                 page.showToast(message: DetailListStrings.text("nothing-to-copy"))
                 return
             }

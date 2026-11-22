@@ -10,11 +10,20 @@ final class DetailBlockStack: UIStackView {
     var onPhotos: (([URL], Int) -> Void)?
     var onStickerSizeChange: (() -> Void)?
     var onSizeChange: (() -> Void)?
+    /// 图片尺寸由页面统一缓存：已知尺寸按最终高度占位，加载后回写。
+    var imageSize: ((URL) -> CGSize?)?
+    var onImageSize: ((URL, CGSize) -> Void)?
     /// 按楼层内第几个标签组读写选中栏，楼层复用重建后恢复，与旧版保持选中一致。
     var savedTab: ((Int) -> Int)?
     var onTabSelected: ((Int, Int) -> Void)?
-    var nextTabOrdinal = 0
+    private var nextTabOrdinal = 0
     weak var viewport: UIView?
+
+    /// 清空正文以便重新装入；标签组序号随之从头计数，复用后能对上之前的选中栏。
+    func removeAllBlocks() {
+        arrangedSubviews.forEach { $0.removeFromSuperview() }
+        nextTabOrdinal = 0
+    }
 
     func refreshPlayback() {
         guard let viewport else { return }
@@ -119,14 +128,6 @@ final class DetailBlockStack: UIStackView {
         var gallery: ((UIView) async throws -> [DetailMagicTabGallery.Image])?
         var galleryTask: Task<Void, Never>?
         deinit { layoutTask?.cancel(); galleryTask?.cancel() }
-    }
-
-    private static var knownImageSizes: [URL: CGSize] = [:]
-
-    static func rememberImageSize(_ size: CGSize, for url: URL) {
-        guard size.width > 0, size.height > 0 else { return }
-        if knownImageSizes.count > 500 { knownImageSizes.removeAll(keepingCapacity: true) }
-        knownImageSizes[url] = size
     }
 
     private static func tabPage(containing view: UIView?) -> TabPage? {
@@ -279,8 +280,16 @@ final class DetailBlockStack: UIStackView {
         }
     }
 
-    /// 与旧版一致：点图时以整楼图片（含引用内，不含标签页）为图集，从点中的那张开始。
-    private func openGallery(at url: URL) {
+    /// 点图统一入口：标签内的图打开跨标签图集，其余用调用方给出的图集，从点中的那张开始。
+    private func openPhoto(_ url: URL, in view: UIView?, gallery: () -> [URL]) {
+        if let page = Self.tabPage(containing: view) { openTabGallery(page, tapped: url); return }
+        let urls = gallery()
+        guard let index = urls.firstIndex(of: url) else { onPhotos?([url], 0); return }
+        onPhotos?(urls, index)
+    }
+
+    /// 与旧版一致：整楼图片（含引用内，不含标签页）组成图集。
+    private func floorImageURLs() -> [URL] {
         var urls: [URL] = []
         func visit(_ view: UIView) {
             if view is TabPage { return }
@@ -288,8 +297,7 @@ final class DetailBlockStack: UIStackView {
             view.subviews.forEach(visit)
         }
         visit(self)
-        guard let index = urls.firstIndex(of: url) else { onPhotos?([url], 0); return }
-        onPhotos?(urls, index)
+        return urls
     }
 
     /// 标签内点图：先生成所有标签的图集（终端报告需截图，期间显示加载），失败时只看当前这张。
@@ -348,11 +356,8 @@ final class DetailBlockStack: UIStackView {
         let size = CGSize(width: max(1, width), height: .greatestFiniteMagnitude)
         let open: (URL) -> Void = { [weak self] in self?.onLink?($0) }
         let photos: ([URL], Int) -> Void = { [weak self, weak stack] urls, index in
-            if let page = Self.tabPage(containing: stack), urls.indices.contains(index) {
-                self?.openTabGallery(page, tapped: urls[index])
-            } else {
-                self?.onPhotos?(urls, index)
-            }
+            guard urls.indices.contains(index) else { return }
+            self?.openPhoto(urls[index], in: stack) { urls }
         }
         for block in blocks {
             switch block {
@@ -388,14 +393,15 @@ final class DetailBlockStack: UIStackView {
                 let inTab = Self.tabPage(containing: stack) != nil
                 let kind: DetailImageKind = inTab ? .report : DetailImageKind.resolved(isSticker: false, imageURL: image.url)
                 let view = DetailImageBlockView(imageBlock: image, imageKind: kind, onImageLoaded: { [weak self] original, resolved in
-                    Self.rememberImageSize(original, for: image.url)
+                    self?.onImageSize?(image.url, original)
                     height?.constant = DetailImageLayout.presentation(for: original, maxWidth: width, kind: resolved ?? kind).size.height
                     self?.onSizeChange?()
                 }, onImageTapped: { [weak self, weak stack] in
-                    if let page = Self.tabPage(containing: stack) { self?.openTabGallery(page, tapped: image.url) } else { self?.openGallery(at: image.url) }
+                    guard let self else { return }
+                    self.openPhoto(image.url, in: stack, gallery: self.floorImageURLs)
                 })
                 // 与旧版一致：同一进程内加载过的图按已知尺寸占位，复用或重新进入时不再先缩后撑。
-                let placeholder = Self.knownImageSizes[image.url].map { DetailImageLayout.presentation(for: $0, maxWidth: width, kind: kind).size }
+                let placeholder = imageSize?(image.url).map { DetailImageLayout.presentation(for: $0, maxWidth: width, kind: kind).size }
                     ?? (kind == .report ? DetailImageLayout.reportPlaceholderSize(maxWidth: width) : DetailImageLayout.normalPlaceholderSize(maxWidth: width))
                 height = attach(view, to: stack, height: placeholder.height)
             case .iframeLink(let link):

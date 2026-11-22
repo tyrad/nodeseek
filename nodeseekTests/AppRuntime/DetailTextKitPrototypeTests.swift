@@ -92,18 +92,18 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         XCTAssertEqual(opened?.0, [outside])
     }
 
-    func testKnownImageSizeReservesFinalHeightBeforeLoading() async throws {
+    func testKnownImageSizeReservesFinalHeightBeforeLoading() throws {
         let url = URL(string: "https://example.invalid/known-\(UUID().uuidString).png")!
-        DetailBlockStack.rememberImageSize(CGSize(width: 400, height: 1000), for: url)
-        let page = DetailMarkdownPrototypeController(id: "known-size", source: .init(html: "", visibleMarkdown: "![图](\(url.absoluteString))"))
-        let window = try host(page)
-        defer { window.isHidden = true }
-        try await waitFor { !self.descendants(page.view, DetailImageBlockView.self).isEmpty }
-        let image = try XCTUnwrap(descendants(page.view, DetailImageBlockView.self).first)
-        page.view.layoutIfNeeded()
+        let stack = DetailBlockStack()
+        stack.axis = .vertical
+        stack.imageSize = { $0 == url ? CGSize(width: 400, height: 1000) : nil }
+        stack.appendLegacy([.image(.init(url: url, altText: nil))], to: stack, width: 300)
+        XCTAssertNotNil(descendants(stack, DetailImageBlockView.self).first)
+        let height = stack.systemLayoutSizeFitting(CGSize(width: 300, height: 0), withHorizontalFittingPriority: .required,
+                                                   verticalFittingPriority: .fittingSizeLevel).height
         // 与旧版一致：已知尺寸的图直接按最终高度占位，加载完成后楼层不再撑开。
-        let expected = DetailImageLayout.presentation(for: CGSize(width: 400, height: 1000), maxWidth: image.bounds.width, kind: .normal).size.height
-        XCTAssertEqual(image.bounds.height, ceil(expected), accuracy: 1)
+        let expected = DetailImageLayout.presentation(for: CGSize(width: 400, height: 1000), maxWidth: 300, kind: .normal).size.height
+        XCTAssertEqual(height, ceil(expected), accuracy: 1)
     }
 
     func testTabsRestoreSelectionAfterReuse() async throws {
