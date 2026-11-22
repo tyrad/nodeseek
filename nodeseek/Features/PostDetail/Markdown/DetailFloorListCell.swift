@@ -46,6 +46,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     let metadata = UILabel()
     struct FloorAction {
         let title: String
+        var image: UIImage?
         let perform: () -> Bool
     }
 
@@ -346,7 +347,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
             guard let request, !floorActions.isEmpty else { return nil }
             let actions = floorActions
             return UIContextMenuConfiguration(identifier: request.id as NSString, previewProvider: nil) { _ in
-                UIMenu(children: actions.map { action in UIAction(title: action.title) { _ in _ = action.perform() } })
+                UIMenu(children: actions.map { action in UIAction(title: action.title, image: action.image) { _ in _ = action.perform() } })
             }
         }
         guard interaction.view === avatar, let authorURL else { return nil }
@@ -400,7 +401,8 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         }
     }
 
-    func addAction(_ key: String, symbol: String, count: Int? = nil, selected: Bool = false, enabled: Bool = true, perform: @escaping () -> Void) {
+    func addAction(_ key: String, symbol: String, count: Int? = nil, selected: Bool = false, enabled: Bool = true,
+                   label: String? = nil, identifier: String? = nil, perform: @escaping () -> Void) {
         let button: FloorButton
         if usedButtonCount < actionButtons.count {
             button = actionButtons[usedButtonCount]
@@ -421,7 +423,8 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         button.setTitle(count.flatMap { $0 > 0 ? " " + $0.formatted() : nil }, for: .normal)
         button.titleLabel?.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(for: AppTypography.commentActionFont(), compatibleWith: traitCollection)
         button.minimumWidth.constant = (count ?? 0) > 0 ? PostDetailContentLayout.reactionActionMinWidth : PostDetailContentLayout.reactionIconOnlyWidth
-        button.accessibilityLabel = DetailListStrings.text(key)
+        button.accessibilityLabel = DetailListStrings.text(label ?? key)
+        button.accessibilityIdentifier = identifier
         button.accessibilityValue = count.map { String($0) }
         button.tintColor = selected ? (key == "chicken" || key == "favorite" ? .systemOrange : .systemRed) : UIColor.secondaryLabel.withAlphaComponent(PostDetailContentLayout.inactiveReactionAlpha)
     }

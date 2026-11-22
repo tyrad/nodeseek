@@ -12,7 +12,6 @@
 "like" = "讚好";
 "chicken" = "投放雞腿";
 "oppose" = "反對";
-"author" = "只看作者";
 "all" = "查看全部回覆";
 "edit" = "編輯";
 "favorite" = "收藏";
@@ -21,3 +20,10 @@
 "comment" = "評論帖子";
 "hot-comment" = "熱門回覆";
 "帖子不存在" = "貼文不存在";
+"reply-comment" = "回覆評論";
+"reply-post" = "回覆樓主";
+"quote-comment" = "引用評論";
+"edit-comment" = "編輯評論";
+"edit-post" = "編輯帖子";
+"author-them" = "只看 TA";
+"author-poster" = "只看樓主";

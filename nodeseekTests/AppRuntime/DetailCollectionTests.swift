@@ -70,7 +70,7 @@ final class DetailCollectionTests: XCTestCase {
         let floorPoint = floor.convert(CGPoint(x: floor.bounds.midX, y: floor.bounds.midY), to: cell)
         XCTAssertTrue(cell.hitTest(floorPoint, with: nil) === blank)
         let copy = try XCTUnwrap(floor.accessibilityCustomActions?.first { $0.name == DetailListStrings.text("copy") })
-        let reply = try XCTUnwrap(cell.contentView.subviews.flatMap(allButtons).first { $0.accessibilityLabel == DetailListStrings.text("reply") })
+        let reply = try XCTUnwrap(cell.contentView.subviews.flatMap(allButtons).first { $0.accessibilityLabel == DetailListStrings.text("reply-comment") })
         let replyPoint = reply.convert(CGPoint(x: reply.bounds.midX, y: reply.bounds.midY), to: cell)
         XCTAssertTrue(cell.hitTest(replyPoint, with: nil) === reply)
         let footerBlank = reply.convert(CGPoint(x: 0, y: reply.bounds.midY), to: cell)
@@ -81,6 +81,42 @@ final class DetailCollectionTests: XCTestCase {
         cell.prepareForReuse()
         XCTAssertTrue(previews().allSatisfy { $0 == nil })
         XCTAssertEqual(copy.actionHandler?(copy), false)
+    }
+
+    func testFloorFooterAndMenuMatchTexture() async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        window.rootViewController = page
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let other = Comment(id: "2", anchorID: "1", authorName: "Alice", avatarURL: nil, floorText: "#1",
+                            createdAtText: nil, contentHTML: "<p>回复</p>", markdown: "回复", hasVisibleMarkdown: true)
+        let own = Comment(id: "3", anchorID: "2", authorName: "Me", avatarURL: nil, floorText: "#2",
+                          createdAtText: nil, contentHTML: "<p>自己</p>", isOwnComment: true, markdown: "自己", hasVisibleMarkdown: true)
+        page.render(detail: PostDetail(id: "1", title: "主题", authorName: "Bob", avatarURL: nil,
+                                       metadataText: nil, contentHTML: "主帖", visibleMarkdown: "主帖", comments: [other, own]))
+        let list = try XCTUnwrap(page.collectionList?.view)
+        window.layoutIfNeeded()
+        func cell(_ anchor: String) throws -> DetailFloorListCell {
+            try XCTUnwrap(list.cellForItem(at: try XCTUnwrap(page.indexPathForCurrentPageAnchor(anchor))) as? DetailFloorListCell)
+        }
+        func labels(_ cell: DetailFloorListCell) -> [String] {
+            cell.contentView.subviews.flatMap(allButtons).filter { !$0.isHidden }.compactMap(\.accessibilityLabel)
+        }
+        // 与旧版一致：回复楼层底栏有回复、引用，本人楼层另有编辑。
+        let otherCell = try cell("1"), ownCell = try cell("2")
+        XCTAssertTrue(labels(otherCell).contains(DetailListStrings.text("reply-comment")))
+        XCTAssertTrue(labels(otherCell).contains(DetailListStrings.text("quote-comment")))
+        XCTAssertFalse(labels(otherCell).contains(DetailListStrings.text("edit-comment")))
+        XCTAssertTrue(labels(ownCell).contains(DetailListStrings.text("edit-comment")))
+        XCTAssertNotNil(otherCell.contentView.subviews.flatMap(allButtons).first { $0.accessibilityIdentifier == "post-detail-quote-comment-1-2" })
+        // 长按菜单：复制、投放鸡腿（非本人）、只看 TA，本人可编辑；均带图标。
+        XCTAssertEqual(otherCell.floorActions.map(\.title), ["copy", "chicken", "author-them"].map(DetailListStrings.text))
+        XCTAssertEqual(ownCell.floorActions.map(\.title), ["copy", "author-them", "edit"].map(DetailListStrings.text))
+        XCTAssertTrue((otherCell.floorActions + ownCell.floorActions).allSatisfy { $0.image != nil })
+        let header = try cell("0")
+        XCTAssertEqual(header.floorActions.last?.title, DetailListStrings.text("author-poster"))
     }
 
     private func allButtons(_ root: UIView) -> [UIButton] {

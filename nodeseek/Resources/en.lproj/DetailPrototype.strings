@@ -12,7 +12,6 @@
 "like" = "Upvote";
 "chicken" = "Give a chicken leg";
 "oppose" = "Downvote";
-"author" = "Filter by author";
 "all" = "Show all replies";
 "edit" = "Edit";
 "favorite" = "Favorite";
@@ -21,3 +20,10 @@
 "comment" = "Comment on post";
 "hot-comment" = "Hot comment";
 "帖子不存在" = "Post not found";
+"reply-comment" = "Reply to comment";
+"reply-post" = "Reply to poster";
+"quote-comment" = "Quote comment";
+"edit-comment" = "Edit comment";
+"edit-post" = "Edit post";
+"author-them" = "Show this user only";
+"author-poster" = "Show poster only";

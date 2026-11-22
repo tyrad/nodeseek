@@ -267,7 +267,15 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
                           onLike: { [weak page] in page?.handleCommentLikeTap(comment) },
                           onChicken: { [weak page] in page?.handleCommentChickenLegTap(comment) },
                           onOppose: { [weak page] in page?.handleCommentOpposeTap(comment) })
-            cell.addAction("reply", symbol: "arrowshape.turn.up.left") { [weak page] in page?.handleReply(to: comment) }
+            // 与旧版一致：回复、引用常驻底栏，本人楼层另有编辑。
+            let floor = comment.anchorID
+            cell.addAction("reply", symbol: "arrowshape.turn.up.left", label: "reply-comment") { [weak page] in page?.handleReply(to: comment) }
+            cell.addAction("quote", symbol: "quote.bubble", label: "quote-comment",
+                           identifier: floor.map { "post-detail-quote-comment-\($0)-\(comment.id)" }) { [weak page] in page?.handleQuote(comment) }
+            if comment.isOwnComment {
+                cell.addAction("edit", symbol: "square.and.pencil", label: "edit-comment",
+                               identifier: floor.map { "post-detail-edit-comment-\($0)-\(comment.id)" }) { [weak page] in page?.presenter.didTapEditComment(comment) }
+            }
         } else if let header = page.currentHeaderContent {
             cell.configureAuthor(name: header.authorName, avatarURL: header.avatarURL, profileURL: header.authorProfileURL) { [weak page] in page?.openUserInfo(profileURL: $0) }
             if headerHasReactions(header) {
@@ -281,8 +289,11 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
                                selected: header.isFavoriteCollected, enabled: !header.isFavoriteSubmitting) { [weak page] in page?.presenter.didTapFavorite() }
             }
             if page.showsReplyEntry {
-                cell.addAction("reply", symbol: "arrowshape.turn.up.left") { [weak page] in page?.handleReply(toPostHeader: header) }
+                cell.addAction("reply", symbol: "arrowshape.turn.up.left", label: "reply-post") { [weak page] in page?.handleReply(toPostHeader: header) }
                 cell.addAction("comment", symbol: "text.bubble") { [weak page] in page?.presentCommentEditor() }
+            }
+            if header.isOwnPost {
+                cell.addAction("edit", symbol: "square.and.pencil", label: "edit-post") { [weak page] in page?.presenter.didTapEditPost() }
             }
         }
         cell.floorActions = floorActions(page: page, cell: cell, comment: comment)
@@ -484,28 +495,33 @@ private extension PostDetailCollectionList {
     func floorActions(page: PostDetailViewController, cell: DetailFloorListCell, comment: Comment?) -> [DetailFloorListCell.FloorAction] {
         let binding = cell.request
         var actions: [DetailFloorListCell.FloorAction] = []
-        func add(_ key: String, _ perform: @escaping (PostDetailViewController) -> Void) {
-            actions.append(.init(title: DetailListStrings.text(key)) { [weak page, weak cell] in
+        func add(_ key: String, _ image: UIImage?, _ perform: @escaping (PostDetailViewController) -> Void) {
+            actions.append(.init(title: DetailListStrings.text(key), image: image) { [weak page, weak cell] in
                 guard let page, let cell, cell.request == binding else { return false }
                 perform(page)
                 return true
             })
         }
-        add("copy") { [weak cell] page in
+        let filterIcon = UIImage(systemName: "person.crop.circle")
+        let editIcon = UIImage(systemName: "square.and.pencil")
+        add("copy", UIImage(systemName: "doc.on.doc")) { [weak cell] page in
             if let text = cell?.copyText {
                 page.present(CommentCopySheetViewController(text: text), animated: true)
             }
         }
+        // 与旧版菜单一致：复制、投放鸡腿（非本人）、只看 TA（作者可展示时）、编辑。引用在底栏。
         if let comment {
-            add("quote") { $0.handleQuote(comment) }
-            add(page.authorFilter == nil ? "author" : "all") { $0.toggleAuthorFilter(.author(of: comment), focusingCommentID: comment.id) }
-            if comment.isOwnComment { add("edit") { $0.presenter.didTapEditComment(comment) } }
+            if !comment.isOwnComment { add("chicken", UIImage(named: "ChickenLeg")) { $0.handleCommentChickenLegTap(comment) } }
+            if AuthorDisplayPolicy.isDisplayable(comment.authorName) {
+                add(page.authorFilter == nil ? "author-them" : "all", filterIcon) { $0.toggleAuthorFilter(.author(of: comment), focusingCommentID: comment.id) }
+            }
+            if comment.isOwnComment { add("edit", editIcon) { $0.presenter.didTapEditComment(comment) } }
         } else if let header = page.currentHeaderContent {
             if !headerHasReactions(header), !header.isOwnPost, page.showsReplyEntry {
-                add("chicken") { $0.handlePostChickenLegTap(header) }
+                add("chicken", UIImage(named: "ChickenLeg")) { $0.handlePostChickenLegTap(header) }
             }
-            add(page.authorFilter == nil ? "author" : "all") { $0.toggleAuthorFilter(.poster(of: header), focusingCommentID: nil) }
-            if header.isOwnPost { add("edit") { $0.presenter.didTapEditPost() } }
+            add(page.authorFilter == nil ? "author-poster" : "all", filterIcon) { $0.toggleAuthorFilter(.poster(of: header), focusingCommentID: nil) }
+            if header.isOwnPost { add("edit", editIcon) { $0.presenter.didTapEditPost() } }
         }
         return actions
     }
