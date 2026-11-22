@@ -115,11 +115,21 @@ struct NodeSeekService: Sendable {
         let response = try await htmlClient.get(targetURL)
         AppLog.info(.service, "详情抓取返回 postID=\(postID), page=\(page), status=\(response.statusCode), htmlLength=\(response.html.utf8.count), finalURL=\(response.finalURL.absoluteString)")
 
-        switch try await parseInBackground(response: response, parse: { [parser] in try parser.parsePostDetail(html: $0.html, url: targetURL) }) {
+        switch try await parseInBackground(response: response, parse: { [parser] response in
+            let detail = try parser.parsePostDetail(html: response.html, url: targetURL)
+            // 站点对游客隐藏部分帖子时只回 404 错误页，与已删除的帖子无法区分；游客先提示登录，登录后仍 404 再显示不存在。
+            let hiddenFromGuest = response.statusCode == 404 && detail.isRestricted
+                && (try? parser.parseAccount(html: response.html))?.isLoggedIn != true
+            return (detail: detail, hiddenFromGuest: hiddenFromGuest)
+        }) {
         case .challenge(let challenge):
             AppLog.warning(.service, "检测到详情 challenge: \(challenge.logDescription)")
             return .challenge(challenge)
-        case .parsed(let detail, let account):
+        case .parsed(let parsed, _) where parsed.hiddenFromGuest:
+            AppLog.warning(.service, "详情对游客返回 404，按需要登录处理，postID=\(postID)")
+            return .challenge(.loginRequired(response.finalURL))
+        case .parsed(let parsed, let account):
+            let detail = parsed.detail
             await saveOpportunisticAccount(account, for: sessionID)
             AppLog.info(.service, "详情解析完成，postID=\(detail.id), 评论数量: \(detail.comments.count)")
             return .value(detail)
