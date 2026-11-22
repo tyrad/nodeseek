@@ -75,7 +75,14 @@ nonisolated struct DetailTextSegment: Sendable {
     let runs: [DetailDocument.Inline]
     let pointSize: CGFloat
     var isListItem = false
+    var isHeading = false
     var isAccentHeading = false
+    var endsList = false
+    var inQuote = false
+
+    // 与旧版网页样式表一致：段落后 12，标题前 18、后 8，列表项之间 6。
+    var spacingBefore: CGFloat { isHeading ? 18 : 0 }
+    var spacingAfter: CGFloat { isHeading ? 8 : (isListItem && !endsList ? 6 : 12) }
 }
 
 nonisolated enum DetailTextTypesetter {
@@ -104,7 +111,7 @@ nonisolated enum DetailTextTypesetter {
             if index > 0 {
                 // 两个换行保留复制出的段落。空行单独测量，避免按正文字号撑高。
                 let gap = NSMutableParagraphStyle()
-                gap.minimumLineHeight = segment.isListItem ? 4 : 8
+                gap.minimumLineHeight = segments[index-1].spacingAfter + segment.spacingBefore
                 gap.maximumLineHeight = gap.minimumLineHeight
                 storage.append(NSAttributedString(string: "\n", attributes: [.font: UIFont.systemFont(ofSize: segments[index-1].pointSize), .paragraphStyle: paragraph]))
                 storage.append(NSAttributedString(string: "\n", attributes: [.font: UIFont.systemFont(ofSize: 1), .paragraphStyle: gap]))
@@ -137,9 +144,12 @@ nonisolated enum DetailTextTypesetter {
                 }
             }
             let style = paragraph.mutableCopy() as! NSMutableParagraphStyle
+            // 旧版按 CSS line-height 排版：行高为字号乘倍数后取整，额外行距不再叠加。
+            style.lineSpacing = 0
+            style.minimumLineHeight = ceil(pointSize * (segment.isHeading ? 1.28 : 1.42))
             if segment.isListItem {
-                style.firstLineHeadIndent = 10
-                style.headIndent = 24
+                // 旧版列表符号顶格，换行悬挂缩进 22；引用内不缩进。
+                style.headIndent = segment.inQuote ? 0 : 22
             }
             storage.addAttribute(.paragraphStyle, value: style, range: NSRange(location: start, length: storage.length - start))
         }

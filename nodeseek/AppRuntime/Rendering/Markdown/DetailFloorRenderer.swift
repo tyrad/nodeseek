@@ -57,7 +57,8 @@ nonisolated struct DetailFloorRenderer: Sendable {
         }
     }
 
-    private func layout(_ blocks: [DetailDocument.Block], appearance: DetailTextAppearance, width: CGFloat) throws -> [DetailLayoutBlock] {
+    private func layout(_ blocks: [DetailDocument.Block], appearance: DetailTextAppearance, width: CGFloat,
+                        inQuote: Bool = false) throws -> [DetailLayoutBlock] {
         var result: [DetailLayoutBlock] = []
         var paragraphs: [DetailTextSegment] = []
         func flush() throws {
@@ -81,24 +82,27 @@ nonisolated struct DetailFloorRenderer: Sendable {
                 paragraphs.append(.init(runs: runs.map { run in
                     if case let .text(text, style, link) = run { return .text(text, style.union(.bold), link) }
                     return run
-                }, pointSize: appearance.pointSize + CGFloat([7, 5, 3, 2, 1, 0][max(0, min(5, level - 1))]), isAccentHeading: level == 2))
+                }, pointSize: appearance.pointSize + CGFloat([7, 5, 3, 2, 1, 0][max(0, min(5, level - 1))]),
+                   isHeading: true, isAccentHeading: level == 2 && !inQuote))
             case .quote(let nested):
                 try flush()
-                result.append(.quote(try layout(nested, appearance: appearance, width: DetailQuoteLayout.contentWidth(width))))
+                result.append(.quote(try layout(nested, appearance: appearance, width: DetailQuoteLayout.contentWidth(width), inQuote: true)))
             case .list(let start, let items):
                 for (index, item) in items.enumerated() {
                     let prefix = DetailDocument.Inline.text(start.map { "\($0 + index). " } ?? "• ", [], nil)
                     if case .paragraph(let text) = item.first {
-                        paragraphs.append(.init(runs: [prefix] + text, pointSize: appearance.pointSize, isListItem: true))
+                        paragraphs.append(.init(runs: [prefix] + text, pointSize: appearance.pointSize, isListItem: true, inQuote: inQuote))
                         if item.count == 1 { continue }
                         try flush()
-                        result += try layout(Array(item.dropFirst()), appearance: appearance, width: width)
+                        result += try layout(Array(item.dropFirst()), appearance: appearance, width: width, inQuote: inQuote)
                     } else {
-                        paragraphs.append(.init(runs: [prefix], pointSize: appearance.pointSize, isListItem: true))
+                        paragraphs.append(.init(runs: [prefix], pointSize: appearance.pointSize, isListItem: true, inQuote: inQuote))
                         try flush()
-                        result += try layout(item, appearance: appearance, width: width)
+                        result += try layout(item, appearance: appearance, width: width, inQuote: inQuote)
                     }
                 }
+                // 旧版列表末项与后文间距和段落相同。
+                if let last = paragraphs.indices.last, paragraphs[last].isListItem { paragraphs[last].endsList = true }
             case .tabs(let tabs):
                 try flush()
                 if let first = tabs.first {

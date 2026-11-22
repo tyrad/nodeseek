@@ -113,19 +113,31 @@ final class DetailCollectionTests: XCTestCase {
         let segment = DetailTextSegment(runs: [.text(text, [], nil)], pointSize: pointSize)
         let snapshot = try DetailTextTypesetter.layout([segment], appearance: appearance, width: 220)
 
-        // 同一系统同一段中西混排文字的默认行距。不同 iOS 的字体回退度量有差异。
-        let reference = NSTextStorage(string: text, attributes: [.font: UIFont.systemFont(ofSize: pointSize)])
-        let layout = NSLayoutManager()
-        let container = NSTextContainer(size: CGSize(width: 220, height: 1_000))
-        container.lineFragmentPadding = 0
-        layout.addTextContainer(container)
-        reference.addLayoutManager(layout)
-        layout.ensureLayout(for: container)
-        var first = NSRange()
-        let firstLine = layout.lineFragmentRect(forGlyphAt: 0, effectiveRange: &first)
-        let nextLine = layout.lineFragmentRect(forGlyphAt: NSMaxRange(first), effectiveRange: nil)
+        // 旧版按 CSS line-height 1.42 排版，大字号下行距随字号放大，中西混排也保持同一行距。
         let distance = snapshot.lines[1].maxY - snapshot.lines[0].maxY
-        XCTAssertEqual(distance, nextLine.maxY - firstLine.maxY + DTCoreTextHTMLContentRenderer.Layout.bodyLineSpacing, accuracy: 1)
+        XCTAssertEqual(distance, ceil(pointSize * 1.42), accuracy: 0.5)
+    }
+
+    func testBlockSpacingMatchesTextureStyleSheet() throws {
+        let appearance = DetailTextAppearance(width: 320, pointSize: 17, scale: 2, dark: false)
+        func bottom(of word: String, in snapshot: DetailTextSnapshot) throws -> CGFloat {
+            let offset = (snapshot.string as NSString).range(of: word).location
+            let index = try XCTUnwrap(snapshot.characters.firstIndex { $0.range.location == offset })
+            return try XCTUnwrap(snapshot.lines.first { $0.characters.contains(index) }).maxY
+        }
+        let body = DetailTextSegment(runs: [.text("正文", [], nil)], pointSize: 17)
+        let heading = DetailTextSegment(runs: [.text("标题", [.bold], nil)], pointSize: 22, isHeading: true)
+        let item = DetailTextSegment(runs: [.text("• 甲", [], nil)], pointSize: 17, isListItem: true)
+        var last = DetailTextSegment(runs: [.text("• 乙", [], nil)], pointSize: 17, isListItem: true)
+        last.endsList = true
+        let after = DetailTextSegment(runs: [.text("结尾", [], nil)], pointSize: 17)
+        let snapshot = try DetailTextTypesetter.layout([body, heading, item, last, after], appearance: appearance, width: 320)
+        // 行高取 ceil(字号 × 1.42)，标题 ×1.28；段后 12、标题前 18 后 8、列表项之间 6。
+        let bodyLine = ceil(17 * 1.42), headingLine = ceil(22 * 1.28)
+        XCTAssertEqual(try bottom(of: "标题", in: snapshot) - bottom(of: "正文", in: snapshot), 12 + 18 + headingLine, accuracy: 1)
+        XCTAssertEqual(try bottom(of: "甲", in: snapshot) - bottom(of: "标题", in: snapshot), 8 + bodyLine, accuracy: 1)
+        XCTAssertEqual(try bottom(of: "乙", in: snapshot) - bottom(of: "甲", in: snapshot), 6 + bodyLine, accuracy: 1)
+        XCTAssertEqual(try bottom(of: "结尾", in: snapshot) - bottom(of: "乙", in: snapshot), 12 + bodyLine, accuracy: 1)
     }
 
     func testReuseRejectsLateFloorAndPreviousAppearance() throws {
