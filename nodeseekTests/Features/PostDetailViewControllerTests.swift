@@ -2289,6 +2289,10 @@ struct PostDetailViewControllerTests {
         let color = try #require(label.attributedText?.foregroundColor(for: "#AFF"))
 
         #expect(color.isClose(to: NodeSeekLinkStyle.color))
+        // UILabel 遇到 .link 会改用系统蓝绘制，点击已按区间命中，不需要这个属性。
+        let text = try #require(label.attributedText)
+        let range = (text.string as NSString).range(of: "#AFF")
+        #expect(text.attribute(.link, at: range.location, effectiveRange: nil) == nil)
     }
 
     @Test func codeBlockNodeKeepsViewportWidthForLongLines() {

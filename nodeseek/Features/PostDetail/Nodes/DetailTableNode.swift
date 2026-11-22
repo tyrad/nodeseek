@@ -899,8 +899,9 @@ private final class DetailTableCellView: UIView {
                 .foregroundColor: textColor
             ]
         )
+        // 只上色不加 .link：UILabel 会把 .link 画成系统蓝，点击由 DetailTableLinkTapHandler 按区间处理。
         for link in links where NSMaxRange(link.nsRange) <= attributed.length {
-            attributed.addAttributes(NodeSeekLinkStyle.attributes(url: link.url), range: link.nsRange)
+            attributed.addAttribute(.foregroundColor, value: NodeSeekLinkStyle.color, range: link.nsRange)
         }
         return attributed
     }
