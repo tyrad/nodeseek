@@ -331,3 +331,136 @@ daily('textkit-backscroll', async ({ t, ids, wda, scroll, fixture, log }) => {
   for (const n of [1, 2, 3]) assert.equal(requests.filter(p => p === n).length, 1, '页 ' + n + ' 请求次数异常：' + requests);
   t.diagnostic('第 3 页 #21 → ' + previous + ' → 原 #21，请求页序列 ' + requests);
 }, ['-postDetail.useTextKitList', 'YES']);
+
+// 新版详情页交互回归：只读公开帖，用控件标识、坐标和日志判断，不依赖登录。
+const textKitPost = '1067259';
+const reviewPost = '1067722';
+const textKit = ['-postDetail.useTextKitList', 'YES'];
+
+function textKitHelpers({ wda, ids, scroll }) {
+  const rect = async el => (await wda('/element/' + el + '/rect'));
+  async function visibleCells() {
+    const xml = await wda('/source');
+    return [...xml.matchAll(/<XCUIElementTypeCell\b[^>]*>/g)]
+      .filter(([tag]) => tag.includes('visible="true"'))
+      .map(([tag]) => ({
+        name: /\bname="([^"]+)"/.exec(tag)?.[1] ?? '',
+        y: Number(/\by="([-\d.]+)"/.exec(tag)?.[1]), height: Number(/\bheight="([\d.]+)"/.exec(tag)?.[1]),
+        x: Number(/\bx="([-\d.]+)"/.exec(tag)?.[1]), width: Number(/\bwidth="([\d.]+)"/.exec(tag)?.[1]),
+      }));
+  }
+  // 在屏幕中段找到满足条件的元素，找不到就往下读，最多 12 次。
+  async function findInMiddle(predicate, message) {
+    const { height } = await wda('/window/size');
+    for (let i = 0; i < 12; i++) {
+      for (const el of await ids(predicate)) {
+        const r = await rect(el);
+        if (r.y > height * .25 && r.y + r.height < height * .7) return { el, rect: r, screen: height };
+      }
+      await scroll(.72, .5);
+    }
+    throw new Error(message);
+  }
+  async function hold(x, y, seconds = 1) {
+    await wda('/wda/touchAndHold', { x, y, duration: seconds });
+  }
+  return { rect, visibleCells, findInMiddle, hold };
+}
+
+daily('textkit-drag-on-button', async ctx => {
+  const { fixture, ids, wda, t } = ctx;
+  const { visibleCells, findInMiddle } = textKitHelpers(ctx);
+  await fixture(textKitPost, 1, undefined, { publicPost: true });
+  assert.equal((await ids('name == "post-detail-textkit-collection"')).length, 1);
+  const { rect, screen } = await findInMiddle('label == "回复评论" AND visible == 1', '屏幕中段没有回复按钮');
+  const before = (await visibleCells()).map(c => c.name);
+  // 手指在按钮上停留 0.3 秒再上拉，列表须滚动，按钮不触发。
+  const x = rect.x + rect.width / 2;
+  const y = rect.y + rect.height / 2;
+  await wda('/wda/dragfromtoforduration', { fromX: x, fromY: y, toX: x, toY: y - screen * .3, duration: .3 });
+  const after = (await visibleCells()).map(c => c.name);
+  assert.notDeepEqual(after, before, '从按钮上拖动后列表没有滚动');
+  assert.ok(!(await ids('name == "post-detail-reply-context-remove-button-0"')).length, '拖动误触发了回复');
+  t.diagnostic('拖动前 ' + before.join(',') + ' → 拖动后 ' + after.join(','));
+}, textKit);
+
+daily('textkit-floor-menu', async ctx => {
+  const { fixture, ids, wda, click, attr, t } = ctx;
+  const { rect, visibleCells, hold } = textKitHelpers(ctx);
+  await fixture(textKitPost, 1, undefined, { publicPost: true });
+  const { height } = await wda('/window/size');
+  // 选一条完整在屏内的回复，按住右上角楼层号附近（不在正文上，避免进入选字）。
+  async function pressReply() {
+    const reply = await waitFor(async () => (await visibleCells())
+      .find(c => /^\d+-reply-/.test(c.name) && c.y > height * .15 && c.y + c.height < height * .85), '屏内没有完整的回复楼层');
+    await hold(reply.x + reply.width - 24, reply.y + 22, 1.2);
+    return reply;
+  }
+  const reply = await pressReply();
+  const copy = await waitFor(async () => (await ids('label == "复制正文"'))[0], '长按楼层没有弹出菜单');
+  const filter = (await ids('label == "只看 TA"'))[0];
+  assert.ok(filter, '菜单缺少「只看 TA」');
+  t.diagnostic('菜单项 ' + (await Promise.all((await ids('type == "XCUIElementTypeButton" AND visible == 1')).map(el => attr(el, 'label')))).join('、'));
+  // 复制：在复制面板确认后写入剪贴板。
+  execFileSync('xcrun', ['simctl', 'pbcopy', device], { input: '' });
+  await click(copy);
+  const confirm = await waitFor(async () => (await ids('name == "comment-copy-selected-button"'))[0], '没有打开复制面板');
+  await click(confirm);
+  const copied = await waitFor(() => simctl('pbpaste', device), '复制后剪贴板为空');
+  t.diagnostic('复制内容 ' + copied.slice(0, 40));
+  // 只看 TA：筛选条出现，可见作者都相同，点「查看全部」恢复。
+  await waitFor(async () => !(await ids('name == "comment-copy-selected-button"')).length, '复制面板没有关闭');
+  // 筛选时主楼仍置顶，只核对回复楼层里的作者。
+  const names = async () => {
+    const replies = (await visibleCells()).filter(c => /^\d+-reply-/.test(c.name));
+    const result = [];
+    for (const el of await ids('name == "comment-author-name" AND visible == 1')) {
+      const r = await rect(el);
+      if (replies.some(c => r.y >= c.y && r.y < c.y + c.height)) result.push(await attr(el, 'label'));
+    }
+    return result;
+  };
+  const author = (await names()).find(Boolean);
+  await pressReply();
+  await click(await waitFor(async () => (await ids('label == "只看 TA"'))[0], '第二次长按没有弹出菜单'));
+  const clear = await waitFor(async () => (await ids('name == "detail-author-filter-clear"'))[0], '没有出现筛选条');
+  const filtered = await names();
+  assert.ok(filtered.length && new Set(filtered).size === 1, '筛选后仍有多个作者：' + filtered);
+  t.diagnostic('长按楼层 ' + reply.name + '，筛选作者 ' + filtered[0] + '（首个可见作者 ' + author + '）');
+  await click(clear);
+  await waitFor(async () => !(await ids('name == "detail-author-filter-clear"')).length, '点「查看全部」后筛选条仍在');
+}, textKit);
+
+daily('textkit-gallery', async ctx => {
+  const { fixture, ids, wda, click, attr, log, t } = ctx;
+  await fixture(reviewPost, 1, undefined, { publicPost: true });
+  // 测评帖首栏是终端报告，生成截图后出现放大按钮；点它打开所有标签的图集。
+  const report = 'name == "detail-terminal-open-report" AND visible == 1';
+  const el = await waitFor(async () => (await ids(report))[0], '测评报告图没有生成');
+  const rect = await wda('/element/' + el + '/rect');
+  const offset = log().length;
+  await click(el);
+  const opened = await waitFor(() => /打开详情大图: count=(\d+), initialIndex=(\d+)/.exec(log().slice(offset)), '点图没有打开大图');
+  const count = Number(opened[1]);
+  assert.ok(count >= 2, '图集只有 ' + count + ' 张，应包含所有标签的图');
+  await waitFor(async () => (await ids('name == "detail-photo-action-button"'))[0], '大图浏览器没有显示');
+  const shown = async () => {
+    for (const img of await ids('type == "XCUIElementTypeImage" AND visible == 1')) {
+      const name = await attr(img, 'name');
+      if (name?.startsWith('http') || name?.startsWith('file')) return name;
+    }
+  };
+  const first = await waitFor(shown, '大图里没有可识别的图片');
+  // 左右翻到同组的另一张。
+  const { width, height } = await wda('/window/size');
+  const toward = Number(opened[2]) + 1 < count ? [.85, .15] : [.15, .85];
+  await wda('/wda/dragfromtoforduration', { fromX: width * toward[0], fromY: height * .5, toX: width * toward[1], toY: height * .5, duration: .1 });
+  const second = await waitFor(async () => { const now = await shown(); return now && now !== first ? now : null; }, '左右滑动后没有翻到另一张');
+  t.diagnostic('图集 ' + count + ' 张，翻页 ' + first + ' → ' + second);
+  // 单击关闭，回到原帖，点过的图仍在原位置附近。
+  await wda('/wda/tap', { x: width * .5, y: height * .5 });
+  await waitFor(async () => !(await ids('name == "detail-photo-action-button"')).length, '大图没有关闭');
+  const back = await waitFor(async () => (await ids(report))[0], '关闭后找不到原来的报告图');
+  const after = await wda('/element/' + back + '/rect');
+  assert.ok(Math.abs(after.y - rect.y) <= 1, '关闭后原图位置偏移 ' + (after.y - rect.y));
+}, textKit);

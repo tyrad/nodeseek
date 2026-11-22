@@ -183,5 +183,26 @@
       "gesture"
     ],
     "setup": "AXe、iOS 模拟器；受控 HTML 传输，无需账号或网络"
+  },
+  "textkit-drag-on-button": {
+    "title": "新版在楼层底栏按钮上按住再拖动，列表滚动且不触发按钮",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，公开帖 1067259；临时启用 TextKit，只读"
+  },
+  "textkit-floor-menu": {
+    "title": "新版长按楼层弹出菜单，复制写入剪贴板，只看 TA 后从筛选条恢复",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，公开帖 1067259；临时启用 TextKit，会写本机剪贴板，只读"
+  },
+  "textkit-gallery": {
+    "title": "新版测评帖点图打开跨标签图集，左右翻页，关闭后回到原图位置",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，公开测评帖 1067722；临时启用 TextKit，只读"
   }
 }
