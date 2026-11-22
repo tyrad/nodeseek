@@ -611,3 +611,24 @@ daily('textkit-dark-text', async ctx => {
     simctl('ui', device, 'appearance', original || 'light');
   }
 }, textKit);
+
+// 站点对游客隐藏的帖子只回 404 错误页，游客应看到登录入口而不是「帖子不存在」。
+const guestHiddenPost = '1062816';
+
+daily('textkit-guest-hidden-post', async ({ ui, ids, click, log, start, t }) => {
+  await start(guestHiddenPost);
+  await ui.tap(home);
+  await ui.tap('post-list-side-menu-settings-button');
+  const offset = log().length;
+  for (const name of ['settings-debug-cell', 'settings-detail-test-cell']) {
+    await click(await waitFor(async () => (await ids('name == ' + JSON.stringify(name)))[0], '缺少调试入口 ' + name));
+  }
+  await waitFor(() => log().slice(offset).includes('详情抓取返回 postID=' + guestHiddenPost), '详情请求没有返回');
+  if (log().slice(offset).includes('详情抓取返回 postID=' + guestHiddenPost + ', page=1, status=200')) {
+    throw new Error('设备已登录或帖子已对游客公开，换未登录设备或另选样本');
+  }
+  const button = await waitFor(async () => (await ids('label == "登录查看"'))[0], '没有出现「登录查看」');
+  assert.ok(button);
+  assert.equal((await ids('label == "帖子不存在"')).length, 0, '仍显示帖子不存在');
+  t.diagnostic('游客打开 ' + guestHiddenPost + ' 显示登录入口');
+}, textKit);

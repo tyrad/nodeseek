@@ -232,5 +232,12 @@
       "daily"
     ],
     "setup": "阅读模式，公开帖 1071908；临时启用 TextKit，会切换模拟器外观并在结束时还原"
+  },
+  "textkit-guest-hidden-post": {
+    "title": "游客打开对游客隐藏的帖子，显示登录入口而不是帖子不存在",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，未登录设备（SIMULATOR_ID 指向游客设备），帖子 1062816；临时启用 TextKit，只读"
   }
 }
