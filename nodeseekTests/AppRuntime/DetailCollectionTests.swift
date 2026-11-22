@@ -176,6 +176,22 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(titles, [" 1.2万", " 12345"])
     }
 
+    func testManyAuthorBadgesWrapInsteadOfOverflowing() throws {
+        let cell = DetailFloorListCell(frame: CGRect(x: 0, y: 0, width: 320, height: 300))
+        let appearance = DetailTextAppearance(width: 250, pointSize: 17, scale: 2, dark: false)
+        cell.bind(.init(id: "badges", version: 1, source: .init(html: "", visibleMarkdown: "正文"), appearance: appearance, baseURL: NodeSeekSite.baseURL))
+        let badges = ["禁言中", "社区贡献者", "长期活跃用户", "资深测评作者"]
+        cell.configureHeader(title: nil, requiredLevel: nil, name: "Alice", isPoster: true, badges: badges, time: "1 小时前", floor: "#12")
+        cell.layoutIfNeeded()
+        let labels = allLabels(cell.contentView).filter { $0 is AuthorBadgeLabel && !$0.isHidden && $0.window == nil && $0.superview != nil }
+        XCTAssertEqual(labels.compactMap(\.text), badges)
+        // 与旧版一致：放不下的标签换到下一行，每个标签完整显示且不超出楼层宽度。
+        let frames = labels.map { $0.convert($0.bounds, to: cell.contentView) }
+        XCTAssertGreaterThan(Set(frames.map { $0.minY.rounded() }).count, 1)
+        XCTAssertTrue(frames.allSatisfy { $0.maxX <= cell.contentView.bounds.maxX + 0.5 })
+        XCTAssertTrue(zip(labels, frames).allSatisfy { $1.width >= ceil($0.intrinsicContentSize.width) - 0.5 })
+    }
+
     private func allButtons(_ root: UIView) -> [UIButton] {
         (root as? UIButton).map { [$0] } ?? root.subviews.flatMap(allButtons)
     }

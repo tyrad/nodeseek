@@ -32,6 +32,8 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     private let timestamp = UILabel()
     private let posterBadge = UILabel()
     private let badgeRow = UIStackView()
+    /// 作者标签放不下时折到下一行，与旧版标签换行一致。
+    private let overflowRows = UIStackView()
     private var badgeLabels: [AuthorBadgeLabel] = []
     private let hotBadge = UIImageView()
     private let riskWarning = DetailRiskWarningView()
@@ -161,6 +163,11 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         header.distribution = .equalCentering
         header.spacing = 3
         header.addArrangedSubview(identity)
+        overflowRows.axis = .vertical
+        overflowRows.alignment = .leading
+        overflowRows.spacing = 3
+        overflowRows.isHidden = true
+        header.addArrangedSubview(overflowRows)
         header.addArrangedSubview(timestamp)
         header.isLayoutMarginsRelativeArrangement = true
         headerHeight = header.heightAnchor.constraint(greaterThanOrEqualToConstant: 28)
@@ -238,7 +245,6 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
             label.isHidden = index >= badges.count
             if index < badges.count { label.configure(badges[index], font: badgeFont) }
         }
-        badgeRow.isHidden = badges.isEmpty
         riskWarning.isHidden = !showsRiskWarning
         floorNumber.font = small
         floorNumber.text = floor
@@ -247,6 +253,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         timestamp.text = time
         timestamp.isHidden = time?.isEmpty != false || (!isReply && badges.isEmpty)
         hotBadge.isHidden = !isHot || floorNumber.isHidden
+        wrapBadges(count: badges.count, hasAuthor: hasAuthor, isPoster: isPoster, floor: floor, isHot: isHot)
         header.directionalLayoutMargins = .init(top: 0, leading: hasAuthor ? PostDetailContentLayout.avatarSize + PostDetailContentLayout.avatarSpacing : 0, bottom: 0, trailing: 0)
         headerHeight.constant = !isReply && hasAuthor ? PostDetailContentLayout.avatarSize : 0
         header.isHidden = !isReply && !hasAuthor && badges.isEmpty && metadata.isHidden
@@ -283,6 +290,48 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
             metadata.accessibilityTraits = .staticText
         }
         if !avatar.isHidden { ImageLoad.url(avatarURL).toAvatar(requestID: request?.id ?? name).into(avatar) }
+    }
+
+    private func wrapBadges(count: Int, hasAuthor: Bool, isPoster: Bool, floor: String?, isHot: Bool) {
+        let visible = Array(badgeLabels.prefix(count))
+        let width = request?.appearance.width ?? contentView.bounds.width
+        let spacing = identity.spacing
+        // 第一行先放作者名和楼主，右侧留出热评与楼层号。
+        var used: CGFloat = 0
+        if !metadata.isHidden { used += ceil(metadata.intrinsicContentSize.width) + spacing }
+        if isPoster { used += ceil(posterBadge.intrinsicContentSize.width) + spacing }
+        if let floor, !floor.isEmpty {
+            used += ceil((floor as NSString).size(withAttributes: [.font: floorNumber.font as Any]).width) + spacing
+            if isHot { used += 13 + 4 }
+        }
+        var firstLine = 0
+        for label in visible {
+            let w = ceil(label.intrinsicContentSize.width)
+            guard used + w <= width || (firstLine == 0 && metadata.isHidden && !isPoster) else { break }
+            used += w + spacing
+            firstLine += 1
+        }
+        visible.prefix(firstLine).forEach(badgeRow.addArrangedSubview)
+        badgeRow.isHidden = firstLine == 0
+        overflowRows.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        var row: UIStackView?
+        var rowWidth: CGFloat = 0
+        for label in visible.dropFirst(firstLine) {
+            let w = ceil(label.intrinsicContentSize.width)
+            if row == nil || rowWidth + spacing + w > width {
+                let next = UIStackView()
+                next.spacing = spacing
+                next.alignment = .center
+                overflowRows.addArrangedSubview(next)
+                row = next
+                rowWidth = 0
+            } else {
+                rowWidth += spacing
+            }
+            row?.addArrangedSubview(label)
+            rowWidth += w
+        }
+        overflowRows.isHidden = overflowRows.arrangedSubviews.isEmpty
     }
 
     @objc private func showAuthor() {
