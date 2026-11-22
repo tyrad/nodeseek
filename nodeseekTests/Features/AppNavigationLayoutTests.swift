@@ -268,6 +268,25 @@ struct AppNavigationLayoutTests {
         #expect(tabBarController.viewControllers?.count == 2)
     }
 
+    @Test func sessionChangeReplacesPrivateTabRootsAndKeepsSelection() throws {
+        let settings = makeSettings()
+        settings.setTabItems([.home, .collections, .comments, .notification, .me])
+        let tabs = MainTabBarController(layoutSettings: settings)
+        let before = try #require(tabs.viewControllers)
+        tabs.selectedIndex = 1
+
+        NotificationCenter.default.post(name: .nodeSeekLoginSessionDidClose, object: nil)
+        #expect(tabs.selectedViewController === before[1])
+        NotificationCenter.default.post(name: .nodeSeekAccountSessionDidChange, object: nil)
+
+        let after = try #require(tabs.viewControllers)
+        #expect(after.count == before.count)
+        #expect(after[0] === before[0])
+        #expect(after[4] === before[4])
+        for index in 1...3 { #expect(after[index] !== before[index]) }
+        #expect(tabs.selectedViewController === after[1])
+    }
+
     @Test func customizePageInSettingsAppliesChangesImmediately() throws {
         let settings = makeSettings()
         let viewController = TabBarCustomizeViewController(mode: .settings, settings: settings)

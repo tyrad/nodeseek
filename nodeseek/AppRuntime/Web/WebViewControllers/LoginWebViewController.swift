@@ -64,6 +64,18 @@ final class LoginWebViewController: BaseWebViewController {
         fatalError("init(coder:) has not been implemented")
     }
 
+    static func open(from source: UIViewController?, onClose: @escaping @MainActor () -> Void = {}) {
+        guard let source, source.presentedViewController == nil else { return }
+        if let navigation = source.navigationController {
+            guard !navigation.viewControllers.contains(where: { $0 is LoginWebViewController }),
+                  navigation.presentedViewController == nil else { return }
+            navigation.pushViewController(LoginWebViewController(onClose: onClose), animated: true)
+        } else {
+            let login = LoginWebViewController(onClose: onClose)
+            source.present(UINavigationController(rootViewController: login), animated: true)
+        }
+    }
+
     override func configureNavigationItems() {
         let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
         let closeButton = UIBarButtonItem(
@@ -169,19 +181,23 @@ final class LoginWebViewController: BaseWebViewController {
             guard let self else { return }
             await webViewContext.captureWebViewSession()
             if let account {
-                await CurrentAccountStore.shared.save(account)
+                await saveLoggedInAccount(account)
             } else {
                 await saveAccountFromCurrentPage()
             }
+            // 回复回调可能立即提交，先丢弃登录前预载的帖子页面。
+            HiddenWebViewPostActionPageScheduler.invalidatePreparedPage()
             NotificationCenter.default.post(name: .nodeSeekLoginSessionDidClose, object: nil)
-            onClose()
             closeSelf()
         }
     }
 
-    /// 登录成功后当前页面里已有账号信息，直接解析存入缓存，
-    /// 各页面关闭后可立刻显示登录状态，不必等隐藏 WebView 重新抓首页（要好几秒）。
-    /// 解析不到（未登录或页面不含账号）就什么都不做，照旧由后台刷新确认。
+    private func saveLoggedInAccount(_ account: AccountResponse) async {
+        await CurrentAccountStore.shared.save(account)
+        NotificationCenter.default.post(name: .nodeSeekAccountSessionDidChange, object: nil)
+    }
+
+    /// 关闭时若能从当前页解析出账号，就立即显示。页面尚未就绪时由后台刷新确认。
     private func saveAccountFromCurrentPage() async {
         guard readsAccountOnClose, let html = await readCurrentPageHTML(), html.isEmpty == false else {
             return
@@ -190,7 +206,7 @@ final class LoginWebViewController: BaseWebViewController {
             try? KannaNodeSeekParser(baseURL: NodeSeekSite.baseURL).parseAccount(html: html)
         }.value
         guard let account, account.isLoggedIn, account.profileURL != nil else { return }
-        await CurrentAccountStore.shared.save(account)
+        await saveLoggedInAccount(account)
         AppLog.debug(.account, "login: 关闭时从页面取到账号 -> \(account.displayName)")
     }
 
@@ -216,9 +232,19 @@ final class LoginWebViewController: BaseWebViewController {
     private func closeSelf() {
         if let navigationController, navigationController.viewControllers.first !== self {
             navigationController.popViewController(animated: true)
+            if let coordinator = navigationController.transitionCoordinator {
+                coordinator.animate(alongsideTransition: nil) { [onClose] _ in onClose() }
+            } else {
+                onClose()
+            }
             return
         }
 
-        dismiss(animated: true)
+        let container = navigationController ?? self
+        if container.presentingViewController != nil {
+            container.dismiss(animated: true, completion: onClose)
+        } else {
+            onClose()
+        }
     }
 }

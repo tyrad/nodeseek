@@ -11,11 +11,14 @@ import UserNotifications
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
+    private(set) var logoutCleanup: Task<Void, Never>?
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         if #unavailable(iOS 26.0) {
             // 旧版系统默认蓝色与阅读界面不一致，导航图标统一跟随明暗主题。
             UINavigationBar.appearance().tintColor = .label
         }
+        logoutCleanup = DefaultSettingsSessionManager().startPendingCleanup()
         UNUserNotificationCenter.current().delegate = self
         CrashReportService.configure()
         ProbeSharedStorage.prepareAtLaunch()
@@ -61,9 +64,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        let userInfo = response.notification.request.content.userInfo
         Task { @MainActor in
-            PushNotificationDeepLink.handle(userInfo: userInfo)
+            PushNotificationDeepLink.handle(response)
             completionHandler()
         }
     }

@@ -3853,6 +3853,37 @@ struct PostDetailViewControllerTests {
 }
 
 @MainActor
+struct ReplyLoginNavigationRegressionTests {
+    @Test func doubleTapWhileWaitingForGuestAccountOpensOneLoginPage() async throws {
+        let detail = PostDetailViewController(
+            presenter: SpyPostDetailPresenter(),
+            accountRefresher: DelayedPostDetailAccountRefresher(isLoggedIn: false)
+        )
+        let navigation = UINavigationController(rootViewController: detail)
+        detail.loadViewIfNeeded()
+        detail.render(detail: authorFilterDetail(comments: [], page: 1, nextPage: nil))
+        await waitForDetailContent(in: detail)
+        try #require(!detail.replyButton.isHidden)
+
+        detail.replyButton.sendActions(for: .touchUpInside)
+        detail.replyButton.sendActions(for: .touchUpInside)
+
+        // 账号查询延迟一秒。先等登录页出现，再给同时返回的第二次查询留出跳转时间。
+        let didOpenLogin = await waitUntil(timeout: 3) { navigation.topViewController is LoginWebViewController }
+        try #require(didOpenLogin)
+        _ = await waitUntil(timeout: 0.5) { navigation.viewControllers.count > 2 }
+        let loginPages = navigation.viewControllers.filter { $0 is LoginWebViewController }.count
+        try #require(loginPages == 1)
+
+        navigation.popViewController(animated: false)
+        try #require(navigation.topViewController === detail)
+        detail.replyButton.sendActions(for: .touchUpInside)
+        let didReopenLogin = await waitUntil(timeout: 3) { navigation.topViewController is LoginWebViewController }
+        #expect(didReopenLogin)
+    }
+}
+
+@MainActor
 @Suite(.serialized)
 struct PostDetailLoginViewControllerTests {
     @Test func loginRequiredStateShowsLoginButtonAndSendsTapToPresenter() throws {
@@ -3872,6 +3903,24 @@ struct PostDetailLoginViewControllerTests {
         button.sendActions(for: .touchUpInside)
 
         #expect(presenter.didTapLoginCount == 1)
+    }
+
+    @Test func leavingDuringAccountCheckDiscardsItsResult() async {
+        let detail = PostDetailViewController(
+            presenter: SpyPostDetailPresenter(),
+            accountRefresher: DelayedPostDetailAccountRefresher(isLoggedIn: true)
+        )
+        var actions = 0
+        detail.ensureNodeSeekLoggedIn { actions += 1 }
+        let pending = detail.loginCheckTask
+        detail.viewWillDisappear(false)
+        await pending?.value
+        #expect(actions == 0)
+
+        detail.ensureNodeSeekLoggedIn { actions += 1 }
+        detail.ensureNodeSeekLoggedIn { actions += 1 }
+        await detail.loginCheckTask?.value
+        #expect(actions == 1)
     }
 
     @Test func loginButtonIsHiddenBeforeLoginRequiredRender() throws {

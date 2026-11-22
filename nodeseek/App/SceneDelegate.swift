@@ -15,6 +15,17 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
+        if let cleanup = (UIApplication.shared.delegate as? AppDelegate)?.logoutCleanup {
+            Task { @MainActor [weak self] in
+                await cleanup.value
+                self?.connectWindow(to: windowScene, options: connectionOptions)
+            }
+        } else {
+            connectWindow(to: windowScene, options: connectionOptions)
+        }
+    }
+
+    private func connectWindow(to windowScene: UIWindowScene, options connectionOptions: UIScene.ConnectionOptions) {
         let window = UIWindow(windowScene: windowScene)
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-DetailTextKitPrototype") {
@@ -38,7 +49,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
 
         if let response = connectionOptions.notificationResponse {
-            PushNotificationDeepLink.handle(userInfo: response.notification.request.content.userInfo)
+            PushNotificationDeepLink.handle(response)
         }
         handle(urlContexts: connectionOptions.urlContexts)
     }
@@ -71,6 +82,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func sceneDidBecomeActive(_ scene: UIScene) {
         Task { @MainActor [weak self] in
             guard let self else { return }
+            await (UIApplication.shared.delegate as? AppDelegate)?.logoutCleanup?.value
             guard let presentationContext = self.autoCheckInPresentationContext() else { return }
             await AutoCheckInModule.runIfNeeded(
                 presentationContext: presentationContext,

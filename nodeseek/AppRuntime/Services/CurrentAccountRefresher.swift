@@ -16,17 +16,14 @@ protocol CurrentAccountRefreshing: Sendable {
 
 actor CurrentAccountRefresher: CurrentAccountRefreshing {
     @MainActor
-    static let shared: CurrentAccountRefresher = {
-        let service = NodeSeekService(htmlClient: HiddenWebViewHTMLClient.isolated())
-        return CurrentAccountRefresher(service: service, store: .shared)
-    }()
+    static let shared = CurrentAccountRefresher(htmlClient: HiddenWebViewHTMLClient.isolated())
 
     private let service: NodeSeekService
     private let store: CurrentAccountStore
     private var inFlightTask: Task<AccountResponse?, Never>?
 
-    init(service: NodeSeekService, store: CurrentAccountStore = .shared) {
-        self.service = service
+    init(htmlClient: any HTMLClient, store: CurrentAccountStore = .shared) {
+        self.service = NodeSeekService(htmlClient: htmlClient, currentAccountStore: store)
         self.store = store
     }
 
@@ -53,7 +50,6 @@ actor CurrentAccountRefresher: CurrentAccountRefreshing {
                 let result = try await service.loadAccount()
                 switch result {
                 case .value(let account):
-                    await store.save(account)
                     AppLog.debug(.account, "refresher: save -> \(account.debugSummary)")
                     return account
                 case .challenge:
@@ -75,6 +71,7 @@ actor CurrentAccountRefresher: CurrentAccountRefreshing {
 }
 
 extension Notification.Name {
+    static let nodeSeekAccountSessionDidChange = Notification.Name("nodeSeekAccountSessionDidChange")
     static let nodeSeekLoginSessionDidClose = Notification.Name("nodeSeekLoginSessionDidClose")
     static let nodeSeekNotificationReadStateDidChange = Notification.Name("nodeSeekNotificationReadStateDidChange")
     static let nodeSeekNotificationUnreadCountDidUpdate = Notification.Name("nodeSeekNotificationUnreadCountDidUpdate")

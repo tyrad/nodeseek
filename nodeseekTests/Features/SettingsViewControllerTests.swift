@@ -940,7 +940,7 @@ struct SettingsViewControllerTests {
         #expect(cell.textLabel?.text == "NodeImage 授权")
     }
 
-    @Test func defaultSessionLogoutClearsNodeImageAuthorization() async throws {
+    @Test func logoutCleansSessionAgainAtLaunchUnlessLoginSucceeded() async throws {
         let nodeImageAPIKeyStore = FakeNodeImageAPIKeyStore()
         nodeImageAPIKeyStore.save(apiKey: "nodeimage-key")
         let defaults = try #require(UserDefaults(suiteName: "settings-session-\(UUID().uuidString)"))
@@ -953,13 +953,26 @@ struct SettingsViewControllerTests {
                 allowedDomains: []
             ),
             currentAccountStore: accountStore,
-            nodeImageAPIKeyStore: nodeImageAPIKeyStore
+            nodeImageAPIKeyStore: nodeImageAPIKeyStore,
+            defaults: defaults
         )
 
+        #expect(manager.startPendingCleanup() == nil)
         await manager.logout()
-
         #expect(nodeImageAPIKeyStore.clearCount == 1)
         #expect(nodeImageAPIKeyStore.apiKey() == nil)
+
+        let member = AccountResponse(displayName: "测试账号", isLoggedIn: true)
+        await accountStore.save(AccountResponse(displayName: "游客", isLoggedIn: false))
+        let cleanup = try #require(manager.startPendingCleanup())
+        await cleanup.value
+        #expect(await accountStore.snapshot() == nil)
+        #expect(manager.startPendingCleanup() == nil)
+
+        await manager.logout()
+        await accountStore.save(member)
+        #expect(manager.startPendingCleanup() == nil)
+        #expect(await accountStore.snapshot()?.account == member)
     }
 }
 
@@ -1057,7 +1070,7 @@ private final class FakeSettingsSessionManager: SettingsSessionManaging {
     }
 }
 
-private final class FakeNodeImageAPIKeyStore: NodeImageAPIKeyStoring {
+final class FakeNodeImageAPIKeyStore: NodeImageAPIKeyStoring {
     private(set) var clearCount = 0
     private var storedAPIKey: String?
 

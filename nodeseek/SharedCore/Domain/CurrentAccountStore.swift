@@ -15,6 +15,9 @@ actor CurrentAccountStore {
 
     nonisolated static let shared = CurrentAccountStore()
 
+    nonisolated static let pendingLogoutCleanupKey = "nodeSeekSession.pendingLogoutCleanup"
+    private(set) var sessionID: UUID? = UUID()
+
     private let userDefaults: UserDefaults
     private let storageKey: String
     private var cachedSnapshot: Snapshot?
@@ -33,9 +36,34 @@ actor CurrentAccountStore {
     }
 
     func save(_ account: AccountResponse, updatedAt: Date = Date()) {
+        guard sessionID != nil else { return }
+        if account.isLoggedIn {
+            userDefaults.removeObject(forKey: Self.pendingLogoutCleanupKey)
+        }
         let snapshot = Snapshot(account: account, updatedAt: updatedAt)
         cachedSnapshot = snapshot
         persist(snapshot)
+    }
+
+    // 退出之前发出的请求即使较晚返回，也不能用旧账号覆盖游客状态。
+    @discardableResult
+    func save(_ account: AccountResponse, for requestSessionID: UUID?) -> Bool {
+        guard let requestSessionID, requestSessionID == sessionID else { return false }
+        save(account)
+        return true
+    }
+
+    func beginLogoutCleanup() {
+        userDefaults.set(true, forKey: Self.pendingLogoutCleanupKey)
+        sessionID = nil
+        clear()
+    }
+
+    func finishLogoutCleanup(atLaunch: Bool) {
+        if atLaunch {
+            userDefaults.removeObject(forKey: Self.pendingLogoutCleanupKey)
+        }
+        sessionID = UUID()
     }
 
     func clear() {

@@ -1,0 +1,20 @@
+appId: com.mistj.nodeseek
+name: 从首页打开搜索并返回
+---
+- launchApp:
+    # 在专用测试模拟器上清除 App 数据，从默认阅读布局开始。
+    clearState: true
+- tapOn:
+    id: layout-chooser-start-button
+- tapOn:
+    id: post-list-menu-button
+- tapOn:
+    id: post-list-side-menu-search-button
+- assertVisible:
+    id: search-keyword-text-field
+- tapOn:
+    id: search-back-button
+- assertVisible:
+    id: post-list-menu-button
+- assertNotVisible:
+    id: search-keyword-text-field

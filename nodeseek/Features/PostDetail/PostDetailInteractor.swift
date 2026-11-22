@@ -387,6 +387,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
                 case .remove:
                     response = try await collectionSubmitter.removeFavorite(postID: post.id, referer: referer)
                 }
+                AppLog.info(.postDetail, "\(actionText)帖子成功，postID=\(post.id)")
                 await sessionStore.recordSuccess()
                 await MainActor.run {
                     switch action {

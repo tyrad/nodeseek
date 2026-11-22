@@ -351,6 +351,10 @@ final class CommentCellNode: ASCellNode, ThemeRefreshableNode {
         configureActionButton(replyButtonNode, systemImageName: "arrowshape.turn.up.left", accessibilityLabel: "回复评论")
         configureActionButton(quoteButtonNode, systemImageName: "quote.bubble", accessibilityLabel: "引用评论")
         configureActionButton(editButtonNode, systemImageName: "square.and.pencil", accessibilityLabel: "编辑评论")
+        if let floor = comment.anchorID {
+            quoteButtonNode.accessibilityIdentifier = "post-detail-quote-comment-\(floor)-\(comment.id)"
+            editButtonNode.accessibilityIdentifier = "post-detail-edit-comment-\(floor)-\(comment.id)"
+        }
     }
 
     private func configureActions() {

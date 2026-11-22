@@ -67,6 +67,12 @@ help:
 		'  make xcode-test-class TEST="NodeSeekServiceTests CookieBridgeTests"' \
 		'  make xcode-test-class TEST=NodeSeekServiceTests SIMULATOR_NAME="iPhone 16" SIMULATOR_OS=18.0' \
 		'  make xcode-test-full' \
+		'  make e2e-list  # List case IDs, profiles and account requirements' \
+		'  make e2e-case CASE=member-compose' \
+		'  make e2e-draft  # Verify local draft recovery and discard after relaunch' \
+		'  make e2e-comment  # Publish and edit a real reply in the designated thread' \
+		'  make e2e-login  # NodeSeek sign-in and session persistence' \
+		'  make e2e-smoke  # Midscene on NodeSeek E2E' \
 		'' \
 		'Variables:' \
 		'  BUILD_DESTINATION defaults to $(BUILD_DESTINATION)' \
@@ -118,3 +124,22 @@ xcode-test-class:
 
 xcode-test-full:
 	xcodebuild -quiet test $(XCODE_TEST_COMMON)
+
+.PHONY: e2e-list e2e-case e2e-smoke e2e-login e2e-comment e2e-draft
+e2e-list:
+	@bash .agents/skills/nodeseek-e2e/scripts/run.sh --list
+
+e2e-case:
+	@bash .agents/skills/nodeseek-e2e/scripts/run.sh --case "$$CASE"
+
+e2e-draft:
+	E2E_PROFILE=draft bash .agents/skills/nodeseek-e2e/scripts/run.sh
+
+e2e-comment:
+	E2E_PROFILE=comment bash .agents/skills/nodeseek-e2e/scripts/run.sh
+
+e2e-login:
+	E2E_PROFILE=login bash .agents/skills/nodeseek-e2e/scripts/run.sh
+
+e2e-smoke:
+	bash .agents/skills/nodeseek-e2e/scripts/run.sh

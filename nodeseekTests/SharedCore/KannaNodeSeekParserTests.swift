@@ -647,6 +647,43 @@ struct KannaNodeSeekParserTests {
         #expect(detail.favoriteCount == 10)
     }
 
+    @Test(arguments: [nil, 0, 7, 2026] as [Int?])
+    func favoriteCountIgnoresYearInPostContent(configuredCount: Int?) throws {
+        let config = configuredCount.map {
+            #"<script id="nodeseek-captured-config" type="application/json">{"postData":{"collectionCount":\#($0),"collected":true}}</script>"#
+        } ?? ""
+        let html = """
+        <div class="nsk-post">
+          <div class="post-title"><h1>测试</h1></div>
+          <div id="0" class="content-item">
+            <article class="post-content"><a title="收藏列表">2026 年度书单</a></article>
+            <div class="signature"><div class="comment-menu">
+              <span class="menu-item \(configuredCount == nil ? "clicked" : "")" title="收藏">2026</span>
+            </div></div>
+          </div>
+        </div>
+        \(config)
+        """
+        let parser = KannaNodeSeekParser(baseURL: NodeSeekSite.baseURL)
+        let detail = try parser.parsePostDetail(html: html, url: NodeSeekSite.postURL(id: "1", page: 1))
+        #expect(detail.favoriteCount == configuredCount)
+        #expect(detail.isFavoriteCollected == (configuredCount != nil))
+    }
+
+    @Test(arguments: [("2026-11-20", nil), ("2026", 2026)] as [(String, Int?)])
+    func legacyFavoriteButtonReadsOnlyStandaloneSiblingCounts(text: String, expected: Int?) throws {
+        let html = """
+        <div class="nsk-post"><div class="post-title"><h1>测试</h1></div>
+          <div id="0" class="content-item"><article class="post-content">正文</article>
+            <button title="收藏"></button><span>\(text)</span>
+          </div>
+        </div>
+        """
+        let parser = KannaNodeSeekParser(baseURL: NodeSeekSite.baseURL)
+        let detail = try parser.parsePostDetail(html: html, url: NodeSeekSite.postURL(id: "1", page: 1))
+        #expect(detail.favoriteCount == expected)
+    }
+
     @Test func prefersRenderedReactionCountsOverStaleCapturedConfiguration() throws {
         let postJSON = """
         {
@@ -1121,8 +1158,12 @@ struct KannaNodeSeekParserTests {
         #expect(detail.requiredReadingLevel == 1)
     }
 
-    @Test func parsesPostDetailPaginationFromFixture() throws {
-        let html = try FixtureLoader.html(named: "post-703863-1")
+    @Test(arguments: [true, false])
+    func parsesPostDetailPaginationFromFixture(hasNextArrow: Bool) throws {
+        let fixture = try FixtureLoader.html(named: "post-703863-1")
+        let html = hasNextArrow ? fixture : fixture.replacingOccurrences(
+            of: #"<a[^>]*class="pager-next"[^>]*>.*?</a>"#, with: "", options: .regularExpression
+        )
         let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
 
         let detail = try parser.parsePostDetail(
@@ -1135,6 +1176,7 @@ struct KannaNodeSeekParserTests {
         #expect(pagination.currentPage == 1)
         #expect(pagination.previousPage == nil)
         #expect(pagination.nextPage == 2)
+        #expect(!detail.isLastPage)
         #expect(pagination.items.map(\.page) == [1, 2, 3, 4])
         #expect(pagination.items.first?.isCurrent == true)
         #expect(pagination.items.dropFirst().first?.isCurrent == false)

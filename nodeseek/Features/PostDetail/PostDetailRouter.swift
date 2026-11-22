@@ -60,13 +60,6 @@ class PostDetailRouter: PostDetailRouterProtocol {
     }
 
     func navigateToLogin(onClose: @escaping @MainActor () -> Void) {
-        let loginViewController = LoginWebViewController(onClose: onClose)
-        if let navigationController = viewController?.navigationController {
-            navigationController.pushViewController(loginViewController, animated: true)
-            return
-        }
-
-        let navigationWrapper = UINavigationController(rootViewController: loginViewController)
-        viewController?.present(navigationWrapper, animated: true)
+        LoginWebViewController.open(from: viewController, onClose: onClose)
     }
 }

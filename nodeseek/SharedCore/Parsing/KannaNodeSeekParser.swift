@@ -387,8 +387,9 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             ?? bodyReactionConfiguration?.chickenLegCount
         let bodyOpposeCount = bodyItem.flatMap { parseReactionCount(in: $0, kind: .oppose) }
             ?? bodyReactionConfiguration?.opposeCount
-        let bodyFavoriteCount = bodyItem.flatMap { parseReactionCount(in: $0, kind: .favorite) }
-            ?? reactionConfiguration?.collectionCount
+        let bodyFavoriteCount = parseReactionCount(
+            in: bodyItem, kind: .favorite, configuredCount: reactionConfiguration?.collectionCount
+        )
         let isFavoriteCollected = bodyItem.map {
             hasRenderedReactionMenu(in: $0)
                 ? parseReactionClicked(in: $0, kind: .favorite)
@@ -422,7 +423,7 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             comments: comments,
             page: page,
             pagination: pagination,
-            isLastPage: document.at_xpath(XPathRules.postDetailNextPage) == nil
+            isLastPage: pagination?.nextPage == nil && document.at_xpath(XPathRules.postDetailNextPage) == nil
         )
     }
 
@@ -681,11 +682,12 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
         let currentPage = items.first(where: \.isCurrent)?.page ?? currentPageFromURL
         let previousPage = Self.postPage(from: pager.at_xpath(XPathRules.pagerPrevious)?["href"], relativeTo: baseURL)
         let nextPage = Self.postPage(from: pager.at_xpath(XPathRules.pagerNext)?["href"], relativeTo: baseURL)
+        let numberedNextPage = items.contains { $0.page > currentPage } ? currentPage + 1 : nil
         let pagination = PostDetailPagination(
             currentPage: currentPage,
             items: items,
             previousPage: previousPage,
-            nextPage: nextPage
+            nextPage: nextPage ?? numberedNextPage
         )
         return pagination.hasMultiplePages ? pagination : nil
     }
@@ -814,12 +816,16 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
         }
     }
 
-    private func parseReactionCount(in item: Kanna.XMLElement, kind: ReactionKind) -> Int? {
+    // 正文和签名是用户内容；其中的链接、数字不能作为帖子操作栏的数据。
+    private static let outsidePostText = "[not(ancestor-or-self::*[contains(concat(' ', normalize-space(@class), ' '), ' post-content ') or contains(concat(' ', normalize-space(@class), ' '), ' signature ')])]"
+
+    private func parseReactionCount(in item: Kanna.XMLElement?, kind: ReactionKind, configuredCount: Int? = nil) -> Int? {
+        guard let item else { return configuredCount }
         if let count = parseRenderedReactionMenuCount(in: item, kind: kind) {
             return count
         }
 
-        if let count = firstInteger(inAttributesOf: item, attributes: kind.rootAttributes) {
+        if let count = firstInteger(inAttributesOf: item, attributes: kind.rootAttributes) ?? configuredCount {
             return count
         }
 
@@ -828,7 +834,7 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             return nil
         }
 
-        for node in item.xpath(".//*") where node.matchesReaction(kind) {
+        for node in item.xpath(".//*" + Self.outsidePostText) where node.matchesReaction(kind) {
             if let count = firstInteger(inAttributesOf: node, attributes: kind.countAttributes) {
                 return count
             }
@@ -844,9 +850,12 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
                 return count
             }
 
-            if let siblingText = node.at_xpath("./following-sibling::*[1]")?.text,
-               let count = Self.firstInteger(in: siblingText) {
-                return count
+            if let siblingText = node.at_xpath("./following-sibling::*[1]" + Self.outsidePostText)?.text {
+                // 旧版收藏按钮旁可能是时间；只有独立数字才是相邻计数。
+                let count = kind == .favorite
+                    ? Int(siblingText.trimmingCharacters(in: .whitespacesAndNewlines))
+                    : Self.firstInteger(in: siblingText)
+                if let count { return count }
             }
         }
 
@@ -854,7 +863,7 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
     }
 
     private func parseRenderedReactionMenuCount(in item: Kanna.XMLElement, kind: ReactionKind) -> Int? {
-        for node in item.xpath(".//*[contains(concat(' ', normalize-space(@class), ' '), ' comment-menu ')]//*[contains(concat(' ', normalize-space(@class), ' '), ' menu-item ')]") where node.matchesReaction(kind) {
+        for node in item.xpath(".//*[contains(concat(' ', normalize-space(@class), ' '), ' comment-menu ')]//*[contains(concat(' ', normalize-space(@class), ' '), ' menu-item ')]" + Self.outsidePostText) where node.matchesReaction(kind) {
             if let countText = node.at_xpath(".//span[normalize-space()][1]")?.text,
                let count = Self.firstInteger(in: countText) {
                 return count
@@ -869,13 +878,13 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
     }
 
     private func parseReactionClicked(in item: Kanna.XMLElement, kind: ReactionKind) -> Bool {
-        item.xpath(".//*").contains { node in
-            node.matchesReaction(kind) && node.hasClass("clicked")
+        item.xpath(".//*[contains(concat(' ', normalize-space(@class), ' '), ' clicked ')]" + Self.outsidePostText).contains { node in
+            node.matchesReaction(kind)
         }
     }
 
     private func hasRenderedReactionMenu(in item: Kanna.XMLElement) -> Bool {
-        item.at_xpath(".//*[contains(concat(' ', normalize-space(@class), ' '), ' comment-menu ')]") != nil
+        item.at_xpath(".//*[contains(concat(' ', normalize-space(@class), ' '), ' comment-menu ')]" + Self.outsidePostText) != nil
     }
 
     private struct PostReactionConfiguration {
@@ -1108,13 +1117,6 @@ nonisolated private extension Kanna.XMLElement {
 
         guard haystack.isEmpty == false else { return false }
         return kind.markers.contains { haystack.contains($0.lowercased()) }
-    }
-
-    func hasClass(_ className: String) -> Bool {
-        guard let value = self["class"] else { return false }
-        return value
-            .split(whereSeparator: { $0.isWhitespace })
-            .contains { $0 == className }
     }
 }
 

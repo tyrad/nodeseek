@@ -58,6 +58,7 @@ class PostListViewController: UIViewController {
     private var tabScrollTrailingToSafeAreaConstraint: NSLayoutConstraint?
     private var tabScrollTrailingToSearchButtonConstraint: NSLayoutConstraint?
     var isSortToggleExpanded = false
+    private var composeLoginCheckTask: Task<Void, Never>?
     private var isComposeButtonHidden = false
     /// 本次拖动中上一次切换发帖按钮时的手指位置。
     private var composeDragAnchorY: CGFloat?
@@ -220,7 +221,10 @@ class PostListViewController: UIViewController {
             )
         },
         detailTestURLProvider: @escaping () -> String = {
-            UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string ?? ""
+            #if DEBUG
+            if let url = ProcessInfo.processInfo.environment["NODESEEK_E2E_DETAIL_URL"] { return url }
+            #endif
+            return UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string ?? ""
         }
     ) {
         self.presenter = presenter
@@ -283,6 +287,8 @@ class PostListViewController: UIViewController {
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        composeLoginCheckTask?.cancel()
+        composeLoginCheckTask = nil
         navigationController?.setNavigationBarHidden(false, animated: animated)
     }
 
@@ -424,9 +430,11 @@ class PostListViewController: UIViewController {
 
     @objc private func composeButtonTapped() {
         AppLog.info(.postList, "首页悬浮发帖按钮点击")
-        Task { @MainActor [weak self] in
+        guard composeLoginCheckTask == nil else { return }
+        composeLoginCheckTask = Task { @MainActor [weak self] in
             let isLoggedIn = await TabLayoutAccountGate.isLoggedIn()
-            guard let self else { return }
+            guard !Task.isCancelled, let self else { return }
+            composeLoginCheckTask = nil
             if isLoggedIn {
                 presenter.didTapNewDiscussion()
             } else {

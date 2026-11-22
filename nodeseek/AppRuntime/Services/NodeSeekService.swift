@@ -38,6 +38,7 @@ struct NodeSeekService: Sendable {
     ) async throws -> NodeSeekResult<[PostSummary]> {
         let targetURL = postListURL(page: page, category: category, sortMode: sortMode)
         AppLog.info(.service, "开始抓取 NodeSeek 列表，category=\(category.rawValue), sort=\(sortMode.rawValue), page=\(page): \(targetURL.absoluteString)")
+        let sessionID = await currentAccountStore?.sessionID
         let response = try await htmlClient.get(targetURL)
         AppLog.info(.service, "抓取返回 category=\(category.rawValue), sort=\(sortMode.rawValue), page=\(page), status=\(response.statusCode), htmlLength=\(response.html.utf8.count), finalURL=\(response.finalURL.absoluteString)")
 
@@ -46,7 +47,7 @@ struct NodeSeekService: Sendable {
             AppLog.warning(.service, "检测到 challenge: \(challenge.logDescription)")
             return .challenge(challenge)
         case .parsed(let posts, let account):
-            await saveOpportunisticAccount(account)
+            await saveOpportunisticAccount(account, for: sessionID)
             AppLog.info(.service, "列表解析完成，帖子数量: \(posts.count)")
             return .value(posts)
         }
@@ -59,6 +60,7 @@ struct NodeSeekService: Sendable {
     ) async throws -> NodeSeekResult<NodeSeekSearchPage> {
         let targetURL = searchURL(query: query, page: page, category: category)
         AppLog.info(.service, "开始抓取 NodeSeek 搜索，category=\(category.rawValue), page=\(page): \(targetURL.absoluteString)")
+        let sessionID = await currentAccountStore?.sessionID
         let response = try await htmlClient.get(targetURL)
         AppLog.info(.service, "搜索抓取返回 category=\(category.rawValue), page=\(page), status=\(response.statusCode), htmlLength=\(response.html.utf8.count), finalURL=\(response.finalURL.absoluteString)")
 
@@ -73,7 +75,7 @@ struct NodeSeekService: Sendable {
             AppLog.warning(.service, "检测到搜索 challenge: \(challenge.logDescription)")
             return .challenge(challenge)
         case .parsed(let searchPage, let account):
-            await saveOpportunisticAccount(account)
+            await saveOpportunisticAccount(account, for: sessionID)
             AppLog.info(.service, "搜索解析完成，帖子数量: \(searchPage.posts.count), 提示: \(searchPage.notice ?? "无")")
             return .value(searchPage)
         }
@@ -83,6 +85,7 @@ struct NodeSeekService: Sendable {
         let targetURL = baseURL
         AppLog.info(.service, "开始抓取 NodeSeek 账号信息: \(targetURL.absoluteString)")
         AppLog.debug(.account, "service: request \(targetURL.absoluteString)")
+        let sessionID = await currentAccountStore?.sessionID
         let response = try await htmlClient.get(targetURL)
         AppLog.info(.service, "账号信息抓取返回 status=\(response.statusCode), htmlLength=\(response.html.count), finalURL=\(response.finalURL.absoluteString)")
         AppLog.debug(
@@ -97,7 +100,9 @@ struct NodeSeekService: Sendable {
         }
 
         let account = try parser.parseAccount(html: response.html)
-        await currentAccountStore?.save(account)
+        if let currentAccountStore, await !currentAccountStore.save(account, for: sessionID) {
+            throw CancellationError()
+        }
         AppLog.info(.service, "账号信息解析完成，loggedIn=\(account.isLoggedIn), displayName=\(account.displayName)")
         AppLog.debug(.account, "service: parsed loggedIn=\(account.isLoggedIn) name=\(account.displayName) avatar=\(account.avatarURL?.path ?? "nil") profile=\(account.profileURL?.path ?? "nil") stats=\(account.stats.joined(separator: "|"))")
         return .value(account)
@@ -106,6 +111,7 @@ struct NodeSeekService: Sendable {
     func loadPostDetail(postID: String, page: Int = 1) async throws -> NodeSeekResult<PostDetail> {
         let targetURL = postDetailURL(postID: postID, page: page)
         AppLog.info(.service, "开始抓取 NodeSeek 详情，postID=\(postID), page=\(page): \(targetURL.absoluteString)")
+        let sessionID = await currentAccountStore?.sessionID
         let response = try await htmlClient.get(targetURL)
         AppLog.info(.service, "详情抓取返回 postID=\(postID), page=\(page), status=\(response.statusCode), htmlLength=\(response.html.utf8.count), finalURL=\(response.finalURL.absoluteString)")
 
@@ -114,7 +120,7 @@ struct NodeSeekService: Sendable {
             AppLog.warning(.service, "检测到详情 challenge: \(challenge.logDescription)")
             return .challenge(challenge)
         case .parsed(let detail, let account):
-            await saveOpportunisticAccount(account)
+            await saveOpportunisticAccount(account, for: sessionID)
             AppLog.info(.service, "详情解析完成，postID=\(detail.id), 评论数量: \(detail.comments.count)")
             return .value(detail)
         }
@@ -154,9 +160,9 @@ struct NodeSeekService: Sendable {
         return components.url ?? baseURL.appendingPathComponent("search")
     }
 
-    private func saveOpportunisticAccount(_ account: AccountResponse?) async {
-        guard let currentAccountStore, let account else { return }
-        await currentAccountStore.save(account)
+    private func saveOpportunisticAccount(_ account: AccountResponse?, for sessionID: UUID?) async {
+        guard let currentAccountStore, let account,
+              await currentAccountStore.save(account, for: sessionID) else { return }
         AppLog.debug(.account, "service: opportunistic account save -> loggedIn=\(account.isLoggedIn) name=\(account.displayName)")
     }
 

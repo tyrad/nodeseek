@@ -105,6 +105,8 @@ make xcode-build-tests
 make xcode-test-full
 ```
 
+发布前的 iOS 端到端冒烟测试使用 `make e2e-smoke`。账号准备、覆盖范围与失败报告见 [NodeSeek E2E 技能](../.agents/skills/nodeseek-e2e/SKILL.md)。
+
 如果 simulator id 失效，先运行：
 
 ```bash

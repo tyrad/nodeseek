@@ -262,6 +262,7 @@ class PostDetailViewController: UIViewController {
     var testOpenedFullPostAnchorWasNil = false
     #endif
     let skeletonCommentRowCount = 4
+    var loginCheckTask: Task<Void, Never>?
     let accountRefresher: any CurrentAccountRefreshing
     let nodeImageAPIKeyStore: NodeImageAPIKeyStoring
     let nodeImageUploadClient: NodeImageUploading
@@ -645,6 +646,12 @@ class PostDetailViewController: UIViewController {
         configureNavigationItems()
         setupUI()
         presenter.viewDidLoad()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        loginCheckTask?.cancel()
+        loginCheckTask = nil
     }
 
     override func viewSafeAreaInsetsDidChange() {

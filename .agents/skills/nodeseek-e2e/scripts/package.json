@@ -1,0 +1,9 @@
+{
+  "name": "nodeseek-midscene-e2e",
+  "private": true,
+  "engines": { "node": "^22.22.2 || ^24.15.0 || >=26.0.0" },
+  "dependencies": {
+    "@midscene/ios": "1.18.1",
+    "appium-webdriveragent": "17.0.12"
+  }
+}

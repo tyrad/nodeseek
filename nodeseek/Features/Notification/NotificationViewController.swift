@@ -315,16 +315,11 @@ final class NotificationViewController: UIViewController {
     }
 
     private func showLogin() {
-        let loginViewController = LoginWebViewController { [weak self] in
+        LoginWebViewController.open(from: self) { [weak self] in
             // 本页在导航栈里时返回会经 viewWillAppear 刷新；弹出的情况在这里补一次
             guard let self, self.navigationController == nil else { return }
             self.loadUnreadCount()
             self.loadSelectedTab(showLoading: true)
-        }
-        if let navigationController {
-            navigationController.pushViewController(loginViewController, animated: true)
-        } else {
-            present(UINavigationController(rootViewController: loginViewController), animated: true)
         }
     }
 

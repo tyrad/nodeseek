@@ -264,7 +264,8 @@ struct NodeSeekServiceTests {
         #expect(snapshot?.account.displayName == "缭雾")
     }
 
-    @Test func cancelledPostListLoadDoesNotSaveAccount() async throws {
+    @Test(arguments: [false, true])
+    func interruptedPostListLoadDoesNotSaveOldAccount(logout: Bool) async throws {
         let html = try FixtureLoader.html(named: "post-list-basic")
             .replacingOccurrences(of: "</body>", with: accountHTML(displayName: "缭雾") + "</body>")
         let url = URL(string: "https://www.nodeseek.com/")!
@@ -287,11 +288,20 @@ struct NodeSeekServiceTests {
 
         let load = Task { try await service.loadPostList(page: 2) }
         await parser.waitUntilParsingStarted()
-        load.cancel()
+        if logout {
+            await store.beginLogoutCleanup()
+            await store.finishLogoutCleanup(atLaunch: false)
+        } else {
+            load.cancel()
+        }
         parser.resumeParsing()
 
-        await #expect(throws: CancellationError.self) {
+        if logout {
             _ = try await load.value
+        } else {
+            await #expect(throws: CancellationError.self) {
+                _ = try await load.value
+            }
         }
         #expect(await store.snapshot() == nil)
     }
@@ -628,7 +638,7 @@ struct NodeSeekServiceTests {
     }
 }
 
-private struct StaticHTMLClient: HTMLClient {
+struct StaticHTMLClient: HTMLClient {
     let response: HTMLResponse
 
     func get(_ url: URL) async throws -> HTMLResponse {

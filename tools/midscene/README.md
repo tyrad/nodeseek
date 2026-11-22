@@ -1,0 +1,1 @@
+NodeSeek 发布前冒烟测试使用 `make e2e-smoke`。发帖草稿跨冷启动恢复使用 `make e2e-draft`。真实登录使用 `make e2e-login`，在指定帖子公开回帖并编辑使用 `make e2e-comment`。运行脚本、测试用例及验收方式已集中到 [NodeSeek E2E 技能](../../.agents/skills/nodeseek-e2e/SKILL.md)。

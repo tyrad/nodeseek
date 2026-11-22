@@ -35,16 +35,21 @@ extension PostDetailViewController {
         return max(maxItemPage, pagination.nextPage ?? 1, currentPage)
     }
 
-    /// 屏幕上第一条可见评论所在的页；只看到主楼时取已加载的第一页。
+    /// 平时按首条可见评论定位，滚到底部时按末条可见评论定位。
     var visibleCommentPage: Int {
         let firstLoadedPage = loadedCommentPageRanges.keys.min() ?? currentPage
         guard isViewLoaded else { return firstLoadedPage }
         let rows = collectionList?.rows ?? detailRows
-        var visibleRows = (collectionList?.view.indexPathsForVisibleItems ?? tableNode.indexPathsForVisibleRows()).map(\.row).sorted()
-        // 仅新版列表：末页不足一屏时，滑到全文底部按最后一条可见评论计页。
-        if let list = collectionList?.view, pagination?.nextPage == nil {
+        let visibleRows: [Int]
+        if let list = collectionList?.view {
             let endY = list.contentSize.height - list.bounds.height + list.adjustedContentInset.bottom
-            if endY > -list.adjustedContentInset.top, list.contentOffset.y >= endY - 1 { visibleRows.reverse() }
+            let atEnd = pagination?.nextPage == nil && endY > -list.adjustedContentInset.top && list.contentOffset.y >= endY - 1
+            visibleRows = list.indexPathsForVisibleItems.map(\.row).sorted(by: atEnd ? (>) : (<))
+        } else {
+            let table = tableNode.view
+            let atBottom = table.contentSize.height > 0
+                && table.bounds.maxY - table.adjustedContentInset.bottom >= table.contentSize.height - 1
+            visibleRows = tableNode.indexPathsForVisibleRows().map(\.row).sorted(by: atBottom ? (>) : (<))
         }
         for row in visibleRows where row < rows.count {
             guard case .comment(let commentIndex) = rows[row] else { continue }
