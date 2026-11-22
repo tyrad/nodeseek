@@ -1016,6 +1016,39 @@ struct KannaNodeSeekParserTests {
         #expect(detail.comments.isEmpty)
     }
 
+    @Test(arguments: [
+        ("404 Not Found😭", nil), ("请在 24 小时后重试", nil),
+        ("403 权限不足，查看本帖需要 Lv. 2，您当前 Lv1", 2),
+        ("您当前 Lv3，权限不足", nil), ("需要注册用户才能查看", nil)
+    ] as [(String, Int?)])
+    func onlyAnExplicitRequiredLevelProducesABadge(notice: String, level: Int?) throws {
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+        let html = "<title>NodeSeek</title><div id='nsk-body'><div id='nsk-body-left'><p>\(notice)</p></div></div>"
+        let detail = try parser.parsePostDetail(html: html, url: URL(string: "https://www.nodeseek.com/post-42-1")!)
+        #expect(detail.requiredReadingLevel == level)
+        #expect(detail.isRestricted)
+        #expect(detail.visibleMarkdown == nil)
+        #expect(detail.contentHTML == notice)
+        if notice.hasPrefix("404") {
+            #expect(detail.title == NSLocalizedString("帖子不存在", tableName: "DetailPrototype", comment: ""))
+        }
+    }
+
+    @Test func ordinaryPostCanDiscuss404WithoutBecomingUnavailable() throws {
+        let html = """
+        <div id="nsk-body"><div id="nsk-body-left"><div class="nsk-post">
+        <div class="post-title"><h1><a class="post-title-link">排查 404</a></h1></div>
+        <div class="content-item"><article class="post-content"><p>404 Not Found😭</p></article></div>
+        </div></div></div>
+        """
+        let url = URL(string: "https://www.nodeseek.com/post-42-1")!
+        let detail = try KannaNodeSeekParser(baseURL: url).parsePostDetail(html: html, url: url)
+        #expect(detail.title == "排查 404")
+        #expect(!detail.isRestricted)
+        #expect(detail.requiredReadingLevel == nil)
+        #expect(detail.contentHTML.contains("404 Not Found"))
+    }
+
     @Test func parsesUnknownNodeSeekEmptyStateNoticeFromBodyLeftFallback() throws {
         let html = """
         <html data-server-rendered="true">

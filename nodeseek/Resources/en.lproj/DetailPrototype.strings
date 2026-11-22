@@ -20,3 +20,4 @@
 "hot" = "Hot";
 "comment" = "Comment on post";
 "hot-comment" = "Hot comment";
+"帖子不存在" = "Post not found";

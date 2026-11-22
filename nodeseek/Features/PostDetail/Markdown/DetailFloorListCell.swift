@@ -1,6 +1,7 @@
 import UIKit
 
 final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
+    private let separator = UIView()
     private let avatar = UIImageView()
     private let actions = UIStackView()
     private let footer = UIScrollView()
@@ -174,7 +175,6 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
             avatar.leadingAnchor.constraint(equalTo: header.leadingAnchor),
             avatar.topAnchor.constraint(equalTo: header.topAnchor)
         ])
-        let separator = UIView()
         separator.translatesAutoresizingMaskIntoConstraints = false
         separator.backgroundColor = .separator
         contentView.addSubview(separator)
@@ -204,7 +204,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         footer.isHidden = true
     }
 
-    func configureHeader(title: String?, name: String, isPoster: Bool = false, badges: [String], time: String?,
+    func configureHeader(title: String?, requiredLevel: Int?, name: String, isPoster: Bool = false, badges: [String], time: String?,
                          floor: String?, isHot: Bool = false, showsRiskWarning: Bool = false) {
         let isReply = title == nil
         let hasAuthor = AuthorDisplayPolicy.isDisplayable(name)
@@ -217,7 +217,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         ])
         // 主楼没有状态标签时，发布信息跟在作者名后；有标签时移到第二行。
         if !isReply, badges.isEmpty, let time, !time.isEmpty {
-            author.append(NSAttributedString(string: (author.length == 0 ? "" : "  ") + time,
+            author.append(NSAttributedString(string: (author.length == 0 ? "" : "  · ") + time,
                                              attributes: [.font: authorFont, .foregroundColor: UIColor.secondaryLabel]))
         }
         metadata.accessibilityLabel = nil
@@ -245,12 +245,22 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         hotBadge.isHidden = !isHot || floorNumber.isHidden
         header.directionalLayoutMargins = .init(top: 0, leading: hasAuthor ? PostDetailContentLayout.avatarSize + PostDetailContentLayout.avatarSpacing : 0, bottom: 0, trailing: 0)
         headerHeight.constant = !isReply && hasAuthor ? PostDetailContentLayout.avatarSize : 0
-        heading.text = title
+        header.isHidden = !isReply && !hasAuthor && badges.isEmpty && metadata.isHidden
+        separator.isHidden = !isReply
         heading.isHidden = isReply
-        heading.font = UIFontMetrics(forTextStyle: .headline).scaledFont(for: AppTypography.detailTitleFont(), compatibleWith: traitCollection)
+        let titleFont = UIFontMetrics(forTextStyle: .headline).scaledFont(for: AppTypography.detailTitleFont(), compatibleWith: traitCollection)
+        heading.font = titleFont
+        heading.attributedText = title.map { title in
+            let text = NSMutableAttributedString(string: title, attributes: [.font: titleFont, .foregroundColor: ReadingColors.text])
+            if let requiredLevel {
+                text.append(NSAttributedString(string: " 🔒 \(requiredLevel)", attributes: [.font: authorFont, .foregroundColor: UIColor.systemRed]))
+            }
+            return text
+        }
         topInset.constant = isReply ? PostDetailContentLayout.commentTopInset : 18
         bottomInset = isReply ? PostDetailContentLayout.commentBottomInset : 14
         stack.spacing = isReply ? 8 : 12
+        stack.setCustomSpacing(header.isHidden ? 18 : stack.spacing, after: heading)
         stack.setCustomSpacing(isReply ? 8 : 18, after: header)
         body.spacing = stack.spacing
     }

@@ -124,6 +124,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         let row = rows[path.item]
         var source: DetailFloorSource
         var title: String?
+        var requiredLevel: Int?
         let author: String
         let badges: [String]
         var isPoster = false
@@ -137,7 +138,8 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         case .header:
             let header = page.currentHeaderContent!
             source = headerSource ?? .init(html: header.contentHTML, visibleMarkdown: nil)
-            title = header.title + (header.requiredReadingLevel.map { " 🔒 \($0)" } ?? "")
+            title = header.title
+            requiredLevel = header.requiredReadingLevel
             author = header.authorName
             badges = header.authorBadgeTexts
             showsRiskWarning = page.authorRiskWarningPostID == header.postID
@@ -184,7 +186,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         cell.body.isLayoutMarginsRelativeArrangement = true
         cell.textIndent = indent
         cell.body.directionalLayoutMargins = .init(top: 0, leading: indent, bottom: 0, trailing: 0)
-        cell.configureHeader(title: title, name: author, isPoster: isPoster, badges: badges, time: time,
+        cell.configureHeader(title: title, requiredLevel: requiredLevel, name: author, isPoster: isPoster, badges: badges, time: time,
                              floor: floor, isHot: isHot, showsRiskWarning: showsRiskWarning)
         cell.body.onLink = { [weak page] in page?.handleContentLinkTap($0) }
         cell.body.onSignatureLinks = { [weak page] in page?.handleSignatureLinkCandidatesTap($0) }

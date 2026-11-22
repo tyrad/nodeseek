@@ -336,7 +336,7 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             ?? document.at_xpath("//meta[@name='twitter:title']")?["content"]?.trimmedNonEmpty
             ?? document.at_xpath("//title")?.text?.normalizedNonEmpty
         let title = Self.isGenericPostDetailTitle(parsedTitle)
-            ? restrictedNotice.map { _ in "受限帖子" }
+            ? restrictedNotice.map(Self.unavailablePostTitle)
             : parsedTitle
 
         guard let title else {
@@ -363,7 +363,7 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             .text?
             .normalizedNonEmpty
             .flatMap(Self.firstInteger(in:))
-            ?? restrictedNotice.flatMap(Self.firstInteger(in:))
+            ?? restrictedNotice.flatMap(Self.requiredLevelFromNotice)
 
         let ownCommentIDs = ownCommentIDs(in: document)
         let commentSources = commentSources(in: document)
@@ -549,6 +549,20 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
         }
 
         return postDetailEmptyStateNotice(in: document)
+    }
+
+    private static func unavailablePostTitle(_ notice: String) -> String {
+        if notice.range(of: #"(?i)^404\s+not\s+found\b"#, options: .regularExpression) != nil {
+            return NSLocalizedString("帖子不存在", tableName: "DetailPrototype", comment: "站点返回帖子不存在提示")
+        }
+        return "受限帖子"
+    }
+
+    private static func requiredLevelFromNotice(_ notice: String) -> Int? {
+        // 提示还可能含状态码、等待时间和用户自己的等级，只取阅读要求后的等级。
+        let pattern = #"(?i)(?:需要|要求)\s*(?:达到\s*)?(?:lv\.?\s*|等级\s*)([0-9]+)"#
+        guard let range = notice.range(of: pattern, options: .regularExpression) else { return nil }
+        return firstInteger(in: String(notice[range]))
     }
 
     private func postDetailEmptyStateNotice(in document: HTMLDocument) -> String? {
