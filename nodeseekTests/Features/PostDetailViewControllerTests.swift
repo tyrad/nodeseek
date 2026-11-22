@@ -4935,8 +4935,10 @@ final class SpyPostDetailPresenter: PostDetailPresenterProtocol {
         didTapLoginCount += 1
     }
 
-    func didApproachCommentEnd() {
+    var acceptsBatchFetch = true
+    func didApproachCommentEnd() -> Bool {
         didApproachCommentEndCount += 1
+        return acceptsBatchFetch
     }
 
     func didTapRefreshCommentsAtEnd() {

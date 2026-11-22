@@ -21,6 +21,12 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     private var keys: [String] = []
     private var heights: [String: CGFloat] = [:]
     private let cache = NSCache<NSString, CachedText>()
+    private var requestedPage: Int?
+    private var retryOnNextDrag = false
+    private var userScrollInProgress = false
+    private var lastOffsetY: CGFloat = 0
+    private var queuedRows: [(row: PostDetailViewController.DetailRow, key: String)] = []
+    private var refreshQueuedBanner = false
     private var batchCheckScheduled = false
     private var generation = 0
     private var previousAppearance: DetailTextAppearance?
@@ -84,6 +90,8 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
 
     func reload(refresh: Bool = true) {
         guard let page else { return }
+        queuedRows.removeAll()
+        refreshQueuedBanner = false
         switch page.displayMode {
         // 首次加载：与 Texture 相同，一个主楼骨架加若干回复骨架；-1 表示主楼。
         case .skeleton: rows = (-1..<page.skeletonCommentRowCount).map(PostDetailViewController.DetailRow.skeletonComment)
@@ -96,10 +104,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             case .comment(let index):
                 let comment = page.comments[index]
                 let number = page.loadedCommentPageRanges.first { $0.value.contains(index) }?.key ?? page.currentPage
-                let prefix = "\(number)-\(comment.isHot ? "hot" : "reply")-\(comment.id)"
-                let occurrence = occurrences[prefix, default: 0]
-                occurrences[prefix] = occurrence + 1
-                return "\(prefix)-\(occurrence)"
+                return replyKey(comment, page: number, occurrences: &occurrences)
             case .authorFilterBanner: return "filter"
             case .entryHint: return "entry"
             case .postRepliesDivider: return "divider"
@@ -116,6 +121,55 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             let previous = Set(data.snapshot().itemIdentifiers)
             snapshot.reconfigureItems(keys.filter(previous.contains))
         }
+        data.apply(snapshot, animatingDifferences: false) { [weak self] in self?.scheduleBatchFetchCheck() }
+    }
+
+    private func replyKey(_ comment: Comment, page: Int, occurrences: inout [String: Int]) -> String {
+        let prefix = "\(page)-\(comment.isHot ? "hot" : "reply")-\(comment.id)"
+        let occurrence = occurrences[prefix, default: 0]
+        occurrences[prefix] = occurrence + 1
+        return "\(prefix)-\(occurrence)"
+    }
+
+    func resetPagination() {
+        requestedPage = nil
+        retryOnNextDrag = false
+    }
+
+    func didFinishLoadingMore() {
+        retryOnNextDrag = requestedPage != nil && requestedPage == page?.pagination?.nextPage
+        scheduleBatchFetchCheck()
+    }
+
+    func appendComments(in range: Range<Int>, pageNumber: Int, bannerChanged: Bool) {
+        guard let page else { return }
+        if range.lowerBound == 0, !range.isEmpty, page.currentHeaderContent != nil, page.authorFilter == nil {
+            queuedRows.append((.postRepliesDivider, "divider"))
+        }
+        var occurrences: [String: Int] = [:]
+        for index in range {
+            let comment = page.comments[index]
+            guard page.authorFilter?.matches(comment) != false else { continue }
+            let key = replyKey(comment, page: pageNumber, occurrences: &occurrences)
+            queuedRows.append((.comment(index), key))
+        }
+        refreshQueuedBanner = refreshQueuedBanner || bannerChanged
+        flushAppendIfPossible()
+    }
+
+    // 手指已拉过旧页底时，改变 contentSize 会移动系统回弹的终点。
+    private func flushAppendIfPossible() {
+        guard !queuedRows.isEmpty || refreshQueuedBanner else { return }
+        let bottom = max(-view.adjustedContentInset.top, view.contentSize.height - view.bounds.height + view.adjustedContentInset.bottom)
+        guard !userScrollInProgress || view.contentOffset.y <= bottom + 0.5 else { return }
+        var snapshot = data.snapshot()
+        let addedKeys = queuedRows.map(\.key)
+        rows.append(contentsOf: queuedRows.map(\.row))
+        keys.append(contentsOf: addedKeys)
+        snapshot.appendItems(addedKeys, toSection: 0)
+        if refreshQueuedBanner, snapshot.indexOfItem("filter") != nil { snapshot.reconfigureItems(["filter"]) }
+        queuedRows.removeAll()
+        refreshQueuedBanner = false
         data.apply(snapshot, animatingDifferences: false) { [weak self] in self?.scheduleBatchFetchCheck() }
     }
 
@@ -278,6 +332,8 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     private func updateHeight(_ cell: DetailFloorListCell, key: String) {
         guard let index = data.indexPath(for: key), view.bounds.width > 0 else { return }
         let height = cell.measuredHeight(width: view.bounds.width)
+        // 已量过的楼层在复用时先收到正文、后收到签名；不能用半成品缩短列表。
+        if let measured = heights[key], !cell.isSettled, height < measured { return }
         let old = heights[key] ?? 100
         guard abs(old - height) >= 0.5 else { return }
         heights[key] = height
@@ -318,11 +374,11 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         (cell as? DetailFloorListCell)?.body.refreshPlayback()
         showPendingHighlight(on: cell)
-        scheduleBatchFetchCheck()
+        if indexPath.item == 0 { scheduleBatchFetchCheck() }
     }
 
-    private func scheduleBatchFetchCheck() {
-        guard !batchCheckScheduled, let page, page.canRequestCommentBatchFetch() else { return }
+    func scheduleBatchFetchCheck() {
+        guard !batchCheckScheduled, let next = page?.pagination?.nextPage, next != requestedPage else { return }
         batchCheckScheduled = true
         // 等这一轮布局和 presenter 的页码更新完成，再根据最新剩余距离发请求。
         DispatchQueue.main.async { [weak self] in
@@ -336,14 +392,16 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         // 跳页、刷新和筛选自动补页期间，旧列表的滚动回调不能抢占下一次请求。
         guard let page, !page.pendingPageJumpScroll, !page.loadingIndicator.isAnimating,
               !page.loadMoreCommentsIndicator.isAnimating, page.authorFilterAutoLoadStreak == 0,
-              page.canRequestCommentBatchFetch(),
+              page.displayMode == .content, let next = page.pagination?.nextPage,
+              next > page.currentPage, requestedPage != next, queuedRows.isEmpty,
               view.window != nil, view.contentSize.height > 0 else { return }
         var bounds = view.bounds
         if let offsetY { bounds.origin.y = offsetY }
         let viewport = bounds.inset(by: view.adjustedContentInset)
         guard viewport.height > 0, view.contentSize.height - viewport.maxY <= page.leadingScreensForBatching * viewport.height else { return }
-        page.lastBatchFetchRequestedCommentCount = page.comments.count
-        page.presenter.didApproachCommentEnd()
+        requestedPage = next
+        retryOnNextDrag = false
+        if !page.presenter.didApproachCommentEnd() { requestedPage = nil }
     }
 
     func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
@@ -351,7 +409,11 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        scheduleBatchFetchCheck()
+        if !queuedRows.isEmpty || refreshQueuedBanner {
+            DispatchQueue.main.async { [weak self] in self?.flushAppendIfPossible() }
+        }
+        if scrollView.contentOffset.y > lastOffsetY { scheduleBatchFetchCheck() }
+        lastOffsetY = scrollView.contentOffset.y
         page?.scrollViewDidScroll(scrollView)
         for case let floor as DetailFloorListCell in view.visibleCells { floor.body.refreshPlayback() }
     }
@@ -364,9 +426,18 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     }
 
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        if !decelerate { finishUserScroll() }
         page?.scrollViewDidEndDragging(scrollView, willDecelerate: decelerate)
     }
-    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) { page?.scrollViewDidEndDecelerating(scrollView) }
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        finishUserScroll()
+        page?.scrollViewDidEndDecelerating(scrollView)
+    }
+
+    private func finishUserScroll() {
+        userScrollInProgress = false
+        flushAppendIfPossible()
+    }
 }
 
 extension PostDetailCollectionList {
@@ -442,6 +513,7 @@ private extension PostDetailCollectionList {
 
 extension PostDetailCollectionList {
     func scrollToAnchor(at row: Int) {
+        if !keys.indices.contains(row) { finishUserScroll() }
         guard keys.indices.contains(row) else { return }
         highlightedFloor?.clearAnchorHighlight()
         pendingAnchorKey = keys[row]
@@ -460,6 +532,8 @@ extension PostDetailCollectionList {
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         pendingAnchorKey = nil
+        userScrollInProgress = true
+        if retryOnNextDrag { resetPagination() }
     }
 
     func scroll(to row: Int, position: UICollectionView.ScrollPosition) {

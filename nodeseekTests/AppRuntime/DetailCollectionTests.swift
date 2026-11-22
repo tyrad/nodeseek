@@ -255,6 +255,137 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(spy.didApproachCommentEndCount, 1)
     }
 
+    func testSlowAppendKeepsBottomBoundaryUntilBounceReturns() async throws {
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        page.render(detail: makePagedDetail(1...20, pageNumber: 1, next: 2))
+        let list = try XCTUnwrap(page.collectionList?.view)
+        window.layoutIfNeeded()
+        func bottom() -> CGFloat {
+            list.contentSize.height - list.bounds.height + list.adjustedContentInset.bottom
+        }
+        list.setContentOffset(CGPoint(x: 0, y: bottom()), animated: false)
+        try await Task.sleep(nanoseconds: 250_000_000)
+        list.layoutIfNeeded()
+        let oldBottom = bottom()
+        let oldCount = list.numberOfItems(inSection: 0)
+        list.delegate?.scrollViewWillBeginDragging?(list)
+        list.contentOffset.y = oldBottom + 65
+        XCTAssertGreaterThan(list.contentOffset.y, oldBottom + 60)
+
+        page.appendCommentPage(detail: makePagedDetail(21...30, pageNumber: 2, next: nil))
+        list.layoutIfNeeded()
+        XCTAssertEqual(list.numberOfItems(inSection: 0), oldCount)
+        XCTAssertEqual(bottom(), oldBottom, accuracy: 1)
+        list.delegate?.scrollViewDidEndDragging?(list, willDecelerate: true)
+        XCTAssertEqual(list.numberOfItems(inSection: 0), oldCount)
+
+        list.contentOffset.y = oldBottom
+        list.delegate?.scrollViewDidEndDecelerating?(list)
+        list.layoutIfNeeded()
+        XCTAssertEqual(list.numberOfItems(inSection: 0), oldCount + 10)
+        XCTAssertEqual(list.contentOffset.y, oldBottom, accuracy: 1)
+        XCTAssertTrue(list.bounces)
+    }
+
+    func testFailedPrefetchWaitsForNextDragBeforeRetry() async throws {
+        let spy = SpyPostDetailPresenter()
+        let page = PostDetailViewController(presenter: spy, usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        page.render(detail: makePagedDetail(1...20, pageNumber: 1, next: 2))
+        let list = try XCTUnwrap(page.collectionList?.view)
+        window.layoutIfNeeded()
+        list.contentOffset.y = list.contentSize.height - list.bounds.height + list.adjustedContentInset.bottom
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(spy.didApproachCommentEndCount, 1)
+        page.showLoadingMoreComments()
+        page.hideLoadingMoreComments()
+        for _ in 0..<4 { list.delegate?.scrollViewDidScroll?(list) }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(spy.didApproachCommentEndCount, 1)
+        list.delegate?.scrollViewWillBeginDragging?(list)
+        list.contentOffset.y += 5
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(spy.didApproachCommentEndCount, 2)
+    }
+
+    func testMeasuredFloorKeepsItsHeightWhileSignatureReloads() async throws {
+        let settings = PostSignatureDisplaySettings.shared
+        let previous = settings.showsSignatures
+        settings.setShowsSignatures(true)
+        defer { settings.setShowsSignatures(previous) }
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let signature = "<p>签名第一行<br>第二行<br>第三行<br>第四行</p>"
+        let comment = Comment(id: "9", anchorID: "9", authorName: "Alice", avatarURL: nil, floorText: "#9",
+                              createdAtText: nil, contentHTML: "<p>正文</p>", signatureHTML: signature,
+                              markdown: "正文", hasVisibleMarkdown: true)
+        page.render(detail: PostDetail(id: "1", title: "高度", authorName: "Bob", avatarURL: nil,
+                                       metadataText: nil, contentHTML: "主帖", visibleMarkdown: "主帖", comments: [comment]))
+        let host = try XCTUnwrap(page.collectionList)
+        let list = host.view
+        window.layoutIfNeeded()
+        let path = try XCTUnwrap(page.indexPathForCurrentPageAnchor("9"))
+        let cell = try XCTUnwrap(list.cellForItem(at: path) as? DetailFloorListCell)
+        for _ in 0..<100 where !cell.isSettled { try await Task.sleep(nanoseconds: 10_000_000) }
+        XCTAssertTrue(cell.isSettled)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        list.layoutIfNeeded()
+        let height = cell.bounds.height
+
+        let gate = DispatchSemaphore(value: 0)
+        defer { gate.signal() }
+        host.renderer.onStep = { step, request in
+            if step == .parse, request.source.html == signature { _ = gate.wait(timeout: .now() + 3) }
+        }
+        host.refresh(commentID: "9")
+        try await Task.sleep(nanoseconds: 100_000_000)
+        list.layoutIfNeeded()
+        let reconfigured = try XCTUnwrap(list.cellForItem(at: path) as? DetailFloorListCell)
+        XCTAssertTrue(reconfigured.contentInstalled)
+        XCTAssertFalse(reconfigured.isSettled)
+        XCTAssertEqual(reconfigured.bounds.height, height, accuracy: 1)
+    }
+
+    func testRepeatedPageDeliveryPreservesUniqueRows() throws {
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        page.render(detail: makePagedDetail(1...10, pageNumber: 1, next: 2))
+        let second = makePagedDetail(11...12, pageNumber: 2, next: nil)
+        page.appendCommentPage(detail: second)
+        page.appendCommentPage(detail: second)
+        let list = try XCTUnwrap(page.collectionList?.view)
+        window.layoutIfNeeded()
+        XCTAssertEqual(page.comments.map(\.id), (1...12).map(String.init))
+        XCTAssertEqual(list.numberOfItems(inSection: 0), 14)
+    }
+
+    func testBusyPresenterDoesNotConsumeNextPage() async throws {
+        let spy = SpyPostDetailPresenter()
+        spy.acceptsBatchFetch = false
+        let page = PostDetailViewController(presenter: spy, usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        page.render(detail: makePagedDetail(1...45, pageNumber: 1, next: 2))
+        let list = try XCTUnwrap(page.collectionList?.view)
+        window.layoutIfNeeded()
+        let end = list.contentSize.height - list.bounds.height + list.adjustedContentInset.bottom
+        var target = CGPoint(x: 0, y: end)
+        func release() {
+            list.delegate?.scrollViewWillEndDragging?(list, withVelocity: CGPoint(x: 0, y: 2), targetContentOffset: &target)
+        }
+        release()
+        XCTAssertEqual(spy.didApproachCommentEndCount, 1)
+        spy.acceptsBatchFetch = true
+        release()
+        release()
+        XCTAssertEqual(spy.didApproachCommentEndCount, 2)
+    }
+
     func testShortLastPageShowsItsNumberAtTheBottom() async throws {
         let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
         let window = try pagingWindow(for: page)

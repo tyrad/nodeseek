@@ -261,24 +261,26 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         }
     }
 
-    func didApproachCommentEnd() {
+    @discardableResult
+    func didApproachCommentEnd() -> Bool {
         guard let page = nextCommentPage else {
             AppLog.debug(.postDetail, "忽略详情评论加载更多: 已无下一页")
-            return
+            return false
         }
         guard activeCommentPageRequest == nil else {
             AppLog.debug(.postDetail, "忽略详情评论加载更多: 正在加载 page=\(activeCommentPageRequest?.requestedPage ?? -1)")
-            return
+            return false
         }
         guard currentDetail != nil else {
             AppLog.debug(.postDetail, "忽略详情评论加载更多: 详情尚未完成首屏加载")
-            return
+            return false
         }
 
         activeCommentPageRequest = .append(page: page)
         AppLog.info(.postDetail, "触发详情评论加载更多: page=\(page)")
         view?.showLoadingMoreComments()
         interactor.loadPostDetail(page: page)
+        return true
     }
 
     func didTapRefreshCommentsAtEnd() {

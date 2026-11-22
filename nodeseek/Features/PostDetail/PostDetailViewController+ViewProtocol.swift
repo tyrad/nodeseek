@@ -53,11 +53,13 @@ extension PostDetailViewController: PostDetailViewProtocol {
     func hideLoadingMoreComments() {
         loadMoreCommentsIndicator.stopAnimating()
         lastBatchFetchRequestedCommentCount = nil
+        collectionList?.didFinishLoadingMore()
         updateLoadMoreCommentsFooter()
     }
 
     func hideLoading() {
         loadingIndicator.stopAnimating()
+        collectionList?.scheduleBatchFetchCheck()
         updateReplyButtonVisibility()
     }
 
@@ -147,6 +149,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
             comments = detail.comments
             loadedCommentPageRanges = [currentPage: 0..<comments.count]
             pagination = detail.pagination
+            collectionList.resetPagination()
             collectionList.reload()
             updateLoadMoreCommentsFooter()
             updateReplyButtonVisibility()
@@ -222,17 +225,22 @@ extension PostDetailViewController: PostDetailViewProtocol {
             return
         }
 
+        if collectionList != nil, loadedCommentPageRanges[detail.page] != nil {
+            refreshCurrentCommentPage(detail: detail)
+            return
+        }
         let oldCommentCount = comments.count
         let hasHeader = currentHeaderContent != nil
         let commentRowOffset = hasHeader ? 2 : 0
-        let oldRowCount = detailRows.count
+        let oldRowCount = collectionList == nil ? detailRows.count : 0
         let oldAuthorFilterBannerText = authorFilterBannerText
         currentPage = max(currentPage, detail.page)
         pagination = detail.pagination
         comments.append(contentsOf: detail.comments)
         loadedCommentPageRanges[detail.page] = oldCommentCount..<comments.count
         if let collectionList {
-            collectionList.reload(refresh: false)
+            collectionList.appendComments(in: oldCommentCount..<comments.count, pageNumber: detail.page,
+                                          bannerChanged: oldAuthorFilterBannerText != authorFilterBannerText)
             updateLoadMoreCommentsFooter()
             updateReplyButtonVisibility()
             if let authorFilter { scheduleAuthorFilterAutoLoadIfNeeded(newMatchCount: detail.comments.filter(authorFilter.matches).count) }

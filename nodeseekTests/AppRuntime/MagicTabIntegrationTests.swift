@@ -517,7 +517,7 @@ private final class TerminalTestPresenter: PostDetailPresenterProtocol {
     func refreshInitialPage() {}
     func didSelectCommentPage(_ page: Int) {}
     func didTapLogin() {}
-    func didApproachCommentEnd() {}
+    func didApproachCommentEnd() -> Bool { false }
     func didTapRefreshCommentsAtEnd() {}
     func didTapSendReply(content: String) {}
     func didTapFavorite() {}
