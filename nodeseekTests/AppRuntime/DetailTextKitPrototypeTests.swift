@@ -68,6 +68,44 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         XCTAssertEqual(opened?.1, 1)
     }
 
+    func testTabImageOpensGalleryAcrossAllTabs() async throws {
+        let first = URL(string: "https://example.invalid/tab-a.png")!
+        let second = URL(string: "https://example.invalid/tab-b.png")!
+        let outside = URL(string: "https://example.invalid/outside.png")!
+        let markdown = "![外](\(outside.absoluteString))\n\n:::: tabs\n::: tab-item 一\n![甲](\(first.absoluteString))\n:::\n::: tab-item 二\n![乙](\(second.absoluteString))\n:::\n::::"
+        let page = DetailMarkdownPrototypeController(id: "tab-gallery", source: .init(html: "", visibleMarkdown: markdown))
+        let window = try host(page)
+        defer { window.isHidden = true }
+        try await waitFor { self.descendants(page.view, DetailImageBlockView.self).count == 2 }
+        let stack = try XCTUnwrap(descendants(page.view, DetailBlockStack.self).first)
+        var opened: ([URL], Int)?
+        stack.onPhotos = { opened = ($0, $1) }
+        let tabImage = try XCTUnwrap(descendants(page.view, DetailImageBlockView.self).first { $0.url == first })
+        // 与旧版一致：标签内的图按报告图处理，图集跨所有标签，不混入标签外的图。
+        XCTAssertEqual(tabImage.imageKind, .report)
+        tabImage.handleTap()
+        try await waitFor { opened != nil }
+        XCTAssertEqual(opened?.0, [first, second])
+        XCTAssertEqual(opened?.1, 0)
+        opened = nil
+        try XCTUnwrap(descendants(page.view, DetailImageBlockView.self).first { $0.url == outside }).handleTap()
+        XCTAssertEqual(opened?.0, [outside])
+    }
+
+    func testKnownImageSizeReservesFinalHeightBeforeLoading() async throws {
+        let url = URL(string: "https://example.invalid/known-\(UUID().uuidString).png")!
+        DetailBlockStack.rememberImageSize(CGSize(width: 400, height: 1000), for: url)
+        let page = DetailMarkdownPrototypeController(id: "known-size", source: .init(html: "", visibleMarkdown: "![图](\(url.absoluteString))"))
+        let window = try host(page)
+        defer { window.isHidden = true }
+        try await waitFor { !self.descendants(page.view, DetailImageBlockView.self).isEmpty }
+        let image = try XCTUnwrap(descendants(page.view, DetailImageBlockView.self).first)
+        page.view.layoutIfNeeded()
+        // 与旧版一致：已知尺寸的图直接按最终高度占位，加载完成后楼层不再撑开。
+        let expected = DetailImageLayout.presentation(for: CGSize(width: 400, height: 1000), maxWidth: image.bounds.width, kind: .normal).size.height
+        XCTAssertEqual(image.bounds.height, ceil(expected), accuracy: 1)
+    }
+
     private func waitFor(_ predicate: @escaping () -> Bool) async throws {
         let deadline = Date().addingTimeInterval(12)
         while !predicate(), Date() < deadline { try await Task.sleep(nanoseconds: 20_000_000) }

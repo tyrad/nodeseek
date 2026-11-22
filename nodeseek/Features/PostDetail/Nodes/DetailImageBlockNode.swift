@@ -155,6 +155,7 @@ final class DetailImageBlockView: UIView {
 
     var isPlayingWebP: Bool { animationBinding.isPlaying }
     var url: URL { imageBlock.url }
+    var imageKind: DetailImageKind { resolvedImageKind }
 
     init(
         imageBlock: RenderedImageBlock,

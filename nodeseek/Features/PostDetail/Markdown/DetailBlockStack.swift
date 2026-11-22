@@ -35,7 +35,8 @@ final class DetailBlockStack: UIStackView {
             case .quote(let children):
                 append(children, to: quote(in: stack), width: DetailQuoteLayout.contentWidth(width))
             case .tabs(let sections, let firstPage):
-                tabs(sections.map(\.title), in: stack, initial: { page in
+                let rendered = RenderedMagicTabsBlock(id: "", sections: sections.map { .init(title: $0.title, blocks: Self.galleryBlocks($0.blocks)) })
+                tabs(sections.map(\.title), in: stack, gallery: { try await DetailMagicTabGallery.images(in: rendered, host: $0) }, initial: { page in
                     self.append(firstPage, to: page, width: width)
                 }) { [weak self] index, page, ready in
                     guard let self, let appearance = self.appearance else { return }
@@ -109,7 +110,28 @@ final class DetailBlockStack: UIStackView {
 
     private final class TabPage: UIStackView {
         var layoutTask: Task<Void, Never>?
-        deinit { layoutTask?.cancel() }
+        var sectionIndex = 0
+        /// 生成跨标签图集（含终端报告截图），与 Texture 版 `DetailMagicTabGallery` 一致。
+        var gallery: ((UIView) async throws -> [DetailMagicTabGallery.Image])?
+        var galleryTask: Task<Void, Never>?
+        deinit { layoutTask?.cancel(); galleryTask?.cancel() }
+    }
+
+    private static var knownImageSizes: [URL: CGSize] = [:]
+
+    static func rememberImageSize(_ size: CGSize, for url: URL) {
+        guard size.width > 0, size.height > 0 else { return }
+        if knownImageSizes.count > 500 { knownImageSizes.removeAll(keepingCapacity: true) }
+        knownImageSizes[url] = size
+    }
+
+    private static func tabPage(containing view: UIView?) -> TabPage? {
+        var current = view
+        while let view = current {
+            if let page = view as? TabPage { return page }
+            current = view.superview
+        }
+        return nil
     }
 
     /// 文字标签条，样式同 Texture 版 `DetailMagicTabsNode`：选中项加粗、加下划线，其余用次级文字色。
@@ -167,7 +189,8 @@ final class DetailBlockStack: UIStackView {
 
     /// 标签页与 Texture 版一致：内容区高度以第一栏为准，较长的栏在区内滚动，切换时楼层高度不变；
     /// 新栏排好后才替换旧栏，避免切换瞬间出现空白。只保留当前栏，未选中的栏不占用正文位图。
-    private func tabs(_ titles: [String], in parent: UIStackView, initial: ((TabPage) -> Void)? = nil,
+    private func tabs(_ titles: [String], in parent: UIStackView,
+                      gallery: ((UIView) async throws -> [DetailMagicTabGallery.Image])? = nil, initial: ((TabPage) -> Void)? = nil,
                       show: @escaping (Int, TabPage, @escaping () -> Void) -> Void) {
         guard !titles.isEmpty else { return }
         let strip = TabStrip(titles: titles)
@@ -215,10 +238,12 @@ final class DetailBlockStack: UIStackView {
             current = page
         }
 
-        func makePage() -> TabPage {
+        func makePage(_ index: Int) -> TabPage {
             let page = TabPage()
             page.axis = .vertical
             page.spacing = 10
+            page.sectionIndex = index
+            page.gallery = gallery
             return page
         }
 
@@ -226,7 +251,7 @@ final class DetailBlockStack: UIStackView {
             guard let strip, titles.indices.contains(index), index != strip.selectedIndex else { return }
             strip.select(index)
             pending?.layoutTask?.cancel()
-            let page = makePage()
+            let page = makePage(index)
             pending = page
             show(index, page) { [weak self, weak page] in
                 guard let page, pending === page else { return }
@@ -235,12 +260,11 @@ final class DetailBlockStack: UIStackView {
                 self?.onSizeChange?()
             }
         }
-        let first = makePage()
+        let first = makePage(0)
         install(first, index: 0)
         if let initial { initial(first) } else { show(0, first) {} }
     }
 
-    @discardableResult
     /// 与旧版一致：点图时以整楼图片（含引用内，不含标签页）为图集，从点中的那张开始。
     private func openGallery(at url: URL) {
         var urls: [URL] = []
@@ -254,6 +278,51 @@ final class DetailBlockStack: UIStackView {
         onPhotos?(urls, index)
     }
 
+    /// 标签内点图：先生成所有标签的图集（终端报告需截图，期间显示加载），失败时只看当前这张。
+    private func openTabGallery(_ page: TabPage, tapped: URL) {
+        guard let gallery = page.gallery else { onPhotos?([tapped], 0); return }
+        guard page.galleryTask == nil else { return }
+        let loading = DetailGalleryLoadingView()
+        loading.center = CGPoint(x: page.bounds.midX, y: min(page.bounds.midY, 120))
+        page.addSubview(loading)
+        page.galleryTask = Task { [weak self, weak page] in
+            defer { loading.removeFromSuperview(); page?.galleryTask = nil }
+            guard let page else { return }
+            do {
+                let entries = try await gallery(page)
+                try Task.checkCancellation()
+                var urls = entries.map(\.url)
+                let index: Int
+                if let found = entries.firstIndex(where: { $0.sectionIndex == page.sectionIndex && $0.url == tapped }) {
+                    index = found
+                } else {
+                    index = urls.count
+                    urls.append(tapped)
+                }
+                self?.onPhotos?(urls, index)
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.onPhotos?([tapped], 0)
+            }
+        }
+    }
+
+    /// 图集只关心图片和终端报告，其余块不参与。
+    private static func galleryBlocks(_ blocks: [DetailDocument.Block]) -> [RenderedContentBlock] {
+        blocks.flatMap { block -> [RenderedContentBlock] in
+            switch block {
+            case let .image(alt, url): return [.image(.init(url: url, altText: alt))]
+            case .terminal(let ansi): return [.terminal(.init(ansi: ansi))]
+            case .quote(let children): return [.quote(.init(children: galleryBlocks(children)))]
+            case .list(_, let items): return items.flatMap(galleryBlocks)
+            case .table(let rows): return [.table(table(rows))]
+            case .tabs(let tabs): return [.tabs(.init(id: "", sections: tabs.map { .init(title: $0.title, blocks: galleryBlocks($0.blocks)) }))]
+            case .paragraph, .heading, .code, .vote, .divider: return []
+            }
+        }
+    }
+
+    @discardableResult
     private func attach(_ view: UIView, to stack: UIStackView, height: CGFloat) -> NSLayoutConstraint {
         stack.addArrangedSubview(view)
         let constraint = view.heightAnchor.constraint(equalToConstant: max(1, ceil(height)))
@@ -264,7 +333,13 @@ final class DetailBlockStack: UIStackView {
     func appendLegacy(_ blocks: [RenderedContentBlock], to stack: UIStackView, width: CGFloat) {
         let size = CGSize(width: max(1, width), height: .greatestFiniteMagnitude)
         let open: (URL) -> Void = { [weak self] in self?.onLink?($0) }
-        let photos: ([URL], Int) -> Void = { [weak self] in self?.onPhotos?($0, $1) }
+        let photos: ([URL], Int) -> Void = { [weak self, weak stack] urls, index in
+            if let page = Self.tabPage(containing: stack), urls.indices.contains(index) {
+                self?.openTabGallery(page, tapped: urls[index])
+            } else {
+                self?.onPhotos?(urls, index)
+            }
+        }
         for block in blocks {
             switch block {
             case .text(let text):
@@ -273,7 +348,7 @@ final class DetailBlockStack: UIStackView {
                 stack.addArrangedSubview(rich)
             case .quote(let children): appendLegacy(children.children, to: quote(in: stack), width: DetailQuoteLayout.contentWidth(width))
             case .tabs(let content):
-                tabs(content.sections.map(\.title), in: stack) { [weak self] index, page, ready in
+                tabs(content.sections.map(\.title), in: stack, gallery: { try await DetailMagicTabGallery.images(in: content, host: $0) }) { [weak self] index, page, ready in
                     self?.appendLegacy(content.sections[index].blocks, to: page, width: width)
                     ready()
                 }
@@ -295,11 +370,20 @@ final class DetailBlockStack: UIStackView {
                 height = attach(view, to: stack, height: DetailImageLayout.reportPlaceholderSize(maxWidth: width).height)
             case .image(let image):
                 weak var height: NSLayoutConstraint?
-                let view = DetailImageBlockView(imageBlock: image, imageKind: .normal, onImageLoaded: { [weak self] original, kind in
-                    height?.constant = DetailImageLayout.presentation(for: original, maxWidth: width, kind: kind ?? .normal).size.height
+                // 与旧版一致：标签内的图按报告图展示，点开后图集跨所有标签。
+                let inTab = Self.tabPage(containing: stack) != nil
+                let kind: DetailImageKind = inTab ? .report : DetailImageKind.resolved(isSticker: false, imageURL: image.url)
+                let view = DetailImageBlockView(imageBlock: image, imageKind: kind, onImageLoaded: { [weak self] original, resolved in
+                    Self.rememberImageSize(original, for: image.url)
+                    height?.constant = DetailImageLayout.presentation(for: original, maxWidth: width, kind: resolved ?? kind).size.height
                     self?.onSizeChange?()
-                }, onImageTapped: { [weak self] in self?.openGallery(at: image.url) })
-                height = attach(view, to: stack, height: DetailImageLayout.normalPlaceholderSize(maxWidth: width).height)
+                }, onImageTapped: { [weak self, weak stack] in
+                    if let page = Self.tabPage(containing: stack) { self?.openTabGallery(page, tapped: image.url) } else { self?.openGallery(at: image.url) }
+                })
+                // 与旧版一致：同一进程内加载过的图按已知尺寸占位，复用或重新进入时不再先缩后撑。
+                let placeholder = Self.knownImageSizes[image.url].map { DetailImageLayout.presentation(for: $0, maxWidth: width, kind: kind).size }
+                    ?? (kind == .report ? DetailImageLayout.reportPlaceholderSize(maxWidth: width) : DetailImageLayout.normalPlaceholderSize(maxWidth: width))
+                height = attach(view, to: stack, height: placeholder.height)
             case .iframeLink(let link):
                 let button = UIButton(type: .system)
                 button.setTitle(link.displayDomain, for: .normal)
