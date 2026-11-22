@@ -127,6 +127,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         avatar.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(showAuthor)))
         avatar.addInteraction(UIContextMenuInteraction(delegate: self))
         metadata.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(showAuthor)))
+        metadata.addInteraction(UIContextMenuInteraction(delegate: self))
         // 与 Texture 楼层一致：作者名、楼主、状态标签各自独立，作者名过长时先换行，标签保持完整。
         metadata.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         posterBadge.accessibilityIdentifier = "detail-poster-badge"
@@ -272,6 +273,13 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         metadata.isUserInteractionEnabled = profileURL != nil
         authorURL = profileURL
         openAuthor = open
+        // 与旧版一致：名字可点开主页，读屏说明用途。
+        if profileURL != nil, let display = AuthorDisplayPolicy.displayName(from: name) {
+            metadata.accessibilityLabel = String(format: DetailListStrings.text("view-profile"), display)
+            metadata.accessibilityTraits = .button
+        } else {
+            metadata.accessibilityTraits = .staticText
+        }
         if !avatar.isHidden { ImageLoad.url(avatarURL).toAvatar(requestID: request?.id ?? name).into(avatar) }
     }
 
@@ -350,7 +358,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
                 UIMenu(children: actions.map { action in UIAction(title: action.title, image: action.image) { _ in _ = action.perform() } })
             }
         }
-        guard interaction.view === avatar, let authorURL else { return nil }
+        guard interaction.view === avatar || interaction.view === metadata, let authorURL else { return nil }
         return UIContextMenuConfiguration(identifier: nil, previewProvider: { UserProfileRouter.makeViewController(profileURL: authorURL) })
     }
 
@@ -384,7 +392,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     }
 
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willPerformPreviewActionForMenuWith configuration: UIContextMenuConfiguration, animator: UIContextMenuInteractionCommitAnimating) {
-        guard interaction.view === avatar else { return }
+        guard interaction.view === avatar || interaction.view === metadata else { return }
         animator.addCompletion { [weak self] in self?.showAuthor() }
     }
 

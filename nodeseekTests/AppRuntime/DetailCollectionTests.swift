@@ -142,6 +142,29 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertTrue(allLabels(page.view).contains { $0.text == DetailListStrings.text("copied") })
     }
 
+    func testAuthorNameOpensProfilePreviewLikeAvatar() async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        window.rootViewController = page
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let comment = Comment(id: "2", anchorID: "1", authorName: "Alice", avatarURL: nil,
+                              authorProfileURL: URL(string: "https://www.nodeseek.com/space/1"), floorText: "#1",
+                              createdAtText: nil, contentHTML: "<p>回复</p>", markdown: "回复", hasVisibleMarkdown: true)
+        page.render(detail: PostDetail(id: "1", title: "主题", authorName: "Bob", avatarURL: nil,
+                                       metadataText: nil, contentHTML: "主帖", visibleMarkdown: "主帖", comments: [comment]))
+        window.layoutIfNeeded()
+        let list = try XCTUnwrap(page.collectionList?.view)
+        let cell = try XCTUnwrap(list.cellForItem(at: try XCTUnwrap(page.indexPathForCurrentPageAnchor("1"))) as? DetailFloorListCell)
+        let name = try XCTUnwrap(allLabels(cell.contentView).first { $0.text == "Alice" })
+        // 与旧版一致：长按名字和头像一样弹出个人页预览，读屏说明可打开主页。
+        let menu = try XCTUnwrap(name.interactions.compactMap { $0 as? UIContextMenuInteraction }.first)
+        XCTAssertNotNil(menu.delegate?.contextMenuInteraction(menu, configurationForMenuAtLocation: .zero))
+        XCTAssertEqual(name.accessibilityLabel, String(format: DetailListStrings.text("view-profile"), "Alice"))
+        XCTAssertTrue(name.accessibilityTraits.contains(.button))
+    }
+
     private func allButtons(_ root: UIView) -> [UIButton] {
         (root as? UIButton).map { [$0] } ?? root.subviews.flatMap(allButtons)
     }
