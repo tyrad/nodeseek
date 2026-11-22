@@ -722,8 +722,8 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
 
         let source = commentSources[id]
         let visibleSource = visibleMarkdown(in: item, sources: commentSources, pageRestricted: restrictedNotice != nil)
-        // 老页面可能没有 blocked 字段。保留原有引用来源，新渲染和复制始终只读取可见原文。
-        let quoteMarkdown = restrictedNotice == nil && source?.blocked == nil && source?.deleted != true ? source?.markdown : visibleSource
+        // 引用按网页逻辑取原文，只排除屏蔽、删除和受限页；正文能否原生渲染不影响引用。
+        let quoteMarkdown = restrictedNotice == nil && source?.blocked != true && source?.deleted != true ? source?.markdown : visibleSource
 
         return Comment(
             id: id,

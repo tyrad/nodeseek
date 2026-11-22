@@ -176,6 +176,16 @@ struct DetailMarkdownParserTests {
         #expect(detail.comments.first?.contentHTML == "回复")
     }
 
+    @Test func quotingAReplyKeepsItsSourceWhenNativeRenderingFallsBack() throws {
+        let payload = #"{"postData":{"comments":[{"commentId":1,"blocked":false,"markdown":"主帖"},{"commentId":2,"blocked":false,"markdown":"a\\_b 我的帖子已删除了吗"},{"commentId":3,"blocked":true,"markdown":"屏蔽原文"}]}}"#
+        let detail = try page(payload: payload, main: "主帖", reply: "<p>a_b 我的帖子已删除了吗</p>")
+        let reply = try #require(detail.comments.first { $0.id == "2" })
+        // 正文走网页兜底不影响引用：未屏蔽的评论按网页逻辑引用原文。
+        #expect(DetailFloorSource(comment: reply).visibleMarkdown == nil)
+        #expect(reply.markdown == #"a\_b 我的帖子已删除了吗"#)
+        #expect(detail.comments.first { $0.id == "3" }?.markdown == nil)
+    }
+
     private func page(payload: String, main: String, reply: String, notice: String = "", title: String = "标题", signature: String = "") throws -> PostDetail {
         let html = """
         <div id="nsk-body-left">\(notice)<div class="post-title"><h1><a class="post-title-link">\(title)</a></h1></div>
