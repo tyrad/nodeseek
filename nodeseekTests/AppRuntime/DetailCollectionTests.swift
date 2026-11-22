@@ -190,7 +190,8 @@ final class DetailCollectionTests: XCTestCase {
         let frames = labels.map { $0.convert($0.bounds, to: cell.contentView) }
         XCTAssertGreaterThan(Set(frames.map { $0.minY.rounded() }).count, 1)
         XCTAssertTrue(frames.allSatisfy { $0.maxX <= cell.contentView.bounds.maxX + 0.5 })
-        XCTAssertTrue(zip(labels, frames).allSatisfy { $1.width >= ceil($0.intrinsicContentSize.width) - 0.5 })
+        // iOS 17 的标签固有宽度带小数，按原值比较。
+        XCTAssertTrue(zip(labels, frames).allSatisfy { $1.width >= $0.intrinsicContentSize.width - 0.5 })
     }
 
     func testAuthorFilterBannerHasClearButtonLikeTexture() async throws {
