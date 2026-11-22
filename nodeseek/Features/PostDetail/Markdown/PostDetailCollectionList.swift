@@ -259,6 +259,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             self.cache.removeObject(forKey: key as NSString)
             self.refresh(key)
         }
+        cell.compactCounts = comment == nil
         if let comment {
             cell.configureAuthor(name: comment.authorName, avatarURL: comment.avatarURL, profileURL: comment.authorProfileURL) { [weak page] in page?.openUserInfo(profileURL: $0) }
             cell.addVotes(like: comment.likeCount, chicken: comment.chickenLegCount, oppose: comment.opposeCount,

@@ -64,6 +64,8 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
             }
         }
     }
+    /// 主楼计数过万按「万 / 亿」缩写，与旧版主楼一致；回复楼层显示原数字。
+    var compactCounts = false
     private(set) var body = DetailBlockStack()
     private(set) var request: DetailFloorRequest?
     private(set) var contentInstalled = false
@@ -428,7 +430,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         button.setImage(icon?.applyingSymbolConfiguration(config)?.withRenderingMode(.alwaysTemplate), for: .normal)
         button.isEnabled = enabled
         footer.isHidden = false
-        button.setTitle(count.flatMap { $0 > 0 ? " " + $0.formatted() : nil }, for: .normal)
+        button.setTitle(count.flatMap { $0 > 0 ? " " + (compactCounts ? PostBodyCellNode.reactionCountText($0) : String($0)) : nil }, for: .normal)
         button.titleLabel?.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(for: AppTypography.commentActionFont(), compatibleWith: traitCollection)
         button.minimumWidth.constant = (count ?? 0) > 0 ? PostDetailContentLayout.reactionActionMinWidth : PostDetailContentLayout.reactionIconOnlyWidth
         button.accessibilityLabel = DetailListStrings.text(label ?? key)

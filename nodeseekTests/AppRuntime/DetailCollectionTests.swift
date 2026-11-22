@@ -165,6 +165,17 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertTrue(name.accessibilityTraits.contains(.button))
     }
 
+    func testPostCountsUseCompactUnitsLikeTexture() {
+        let cell = DetailFloorListCell(frame: CGRect(x: 0, y: 0, width: 360, height: 200))
+        // 与旧版一致：主楼计数过万显示「1.2万」，回复楼层保持原数字。
+        cell.compactCounts = true
+        cell.addAction("favorite", symbol: "star", count: 12_345) {}
+        cell.compactCounts = false
+        cell.addAction("like", symbol: "hand.thumbsup", count: 12_345) {}
+        let titles = allButtons(cell.contentView).compactMap { $0.title(for: .normal) }
+        XCTAssertEqual(titles, [" 1.2万", " 12345"])
+    }
+
     private func allButtons(_ root: UIView) -> [UIButton] {
         (root as? UIButton).map { [$0] } ?? root.subviews.flatMap(allButtons)
     }
