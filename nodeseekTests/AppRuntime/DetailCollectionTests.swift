@@ -26,6 +26,21 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(calls, ["b"])
     }
 
+    func testFloorActionIconsKeepTextureSymbolSize() throws {
+        let cell = DetailFloorListCell(frame: CGRect(x: 0, y: 0, width: 390, height: 120))
+        cell.bind(.init(id: "a", version: 1, source: .init(html: "", visibleMarkdown: "a"),
+                        appearance: .init(width: 358, pointSize: 16, scale: 3, dark: false), baseURL: NodeSeekSite.baseURL))
+        cell.addAction("like", symbol: "hand.thumbsup", count: 2) {}
+        cell.contentView.layoutIfNeeded()
+        let button = try XCTUnwrap(allButtons(cell.contentView).first { !$0.isHidden })
+        let imageView = try XCTUnwrap(button.imageView)
+        // 旧版按 14pt 符号原样绘制；按钮不能再按自身样式放大图标。
+        let config = UIImage.SymbolConfiguration(pointSize: PostDetailContentLayout.reactionSymbolPointSize, weight: .regular)
+        let expected = try XCTUnwrap(UIImage(systemName: "hand.thumbsup", withConfiguration: config)).size
+        XCTAssertEqual(imageView.bounds.width, expected.width, accuracy: 0.5)
+        XCTAssertEqual(imageView.bounds.height, expected.height, accuracy: 0.5)
+    }
+
     func testFloorMenuAndTextSelectionHaveSeparateHitAreas() async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)

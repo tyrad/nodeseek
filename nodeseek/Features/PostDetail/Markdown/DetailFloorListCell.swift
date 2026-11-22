@@ -471,6 +471,8 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         let config = UIImage.SymbolConfiguration(pointSize: PostDetailContentLayout.reactionSymbolPointSize, weight: .regular)
         let icon = key == "chicken" ? UIImage(named: "ChickenLeg") : UIImage(systemName: symbol)
         button.setImage(icon?.applyingSymbolConfiguration(config)?.withRenderingMode(.alwaysTemplate), for: .normal)
+        // 系统按钮默认会把符号按自身样式再放大一档，固定为 14pt 才与旧版图标一样大。
+        button.setPreferredSymbolConfiguration(config, forImageIn: .normal)
         button.isEnabled = enabled
         footer.isHidden = false
         button.setTitle(count.flatMap { $0 > 0 ? " " + (compactCounts ? PostBodyCellNode.reactionCountText($0) : String($0)) : nil }, for: .normal)
