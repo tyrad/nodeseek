@@ -106,6 +106,42 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         XCTAssertEqual(image.bounds.height, ceil(expected), accuracy: 1)
     }
 
+    func testTabsRestoreSelectionAfterReuse() async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 390, height: 800)
+        window.rootViewController = UIViewController()
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        var saved: [Int: Int] = [:]
+        func make() -> DetailBlockStack {
+            let stack = DetailBlockStack(frame: CGRect(x: 0, y: 0, width: 360, height: 10))
+            stack.axis = .vertical
+            stack.savedTab = { saved[$0] ?? 0 }
+            stack.onTabSelected = { saved[$0] = $1 }
+            window.rootViewController?.view.addSubview(stack)
+            let tabs = RenderedMagicTabsBlock(id: "t", sections: [
+                .init(title: "一", blocks: [.text(NSAttributedString(string: "第一栏"))]),
+                .init(title: "二", blocks: [.text(NSAttributedString(string: "第二栏"))])
+            ])
+            stack.appendLegacy([.tabs(tabs)], to: stack, width: 360)
+            stack.layoutIfNeeded()
+            return stack
+        }
+        func shown(_ stack: DetailBlockStack) -> [String] {
+            descendants(stack, DetailRichTextView.self).compactMap { $0.debugAttributedString?.string }
+        }
+        let first = make()
+        XCTAssertEqual(shown(first), ["第一栏"])
+        try XCTUnwrap(tabButton(1, in: first)).sendActions(for: .touchUpInside)
+        XCTAssertEqual(saved, [0: 1])
+        first.removeFromSuperview()
+        // 与旧版一致：楼层滑出再回来（复用后重建），仍显示上次选中的标签。
+        let second = make()
+        try await waitFor { shown(second) == ["第二栏"] }
+        XCTAssertEqual(tabButton(1, in: second)?.accessibilityTraits.contains(.selected), true)
+    }
+
     private func waitFor(_ predicate: @escaping () -> Bool) async throws {
         let deadline = Date().addingTimeInterval(12)
         while !predicate(), Date() < deadline { try await Task.sleep(nanoseconds: 20_000_000) }

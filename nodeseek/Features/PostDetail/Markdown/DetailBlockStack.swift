@@ -10,6 +10,10 @@ final class DetailBlockStack: UIStackView {
     var onPhotos: (([URL], Int) -> Void)?
     var onStickerSizeChange: (() -> Void)?
     var onSizeChange: (() -> Void)?
+    /// 按楼层内第几个标签组读写选中栏，楼层复用重建后恢复，与旧版保持选中一致。
+    var savedTab: ((Int) -> Int)?
+    var onTabSelected: ((Int, Int) -> Void)?
+    var nextTabOrdinal = 0
     weak var viewport: UIView?
 
     func refreshPlayback() {
@@ -36,7 +40,7 @@ final class DetailBlockStack: UIStackView {
                 append(children, to: quote(in: stack), width: DetailQuoteLayout.contentWidth(width))
             case .tabs(let sections, let firstPage):
                 let rendered = RenderedMagicTabsBlock(id: "", sections: sections.map { .init(title: $0.title, blocks: Self.galleryBlocks($0.blocks)) })
-                tabs(sections.map(\.title), in: stack, gallery: { try await DetailMagicTabGallery.images(in: rendered, host: $0) }, initial: { page in
+                tabs(sections.map(\.title), in: stack, width: width, gallery: { try await DetailMagicTabGallery.images(in: rendered, host: $0) }, initial: { page in
                     self.append(firstPage, to: page, width: width)
                 }) { [weak self] index, page, ready in
                     guard let self, let appearance = self.appearance else { return }
@@ -189,10 +193,12 @@ final class DetailBlockStack: UIStackView {
 
     /// 标签页与 Texture 版一致：内容区高度以第一栏为准，较长的栏在区内滚动，切换时楼层高度不变；
     /// 新栏排好后才替换旧栏，避免切换瞬间出现空白。只保留当前栏，未选中的栏不占用正文位图。
-    private func tabs(_ titles: [String], in parent: UIStackView,
+    private func tabs(_ titles: [String], in parent: UIStackView, width: CGFloat,
                       gallery: ((UIView) async throws -> [DetailMagicTabGallery.Image])? = nil, initial: ((TabPage) -> Void)? = nil,
                       show: @escaping (Int, TabPage, @escaping () -> Void) -> Void) {
         guard !titles.isEmpty else { return }
+        let ordinal = nextTabOrdinal
+        nextTabOrdinal += 1
         let strip = TabStrip(titles: titles)
         let viewport = UIScrollView()
         viewport.accessibilityIdentifier = "detail-magic-tab-content"
@@ -211,7 +217,11 @@ final class DetailBlockStack: UIStackView {
         func install(_ page: TabPage, index: Int) {
             if let current, current !== page {
                 if let followFirst, followFirst.isActive {
-                    frozen.constant = max(44, ceil(current.bounds.height))
+                    // 恢复选中栏时第一栏可能还没布局，按内容宽度先量出高度。
+                    let measured = current.bounds.height > 0 ? current.bounds.height : current.systemLayoutSizeFitting(
+                        CGSize(width: max(1, width), height: UIView.layoutFittingCompressedSize.height),
+                        withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height
+                    frozen.constant = max(44, ceil(measured))
                     followFirst.isActive = false
                     frozen.isActive = true
                 }
@@ -250,6 +260,7 @@ final class DetailBlockStack: UIStackView {
         strip.onSelect = { [weak self, weak strip] index in
             guard let strip, titles.indices.contains(index), index != strip.selectedIndex else { return }
             strip.select(index)
+            self?.onTabSelected?(ordinal, index)
             pending?.layoutTask?.cancel()
             let page = makePage(index)
             pending = page
@@ -263,6 +274,9 @@ final class DetailBlockStack: UIStackView {
         let first = makePage(0)
         install(first, index: 0)
         if let initial { initial(first) } else { show(0, first) {} }
+        if let saved = savedTab?(ordinal), saved != 0, titles.indices.contains(saved) {
+            strip.onSelect?(saved)
+        }
     }
 
     /// 与旧版一致：点图时以整楼图片（含引用内，不含标签页）为图集，从点中的那张开始。
@@ -348,7 +362,7 @@ final class DetailBlockStack: UIStackView {
                 stack.addArrangedSubview(rich)
             case .quote(let children): appendLegacy(children.children, to: quote(in: stack), width: DetailQuoteLayout.contentWidth(width))
             case .tabs(let content):
-                tabs(content.sections.map(\.title), in: stack, gallery: { try await DetailMagicTabGallery.images(in: content, host: $0) }) { [weak self] index, page, ready in
+                tabs(content.sections.map(\.title), in: stack, width: width, gallery: { try await DetailMagicTabGallery.images(in: content, host: $0) }) { [weak self] index, page, ready in
                     self?.appendLegacy(content.sections[index].blocks, to: page, width: width)
                     ready()
                 }

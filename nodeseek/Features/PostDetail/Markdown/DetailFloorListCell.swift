@@ -495,6 +495,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         guard request == delivered else { return }
         contentInstalled = true
         body.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        body.nextTabOrdinal = 0
         switch layout {
         case .native(let blocks):
             onNative?(blocks)

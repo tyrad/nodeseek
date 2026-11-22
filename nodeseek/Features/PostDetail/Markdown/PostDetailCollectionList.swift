@@ -20,6 +20,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     private(set) var rows: [PostDetailViewController.DetailRow] = []
     private var keys: [String] = []
     private var heights: [String: CGFloat] = [:]
+    private var tabSelections: [String: Int] = [:]
     private let cache = NSCache<NSString, CachedText>()
     private var requestedPage: Int?
     private var retryOnNextDrag = false
@@ -253,6 +254,8 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             }
         }
         cell.body.onSizeChange = resized
+        cell.body.savedTab = { [weak self] in self?.tabSelections["\(key)#\($0)"] ?? 0 }
+        cell.body.onTabSelected = { [weak self] in self?.tabSelections["\(key)#\($0)"] = $1 }
         cell.didInstall = resized
         cell.body.onStickerSizeChange = { [weak self, weak cell] in
             guard let self, cell?.request == request else { return }
