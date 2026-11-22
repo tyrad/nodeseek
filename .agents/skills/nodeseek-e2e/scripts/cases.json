@@ -204,5 +204,12 @@
       "daily"
     ],
     "setup": "阅读模式，公开测评帖 1067722；临时启用 TextKit，只读"
+  },
+  "textkit-floor-gallery": {
+    "title": "新版点主楼配图打开同楼图集，从点中的那张开始，左右翻页后回到原图位置",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，公开帖 1072089；临时启用 TextKit，只读"
   }
 }

@@ -335,6 +335,7 @@ daily('textkit-backscroll', async ({ t, ids, wda, scroll, fixture, log }) => {
 // 新版详情页交互回归：只读公开帖，用控件标识、坐标和日志判断，不依赖登录。
 const textKitPost = '1067259';
 const reviewPost = '1067722';
+const floorGalleryPost = '1072089';
 const textKit = ['-postDetail.useTextKitList', 'YES'];
 
 function textKitHelpers({ wda, ids, scroll }) {
@@ -349,13 +350,13 @@ function textKitHelpers({ wda, ids, scroll }) {
         x: Number(/\bx="([-\d.]+)"/.exec(tag)?.[1]), width: Number(/\bwidth="([\d.]+)"/.exec(tag)?.[1]),
       }));
   }
-  // 在屏幕中段找到满足条件的元素，找不到就往下读，最多 12 次。
+  // 找到完整在屏内、避开顶部导航和底部按钮的元素，找不到就往下读，最多 12 次。
   async function findInMiddle(predicate, message) {
     const { height } = await wda('/window/size');
     for (let i = 0; i < 12; i++) {
       for (const el of await ids(predicate)) {
         const r = await rect(el);
-        if (r.y > height * .25 && r.y + r.height < height * .7) return { el, rect: r, screen: height };
+        if (r.y > height * .15 && r.y + r.height < height * .8) return { el, rect: r, screen: height };
       }
       await scroll(.72, .5);
     }
@@ -431,18 +432,14 @@ daily('textkit-floor-menu', async ctx => {
   await waitFor(async () => !(await ids('name == "detail-author-filter-clear"')).length, '点「查看全部」后筛选条仍在');
 }, textKit);
 
-daily('textkit-gallery', async ctx => {
-  const { fixture, ids, wda, click, attr, log, t } = ctx;
-  await fixture(reviewPost, 1, undefined, { publicPost: true });
-  // 测评帖首栏是终端报告，生成截图后出现放大按钮；点它打开所有标签的图集。
-  const report = 'name == "detail-terminal-open-report" AND visible == 1';
-  const el = await waitFor(async () => (await ids(report))[0], '测评报告图没有生成');
+// 点图后核对图集：张数、起始图、左右翻页，关闭后原图回到原位置。
+async function checkGallery({ ids, wda, click, attr, log, t }, el, query, { tappedURL, minCount, why }) {
   const rect = await wda('/element/' + el + '/rect');
   const offset = log().length;
   await click(el);
   const opened = await waitFor(() => /打开详情大图: count=(\d+), initialIndex=(\d+)/.exec(log().slice(offset)), '点图没有打开大图');
   const count = Number(opened[1]);
-  assert.ok(count >= 2, '图集只有 ' + count + ' 张，应包含所有标签的图');
+  assert.ok(count >= minCount, '图集只有 ' + count + ' 张，' + why);
   await waitFor(async () => (await ids('name == "detail-photo-action-button"'))[0], '大图浏览器没有显示');
   const shown = async () => {
     for (const img of await ids('type == "XCUIElementTypeImage" AND visible == 1')) {
@@ -451,16 +448,49 @@ daily('textkit-gallery', async ctx => {
     }
   };
   const first = await waitFor(shown, '大图里没有可识别的图片');
-  // 左右翻到同组的另一张。
+  if (tappedURL) assert.equal(first, tappedURL, '大图没有从点中的那张开始');
   const { width, height } = await wda('/window/size');
   const toward = Number(opened[2]) + 1 < count ? [.85, .15] : [.15, .85];
   await wda('/wda/dragfromtoforduration', { fromX: width * toward[0], fromY: height * .5, toX: width * toward[1], toY: height * .5, duration: .1 });
   const second = await waitFor(async () => { const now = await shown(); return now && now !== first ? now : null; }, '左右滑动后没有翻到另一张');
-  t.diagnostic('图集 ' + count + ' 张，翻页 ' + first + ' → ' + second);
-  // 单击关闭，回到原帖，点过的图仍在原位置附近。
+  t.diagnostic('图集 ' + count + ' 张，起始第 ' + (Number(opened[2]) + 1) + ' 张，翻页 ' + first + ' → ' + second);
   await wda('/wda/tap', { x: width * .5, y: height * .5 });
   await waitFor(async () => !(await ids('name == "detail-photo-action-button"')).length, '大图没有关闭');
-  const back = await waitFor(async () => (await ids(report))[0], '关闭后找不到原来的报告图');
+  const back = await waitFor(async () => {
+    for (const candidate of await ids(query)) {
+      if (!tappedURL || await attr(candidate, 'value') === tappedURL) return candidate;
+    }
+  }, '关闭后找不到原来的图片');
   const after = await wda('/element/' + back + '/rect');
   assert.ok(Math.abs(after.y - rect.y) <= 1, '关闭后原图位置偏移 ' + (after.y - rect.y));
+}
+
+daily('textkit-gallery', async ctx => {
+  await ctx.fixture(reviewPost, 1, undefined, { publicPost: true });
+  // 测评帖首栏是终端报告，生成截图后出现放大按钮；点它打开所有标签的图集。
+  const report = 'name == "detail-terminal-open-report" AND visible == 1';
+  const el = await waitFor(async () => (await ctx.ids(report))[0], '测评报告图没有生成');
+  await checkGallery(ctx, el, report, { minCount: 2, why: '应包含所有标签的图' });
+}, textKit);
+
+daily('textkit-floor-gallery', async ctx => {
+  // 1072089 主楼有多张普通配图。
+  await ctx.fixture(floorGalleryPost, 1, undefined, { publicPost: true });
+  const image = 'name == "detail-content-image" AND visible == 1';
+  const { findInMiddle } = textKitHelpers(ctx);
+  // 点第二张，核对图集从点中的那张开始，而不是总从第一张开始。
+  const firstURL = await ctx.attr((await findInMiddle(image, '主楼里找不到配图')).el, 'value');
+  let target;
+  // 每次只滚动约一成屏高，保证第二张能完整停在屏内。
+  for (let i = 0; i < 16 && !target; i++) {
+    await ctx.scroll(.6, .5);
+    for (const el of await ctx.ids(image)) {
+      const r = await ctx.wda('/element/' + el + '/rect');
+      const { height } = await ctx.wda('/window/size');
+      if (r.y > height * .15 && r.y + r.height < height * .8 && await ctx.attr(el, 'value') !== firstURL) target = el;
+    }
+  }
+  assert.ok(target, '主楼里找不到第二张配图');
+  const tappedURL = await ctx.attr(target, 'value');
+  await checkGallery(ctx, target, image, { tappedURL, minCount: 2, why: '应包含同楼其它配图' });
 }, textKit);
