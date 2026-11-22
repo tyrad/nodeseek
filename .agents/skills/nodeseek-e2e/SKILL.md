@@ -113,6 +113,10 @@ make e2e-case CASE=push-cold
 
 [常用功能脚本](scripts/daily.test.mjs) 中，`home-paging` 核对首页刷新、排序和第二页加载；`quote-cancel` 在固定评论取消引用并逐字读回自己的输入；`photo-return` 用帖子 703863 的配图验证大图返回；`last-page-filter` 检查只看楼主、恢复全部和末页导航；`inbox-reply` 从通知记录取得帖子及楼层，重开核对已读；`favorite-sync` 临时收藏帖子 1016685，从「我的收藏」重开并恢复初始状态。有站内通知时优先使用未读样本；全部已读时单独注明。无通知或固定帖已被用户收藏时，报告中的跳过项不计入通过数。
 
+## TextKit 详情页分页
+
+[分页与回弹的详细用例](../../../docs/testing/detail-textkit-pagination-e2e.md)列出逐步操作、触发时机、坐标容差和证据位置。`thread-pagination` 在 Texture 上跑同一短末页对照，`textkit-pagination` 验收新版连续分页、回弹与跳页，`textkit-backscroll` 从第三页普通 #21 回读第二页。`textkit-paging-timing` 使用 AXe 和受控 HTML 在指定模拟器上验证慢响应和失败重试；报告在 `.build/detail-paging-e2e/`，实站用例沿用 daily 的 JUnit 和截图。
+
 ## 后续发布回归功能点
 
 按故障影响安排后续用例，表中的用例尚待实跑。

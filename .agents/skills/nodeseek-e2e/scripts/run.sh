@@ -29,6 +29,7 @@ profile=${E2E_PROFILE:-guest}
 device_profile=$profile
 suite=smoke.test.mjs
 case "$profile" in
+  gesture) device_profile=guest ;;
   daily) device_profile=member; suite=daily.test.mjs ;;
   push) device_profile=member; suite=push.test.mjs ;;
   draft) device_profile=member; suite=draft.test.mjs ;;
@@ -36,7 +37,7 @@ case "$profile" in
   logout) suite=logout.test.mjs ;;
   login) device_profile=member; suite=login.test.mjs ;;
   guest|member) ;;
-  *) echo "E2E_PROFILE 只接受 guest、member、login、logout、draft、daily、push 或 comment" >&2; exit 2 ;;
+  *) echo "E2E_PROFILE 只接受 guest、member、login、logout、draft、daily、gesture、push 或 comment" >&2; exit 2 ;;
 esac
 config=${E2E_CONFIG_FILE:-"$HOME/.config/nodeseek/e2e.json"}
 settings='{}'
@@ -47,7 +48,7 @@ if [[ -z ${E2E_ENV_FILE:-} && -z ${OPENAI_API_KEY:-} ]]; then
   E2E_ENV_FILE=$(jq -r '.envFile // empty' <<<"$settings")
   export E2E_ENV_FILE
 fi
-node "$tool_dir/api-key.mjs"
+if [[ $profile != gesture ]]; then node "$tool_dir/api-key.mjs"; fi
 if [[ $device_profile == member || $profile == logout ]]; then
   device_name="NodeSeek E2E Member"
   E2E_MEMBER_USERNAME=${E2E_MEMBER_USERNAME:-$(jq -r '.memberDisplayName // empty' <<<"$settings")}
@@ -74,6 +75,11 @@ udid=${SIMULATOR_ID:-$(jq -r --arg profile "$device_profile" '.[$profile + "UDID
 udid=$(xcrun simctl list -j devices available | jq -er --arg id "$udid" --arg name "$device_name" '
   [.devices[][] | select(if $id != "" then .udid == $id else .name == $name end)]
   | if length == 1 then .[0].udid else error("请核对 " + $name + " 的设备配置或指定 SIMULATOR_ID") end')
+if [[ $profile == gesture ]]; then
+  command -v axe >/dev/null || { echo "分页手势回放需要 AXe" >&2; exit 2; }
+  if [[ ${1:-} == --check ]]; then echo "AXe 与手势设备 $udid 可用"; exit 0; fi
+  exec python3 "$tool_dir/paging-gestures.py" "$udid"
+fi
 if [[ ${1:-} == --check ]]; then
   echo "API Key 已读取，$profile 模拟器 $udid 可用。账号登录状态在运行用例时验证。"
   exit 0
