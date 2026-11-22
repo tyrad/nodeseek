@@ -136,7 +136,7 @@ final class UserProfileViewControllerTests: XCTestCase {
             """
             {"success":true,"detail":{"member_id":9,"member_name":"酒神","rank":6,"coin":17995,"stardust":1386,
             "bio":"人生得意须尽欢，莫使金樽空对月","nPost":374,"nComment":4790,"follows":3,"fans":366,"readme":"",
-            "roles":[],"followed":false}}
+            "roles":[{"id":1,"name":"broker","display_text":"交易中介"},{"id":2,"name":"ai","display_text":"AI 服务"}],"followed":false}}
             """.utf8
         )
         let configuration = URLSessionConfiguration.ephemeral
@@ -163,6 +163,11 @@ final class UserProfileViewControllerTests: XCTestCase {
         XCTAssertEqual(follow.configuration?.title, "关注")
         window.layoutIfNeeded()
         capture(window, name: "profile-follow-light")
+        // 有两个徽章时，两字名字仍要完整显示，关注、私信不在名字这一行
+        let name = try XCTUnwrap(descendants(controller.view).first { $0.accessibilityIdentifier == "user-profile-name" } as? UILabel)
+        XCTAssertGreaterThanOrEqual(name.bounds.width, name.intrinsicContentSize.width - 0.5)
+        XCTAssertGreaterThan(follow.convert(follow.bounds, to: nil).minY, name.convert(name.bounds, to: nil).maxY)
+        XCTAssertGreaterThanOrEqual(follow.bounds.height, 36)
 
         follow.sendActions(for: .touchUpInside)
         try await Task.sleep(nanoseconds: 100_000_000)

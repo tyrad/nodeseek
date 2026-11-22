@@ -261,7 +261,11 @@ final class UserProfileViewController: UIViewController {
         nameLabel.font = .systemFont(ofSize: 24, weight: .bold)
         nameLabel.textColor = ReadingColors.text
         nameLabel.lineBreakMode = .byTruncatingTail
+        nameLabel.accessibilityIdentifier = "user-profile-name"
         nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        // 徽章多时先压缩徽章，名字至少保留约三个字的宽度，避免被挤没
+        let nameMinWidth = min(nameLabel.intrinsicContentSize.width, nameLabel.font.pointSize * 3)
+        nameLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: nameMinWidth).isActive = true
 
         let nameRow = UIStackView(arrangedSubviews: [nameLabel])
         nameRow.axis = .horizontal
@@ -271,11 +275,6 @@ final class UserProfileViewController: UIViewController {
             nameRow.addArrangedSubview(UserProfileBadgeLabel(text: role))
         }
         nameRow.addArrangedSubview(UIView())
-        if !isSelf {
-            followButton.applyFollowStyle(followed: profile.followed, busy: isUpdatingFollow)
-            nameRow.addArrangedSubview(followButton)
-            nameRow.addArrangedSubview(makeMessageButton())
-        }
 
         let infoStack = UIStackView(arrangedSubviews: [nameRow])
         infoStack.axis = .vertical
@@ -295,7 +294,22 @@ final class UserProfileViewController: UIViewController {
         header.spacing = 14
         header.isLayoutMarginsRelativeArrangement = true
         header.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20)
-        return header
+        guard !isSelf else { return header }
+
+        // 关注、私信单独成行，不再和名字、徽章抢宽度
+        followButton.applyFollowStyle(followed: profile.followed, busy: isUpdatingFollow)
+        let actionRow = UIStackView(arrangedSubviews: [followButton, makeMessageButton()])
+        actionRow.axis = .horizontal
+        actionRow.distribution = .fillEqually
+        actionRow.spacing = 10
+        actionRow.isLayoutMarginsRelativeArrangement = true
+        actionRow.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20)
+        actionRow.heightAnchor.constraint(greaterThanOrEqualToConstant: 36).isActive = true
+
+        let container = UIStackView(arrangedSubviews: [header, actionRow])
+        container.axis = .vertical
+        container.spacing = 14
+        return container
     }
 
     @objc private func avatarTapped() {
@@ -369,7 +383,7 @@ final class UserProfileViewController: UIViewController {
         configuration.title = "私信"
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
             var attributes = attributes
-            attributes.font = .systemFont(ofSize: 13.5, weight: .semibold)
+            attributes.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .systemFont(ofSize: 13.5, weight: .semibold))
             return attributes
         }
         configuration.baseForegroundColor = .label
@@ -643,7 +657,9 @@ private final class UserProfileBadgeLabel: UILabel {
         layer.borderWidth = 1
         updateBorderColor()
         setContentHuggingPriority(.required, for: .horizontal)
-        setContentCompressionResistancePriority(.required, for: .horizontal)
+        // 低于名字的最小宽度约束，空间不够时徽章先截断
+        setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
+        lineBreakMode = .byTruncatingTail
     }
 
     required init?(coder: NSCoder) {
