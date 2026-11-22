@@ -211,5 +211,19 @@
       "daily"
     ],
     "setup": "阅读模式，公开帖 1072089；临时启用 TextKit，只读"
+  },
+  "textkit-guest-reaction-login": {
+    "title": "新版游客点主楼点赞、收藏先进入登录页，不弹确认框",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "须用游客设备（SIMULATOR_ID 指定）；公开帖 1071908，临时启用 TextKit；已登录设备会取消确认框并报错，不提交"
+  },
+  "textkit-link-color": {
+    "title": "新版正文与表格里的链接为站点绿，不出现系统蓝",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，公开帖 1071908；临时启用 TextKit，只读，保存逐屏截图"
   }
 }

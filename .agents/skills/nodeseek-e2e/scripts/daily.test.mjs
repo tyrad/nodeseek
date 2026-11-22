@@ -494,3 +494,66 @@ daily('textkit-floor-gallery', async ctx => {
   const tappedURL = await ctx.attr(target, 'value');
   await checkGallery(ctx, target, image, { tappedURL, minCount: 2, why: '应包含同楼其它配图' });
 }, textKit);
+
+const linkColorPost = '1071908';
+
+// 游客点赞、收藏先进入登录页。已登录设备会先弹确认框：取消并报错，不会提交。
+daily('textkit-guest-reaction-login', async ctx => {
+  const { fixture, ids, click, start, t } = ctx;
+  for (const label of ['点赞', '收藏']) {
+    await fixture(linkColorPost, 1, undefined, { publicPost: true });
+    // 主楼较长，先读到底栏；正文装好时底栏会重建，点之前重新查找。
+    const query = 'label == "' + label + '" AND visible == 1';
+    await textKitHelpers(ctx).findInMiddle(query, '主楼底栏没有「' + label + '」');
+    await waitFor(async () => {
+      const button = (await ids(query))[0];
+      if (!button) return false;
+      try { await click(button); return true; } catch { return false; }
+    }, '主楼底栏的「' + label + '」点不中');
+    const outcome = await waitFor(async () => {
+      if ((await ids('name == "login-hint-container"')).length) return 'login';
+      const cancel = (await ids('type == "XCUIElementTypeButton" AND label == "取消"'))[0];
+      if (cancel) { await click(cancel); return 'confirm'; }
+    }, '点「' + label + '」后既没有登录页也没有确认框');
+    assert.equal(outcome, 'login', '点「' + label + '」弹出了确认框：该设备已登录，请用游客设备运行');
+    t.diagnostic('游客点「' + label + '」进入登录页');
+  }
+  await start();
+}, textKit);
+
+// 统计截图中的站点绿与系统蓝文字像素：表格等处的链接须为站点绿，不能出现系统蓝。
+function countLinkPixels(png) {
+  const script = `
+import sys
+from PIL import Image
+img = Image.open(sys.argv[1]).convert('RGB')
+w, h = img.size
+green = blue = 0
+for y in range(int(h * .12), int(h * .9), 2):
+    for x in range(0, w, 2):
+        r, g, b = img.getpixel((x, y))
+        if abs(r - 15) < 30 and abs(g - 128) < 30 and abs(b - 85) < 30: green += 1
+        if r < 60 and 90 < g < 160 and b > 220: blue += 1
+print(green, blue)`;
+  const [green, blue] = execFileSync('python3', ['-c', script, png], { encoding: 'utf8' }).trim().split(' ').map(Number);
+  return { green, blue };
+}
+
+daily('textkit-link-color', async ctx => {
+  const { fixture, scroll, t } = ctx;
+  await fixture(linkColorPost, 1, undefined, { publicPost: true });
+  let green = 0;
+  const blueShots = [];
+  for (let i = 0; i < 8; i++) {
+    const png = join(out, 'textkit-link-color-' + i + '.png');
+    simctl('io', device, 'screenshot', png);
+    const count = countLinkPixels(png);
+    green += count.green;
+    if (count.blue > 40) blueShots.push(i + ':' + count.blue);
+    await scroll(.8, .3);
+  }
+  t.diagnostic('站点绿像素 ' + green + '，含系统蓝的截图 ' + (blueShots.join(',') || '无'));
+  // 站点绿也用于分节标题，只说明截图有效；判断依据是没有系统蓝。
+  assert.ok(green > 200, '前几屏没有站点绿的文字');
+  assert.equal(blueShots.length, 0, '出现系统蓝链接：' + blueShots.join(','));
+}, textKit);
