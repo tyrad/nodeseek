@@ -194,6 +194,25 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertTrue(zip(labels, frames).allSatisfy { $1.width >= $0.intrinsicContentSize.width - 0.5 })
     }
 
+    func testMainPostBadgesWrapWithinHeaderBesideAvatar() throws {
+        let inset = PostDetailContentLayout.horizontalInset
+        // 主楼正文不缩进，但作者栏左侧仍有头像；逐个加标签，覆盖第一行刚好放满的情况。
+        let appearance = DetailTextAppearance(width: 402 - 2 * inset, pointSize: 17, scale: 3, dark: false)
+        for count in 1...12 {
+            let cell = DetailFloorListCell(frame: CGRect(x: 0, y: 0, width: 402, height: 400))
+            cell.bind(.init(id: "post", version: 1, source: .init(html: "", visibleMarkdown: "正文"), appearance: appearance, baseURL: NodeSeekSite.baseURL))
+            let badges = (1...count).map { "标签\($0)" }
+            cell.configureHeader(title: "主题", requiredLevel: nil, name: "Bob", badges: badges, time: "1 小时前", floor: nil)
+            cell.layoutIfNeeded()
+            let labels = allLabels(cell.contentView).filter { $0 is AuthorBadgeLabel && !$0.isHidden && $0.superview != nil }
+            XCTAssertEqual(labels.compactMap(\.text), badges)
+            let limit = cell.contentView.bounds.maxX - inset + 0.5
+            XCTAssertTrue(labels.allSatisfy { $0.convert($0.bounds, to: cell.contentView).maxX <= limit }, "\(count) 个标签超出")
+            XCTAssertTrue(labels.allSatisfy { $0.bounds.width >= $0.intrinsicContentSize.width - 0.5 }, "\(count) 个标签被压缩")
+            XCTAssertGreaterThanOrEqual(cell.metadata.bounds.width, cell.metadata.intrinsicContentSize.width - 0.5, "\(count) 个标签挤压作者名")
+        }
+    }
+
     func testAuthorFilterBannerHasClearButtonLikeTexture() async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
