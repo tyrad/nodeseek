@@ -51,6 +51,23 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         XCTAssertGreaterThan(viewport.contentSize.height, height)
     }
 
+    func testTappingImageOpensWholeFloorGallery() async throws {
+        let first = URL(string: "https://example.invalid/a.png")!
+        let second = URL(string: "https://example.invalid/b.png")!
+        let markdown = "文字\n\n![甲](\(first.absoluteString))\n\n> ![乙](\(second.absoluteString))"
+        let page = DetailMarkdownPrototypeController(id: "gallery", source: .init(html: "", visibleMarkdown: markdown))
+        let window = try host(page)
+        defer { window.isHidden = true }
+        try await waitFor { self.descendants(page.view, DetailImageBlockView.self).count == 2 }
+        let stack = try XCTUnwrap(descendants(page.view, DetailBlockStack.self).first)
+        var opened: ([URL], Int)?
+        stack.onPhotos = { opened = ($0, $1) }
+        // 与旧版一致：点任意一张都从整楼图片里打开，可左右翻到同楼其它图。
+        descendants(page.view, DetailImageBlockView.self)[1].handleTap()
+        XCTAssertEqual(opened?.0, [first, second])
+        XCTAssertEqual(opened?.1, 1)
+    }
+
     private func waitFor(_ predicate: @escaping () -> Bool) async throws {
         let deadline = Date().addingTimeInterval(12)
         while !predicate(), Date() < deadline { try await Task.sleep(nanoseconds: 20_000_000) }

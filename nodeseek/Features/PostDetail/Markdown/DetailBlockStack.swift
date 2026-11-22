@@ -241,6 +241,19 @@ final class DetailBlockStack: UIStackView {
     }
 
     @discardableResult
+    /// 与旧版一致：点图时以整楼图片（含引用内，不含标签页）为图集，从点中的那张开始。
+    private func openGallery(at url: URL) {
+        var urls: [URL] = []
+        func visit(_ view: UIView) {
+            if view is TabPage { return }
+            if let image = view as? DetailImageBlockView { urls.append(image.url); return }
+            view.subviews.forEach(visit)
+        }
+        visit(self)
+        guard let index = urls.firstIndex(of: url) else { onPhotos?([url], 0); return }
+        onPhotos?(urls, index)
+    }
+
     private func attach(_ view: UIView, to stack: UIStackView, height: CGFloat) -> NSLayoutConstraint {
         stack.addArrangedSubview(view)
         let constraint = view.heightAnchor.constraint(equalToConstant: max(1, ceil(height)))
@@ -285,7 +298,7 @@ final class DetailBlockStack: UIStackView {
                 let view = DetailImageBlockView(imageBlock: image, imageKind: .normal, onImageLoaded: { [weak self] original, kind in
                     height?.constant = DetailImageLayout.presentation(for: original, maxWidth: width, kind: kind ?? .normal).size.height
                     self?.onSizeChange?()
-                }, onImageTapped: { photos([image.url], 0) })
+                }, onImageTapped: { [weak self] in self?.openGallery(at: image.url) })
                 height = attach(view, to: stack, height: DetailImageLayout.normalPlaceholderSize(maxWidth: width).height)
             case .iframeLink(let link):
                 let button = UIButton(type: .system)
