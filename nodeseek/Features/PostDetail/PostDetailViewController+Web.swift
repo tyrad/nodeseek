@@ -133,8 +133,7 @@ extension PostDetailViewController {
     func handleLoadedCommentAnchorIfNeeded(for url: URL) -> Bool {
         guard let anchorID = currentPostCommentAnchorID(from: url),
               anchorID != "0",
-              let comment = loadedComment(matchingAnchorID: anchorID),
-              let indexPath = indexPathForLoadedComment(comment) else {
+              let (comment, indexPath) = loadedCommentLocation(matching: anchorID) else {
             return false
         }
 
@@ -167,23 +166,24 @@ extension PostDetailViewController {
         return route.anchorID
     }
 
-    private func loadedComment(matchingAnchorID anchorID: String) -> Comment? {
-        let normalizedTarget = normalizedAnchorText(anchorID)
-        guard normalizedTarget.isEmpty == false else { return nil }
-        let matches = comments.filter { comment in
-            normalizedAnchorText(comment.anchorID) == normalizedTarget
-                || normalizedAnchorText(comment.floorText) == normalizedTarget
+    private func loadedCommentLocation(matching anchorID: String) -> (Comment, IndexPath)? {
+        let target = normalizedAnchorText(anchorID)
+        guard !target.isEmpty else { return nil }
+        var match: (Comment, IndexPath)?
+        for (row, detailRow) in detailRows.enumerated() {
+            guard case .comment(let index) = detailRow else { continue }
+            let comment = comments[index]
+            guard normalizedAnchorText(comment.anchorID) == target || normalizedAnchorText(comment.floorText) == target else { continue }
+            let location = (comment, IndexPath(row: row, section: 0))
+            // 首页置顶副本也可能没有热评标记。续页后的同楼普通回复才处在连续的阅读位置。
+            if !comment.isHot {
+                if collectionList == nil { return location }
+                match = location
+            } else if match == nil {
+                match = location
+            }
         }
-        return matches.first(where: { !$0.isHot }) ?? matches.first
-    }
-
-    private func indexPathForLoadedComment(_ comment: Comment) -> IndexPath? {
-        let row = detailRows.firstIndex {
-            guard case .comment(let index) = $0 else { return false }
-            let candidate = comments[index]
-            return candidate.id == comment.id && candidate.isHot == comment.isHot
-        }
-        return row.map { IndexPath(row: $0, section: 0) }
+        return match
     }
 
     private func isLoadedCommentVisible(anchorID: String, indexPath: IndexPath) -> Bool {
@@ -348,9 +348,8 @@ extension PostDetailViewController {
     }
 
     func indexPathForCurrentPageAnchor(_ anchorID: String) -> IndexPath? {
-        if let comment = loadedComment(matchingAnchorID: anchorID),
-           let index = indexPathForLoadedComment(comment) {
-            return index
+        if let (_, path) = loadedCommentLocation(matching: anchorID) {
+            return path
         }
 
         guard anchorID == "0", currentHeaderContent != nil,

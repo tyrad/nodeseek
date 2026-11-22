@@ -44,6 +44,57 @@ final class DetailFloorAnchorTests: XCTestCase {
         XCTAssertNil(text.linkHit(at: CGPoint(x: last.midX, y: last.midY)))
     }
 
+    func testPageTwoLinkInFloor21PrefersOriginalFloor20OverPinnedCopy() async throws {
+        func detail(_ floors: [Int], page: Int, hot: Set<Int> = []) -> PostDetail {
+            let comments = floors.map { floor in
+                Comment(id: String(floor), anchorID: String(floor), authorName: "A", avatarURL: nil,
+                        floorText: "#\(floor)", createdAtText: nil, contentHTML: "回复", isHot: hot.contains(floor))
+            }
+            return PostDetail(id: "1067259", title: "帖子", authorName: "B", avatarURL: nil,
+                              metadataText: nil, contentHTML: "", comments: comments, page: page)
+        }
+        let controller = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        controller.render(detail: detail([20, 18, 21, 70, 19] + Array(1...10), page: 1, hot: [18, 21, 70, 19]))
+        func targetIndex(_ floor: String) throws -> Int {
+            let path = try XCTUnwrap(controller.indexPathForCurrentPageAnchor(floor))
+            guard case .comment(let index) = controller.detailRows[path.row] else {
+                XCTFail("楼层定位到了非回复行")
+                return -1
+            }
+            return index
+        }
+        // 首页只有置顶和热评副本时，引用仍可定位它们。
+        XCTAssertEqual(try targetIndex("20"), 0)
+        XCTAssertEqual(try targetIndex("21"), 2)
+        controller.appendCommentPage(detail: detail(Array(11...20), page: 2))
+        controller.appendCommentPage(detail: detail(Array(21...30), page: 3))
+        XCTAssertEqual(try targetIndex("20"), 24)
+        XCTAssertEqual(try targetIndex("21"), 25)
+        let list = try XCTUnwrap(controller.collectionList)
+        let originalRow = try XCTUnwrap(controller.indexPathForCurrentPageAnchor("20"))
+        window.layoutIfNeeded()
+        for _ in 0..<30 {
+            list.scroll(to: originalRow.item, position: .centeredVertically)
+            try await Task.sleep(nanoseconds: 20_000_000)
+            if list.view.indexPathsForVisibleItems.contains(originalRow) { break }
+        }
+        XCTAssertTrue(list.view.indexPathsForVisibleItems.contains(originalRow))
+        controller.handleContentLinkTap(try XCTUnwrap(URL(string: "https://www.nodeseek.com/post-1067259-2#20")))
+        XCTAssertEqual(controller.testHighlightedAnchorID, "20")
+        XCTAssertTrue(list.view.indexPathsForVisibleItems.contains(originalRow))
+        XCTAssertNil(controller.testPresentedLoadedCommentID)
+        let direct = PostDetailViewController(presenter: SpyPostDetailPresenter(), currentPage: 3, usesTextKitList: true)
+        direct.loadViewIfNeeded()
+        direct.render(detail: detail(Array(21...30), page: 3))
+        XCTAssertNil(direct.indexPathForCurrentPageAnchor("20"))
+        XCTAssertEqual(direct.entryHintPage, 3)
+    }
+
     func testTappingVisibleFloorHighlightsOnlyTheTargetAndReuseClearsIt() async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
