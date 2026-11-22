@@ -183,7 +183,8 @@ class PostDetailViewController: UIViewController {
     static let textKitListKey = "postDetail.useTextKitList"
     /// 未手动切换过时默认使用 TextKit 列表，调试菜单仍可切回 Texture 对照。
     static var usesTextKitListSetting: Bool {
-        UserDefaults.standard.object(forKey: textKitListKey) as? Bool ?? true
+        // 启动参数传入的是字符串 "NO"，交给 bool(forKey:) 解析。
+        UserDefaults.standard.object(forKey: textKitListKey) == nil || UserDefaults.standard.bool(forKey: textKitListKey)
     }
 
     enum DisplayMode {
