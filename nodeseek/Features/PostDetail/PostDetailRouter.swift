@@ -40,7 +40,7 @@ class PostDetailRouter: PostDetailRouterProtocol {
             sourcePostURL: post?.url,
             currentPage: page,
             initialAnchorID: initialAnchorID,
-            usesTextKitList: UserDefaults.standard.bool(forKey: PostDetailViewController.textKitListKey)
+            usesTextKitList: PostDetailViewController.usesTextKitListSetting
         )
         
         presenter.setView(view)

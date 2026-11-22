@@ -181,6 +181,10 @@ enum PostDetailLinkResolver {
 
 class PostDetailViewController: UIViewController {
     static let textKitListKey = "postDetail.useTextKitList"
+    /// 未手动切换过时默认使用 TextKit 列表，调试菜单仍可切回 Texture 对照。
+    static var usesTextKitListSetting: Bool {
+        UserDefaults.standard.object(forKey: textKitListKey) as? Bool ?? true
+    }
 
     enum DisplayMode {
         case content

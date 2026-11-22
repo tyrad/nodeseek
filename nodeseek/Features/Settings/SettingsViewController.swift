@@ -1209,7 +1209,7 @@ final class PostDetailDebugLinksViewController: UITableViewController {
         }]
         let listSwitch = UIDeferredMenuElement.uncached { completion in
             let key = PostDetailViewController.textKitListKey
-            let enabled = UserDefaults.standard.bool(forKey: key)
+            let enabled = PostDetailViewController.usesTextKitListSetting
             completion([UIAction(title: DetailListStrings.text("use-list"), state: enabled ? .on : .off) { _ in
                 UserDefaults.standard.set(!enabled, forKey: key)
             }])

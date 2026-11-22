@@ -533,6 +533,8 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertNotNil(routed.collectionList)
         defaults.set(false, forKey: key)
         XCTAssertNil((PostDetailRouter.createModule() as? PostDetailViewController)?.collectionList)
+        defaults.removeObject(forKey: key)
+        XCTAssertNotNil((PostDetailRouter.createModule() as? PostDetailViewController)?.collectionList, "未手动切换时默认使用 TextKit")
         let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), currentPage: 2, initialAnchorID: "21", usesTextKitList: true)
         page.loadViewIfNeeded()
         page.view.frame = CGRect(x: 0, y: 0, width: 390, height: 700)
