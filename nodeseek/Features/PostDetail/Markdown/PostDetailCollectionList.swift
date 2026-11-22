@@ -505,9 +505,17 @@ private extension PostDetailCollectionList {
         let filterIcon = UIImage(systemName: "person.crop.circle")
         let editIcon = UIImage(systemName: "square.and.pencil")
         add("copy", UIImage(systemName: "doc.on.doc")) { [weak cell] page in
-            if let text = cell?.copyText {
-                page.present(CommentCopySheetViewController(text: text), animated: true)
+            // 正文排好前用网页内容兜底，与旧版一样复制后提示，没有内容时直接说明。
+            let fallback = comment.map { CommentCopyTextFormatter.plainText(for: $0, baseURL: page.baseURL) }
+                ?? page.currentHeaderContent.map { CommentCopyTextFormatter.plainText(for: $0, baseURL: page.baseURL) }
+            guard let text = cell?.copyText ?? fallback, !text.isEmpty else {
+                page.showToast(message: DetailListStrings.text("nothing-to-copy"))
+                return
             }
+            page.present(CommentCopySheetViewController(text: text, pasteboardStringWriter: { [weak page] copied in
+                page?.pasteboardStringWriter(copied)
+                page?.showToast(message: DetailListStrings.text("copied"))
+            }), animated: true)
         }
         // 与旧版菜单一致：复制、投放鸡腿（非本人）、只看 TA（作者可展示时）、编辑。引用在底栏。
         if let comment {

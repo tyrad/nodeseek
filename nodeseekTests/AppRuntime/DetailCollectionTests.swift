@@ -119,6 +119,29 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(header.floorActions.last?.title, DetailListStrings.text("author-poster"))
     }
 
+    func testCopyActionWritesThroughPageAndShowsToast() async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        var copied: [String] = []
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true, pasteboardStringWriter: { copied.append($0) })
+        window.rootViewController = page
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let comment = Comment(id: "2", anchorID: "1", authorName: "Alice", avatarURL: nil, floorText: "#1",
+                              createdAtText: nil, contentHTML: "<p>回复</p>", markdown: "回复", hasVisibleMarkdown: true)
+        page.render(detail: PostDetail(id: "1", title: "主题", authorName: "Bob", avatarURL: nil,
+                                       metadataText: nil, contentHTML: "主帖", visibleMarkdown: "主帖", comments: [comment]))
+        window.layoutIfNeeded()
+        let list = try XCTUnwrap(page.collectionList?.view)
+        let cell = try XCTUnwrap(list.cellForItem(at: try XCTUnwrap(page.indexPathForCurrentPageAnchor("1"))) as? DetailFloorListCell)
+        XCTAssertTrue(try XCTUnwrap(cell.floorActions.first { $0.title == DetailListStrings.text("copy") }).perform())
+        let sheet = try XCTUnwrap(page.presentedViewController as? CommentCopySheetViewController)
+        sheet.copySelection()
+        // 与旧版一致：复制后在详情页提示「已复制」。
+        XCTAssertEqual(copied, ["回复"])
+        XCTAssertTrue(allLabels(page.view).contains { $0.text == DetailListStrings.text("copied") })
+    }
+
     private func allButtons(_ root: UIView) -> [UIButton] {
         (root as? UIButton).map { [$0] } ?? root.subviews.flatMap(allButtons)
     }

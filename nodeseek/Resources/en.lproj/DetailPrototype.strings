@@ -27,3 +27,5 @@
 "edit-post" = "Edit post";
 "author-them" = "Show this user only";
 "author-poster" = "Show poster only";
+"copied" = "Copied";
+"nothing-to-copy" = "Nothing to copy";
