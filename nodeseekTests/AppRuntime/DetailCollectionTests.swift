@@ -42,7 +42,7 @@ final class DetailCollectionTests: XCTestCase {
         let list = try XCTUnwrap(page.collectionList?.view)
         window.layoutIfNeeded()
         let path = try XCTUnwrap(page.indexPathForCurrentPageAnchor("1"))
-        let cell = try XCTUnwrap(list.cellForItem(at: path) as? DetailFloorListCell)
+        let cell = try await waitForCell(list, at: path)
         for _ in 0..<100 where !cell.contentInstalled { try await Task.sleep(nanoseconds: 10_000_000) }
         window.layoutIfNeeded()
         let text = try XCTUnwrap(cell.body.arrangedSubviews.first?.subviews.first as? DetailSelectableTextView)
@@ -98,6 +98,7 @@ final class DetailCollectionTests: XCTestCase {
                                        metadataText: nil, contentHTML: "主帖", visibleMarkdown: "主帖", comments: [other, own]))
         let list = try XCTUnwrap(page.collectionList?.view)
         window.layoutIfNeeded()
+        _ = try await waitForCell(list, at: try XCTUnwrap(page.indexPathForCurrentPageAnchor("1")))
         func cell(_ anchor: String) throws -> DetailFloorListCell {
             try XCTUnwrap(list.cellForItem(at: try XCTUnwrap(page.indexPathForCurrentPageAnchor(anchor))) as? DetailFloorListCell)
         }
@@ -133,7 +134,7 @@ final class DetailCollectionTests: XCTestCase {
                                        metadataText: nil, contentHTML: "主帖", visibleMarkdown: "主帖", comments: [comment]))
         window.layoutIfNeeded()
         let list = try XCTUnwrap(page.collectionList?.view)
-        let cell = try XCTUnwrap(list.cellForItem(at: try XCTUnwrap(page.indexPathForCurrentPageAnchor("1"))) as? DetailFloorListCell)
+        let cell = try await waitForCell(list, at: try XCTUnwrap(page.indexPathForCurrentPageAnchor("1")))
         XCTAssertTrue(try XCTUnwrap(cell.floorActions.first { $0.title == DetailListStrings.text("copy") }).perform())
         let sheet = try XCTUnwrap(page.presentedViewController as? CommentCopySheetViewController)
         sheet.copySelection()
@@ -156,7 +157,7 @@ final class DetailCollectionTests: XCTestCase {
                                        metadataText: nil, contentHTML: "主帖", visibleMarkdown: "主帖", comments: [comment]))
         window.layoutIfNeeded()
         let list = try XCTUnwrap(page.collectionList?.view)
-        let cell = try XCTUnwrap(list.cellForItem(at: try XCTUnwrap(page.indexPathForCurrentPageAnchor("1"))) as? DetailFloorListCell)
+        let cell = try await waitForCell(list, at: try XCTUnwrap(page.indexPathForCurrentPageAnchor("1")))
         let name = try XCTUnwrap(allLabels(cell.contentView).first { $0.text == "Alice" })
         // 与旧版一致：长按名字和头像一样弹出个人页预览，读屏说明可打开主页。
         let menu = try XCTUnwrap(name.interactions.compactMap { $0 as? UIContextMenuInteraction }.first)
@@ -208,12 +209,27 @@ final class DetailCollectionTests: XCTestCase {
         let list = try XCTUnwrap(page.collectionList?.view)
         list.layoutIfNeeded()
         // 与旧版一致：筛选条有说明文字和独立的「查看全部」按钮。
-        let banner = try XCTUnwrap(list.visibleCells.compactMap { $0 as? DetailAuthorFilterBannerCell }.first)
+        let banner = try await waitForCell(list, as: DetailAuthorFilterBannerCell.self)
         XCTAssertTrue(allLabels(banner).contains { $0.text == page.authorFilterBannerText })
         XCTAssertGreaterThanOrEqual(banner.bounds.height, 34 + 20 + 8 - 0.5)
         let clear = try XCTUnwrap(allButtons(banner).first { $0.accessibilityIdentifier == "detail-author-filter-clear" })
         clear.sendActions(for: .touchUpInside)
         XCTAssertNil(page.authorFilter)
+    }
+
+    /// 主楼量出高度前回复不建 cell，取回复楼层要等主楼排好的下一轮布局。
+    private func waitForCell<T: UICollectionViewCell>(_ list: UICollectionView, as type: T.Type = DetailFloorListCell.self,
+                                                       where match: (T) -> Bool = { _ in true }) async throws -> T {
+        for _ in 0..<100 {
+            list.layoutIfNeeded()
+            if let cell = list.visibleCells.compactMap({ $0 as? T }).first(where: match) { return cell }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        return try XCTUnwrap(list.visibleCells.compactMap { $0 as? T }.first(where: match))
+    }
+
+    private func waitForCell(_ list: UICollectionView, at path: IndexPath) async throws -> DetailFloorListCell {
+        try await waitForCell(list) { list.indexPath(for: $0) == path }
     }
 
     private func allButtons(_ root: UIView) -> [UIButton] {
@@ -474,7 +490,7 @@ final class DetailCollectionTests: XCTestCase {
         let list = host.view
         window.layoutIfNeeded()
         let path = try XCTUnwrap(page.indexPathForCurrentPageAnchor("9"))
-        let cell = try XCTUnwrap(list.cellForItem(at: path) as? DetailFloorListCell)
+        let cell = try await waitForCell(list, at: path)
         for _ in 0..<100 where !cell.isSettled { try await Task.sleep(nanoseconds: 10_000_000) }
         XCTAssertTrue(cell.isSettled)
         try await Task.sleep(nanoseconds: 50_000_000)
@@ -636,7 +652,7 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(spy.didApproachCommentEndCount, 1)
     }
 
-    func testDuplicateHotAndPagedReplyKeepSeparateSourcesAndTargetThePagedRow() throws {
+    func testDuplicateHotAndPagedReplyKeepSeparateSourcesAndTargetThePagedRow() async throws {
         func reply(_ text: String, hot: Bool) -> Comment {
             Comment(id: "150", anchorID: "21", authorName: "Alice", avatarURL: nil, floorText: "#21", createdAtText: nil,
                     contentHTML: text, isHot: hot, markdown: hot ? nil : text, hasVisibleMarkdown: !hot)
@@ -655,9 +671,9 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(list.numberOfItems(inSection: 0), 4)
         let target = try XCTUnwrap(page.indexPathForCurrentPageAnchor("21"))
         XCTAssertEqual(target.item, 3)
-        let cell = try XCTUnwrap(list.cellForItem(at: target) as? DetailFloorListCell)
+        let cell = try await waitForCell(list, at: target)
         XCTAssertEqual(cell.copyText, "普通回复")
-        let hot = try XCTUnwrap(list.cellForItem(at: IndexPath(item: 2, section: 0)) as? DetailFloorListCell)
+        let hot = try await waitForCell(list, at: IndexPath(item: 2, section: 0))
         XCTAssertNotEqual(hot.request?.id, cell.request?.id)
         XCTAssertNil(hot.request?.source.visibleMarkdown)
         page.refreshCurrentCommentPage(detail: detail([reply("已编辑", hot: false)], page: 2))
@@ -668,7 +684,7 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertTrue(list.visibleCells.compactMap { $0 as? DetailFloorListCell }.allSatisfy { $0.copyText != "普通回复" })
     }
 
-    func testOptInOpensCollectionAtRequestedFloor() throws {
+    func testOptInOpensCollectionAtRequestedFloor() async throws {
         let defaults = UserDefaults.standard
         let key = PostDetailViewController.textKitListKey
         let previous = defaults.object(forKey: key)
@@ -690,7 +706,13 @@ final class DetailCollectionTests: XCTestCase {
         page.render(detail: detail)
         page.view.layoutIfNeeded()
         let list = try XCTUnwrap(page.view.subviews.compactMap { $0 as? UICollectionView }.first)
-        XCTAssertTrue(list.indexPathsForVisibleItems.contains(try XCTUnwrap(page.indexPathForCurrentPageAnchor("21"))))
+        let anchor = try XCTUnwrap(page.indexPathForCurrentPageAnchor("21"))
+        // 定位在下一轮主线程执行，主楼按一屏预估时锚点不在首屏内。
+        for _ in 0..<100 where !list.indexPathsForVisibleItems.contains(anchor) {
+            try await Task.sleep(nanoseconds: 10_000_000)
+            page.view.layoutIfNeeded()
+        }
+        XCTAssertTrue(list.indexPathsForVisibleItems.contains(anchor))
     }
 
     private func allViews(_ root: UIView) -> [UIView] {
@@ -730,7 +752,7 @@ final class DetailCollectionTests: XCTestCase {
                                        metadataText: nil, contentHTML: "主帖", visibleMarkdown: "主帖", comments: [reply]))
         window.layoutIfNeeded()
         let list = try XCTUnwrap(page.collectionList?.view)
-        let cell = try XCTUnwrap(list.cellForItem(at: try XCTUnwrap(page.indexPathForCurrentPageAnchor("1"))) as? DetailFloorListCell)
+        let cell = try await waitForCell(list, at: try XCTUnwrap(page.indexPathForCurrentPageAnchor("1")))
         XCTAssertEqual(cell.metadata.text, "Alice")
         let poster = try XCTUnwrap(view("detail-poster-badge", in: cell) as? UILabel)
         XCTAssertFalse(poster.isHidden)
@@ -787,6 +809,42 @@ final class DetailCollectionTests: XCTestCase {
         let after = list.visibleCells.compactMap { $0 as? DetailFloorListCell }.compactMap(\.request)
         XCTAssertEqual(Set(after.map(\.version)), Set(before.map(\.version)))
         XCTAssertEqual(list.contentOffset.y, offset, accuracy: 0.5)
+    }
+
+    func testFirstLayoutBuildsOnlyMainPostUntilItIsMeasured() async throws {
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        page.render(detail: makePagedDetail(1...12, pageNumber: 1, next: nil))
+        window.layoutIfNeeded()
+        // 主楼量出高度前按一屏预估，首帧不为随后会被挤出屏幕的回复建 cell。
+        let list = try XCTUnwrap(page.collectionList?.view)
+        XCTAssertEqual(list.visibleCells.compactMap { $0 as? DetailFloorListCell }.count, 1)
+        var waited = 0
+        while list.visibleCells.compactMap({ $0 as? DetailFloorListCell }).count < 2, waited < 100 {
+            try await Task.sleep(nanoseconds: 10_000_000)
+            waited += 1
+        }
+        // 主楼很短时，量完后回复正常补上。
+        XCTAssertGreaterThan(list.visibleCells.compactMap { $0 as? DetailFloorListCell }.count, 3)
+    }
+
+    func testShortMainPostKeepsInitialAnchorOnScreenAfterMeasuring() async throws {
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), initialAnchorID: "2", usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        page.render(detail: makePagedDetail(1...30, pageNumber: 1, next: nil))
+        let list = try XCTUnwrap(page.collectionList?.view)
+        let target = try XCTUnwrap(page.indexPathForCurrentPageAnchor("2"))
+        for _ in 0..<50 {
+            window.layoutIfNeeded()
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        // 带锚点打开时主楼量完变短，目标楼层仍要留在屏幕内。
+        let frame = try XCTUnwrap(list.layoutAttributesForItem(at: target)?.frame)
+        let visible = CGRect(x: 0, y: list.contentOffset.y + list.adjustedContentInset.top, width: list.bounds.width,
+                             height: list.bounds.height - list.adjustedContentInset.top - list.adjustedContentInset.bottom)
+        XCTAssertTrue(visible.intersects(frame), "\(frame) \(visible)")
     }
 
     func testFirstRenderKeepsSkeletonUntilVisibleFloorsInstall() async throws {

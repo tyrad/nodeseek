@@ -21,6 +21,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     private(set) var rows: [PostDetailViewController.DetailRow] = []
     private var keys: [String] = []
     private var heights: [String: CGFloat] = [:]
+    private var headerEstimate: CGFloat = 100
     private var tabSelections: [String: Int] = [:]
     private let cache = NSCache<NSString, CachedText>()
     private var requestedPage: Int?
@@ -117,6 +118,10 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         let currentKeys = Set(keys)
         if let key = pendingAnchorKey, !currentKeys.contains(key) { pendingAnchorKey = nil }
         heights = heights.filter { currentKeys.contains($0.key) }
+        // 预估值在一次加载内保持不变，否则视图尺寸变化会挪动已定位的锚点。
+        // 带锚点或翻页打开时主楼可能横跨视口顶部，量完缩短会把目标楼层挤出屏幕，仍按小值预估。
+        let opensAtTop = page.currentPage == 1 && page.pendingInitialAnchorID == nil && !page.pendingPageJumpScroll
+        headerEstimate = opensAtTop ? max(100, view.bounds.height) : 100
         var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
         snapshot.appendSections([0])
         snapshot.appendItems(keys)
@@ -355,7 +360,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         let height = cell.measuredHeight(width: view.bounds.width)
         // 已量过的楼层在复用时先收到正文、后收到签名；不能用半成品缩短列表。
         if let measured = heights[key], !cell.isSettled, height < measured { return }
-        let old = heights[key] ?? 100
+        let old = heights[key] ?? estimatedHeight(for: key)
         guard abs(old - height) >= 0.5 else { return }
         heights[key] = height
         let context = UICollectionViewFlowLayoutInvalidationContext()
@@ -385,8 +390,14 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             sizingFilterBanner.configure(text: page.authorFilterBannerText)
             return CGSize(width: width, height: sizingFilterBanner.height(for: width))
         }
-        let estimate: CGFloat = key == "divider" ? 8 : 100
-        return CGSize(width: max(1, collectionView.bounds.width), height: heights[key] ?? estimate)
+        return CGSize(width: max(1, collectionView.bounds.width), height: heights[key] ?? estimatedHeight(for: key))
+    }
+
+    private func estimatedHeight(for key: String) -> CGFloat {
+        if key == "divider" { return 8 }
+        // 主楼量出高度前按一屏预估：首帧只建主楼，避免一次建出随后被挤出屏幕的整屏回复。
+        if key.hasPrefix("post-") { return headerEstimate }
+        return 100
     }
 
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
