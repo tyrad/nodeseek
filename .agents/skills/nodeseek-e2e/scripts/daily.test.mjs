@@ -557,3 +557,57 @@ daily('textkit-link-color', async ctx => {
   assert.ok(green > 200, '前几屏没有站点绿的文字');
   assert.equal(blueShots.length, 0, '出现系统蓝链接：' + blueShots.join(','));
 }, textKit);
+
+// 统计正文区：背景亮度中位数，以及亮字、暗字像素数。浅色字在黑底上才看得见，反之亦然。
+function textPixels(png) {
+  const script = `
+import sys
+from PIL import Image
+img = Image.open(sys.argv[1]).convert('L')
+w, h = img.size
+values = [img.getpixel((x, y)) for y in range(int(h * .12), int(h * .9), 2) for x in range(0, w, 2)]
+print(sorted(values)[len(values) // 2], sum(v > 170 for v in values), sum(v < 80 for v in values))`;
+  const [background, bright, dark] = execFileSync('python3', ['-c', script, png], { encoding: 'utf8' }).trim().split(' ').map(Number);
+  return { background, bright, dark };
+}
+
+daily('textkit-dark-text', async ctx => {
+  const { fixture, scroll, t } = ctx;
+  const wait = ms => new Promise(done => setTimeout(done, ms));
+  const shot = name => {
+    const png = join(out, 'textkit-dark-text-' + name + '.png');
+    simctl('io', device, 'screenshot', png);
+    const stats = textPixels(png);
+    t.diagnostic(name + ' 背景 ' + stats.background + '，亮字 ' + stats.bright + '，暗字 ' + stats.dark);
+    return stats;
+  };
+  const appearance = mode => { simctl('ui', device, 'appearance', mode); return wait(1500); };
+  const original = simctl('ui', device, 'appearance').trim();
+  // 字的像素数以同一屏另一外观为准，低于一半说明有文字没跟着换色。
+  const expectDark = (stats, light, name) => {
+    assert.ok(stats.background < 60, name + '背景没有变暗');
+    assert.ok(stats.bright > light.dark * .5, name + '亮字太少，文字可能仍是深色：' + stats.bright + ' / ' + light.dark);
+  };
+  const expectLight = (stats, dark, name) => {
+    assert.ok(stats.background > 200, name + '背景没有变亮');
+    assert.ok(stats.dark > dark.bright * .5, name + '暗字太少，文字可能仍是浅色：' + stats.dark + ' / ' + dark.bright);
+  };
+  try {
+    await appearance('light');
+    await fixture(linkColorPost, 1, undefined, { publicPost: true });
+    const light = shot('light');
+    await appearance('dark');
+    expectDark(shot('dark-live'), light, '页面打开后切到暗黑，');
+    await scroll(.8, .3);
+    await wait(800);
+    const darkBelow = shot('dark-below');
+    assert.ok(darkBelow.background < 60 && darkBelow.bright > 2000, '切换后新出现的楼层亮字太少：' + darkBelow.bright);
+    await fixture(linkColorPost, 1, undefined, { publicPost: true });
+    const dark = shot('dark-fresh');
+    expectDark(dark, light, '暗黑下打开，');
+    await appearance('light');
+    expectLight(shot('light-live'), dark, '页面打开后切回浅色，');
+  } finally {
+    simctl('ui', device, 'appearance', original || 'light');
+  }
+}, textKit);
