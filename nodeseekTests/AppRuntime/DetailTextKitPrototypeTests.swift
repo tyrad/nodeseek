@@ -142,6 +142,21 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         XCTAssertEqual(tabButton(1, in: second)?.accessibilityTraits.contains(.selected), true)
     }
 
+    func testIFrameLinkUsesTextureCard() throws {
+        let stack = DetailBlockStack(frame: CGRect(x: 0, y: 0, width: 360, height: 10))
+        stack.axis = .vertical
+        var opened: URL?
+        stack.onLink = { opened = $0 }
+        let link = RenderedIFrameLinkBlock(source: "https://player.example.com/embed/1", displayDomain: "player.example.com",
+                                           openURL: URL(string: "https://player.example.com/embed/1")!)
+        stack.appendLegacy([.iframeLink(link)], to: stack, width: 360)
+        // 与旧版一致：卡片而不是只有域名的按钮，点按打开链接。
+        let card = try XCTUnwrap(descendants(stack, DetailIFrameLinkView.self).first)
+        XCTAssertTrue(card.accessibilityTraits.contains(.link))
+        card.sendActions(for: .touchUpInside)
+        XCTAssertEqual(opened, link.openURL)
+    }
+
     private func waitFor(_ predicate: @escaping () -> Bool) async throws {
         let deadline = Date().addingTimeInterval(12)
         while !predicate(), Date() < deadline { try await Task.sleep(nanoseconds: 20_000_000) }

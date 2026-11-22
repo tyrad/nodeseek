@@ -399,10 +399,9 @@ final class DetailBlockStack: UIStackView {
                     ?? (kind == .report ? DetailImageLayout.reportPlaceholderSize(maxWidth: width) : DetailImageLayout.normalPlaceholderSize(maxWidth: width))
                 height = attach(view, to: stack, height: placeholder.height)
             case .iframeLink(let link):
-                let button = UIButton(type: .system)
-                button.setTitle(link.displayDomain, for: .normal)
-                button.addAction(UIAction { _ in open(link.openURL) }, for: .touchUpInside)
-                stack.addArrangedSubview(button)
+                // 与旧版一致：嵌入内容显示为带标题和来源的卡片。
+                attach(DetailIFrameLinkView(iframeBlock: link) { open(link.openURL) }, to: stack,
+                       height: DetailIFrameLinkLayout.measure(iframeBlock: link, constrainedSize: size).height)
             case .imagePlaceholder(let url): appendLegacy([.text(NSAttributedString(string: url?.absoluteString ?? "🖼"))], to: stack, width: width)
             case .unsupported(let reason): appendLegacy([.text(NSAttributedString(string: reason))], to: stack, width: width)
             }

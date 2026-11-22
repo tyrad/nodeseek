@@ -289,7 +289,7 @@ final class DetailIFrameLinkNode: ASDisplayNode {
     }
 }
 
-private final class DetailIFrameLinkView: UIControl {
+final class DetailIFrameLinkView: UIControl {
     private let iframeBlock: RenderedIFrameLinkBlock
     private let onTapped: () -> Void
     private let titleLabel = UILabel()
