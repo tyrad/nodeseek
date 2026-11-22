@@ -192,6 +192,30 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertTrue(zip(labels, frames).allSatisfy { $1.width >= ceil($0.intrinsicContentSize.width) - 0.5 })
     }
 
+    func testAuthorFilterBannerHasClearButtonLikeTexture() async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        window.rootViewController = page
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let comment = Comment(id: "2", anchorID: "1", authorName: "Bob", avatarURL: nil, floorText: "#1",
+                              createdAtText: nil, contentHTML: "<p>回复</p>", markdown: "回复", hasVisibleMarkdown: true)
+        page.render(detail: PostDetail(id: "1", title: "主题", authorName: "Bob", avatarURL: nil,
+                                       metadataText: nil, contentHTML: "主帖", visibleMarkdown: "主帖", comments: [comment]))
+        page.toggleAuthorFilter(.poster(of: try XCTUnwrap(page.currentHeaderContent)), focusingCommentID: nil)
+        window.layoutIfNeeded()
+        let list = try XCTUnwrap(page.collectionList?.view)
+        list.layoutIfNeeded()
+        // 与旧版一致：筛选条有说明文字和独立的「查看全部」按钮。
+        let banner = try XCTUnwrap(list.visibleCells.compactMap { $0 as? DetailAuthorFilterBannerCell }.first)
+        XCTAssertTrue(allLabels(banner).contains { $0.text == page.authorFilterBannerText })
+        XCTAssertGreaterThanOrEqual(banner.bounds.height, 34 + 20 + 8 - 0.5)
+        let clear = try XCTUnwrap(allButtons(banner).first { $0.accessibilityIdentifier == "detail-author-filter-clear" })
+        clear.sendActions(for: .touchUpInside)
+        XCTAssertNil(page.authorFilter)
+    }
+
     private func allButtons(_ root: UIView) -> [UIButton] {
         (root as? UIButton).map { [$0] } ?? root.subviews.flatMap(allButtons)
     }

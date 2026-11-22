@@ -15,6 +15,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
 
     private weak var page: PostDetailViewController?
     private lazy var sizingEntryHint = DetailEntryHintCell(frame: .zero)
+    private lazy var sizingFilterBanner = DetailAuthorFilterBannerCell(frame: .zero)
     private let flow = UICollectionViewFlowLayout()
     let view: UICollectionView
     private(set) var rows: [PostDetailViewController.DetailRow] = []
@@ -56,6 +57,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         view.register(DetailFloorListCell.self, forCellWithReuseIdentifier: "floor")
         view.register(UICollectionViewListCell.self, forCellWithReuseIdentifier: "notice")
         view.register(DetailEntryHintCell.self, forCellWithReuseIdentifier: "entry")
+        view.register(DetailAuthorFilterBannerCell.self, forCellWithReuseIdentifier: "filter")
         view.register(DetailSkeletonListCell.self, forCellWithReuseIdentifier: "skeleton")
         view.register(UICollectionReusableView.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter, withReuseIdentifier: "footer")
         data.supplementaryViewProvider = { [weak page] list, kind, path in
@@ -220,10 +222,14 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             let cell = list.dequeueReusableCell(withReuseIdentifier: "skeleton", for: path) as! DetailSkeletonListCell
             cell.configure(key == "skeleton-header" ? .header : .comment)
             return cell
+        case .authorFilterBanner:
+            let cell = list.dequeueReusableCell(withReuseIdentifier: "filter", for: path) as! DetailAuthorFilterBannerCell
+            cell.configure(text: page.authorFilterBannerText)
+            cell.onClear = { [weak page] in page?.toggleAuthorFilter(nil, focusingCommentID: nil) }
+            return cell
         default:
             let cell = list.dequeueReusableCell(withReuseIdentifier: "notice", for: path) as! UICollectionViewListCell
             var content = UIListContentConfiguration.cell()
-            content.text = key == "filter" ? page.authorFilterBannerText : nil
             cell.contentConfiguration = content
             cell.backgroundConfiguration = .clear()
             cell.contentView.backgroundColor = key == "divider" ? .secondarySystemBackground : .systemBackground
@@ -374,16 +380,13 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             sizingEntryHint.configure(page: page.entryHintPage, afterJump: page.hasJumpedCommentPage, traits: collectionView.traitCollection)
             return CGSize(width: width, height: sizingEntryHint.height(for: width))
         }
-        let estimate: CGFloat = key == "divider" ? 8 : key == "filter" ? 48 : 100
-        return CGSize(width: max(1, collectionView.bounds.width), height: heights[key] ?? estimate)
-    }
-
-    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        guard let page, rows.indices.contains(indexPath.item) else { return }
-        switch rows[indexPath.item] {
-        case .authorFilterBanner: page.toggleAuthorFilter(nil, focusingCommentID: nil)
-        default: break
+        if key == "filter", let page {
+            let width = max(1, collectionView.bounds.width)
+            sizingFilterBanner.configure(text: page.authorFilterBannerText)
+            return CGSize(width: width, height: sizingFilterBanner.height(for: width))
         }
+        let estimate: CGFloat = key == "divider" ? 8 : 100
+        return CGSize(width: max(1, collectionView.bounds.width), height: heights[key] ?? estimate)
     }
 
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
