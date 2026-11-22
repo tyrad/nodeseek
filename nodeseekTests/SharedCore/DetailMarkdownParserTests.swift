@@ -165,10 +165,21 @@ struct DetailMarkdownParserTests {
         }
     }
 
-    private func page(payload: String, main: String, reply: String, notice: String = "") throws -> PostDetail {
+    @Test func titleOrSignatureMentioningPermissionDoesNotRestrictThePage() throws {
+        let payload = #"{"postData":{"comments":[{"commentId":1,"blocked":false,"markdown":"主帖"},{"commentId":2,"blocked":false,"markdown":"回复"}]}}"#
+        // 标题、签名都是普通楼层内容，只有独立的站点提示才算受限页。
+        let detail = try page(payload: payload, main: "主帖", reply: "回复", title: "Docker 提示权限不足怎么办",
+                              signature: #"<div class="signature">需要注册用户才能查看的资源别问我</div>"#)
+        #expect(!detail.isRestricted)
+        #expect(detail.contentHTML == "主帖")
+        #expect(DetailFloorSource(post: detail).visibleMarkdown == "主帖")
+        #expect(detail.comments.first?.contentHTML == "回复")
+    }
+
+    private func page(payload: String, main: String, reply: String, notice: String = "", title: String = "标题", signature: String = "") throws -> PostDetail {
         let html = """
-        <div id="nsk-body-left">\(notice)<div class="post-title"><h1>标题</h1></div>
-        <div class="nsk-post"><div class="content-item" id="0" data-comment-id="1"><a class="author-name">楼主</a><article class="post-content">\(main)</article></div>
+        <div id="nsk-body-left">\(notice)<div class="post-title"><h1><a class="post-title-link">\(title)</a></h1></div>
+        <div class="nsk-post"><div class="content-item" id="0" data-comment-id="1"><a class="author-name">楼主</a><article class="post-content">\(main)</article>\(signature)</div>
         <ul class="comments"><li class="content-item" id="1" data-comment-id="2"><a class="author-name">回复者</a><article class="post-content">\(reply)</article></li>
         <li class="content-item" id="2" data-comment-id="3"><a class="author-name">跨页热评</a><article class="post-content">其他楼层</article></li></ul></div></div>
         <script id="temp-script">\(Data(payload.utf8).base64EncodedString())</script>
