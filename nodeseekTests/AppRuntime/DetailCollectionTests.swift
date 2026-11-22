@@ -852,6 +852,15 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertTrue(visible.intersects(frame), "\(frame) \(visible)")
     }
 
+    func testDragStartingOnFooterButtonStillScrollsList() throws {
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        page.loadViewIfNeeded()
+        let list = try XCTUnwrap(page.collectionList?.view)
+        // 与旧版一致：手指在底栏按钮上停留后拖动，仍然滚动列表而不是卡在按钮上。
+        XCTAssertTrue(list.touchesShouldCancel(in: UIButton(type: .system)))
+        XCTAssertFalse(list.touchesShouldCancel(in: UITextField()))
+    }
+
     func testFirstRenderKeepsSkeletonUntilVisibleFloorsInstall() async throws {
         let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
         let window = try pagingWindow(for: page)

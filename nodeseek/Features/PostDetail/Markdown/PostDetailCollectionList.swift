@@ -49,7 +49,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         flow.minimumLineSpacing = 0
         flow.minimumInteritemSpacing = 0
         flow.footerReferenceSize = CGSize(width: 1, height: 56)
-        view = UICollectionView(frame: .zero, collectionViewLayout: flow)
+        view = DetailCollectionView(frame: .zero, collectionViewLayout: flow)
         super.init()
         view.backgroundColor = .systemBackground
         view.alwaysBounceVertical = true
@@ -582,5 +582,12 @@ extension PostDetailCollectionList {
         guard keys.indices.contains(row), row < view.numberOfItems(inSection: 0) else { return }
         view.layoutIfNeeded()
         view.scrollToItem(at: IndexPath(item: row, section: 0), at: position, animated: false)
+    }
+}
+
+/// 楼层底栏按钮是 UIControl，系统默认不让列表接管已交给按钮的触摸。旧版按钮不是 UIControl，按住按钮再拖动仍会滚动，这里保持一致。
+private final class DetailCollectionView: UICollectionView {
+    override func touchesShouldCancel(in view: UIView) -> Bool {
+        view is UIButton || super.touchesShouldCancel(in: view)
     }
 }
