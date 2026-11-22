@@ -161,7 +161,7 @@
     "profiles": [
       "logout"
     ],
-    "setup": "专用 Profile 设备；必要时登录本机测试账号，需已有收藏，结束时保留游客状态"
+    "setup": "暂停运行，需 E2E_ALLOW_LOGOUT=1；专用 Profile 设备；必要时登录本机测试账号，需已有收藏，结束时保留游客状态"
   },
   "textkit-pagination": {
     "title": "新版连续续页、末页回弹及页码面板往返",

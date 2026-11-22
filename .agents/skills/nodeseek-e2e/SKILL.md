@@ -70,6 +70,8 @@ E2E_PROFILE=member make e2e-smoke
 
 ### 退出后会话清理
 
+此用例暂停运行：它用测试账号反复登录、退出，曾让同一账号在真机上的登录失效。`run.sh` 默认拒绝运行；换成专用测试账号后，再以 `E2E_ALLOW_LOGOUT=1 make e2e-case CASE=logout-session` 显式运行。
+
 `make e2e-case CASE=logout-session` 默认使用「NodeSeek E2E Profile」专用设备，也可在本机配置中指定 `logoutUDID`。脚本用启动参数临时显示「我的收藏」标签。测试账号需要已有收藏；设备为游客时复用官方表单和本机 `memberEnvFile` 登录。用例结束后这台设备保留游客状态。
 
 先核对账号并打开真实收藏，转到「我的」确认退出，再返回同一个收藏标签。旧收藏行必须消失，重新从「我的」点收藏必须进入站点登录表单。冷启动复查「我的」、收藏和通知的游客状态，再用阅读模式核对侧栏。查看运行目录的 `junit.xml`、`report/logout-session.html` 与截图。

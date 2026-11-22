@@ -34,7 +34,12 @@ case "$profile" in
   push) device_profile=member; suite=push.test.mjs ;;
   draft) device_profile=member; suite=draft.test.mjs ;;
   comment) device_profile=member; suite=comment.test.mjs ;;
-  logout) suite=logout.test.mjs ;;
+  logout)
+    # 反复登录、退出会让同账号的真机登录失效，暂停此用例；确需运行时显式设置 E2E_ALLOW_LOGOUT=1。
+    if [[ ${E2E_ALLOW_LOGOUT:-} != 1 ]]; then
+      echo "logout-session 已暂停：会让同一账号在其他设备上的登录失效。确需运行请设置 E2E_ALLOW_LOGOUT=1" >&2; exit 2
+    fi
+    suite=logout.test.mjs ;;
   login) device_profile=member; suite=login.test.mjs ;;
   guest|member) ;;
   *) echo "E2E_PROFILE 只接受 guest、member、login、logout、draft、daily、gesture、push 或 comment" >&2; exit 2 ;;
