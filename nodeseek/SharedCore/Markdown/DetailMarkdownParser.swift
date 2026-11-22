@@ -205,16 +205,43 @@ nonisolated struct DetailMarkdownParser: Sendable {
 
     private static let token = try! NSRegularExpression(pattern: #"https?://[^\s<>]+|nsapp://[^\s<>]+|:[A-Za-z][A-Za-z0-9]+:|(?<![\p{L}\p{N}_])@[\p{L}\p{N}_-]+"#)
 
+    /// 与网页 linkify 一致：主机名遇到标点（含全角）即结束；路径末尾的句读和不成对的右括号不算链接。
+    private static func linkifiedLength(_ token: String) -> Int {
+        let units = Array(token.utf16)
+        let schemeEnd = (token as NSString).range(of: "://").upperBound
+        let punctuation: Set<Unicode.GeneralCategory> = [.connectorPunctuation, .dashPunctuation, .openPunctuation, .closePunctuation,
+                                                         .initialPunctuation, .finalPunctuation, .otherPunctuation]
+        var end = units.count
+        var position = 0
+        for scalar in token.unicodeScalars {
+            defer { position += UTF16.width(scalar) }
+            guard position >= schemeEnd else { continue }
+            if "/?#".unicodeScalars.contains(scalar) { break }
+            if scalar.value > 0x7F, punctuation.contains(scalar.properties.generalCategory) { end = position; break }
+        }
+        let closing: [UInt16: UInt16] = [41: 40, 93: 91, 125: 123]
+        while end > schemeEnd {
+            let last = units[end - 1]
+            if ".,;:!?'\"-".utf16.contains(last) { end -= 1; continue }
+            if let open = closing[last], units[..<end].filter({ $0 == open }).count < units[..<end].filter({ $0 == last }).count { end -= 1; continue }
+            break
+        }
+        return end
+    }
+
     private func tokenize(_ text: String, style: Style, link: URL?) throws -> [Piece] {
         guard link == nil else { return [.inline(.text(text, style, link))] }
         let string = text as NSString
         var result: [Piece] = []
         var offset = 0
-        for match in Self.token.matches(in: text, range: NSRange(location: 0, length: string.length)) {
+        // 逐个查找：裸链接截掉的尾部要重新参与匹配，里面可能还有 @ 或表情。
+        while let match = Self.token.firstMatch(in: text, range: NSRange(location: offset, length: string.length - offset)) {
             if match.range.location > offset {
                 result.append(.inline(.text(string.substring(with: NSRange(location: offset, length: match.range.location-offset)), style, nil)))
             }
-            let token = string.substring(with: match.range)
+            var range = match.range
+            if string.substring(with: range).hasPrefix("http") { range.length = Self.linkifiedLength(string.substring(with: range)) }
+            let token = string.substring(with: range)
             if token.hasPrefix("nsapp://") {
                 guard let url = URL(string: token), let id = NodeSeekVoteParser.voteID(in: url) else { throw ParseError.unsupported }
                 result.append(.block(.vote(id)))
@@ -228,7 +255,7 @@ nonisolated struct DetailMarkdownParser: Sendable {
                 let url = token.hasPrefix("http") ? destination(token) : nil
                 result.append(.inline(.text(token, style, url)))
             }
-            offset = NSMaxRange(match.range)
+            offset = NSMaxRange(range)
         }
         if offset < string.length { result.append(.inline(.text(string.substring(from: offset), style, nil))) }
         return result

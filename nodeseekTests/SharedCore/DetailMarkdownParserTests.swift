@@ -186,6 +186,15 @@ struct DetailMarkdownParserTests {
         #expect(detail.comments.first { $0.id == "3" }?.markdown == nil)
     }
 
+    @Test func bareLinksStopWhereTheWebpageLinkifierStops() throws {
+        let site = try #require(URL(string: "https://example.com"))
+        #expect(try parse("官网 https://example.com，欢迎访问") == [.paragraph([.text("官网 ", [], nil), .text("https://example.com", [], site), .text("，欢迎访问", [], nil)])])
+        #expect(try parse("(见 https://example.com).") == [.paragraph([.text("(见 ", [], nil), .text("https://example.com", [], site), .text(").", [], nil)])])
+        #expect(try parse("https://example.com，@bob") == [.paragraph([.text("https://example.com", [], site), .text("，", [], nil),
+                                                                    .text("@bob", [], URL(string: "https://www.nodeseek.com/member?t=bob"))])])
+        #expect(try bareLinkTarget("https://en.wikipedia.org/wiki/A_(B)") == "https://en.wikipedia.org/wiki/A_(B)")
+    }
+
     private func page(payload: String, main: String, reply: String, notice: String = "", title: String = "标题", signature: String = "") throws -> PostDetail {
         let html = """
         <div id="nsk-body-left">\(notice)<div class="post-title"><h1><a class="post-title-link">\(title)</a></h1></div>
