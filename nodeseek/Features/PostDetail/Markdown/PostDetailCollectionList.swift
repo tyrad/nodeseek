@@ -438,8 +438,9 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
 
     private func requestNextPageIfNeeded(at offsetY: CGFloat? = nil) {
         // 跳页、刷新和筛选自动补页期间，旧列表的滚动回调不能抢占下一次请求。
+        // 自动补页只在排队时拦截：请求中已有加载指示器；请求失败后连续计数不会清零，按计数拦会让滚动再也翻不了页。
         guard let page, !page.pendingPageJumpScroll, !page.loadingIndicator.isAnimating,
-              !page.loadMoreCommentsIndicator.isAnimating, page.authorFilterAutoLoadStreak == 0,
+              !page.loadMoreCommentsIndicator.isAnimating, page.authorFilterAutoLoadWorkItem == nil,
               page.displayMode == .content, let next = page.pagination?.nextPage,
               next > page.currentPage, requestedPage != next, queuedRows.isEmpty,
               view.window != nil, view.contentSize.height > 0 else { return }

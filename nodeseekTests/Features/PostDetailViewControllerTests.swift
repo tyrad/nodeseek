@@ -5023,8 +5023,12 @@ final class SpyPostDetailPresenter: PostDetailPresenterProtocol {
     }
 
     var acceptsBatchFetch = true
+    /// 真实 presenter 发起请求时会立即显示底部加载指示器。
+    var onApproachCommentEnd: (() -> Void)?
+
     func didApproachCommentEnd() -> Bool {
         didApproachCommentEndCount += 1
+        onApproachCommentEnd?()
         return acceptsBatchFetch
     }
 

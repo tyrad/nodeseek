@@ -788,6 +788,35 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(spy.didApproachCommentEndCount, 1)
     }
 
+    func testFailedAuthorFilterAutoLoadStillLetsScrollingLoadTheNextPage() async throws {
+        let spy = SpyPostDetailPresenter()
+        let page = PostDetailViewController(presenter: spy, usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let paged = makePagedDetail(1...45, pageNumber: 1, next: 2)
+        var comments = paged.comments
+        let target = Comment(id: "1", anchorID: "1", authorName: "Carol", avatarURL: nil, floorText: "#1", createdAtText: nil,
+                             contentHTML: "短回复", markdown: "短回复", hasVisibleMarkdown: true)
+        comments[0] = target
+        page.render(detail: PostDetail(id: "10", title: "分页", authorName: "Bob", avatarURL: nil, metadataText: nil,
+                                       contentHTML: "主楼", visibleMarkdown: "主楼", comments: comments, page: 1,
+                                       pagination: .init(currentPage: 1, items: [], previousPage: nil, nextPage: 2)))
+        window.layoutIfNeeded()
+        spy.onApproachCommentEnd = { [weak page] in page?.showLoadingMoreComments() }
+        // 只看 TA 后本页匹配太少，自动向后补页；这次请求失败。
+        page.toggleAuthorFilter(.author(of: target), focusingCommentID: nil)
+        for _ in 0..<50 where spy.didApproachCommentEndCount == 0 { try await Task.sleep(nanoseconds: 20_000_000) }
+        XCTAssertEqual(spy.didApproachCommentEndCount, 1)
+        page.hideLoadingMoreComments()
+        let list = try XCTUnwrap(page.collectionList?.view)
+        list.delegate?.scrollViewWillBeginDragging?(list)
+        list.setContentOffset(CGPoint(x: 0, y: max(0, list.contentSize.height - list.bounds.height + list.adjustedContentInset.bottom)), animated: false)
+        list.delegate?.scrollViewDidScroll?(list)
+        list.layoutIfNeeded()
+        try await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertEqual(spy.didApproachCommentEndCount, 2, "失败后用户再拖动，应能重新请求下一页")
+    }
+
     func testDuplicateHotAndPagedReplyKeepSeparateSourcesAndTargetThePagedRow() async throws {
         func reply(_ text: String, hot: Bool) -> Comment {
             Comment(id: "150", anchorID: "21", authorName: "Alice", avatarURL: nil, floorText: "#21", createdAtText: nil,
