@@ -45,6 +45,8 @@ final class DetailAnimatedImageIntegrationTests: XCTestCase {
         XCTAssertTrue(second.isPlaying)
         NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
         XCTAssertFalse(second.isPlaying)
+        // Texture 在即将进入前台时恢复可见范围，模拟完整的系统通知顺序。
+        NotificationCenter.default.post(name: UIApplication.willEnterForegroundNotification, object: nil)
         NotificationCenter.default.post(name: UIApplication.didBecomeActiveNotification, object: nil)
         XCTAssertFalse(first.isPlaying)
         XCTAssertTrue(second.isPlaying)
@@ -304,7 +306,7 @@ private final class DetailWebPIntegrationSampler: NSObject {
 }
 
 @MainActor
-private final class DetailWebPTableFixtureController: UIViewController, ASTableDataSource, ASTableDelegate {
+private final class DetailWebPTableFixtureController: UIViewController, ASTableDataSource {
     let table = ASTableNode(style: .plain)
     private var rows: [ASCellNode] = []
     private(set) var animatedNodes: [ASDisplayNode] = []
@@ -365,7 +367,6 @@ private final class DetailWebPTableFixtureController: UIViewController, ASTableD
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        table.delegate = self
         table.dataSource = self
         view.addSubview(table.view)
     }
