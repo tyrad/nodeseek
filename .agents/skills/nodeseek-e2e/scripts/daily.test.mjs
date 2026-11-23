@@ -638,23 +638,44 @@ daily('textkit-guest-hidden-post', async ({ ui, ids, click, log, start, t }) => 
 
 // 签名改用 TextKit 后链接是无障碍链接元素。站点只给登录用户输出签名，需 member 设备。
 daily('textkit-signature-link', async ctx => {
-  const { fixture, ids, wda, attr, t } = ctx;
-  const { rect, findInMiddle } = textKitHelpers(ctx);
-  // 703863 多数回复带签名，签名里都有站外链接。
+  const { fixture, ids, wda, attr, click, scroll, t } = ctx;
+  const { rect } = textKitHelpers(ctx);
+  // 703863 的签名多为「站内私信 | 我的TG | 个人博客」这类挨着的短链接。
   await fixture(imagePost);
-  const { rect: area } = await findInMiddle('name == "detail-signature"', '屏幕中段没有签名');
-  let link;
-  for (const el of await ids('type == "XCUIElementTypeLink" AND visible == 1')) {
-    const r = await rect(el);
-    if (r.y >= area.y && r.y + r.height <= area.y + area.height + 1) { link = { el, r }; break; }
+  const { height } = await wda('/window/size');
+  // 找一处同一行相邻的两个签名链接，完整在屏幕中段。
+  async function adjacentPair() {
+    const links = [];
+    for (const area of await ids('name == "detail-signature" AND visible == 1')) {
+      const box = await rect(area);
+      if (box.y < height * .15 || box.y + box.height > height * .8) continue;
+      for (const el of await ids('type == "XCUIElementTypeLink" AND visible == 1')) {
+        const r = await rect(el);
+        if (r.y >= box.y && r.y + r.height <= box.y + box.height + 1) links.push({ el, r, label: await attr(el, 'label') });
+      }
+    }
+    links.sort((a, b) => a.r.y - b.r.y || a.r.x - b.r.x);
+    for (let i = 1; i < links.length; i++) {
+      const [a, b] = [links[i - 1], links[i]];
+      if (Math.abs(a.r.y - b.r.y) < 2 && b.r.x - (a.r.x + a.r.width) < 30) return [a, b];
+    }
   }
-  assert.ok(link, '签名里没有可识别的链接');
-  const label = await attr(link.el, 'label');
-  // 用真实触摸点链接文字中心；站外地址打开内置浏览器，站内地址进入对应页面。
-  await wda('/wda/tap', { x: link.r.x + link.r.width / 2, y: link.r.y + link.r.height / 2 });
-  const opened = await waitFor(async () => {
+  let pair;
+  for (let i = 0; i < 10 && !(pair = await adjacentPair()); i++) await scroll(.7, .45);
+  assert.ok(pair, '屏幕中段没有同一行相邻的签名链接');
+  const [a, b] = pair;
+  const left = async () => {
     if ((await ids('label IN {"完成", "Done"} AND type == "XCUIElementTypeButton"')).length) return '内置浏览器';
     if (!(await ids('name == "post-detail-textkit-collection" AND visible == 1')).length) return '新页面';
-  }, '点签名链接「' + label + '」没有反应');
-  t.diagnostic('点签名链接「' + label + '」后打开' + opened);
+  };
+  // 用真实触摸点两个链接之间的分隔符：两者放大后的点击区都覆盖这里，须弹「选择链接」让用户选，与旧版一致。
+  await wda('/wda/tap', { x: (a.r.x + a.r.width + b.r.x) / 2, y: a.r.y + a.r.height / 2 });
+  await waitFor(async () => (await ids('label == "选择链接"')).length, '点「' + a.label + '」和「' + b.label + '」之间没有弹出选择面板');
+  // 面板每行的标题是文本元素；签名里的同名链接是链接元素，不会混淆。
+  const row = async label => (await ids('type == "XCUIElementTypeStaticText" AND label == ' + JSON.stringify(label)))[0];
+  for (const label of [a.label, b.label]) assert.ok(await row(label), '选择面板缺少「' + label + '」');
+  const rows = [a.label, b.label];
+  await click(await row(b.label));
+  const opened = await waitFor(left, '从面板选择「' + b.label + '」后没有打开');
+  t.diagnostic('点「' + a.label + '」与「' + b.label + '」之间弹出选择面板（' + rows.join('；') + '），选「' + b.label + '」后打开' + opened);
 }, textKit);
