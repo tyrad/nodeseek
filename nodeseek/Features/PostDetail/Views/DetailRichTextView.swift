@@ -893,8 +893,11 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
             adjustedBounds.size.width = width
             bounds = adjustedBounds
         }
+        let hadLinkViews = subviews.contains { $0 is DetailLinkOverlayButton }
         layoutFrame = nil
         _ = layoutFrame
+        // 重建排版会移除链接点击层；新版列表在本视图布局之后还会量尺寸，之后不再布局，需当场补回，否则链接点不动。
+        if hadLinkViews { layoutSubviews(in: .infinite) }
         let size = super.intrinsicContentSize
         logDiagnostics(
             "richTextSize width=\(Self.numberString(width)) result=\(Self.string(from: size)) bounds=\(Self.string(from: bounds.size)) attachments=\(attachmentDiagnostics())"

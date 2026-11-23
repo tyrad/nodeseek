@@ -406,7 +406,7 @@ final class DetailCollectionTests: XCTestCase {
                           pagination: .init(currentPage: pageNumber, items: [], previousPage: nil, nextPage: next))
     }
 
-    private func pagingWindow(for page: PostDetailViewController) throws -> UIWindow {
+    private func pagingWindow(for page: UIViewController) throws -> UIWindow {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
         window.rootViewController = page
@@ -547,6 +547,67 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertTrue(reconfigured.contentInstalled)
         XCTAssertFalse(reconfigured.isSettled)
         XCTAssertEqual(reconfigured.bounds.height, height, accuracy: 1)
+    }
+
+    func testSignatureLinksReceiveTaps() async throws {
+        let settings = PostSignatureDisplaySettings.shared
+        let previous = settings.showsSignatures
+        settings.setShowsSignatures(true)
+        defer { settings.setShowsSignatures(previous) }
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        // 取自 703863 的真实签名：一行多个链接，以及单独一个链接。
+        let signature = "<p><a href=\"https://t.me/a\">我的TG</a> | <a href=\"https://example.com/blog\">个人博客</a></p>"
+        let comment = Comment(id: "9", anchorID: "9", authorName: "Alice", avatarURL: nil, floorText: "#9",
+                              createdAtText: nil, contentHTML: "<p>正文</p>", signatureHTML: signature,
+                              markdown: "正文", hasVisibleMarkdown: true)
+        page.render(detail: PostDetail(id: "1", title: "签名", authorName: "Bob", avatarURL: nil,
+                                       metadataText: nil, contentHTML: "主帖", visibleMarkdown: "主帖", comments: [comment]))
+        let list = try XCTUnwrap(page.collectionList?.view)
+        window.layoutIfNeeded()
+        let path = try XCTUnwrap(page.indexPathForCurrentPageAnchor("9"))
+        let cell = try await waitForCell(list, at: path)
+        for _ in 0..<200 where !cell.isSettled { try await Task.sleep(nanoseconds: 10_000_000) }
+        // 首屏遮盖揭开后才是用户能点到的状态。
+        func covered() -> Bool { window.subviewsRecursive.contains { $0.accessibilityIdentifier == "post-detail-reveal-cover" } }
+        for _ in 0..<300 where covered() { try await Task.sleep(nanoseconds: 10_000_000) }
+        XCTAssertFalse(covered())
+        window.layoutIfNeeded()
+        let links = allButtons(cell.contentView).filter { String(describing: type(of: $0)).contains("LinkOverlay") }
+        XCTAssertEqual(links.count, 2, "签名链接没有生成可点区域")
+        for link in links {
+            let center = link.convert(CGPoint(x: link.bounds.midX, y: link.bounds.midY), to: window)
+            let hit = window.hitTest(center, with: nil)
+            XCTAssertTrue(hit === link, "点签名链接命中的是 \(hit.map { String(describing: type(of: $0)) } ?? "nil")")
+        }
+    }
+
+    /// 新版列表在签名排好后还会再量高度；宽度变化重建排版时会移除链接点击层，之后必须能补回来。
+    func testRichTextKeepsLinksTappableAfterWidthChange() throws {
+        let host = UIViewController()
+        let window = try pagingWindow(for: host)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let blocks = DTCoreTextHTMLContentRenderer().renderTextBlocks(
+            fragment: "<p><a href=\"https://t.me/a\">TG</a></p>", baseURL: NodeSeekSite.baseURL, maxImageWidth: 320)
+        guard case .text(let text) = try XCTUnwrap(blocks.first) else { return XCTFail("签名没有渲染成文字") }
+        // 与签名一致：按整楼宽度创建，装进有缩进的栈后实际宽度变窄，触发重新排版。
+        let rich = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 358, height: 1))
+        rich.configure(text, onImageTapped: nil, onLayoutInvalidated: nil)
+        let stack = UIStackView(arrangedSubviews: [rich])
+        stack.axis = .vertical
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        host.view.addSubview(stack)
+        NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: host.view.leadingAnchor, constant: 38),
+                                     stack.topAnchor.constraint(equalTo: host.view.topAnchor, constant: 100),
+                                     stack.widthAnchor.constraint(equalToConstant: 320)])
+        window.layoutIfNeeded()
+        XCTAssertEqual(allButtons(rich).count, 1, "排版后签名链接没有点击层")
+        // 约束更新阶段会再查询固有尺寸，重建排版会移除已生成的点击层。
+        rich.invalidateIntrinsicContentSize()
+        _ = rich.intrinsicContentSize
+        // 真实列表里这次查询发生在本视图布局之后，不会再有布局把点击层补回来。
+        XCTAssertEqual(allButtons(rich).count, 1, "量高度后签名链接的点击层消失")
     }
 
     func testRepeatedPageDeliveryPreservesUniqueRows() throws {
@@ -919,4 +980,8 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertFalse(floors.isEmpty)
         XCTAssertTrue(floors.allSatisfy(\.contentInstalled))
     }
+}
+
+private extension UIView {
+    var subviewsRecursive: [UIView] { subviews + subviews.flatMap(\.subviewsRecursive) }
 }
