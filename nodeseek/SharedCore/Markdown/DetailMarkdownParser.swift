@@ -7,13 +7,34 @@ nonisolated struct DetailMarkdownParser: Sendable {
     typealias Style = DetailDocument.Style
     let baseURL: URL
     var mediaURLs: [URL: URL] = [:]
+    /// 网页 linkify 生成的无协议域名链接，按显示文字索引。
+    private var fuzzyLinks: [String: URL] = [:]
 
     nonisolated private enum ParseError: Error { case unsupported }
 
     func render(_ source: DetailFloorSource) -> DetailDocumentResult {
         guard let markdown = source.visibleMarkdown, !markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              let blocks = try? parseContainers(markdown), !blocks.isEmpty else { return .webpage(html: source.html) }
+              let blocks = try? withFuzzyLinks(from: source.html).parseContainers(markdown), !blocks.isEmpty else { return .webpage(html: source.html) }
         return .native(DetailDocument(blocks: blocks))
+    }
+
+    // 网页 linkify 还会把 ping.nodeseek.com 这类不带协议的域名转成链接，判定依赖顶级域名表。
+    // 直接沿用本楼网页已生成的这些链接，不自行猜测，避免把 README.md 之类误判为链接。
+    private static let fuzzyAnchor = try! NSRegularExpression(pattern: #"<a href="/jump\?to=([^"]+)"[^>]*>([^<&]+)</a>"#)
+
+    private func withFuzzyLinks(from html: String) -> Self {
+        guard html.contains("/jump?to=") else { return self }
+        var parser = self
+        let string = html as NSString
+        for match in Self.fuzzyAnchor.matches(in: html, range: NSRange(location: 0, length: string.length)) {
+            let label = string.substring(with: match.range(at: 2))
+            // 只认显示文字就是去掉协议后的地址的链接；[地址](https://…) 这类自定义文字不算。
+            guard let target = string.substring(with: match.range(at: 1)).removingPercentEncoding,
+                  let scheme = target.range(of: "://"), target[scheme.upperBound...] == label,
+                  let url = destination(target) else { continue }
+            parser.fuzzyLinks[label] = url
+        }
+        return parser
     }
 
     // 仅在独立行识别站点容器。围栏内的冒号（包括与结束符相同的整行）属于代码。
@@ -251,7 +272,7 @@ nonisolated struct DetailMarkdownParser: Sendable {
         // 逐个查找：裸链接截掉的尾部要重新参与匹配，里面可能还有 @ 或表情。
         while let match = Self.token.firstMatch(in: text, range: NSRange(location: offset, length: string.length - offset)) {
             if match.range.location > offset {
-                result.append(.inline(.text(string.substring(with: NSRange(location: offset, length: match.range.location-offset)), style, nil)))
+                result += plain(string.substring(with: NSRange(location: offset, length: match.range.location-offset)), style: style)
             }
             var range = match.range
             if string.substring(with: range).hasPrefix("http") { range.length = Self.linkifiedLength(string.substring(with: range)) }
@@ -270,6 +291,28 @@ nonisolated struct DetailMarkdownParser: Sendable {
                 result.append(.inline(.text(token, style, url)))
             }
             offset = NSMaxRange(range)
+        }
+        if offset < string.length { result += plain(string.substring(from: offset), style: style) }
+        return result
+    }
+
+    /// 普通文字里补上网页已识别的无协议域名链接；前后紧邻字母、数字、点或连字符时不算。
+    private func plain(_ text: String, style: Style) -> [Piece] {
+        guard !fuzzyLinks.isEmpty, !style.contains(.code) else { return [.inline(.text(text, style, nil))] }
+        let labels = fuzzyLinks.keys.sorted { $0.count > $1.count }.map(NSRegularExpression.escapedPattern(for:))
+        guard let pattern = try? NSRegularExpression(pattern: "(?<![A-Za-z0-9.-])(?:" + labels.joined(separator: "|") + ")(?![A-Za-z0-9-])") else {
+            return [.inline(.text(text, style, nil))]
+        }
+        let string = text as NSString
+        var result: [Piece] = []
+        var offset = 0
+        for match in pattern.matches(in: text, range: NSRange(location: 0, length: string.length)) {
+            if match.range.location > offset {
+                result.append(.inline(.text(string.substring(with: NSRange(location: offset, length: match.range.location - offset)), style, nil)))
+            }
+            let label = string.substring(with: match.range)
+            result.append(.inline(.text(label, style, fuzzyLinks[label])))
+            offset = NSMaxRange(match.range)
         }
         if offset < string.length { result.append(.inline(.text(string.substring(from: offset), style, nil))) }
         return result

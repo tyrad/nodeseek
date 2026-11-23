@@ -251,6 +251,18 @@ struct DetailMarkdownParserTests {
         #expect(try bareLinkTarget(target) == target)
     }
 
+    @Test func bareDomainsLinkedByTheWebpageStayLinks() throws {
+        // 取自 832584 #83：网页把不带协议的域名转成了跳转链接。
+        let html = #"<p>可以把 <a href="/jump?to=http%3A%2F%2Fping.nodeseek.com" target="_blank">ping.nodeseek.com</a> 跳转过去，xping.nodeseek.com 不算</p>"#
+        let result = parser.render(.init(html: html, visibleMarkdown: "可以把 ping.nodeseek.com 跳转过去，xping.nodeseek.com 不算"))
+        let url = try #require(URL(string: "http://ping.nodeseek.com"))
+        #expect(result == .native(.init(blocks: [.paragraph([
+            .text("可以把 ", [], nil), .text("ping.nodeseek.com", [], url), .text(" 跳转过去，xping.nodeseek.com 不算", [], nil),
+        ])])))
+        // 网页没有链接的域名保持普通文字。
+        #expect(try parse("README.md") == [.paragraph([.text("README.md", [], nil)])])
+    }
+
     @Test func lineBreaksAroundImagesDoNotBecomeBlankParagraphs() throws {
         // 取自 1075030 主楼：文字与多张图片之间只隔换行，旧版图片紧挨着排列。
         let a = try #require(URL(string: "https://example.com/a.webp")), b = try #require(URL(string: "https://example.com/b.webp"))
