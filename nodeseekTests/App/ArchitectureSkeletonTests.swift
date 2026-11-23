@@ -13,7 +13,9 @@ import UIKit
 struct ArchitectureSkeletonTests {
 
     @Test func appRouterCreatesNodeSeekNavigationRoot() {
-        let root = AppRouter().makeRootViewController()
+        let settings = AppNavigationLayoutSettings(userDefaults: UserDefaults(suiteName: UUID().uuidString)!)
+        settings.setLayout(.reading)
+        let root = AppRouter(layoutSettings: settings).makeRootViewController()
 
         #expect(root is UINavigationController)
         let navigationController = root as? UINavigationController

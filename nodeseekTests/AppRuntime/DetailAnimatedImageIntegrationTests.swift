@@ -304,7 +304,7 @@ private final class DetailWebPIntegrationSampler: NSObject {
 }
 
 @MainActor
-private final class DetailWebPTableFixtureController: UIViewController, ASTableDataSource {
+private final class DetailWebPTableFixtureController: UIViewController, ASTableDataSource, ASTableDelegate {
     let table = ASTableNode(style: .plain)
     private var rows: [ASCellNode] = []
     private(set) var animatedNodes: [ASDisplayNode] = []
@@ -365,6 +365,7 @@ private final class DetailWebPTableFixtureController: UIViewController, ASTableD
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
+        table.delegate = self
         table.dataSource = self
         view.addSubview(table.view)
     }
