@@ -360,6 +360,26 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         XCTAssertEqual(long, short)
     }
 
+    func testNestedListKeepsIndentAndHollowBullet() async throws {
+        let request = DetailFloorRequest(id: "list", version: 1, source: .init(html: "", visibleMarkdown: "- 甲\n  - 乙\n- 丙"),
+            appearance: .init(width: 280, pointSize: 17, scale: 2, dark: false), baseURL: NodeSeekSite.baseURL)
+        var texts: [DetailTextSnapshot] = []
+        await DetailFloorRenderer().start(request) { _, layout in
+            if case .native(let blocks) = layout {
+                texts = blocks.compactMap { if case .text(let text) = $0 { text } else { nil } }
+            }
+        }.value
+        func minX(_ word: String) throws -> CGFloat {
+            let text = try XCTUnwrap(texts.first { $0.string.contains(word) }, word)
+            let offset = (text.string as NSString).range(of: word).location
+            return try XCTUnwrap(text.characters.first { $0.range.location == offset }).rect.minX
+        }
+        // 旧版二级列表缩进一级并用空心圆点，层级不能被拍平。
+        XCTAssertTrue(texts.contains { $0.string.contains("◦ 乙") }, texts.map(\.string).description)
+        XCTAssertGreaterThan(try minX("◦"), try minX("•") + 15)
+        XCTAssertEqual(try minX("丙") - minX("•"), try minX("甲") - minX("•"), accuracy: 0.5)
+    }
+
     func testOnlyLastSelectedTabInstallsText() async throws {
         let long = String(repeating: "第二页很长。", count: 400)
         let markdown = ":::: tabs\n::: tab-item 一\n首页\n:::\n::: tab-item 二\n" + long + "\n:::\n::: tab-item 三\n末页\n:::\n::::"

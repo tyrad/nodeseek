@@ -78,7 +78,7 @@ nonisolated struct DetailFloorRenderer: Sendable {
     }
 
     private func layout(_ blocks: [DetailDocument.Block], appearance: DetailTextAppearance, width: CGFloat,
-                        inQuote: Bool = false, signature: Bool = false) throws -> [DetailLayoutBlock] {
+                        inQuote: Bool = false, signature: Bool = false, listLevel: Int = 0) throws -> [DetailLayoutBlock] {
         var result: [DetailLayoutBlock] = []
         var paragraphs: [DetailTextSegment] = []
         func flush() throws {
@@ -108,17 +108,20 @@ nonisolated struct DetailFloorRenderer: Sendable {
                 try flush()
                 result.append(.quote(try layout(nested, appearance: appearance, width: DetailQuoteLayout.contentWidth(width), inQuote: true)))
             case .list(let start, let items):
+                // 与网页默认列表样式一致：一级实心圆点，二级空心圆点，更深用方块。
+                let level = listLevel + 1
+                let bullet = level == 1 ? "• " : level == 2 ? "◦ " : "▪ "
                 for (index, item) in items.enumerated() {
-                    let prefix = DetailDocument.Inline.text(start.map { "\($0 + index). " } ?? "• ", [], nil)
+                    let prefix = DetailDocument.Inline.text(start.map { "\($0 + index). " } ?? bullet, [], nil)
                     if case .paragraph(let text) = item.first {
-                        paragraphs.append(.init(runs: [prefix] + text, pointSize: appearance.pointSize, isListItem: true, inQuote: inQuote))
+                        paragraphs.append(.init(runs: [prefix] + text, pointSize: appearance.pointSize, isListItem: true, inQuote: inQuote, listLevel: level))
                         if item.count == 1 { continue }
                         try flush()
-                        result += try layout(Array(item.dropFirst()), appearance: appearance, width: width, inQuote: inQuote)
+                        result += try layout(Array(item.dropFirst()), appearance: appearance, width: width, inQuote: inQuote, listLevel: level)
                     } else {
-                        paragraphs.append(.init(runs: [prefix], pointSize: appearance.pointSize, isListItem: true, inQuote: inQuote))
+                        paragraphs.append(.init(runs: [prefix], pointSize: appearance.pointSize, isListItem: true, inQuote: inQuote, listLevel: level))
                         try flush()
-                        result += try layout(item, appearance: appearance, width: width, inQuote: inQuote)
+                        result += try layout(item, appearance: appearance, width: width, inQuote: inQuote, listLevel: level)
                     }
                 }
                 // 旧版列表末项与后文间距和段落相同。

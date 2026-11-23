@@ -79,6 +79,8 @@ nonisolated struct DetailTextSegment: Sendable {
     var isAccentHeading = false
     var endsList = false
     var inQuote = false
+    /// 列表嵌套层级，1 为顶层；每深一层整体右移一个悬挂缩进。
+    var listLevel = 1
     /// 签名沿用旧版样式：统一常规字重、次要文字色和签名链接色，段落紧凑。
     var isSignature = false
 
@@ -154,7 +156,9 @@ nonisolated enum DetailTextTypesetter {
             style.minimumLineHeight = segment.isSignature ? ceil(pointSize * 1.2 + 2) : ceil(pointSize * (segment.isHeading ? 1.28 : 1.42))
             if segment.isListItem {
                 // 旧版列表符号顶格，换行悬挂缩进 22；引用内不缩进。
-                style.headIndent = segment.inQuote ? 0 : 22
+                let nested = CGFloat(max(0, segment.listLevel - 1)) * 22
+                style.firstLineHeadIndent = nested
+                style.headIndent = nested + (segment.inQuote ? 0 : 22)
             }
             storage.addAttribute(.paragraphStyle, value: style, range: NSRange(location: start, length: storage.length - start))
         }
