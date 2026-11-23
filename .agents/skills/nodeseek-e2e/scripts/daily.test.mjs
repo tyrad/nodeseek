@@ -391,9 +391,12 @@ daily('textkit-floor-menu', async ctx => {
   await fixture(textKitPost, 1, undefined, { publicPost: true });
   const { height } = await wda('/window/size');
   // 选一条完整在屏内的回复，按住右上角楼层号附近（不在正文上，避免进入选字）。
+  // 已登录设备会显示签名，主楼变高后首屏可能没有完整的回复，找不到时往下读一点再找。
   async function pressReply() {
-    const reply = await waitFor(async () => (await visibleCells())
-      .find(c => /^\d+-reply-/.test(c.name) && c.y > height * .15 && c.y + c.height < height * .85), '屏内没有完整的回复楼层');
+    const complete = async () => (await visibleCells())
+      .find(c => /^\d+-reply-/.test(c.name) && c.y > height * .15 && c.y + c.height < height * .85);
+    for (let i = 0; i < 6 && !(await complete()); i++) await ctx.scroll(.6, .45);
+    const reply = await waitFor(complete, '屏内没有完整的回复楼层');
     await hold(reply.x + reply.width - 24, reply.y + 22, 1.2);
     return reply;
   }
