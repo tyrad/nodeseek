@@ -210,7 +210,7 @@ struct DetailMarkdownParserTests {
         let pages = try JSONDecoder().decode([Page].self, from: data("detail-replay-pages"))
         let vote = try #require(pages.first { $0.path == "/post-917518-1" }?.items.first)
         #expect(try parse(vote.markdown) == [.vote(3108)])
-        #expect(try parse("> 前\n> nsapp://vote?id=3108\n> 后") == [.quote([.paragraph([.text("前", [], nil), .text("\n", [], nil)]), .vote(3108), .paragraph([.text("\n", [], nil), .text("后", [], nil)])])])
+        #expect(try parse("> 前\n> nsapp://vote?id=3108\n> 后") == [.quote([.paragraph([.text("前", [], nil)]), .vote(3108), .paragraph([.text("后", [], nil)])])])
         let tab = ":::: tabs\n::: tab-item A\nnsapp://vote?id=3108\n\n```\n::::\n```\n:::\n::::"
         #expect(try parse(tab) == [.tabs([.init(title: "A", blocks: [.vote(3108), .code(language: nil, text: "::::\n")])])])
         #expect(try parse("`:xhj003: @a nsapp://vote?id=3`") == [.paragraph([.text(":xhj003: @a nsapp://vote?id=3", .code, nil)])])
@@ -249,6 +249,14 @@ struct DetailMarkdownParserTests {
         #expect(rendered == target)
         #expect(CFURLCreateWithString(nil, rendered as CFString, nil) != nil)
         #expect(try bareLinkTarget(target) == target)
+    }
+
+    @Test func lineBreaksAroundImagesDoNotBecomeBlankParagraphs() throws {
+        // 取自 1075030 主楼：文字与多张图片之间只隔换行，旧版图片紧挨着排列。
+        let a = try #require(URL(string: "https://example.com/a.webp")), b = try #require(URL(string: "https://example.com/b.webp"))
+        #expect(try parse("文字\n![a](https://example.com/a.webp)\n![b](https://example.com/b.webp)\n结尾") == [
+            .paragraph([.text("文字", [], nil)]), .image(alt: "a", url: a), .image(alt: "b", url: b), .paragraph([.text("结尾", [], nil)]),
+        ])
     }
 
     @Test func relativeLinkAndImageKeepExistingEscapes() throws {

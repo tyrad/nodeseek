@@ -119,17 +119,31 @@ nonisolated struct DetailMarkdownParser: Sendable {
     private func inlineBlocks(_ parent: Markup) throws -> [Block] {
         var result: [Block] = []
         var run: [Inline] = []
+        // 图片等块把段落切开后，切口处的换行不再有意义；保留会形成只有换行的空段，图片之间多出一大段空白。
+        func flush() {
+            while case let .text(text, style, link)? = run.first, text.first == "\n" {
+                let rest = String(text.drop { $0 == "\n" })
+                if rest.isEmpty { run.removeFirst() } else { run[0] = .text(rest, style, link) }
+            }
+            while case let .text(text, style, link)? = run.last, text.last == "\n" {
+                var rest = text
+                while rest.last == "\n" { rest.removeLast() }
+                if rest.isEmpty { run.removeLast() } else { run[run.count - 1] = .text(rest, style, link) }
+            }
+            if !run.isEmpty { result.append(.paragraph(run)) }
+            run.removeAll(keepingCapacity: true)
+        }
         for child in try inlineChildren(parent) {
             for piece in try pieces(child) {
                 switch piece {
                 case .inline(let inline): run.append(inline)
                 case .block(let block):
-                    if !run.isEmpty { result.append(.paragraph(run)); run.removeAll(keepingCapacity: true) }
+                    flush()
                     result.append(block)
                 }
             }
         }
-        if !run.isEmpty { result.append(.paragraph(run)) }
+        flush()
         return result
     }
 
