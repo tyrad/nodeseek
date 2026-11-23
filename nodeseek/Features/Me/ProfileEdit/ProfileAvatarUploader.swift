@@ -141,7 +141,7 @@ final class WebViewProfileAvatarUploader: ProfileAvatarUploading {
         const body = await response.text();
         let json = {};
         try { json = JSON.parse(body) || {}; } catch (_) {}
-        const ok = response.status >= 200 && response.status < 300 && json.success !== false;
+        const ok = response.status >= 200 && response.status < 300 && json.success === true;
         finish({ ok, statusCode: response.status, message: json.message || null });
       } catch (error) {
         finish({ ok: false, reason: "network_error", message: String(error && error.message ? error.message : error) });
