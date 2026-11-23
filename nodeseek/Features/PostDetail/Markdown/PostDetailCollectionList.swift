@@ -367,6 +367,12 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         data.apply(snapshot, animatingDifferences: false)
     }
 
+    /// 只重配主楼：点赞、收藏、风险提示只改主楼，整页重配会让回复的签名和网页回退正文清空后再回填。
+    func refreshHeader() {
+        guard let key = keys.first(where: { $0.hasPrefix("post-") }) else { return }
+        refresh(key)
+    }
+
     private func refresh(_ key: String) {
         guard data.indexPath(for: key) != nil else { return }
         var snapshot = data.snapshot()

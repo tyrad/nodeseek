@@ -817,6 +817,29 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(spy.didApproachCommentEndCount, 2, "失败后用户再拖动，应能重新请求下一页")
     }
 
+    func testMainPostReactionOnlyRefreshesTheMainPost() async throws {
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let detail = makePagedDetail(1...5, pageNumber: 1, next: nil)
+        page.render(detail: detail)
+        let list = try XCTUnwrap(page.collectionList?.view)
+        window.layoutIfNeeded()
+        try await Task.sleep(nanoseconds: 300_000_000)
+        func versions() -> [String: Int] {
+            Dictionary(uniqueKeysWithValues: list.visibleCells.compactMap { ($0 as? DetailFloorListCell)?.request }.map { ($0.id, $0.version) })
+        }
+        let before = versions()
+        XCTAssertGreaterThan(before.count, 1)
+        // 主楼点赞、鸡腿、收藏和作者风险提示只改主楼，回复楼层不应清空重装（签名和网页回退正文会闪）。
+        page.updatePostBody(detail: detail)
+        page.updateAuthorRiskWarning(postID: detail.id, isVisible: true)
+        window.layoutIfNeeded()
+        let after = versions()
+        XCTAssertEqual(after.filter { !$0.key.hasPrefix("post-") }, before.filter { !$0.key.hasPrefix("post-") })
+        XCTAssertNotEqual(after.first { $0.key.hasPrefix("post-") }?.value, before.first { $0.key.hasPrefix("post-") }?.value)
+    }
+
     func testDuplicateHotAndPagedReplyKeepSeparateSourcesAndTargetThePagedRow() async throws {
         func reply(_ text: String, hot: Bool) -> Comment {
             Comment(id: "150", anchorID: "21", authorName: "Alice", avatarURL: nil, floorText: "#21", createdAtText: nil,

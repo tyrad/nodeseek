@@ -385,7 +385,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
         let wasVisible = authorRiskWarningPostID == postID
         authorRiskWarningPostID = isVisible ? postID : nil
         guard wasVisible != isVisible, isViewLoaded, displayMode == .content else { return }
-        if let collectionList { collectionList.reload(); return }
+        if let collectionList { collectionList.refreshHeader(); return }
         // 等待 Texture 完成在途的 cell 创建，避免查询结果早于正文节点就绪。
         tableNode.onDidFinishProcessingUpdates { [weak self] in
             guard let self, self.currentHeaderContent?.postID == postID,
@@ -404,7 +404,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
         if let collectionList {
             collectionList.headerSource = .init(post: detail)
             configureHeader(nextContent, renderedContent: nil)
-            collectionList.reload()
+            collectionList.refreshHeader()
             return
         }
         guard let previousContent = currentHeaderContent else {
