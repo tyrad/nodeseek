@@ -46,6 +46,9 @@ private final class DetailAccessibleText: UIAccessibilityElement {
 final class DetailSelectableTextView: UIView, UITextInput, UITextInteractionDelegate, UIGestureRecognizerDelegate {
     let snapshot: DetailTextSnapshot
     private let onLink: (URL) -> Void
+    /// 签名字小、链接常挨在一起：给每个链接至少这么大的点击区，重叠时交给 onLinkCandidates 让用户选。正文为 nil。
+    var linkTargetSize: CGSize?
+    var onLinkCandidates: (([DetailLinkCandidate]) -> Void)?
     private var selection: DetailRange?
     private weak var playbackViewport: UIView?
     private var gifs = [DetailInlineImageView]()
@@ -161,7 +164,7 @@ final class DetailSelectableTextView: UIView, UITextInput, UITextInteractionDele
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        linkHit(at: touch.location(in: self)) != nil
+        hasLink(at: touch.location(in: self))
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
@@ -169,8 +172,66 @@ final class DetailSelectableTextView: UIView, UITextInput, UITextInteractionDele
     }
 
     @objc private func openLink(_ tap: UITapGestureRecognizer) {
-        if let hit = linkHit(at: tap.location(in: self)) { onLink(hit.url) }
+        activateLink(at: tap.location(in: self))
     }
+
+    func hasLink(at point: CGPoint) -> Bool {
+        linkTargetSize == nil ? linkHit(at: point) != nil : !linkCandidates(at: point).isEmpty
+    }
+
+    /// 打开该点的链接；放大点击区命中多个时交给 onLinkCandidates。返回是否命中了链接。
+    @discardableResult
+    func activateLink(at point: CGPoint) -> Bool {
+        guard linkTargetSize != nil else {
+            guard let hit = linkHit(at: point) else { return false }
+            onLink(hit.url)
+            return true
+        }
+        let candidates = linkCandidates(at: point)
+        guard let first = candidates.first else { return false }
+        if candidates.count > 1, let onLinkCandidates {
+            onLinkCandidates(candidates)
+        } else {
+            onLink(first.url)
+        }
+        return true
+    }
+
+    /// 放大点击区包含该点的链接，按行和从左到右排列；同一行连续的同一链接合并为一段。
+    func linkCandidates(at point: CGPoint) -> [DetailLinkCandidate] {
+        guard let size = linkTargetSize, selection?.isEmpty != false else { return [] }
+        var result: [DetailLinkCandidate] = []
+        for segment in linkSegments {
+            let rect = segment.rect
+            var target = rect.insetBy(dx: min(0, (rect.width - size.width) / 2), dy: min(0, (rect.height - size.height) / 2))
+            // 与旧版一致，向上不越过本段文字顶部，免得盖住上方正文的最后一行。
+            let top = min(rect.minY, max(0, target.minY))
+            target = CGRect(x: target.minX, y: top, width: target.width, height: target.maxY - top)
+            guard target.contains(point) else { continue }
+            let candidate = DetailLinkCandidate(title: segment.title, subtitle: segment.url.absoluteString, url: segment.url)
+            if !result.contains(candidate) { result.append(candidate) }
+        }
+        return result
+    }
+
+    private lazy var linkSegments: [(url: URL, rect: CGRect, title: String)] = {
+        var segments: [(url: URL, rect: CGRect, title: String)] = []
+        let boxes = snapshot.characters
+        var start = 0
+        while start < boxes.count {
+            guard let url = boxes[start].link else { start += 1; continue }
+            var end = start + 1
+            var rect = boxes[start].rect
+            while end < boxes.count, boxes[end].link == url, boxes[end].line == boxes[start].line {
+                rect = rect.union(boxes[end].rect)
+                end += 1
+            }
+            let title = snapshot.copyText(in: NSUnionRange(boxes[start].range, boxes[end - 1].range))
+            segments.append((url, rect, title.trimmingCharacters(in: .whitespacesAndNewlines)))
+            start = end
+        }
+        return segments.sorted { abs($0.rect.minY - $1.rect.minY) > 0.5 ? $0.rect.minY < $1.rect.minY : $0.rect.minX < $1.rect.minX }
+    }()
 
     static let linkHitPadding: CGFloat = 12
 
@@ -305,6 +366,7 @@ final class DetailSelectableTextView: UIView, UITextInput, UITextInteractionDele
     }
     func handlesTouch(at point: CGPoint) -> Bool {
         if selection?.isEmpty == false { return true }
+        if linkTargetSize != nil, hasLink(at: point) { return true }
         // 仅用于手势起点。保留字边缘容差，拖选仍由 UITextInput 按最近字符定位。
         let tolerance: CGFloat = 5
         guard let first = snapshot.line(at: point.y - tolerance)?.lowerBound,

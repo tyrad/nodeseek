@@ -334,10 +334,21 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
 
     // 行末和段落边缘可能落在菜单背景上。仅补单击；长按仍由选字或楼层菜单处理。
     @objc private func tapNearBodyLink(_ tap: UITapGestureRecognizer) {
+        openLink(near: tap.location(in: contentView))
+    }
+
+    /// 点在正文、签名文字之外的空白处时，找附近的链接。签名在正文下方，点到签名顶部以下时先按签名的放大点击区找。
+    func openLink(near point: CGPoint) {
+        if let signatureStack, point.y >= signatureStack.convert(signatureStack.bounds, to: contentView).minY {
+            for case let text as DetailSelectableTextView in allSubviews(of: signatureStack)
+            where !text.isHidden && text.activateLink(at: contentView.convert(point, to: text)) {
+                return
+            }
+        }
         let padding = DetailSelectableTextView.linkHitPadding
         var closest: (url: URL, distance: CGFloat)?
         func visit(_ view: UIView) {
-            let point = tap.location(in: view)
+            let point = contentView.convert(point, to: view)
             guard !view.isHidden, view.alpha > 0.01,
                   view.bounds.insetBy(dx: -padding, dy: -padding).contains(point),
                   !view.clipsToBounds || view.bounds.contains(point) else { return }
@@ -351,6 +362,10 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         }
         visit(body)
         if let closest { body.onLink?(closest.url) }
+    }
+
+    private func allSubviews(of view: UIView) -> [UIView] {
+        view.subviews + view.subviews.flatMap(allSubviews)
     }
 
     func flashAnchorHighlight() {
@@ -389,7 +404,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         }
         var container: UIView? = hit
         while let view = container as? UIStackView {
-            if view === body { return menuSurface }
+            if view === body || view === signatureStack { return menuSurface }
             container = view.superview
         }
         return hit
@@ -573,6 +588,8 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
             signature.spacing = 4
             signature.onLink = self.body.onLink
             signature.onSignatureLinks = self.body.onSignatureLinks
+            // 与旧版签名一致：每个链接至少 72×48 的点击区。
+            signature.linkTargetSize = CGSize(width: 72, height: 48)
             signature.onPhotos = self.body.onPhotos
             signature.onStickerSizeChange = self.body.onStickerSizeChange
             signature.imageSize = self.body.imageSize

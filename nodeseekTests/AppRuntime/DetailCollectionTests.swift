@@ -1,3 +1,4 @@
+import SafariServices
 import UIKit
 import XCTest
 @testable import nodeseek
@@ -553,7 +554,8 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(reconfigured.bounds.height, height, accuracy: 1)
     }
 
-    func testSignatureLinksReceiveTaps() async throws {
+    /// 签名字小、链接挨得近：沿用旧版放大点击区，点到几个链接的重叠处时弹出选择面板，只命中一个时直接打开。
+    func testSignatureLinksUseEnlargedTargetsAndAskWhenAmbiguous() async throws {
         let settings = PostSignatureDisplaySettings.shared
         let previous = settings.showsSignatures
         settings.setShowsSignatures(true)
@@ -561,8 +563,9 @@ final class DetailCollectionTests: XCTestCase {
         let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
         let window = try pagingWindow(for: page)
         defer { window.isHidden = true; window.rootViewController = nil }
-        // 仿 703863 的签名：同一行挨着两个链接。
-        let signature = "<p><a href=\"https://t.me/a\">我的TG</a> | <a href=\"https://example.com/blog\">个人博客</a></p>"
+        // 仿 703863 的签名：首行两个挨着的短链接，次行长文字后一个远处的链接。
+        let signature = "<p><a href=\"https://t.me/a\">TG</a> | <a href=\"https://example.com/blog\">博客</a></p>"
+            + "<p>一段比较长的签名说明文字<a href=\"https://example.com/home\">主页</a></p>"
         let comment = Comment(id: "9", anchorID: "9", authorName: "Alice", avatarURL: nil, floorText: "#9",
                               createdAtText: nil, contentHTML: "<p>正文</p>", signatureHTML: signature,
                               markdown: "正文", hasVisibleMarkdown: true)
@@ -578,17 +581,43 @@ final class DetailCollectionTests: XCTestCase {
         for _ in 0..<300 where covered() { try await Task.sleep(nanoseconds: 10_000_000) }
         XCTAssertFalse(covered())
         window.layoutIfNeeded()
-        // 签名改用 TextKit：和正文一样由可选文本视图处理链接，点在链接文字上打开对应地址。
         let signatureView = try XCTUnwrap(allSubviews(cell.contentView).first { $0.accessibilityIdentifier == "detail-signature" })
         let text = try XCTUnwrap(allSubviews(signatureView).compactMap { $0 as? DetailSelectableTextView }.first, "签名没有用 TextKit 渲染")
-        var opened: [URL] = []
-        for url in [URL(string: "https://t.me/a")!, URL(string: "https://example.com/blog")!] {
-            let box = try XCTUnwrap(text.snapshot.characters.first { $0.link == url })
-            let center = CGPoint(x: box.rect.midX, y: box.rect.midY)
-            XCTAssertTrue(window.hitTest(text.convert(center, to: window), with: nil) === text, "点签名链接没有落到签名文字上")
-            if let hit = text.linkHit(at: center) { opened.append(hit.url) }
+        func center(of url: String) throws -> CGPoint {
+            let boxes = text.snapshot.characters.filter { $0.link?.absoluteString == url }
+            let rect = try XCTUnwrap(boxes.map(\.rect).reduce(nil) { $0?.union($1) ?? $1 })
+            return CGPoint(x: rect.midX, y: rect.midY)
         }
-        XCTAssertEqual(opened.map(\.absoluteString), ["https://t.me/a", "https://example.com/blog"])
+        func presentedCandidates() -> [String]? {
+            guard let sheet = page.presentedViewController as? LinkSelectionSheetViewController else { return nil }
+            return sheet.candidates.map(\.url.absoluteString)
+        }
+        func dismiss() async throws {
+            page.presentedViewController?.dismiss(animated: false)
+            for _ in 0..<200 where page.presentedViewController != nil { try await Task.sleep(nanoseconds: 10_000_000) }
+            XCTAssertNil(page.presentedViewController)
+        }
+
+        // 点在「TG」上：放大后的点击区与「博客」重叠，让用户选。
+        let tg = try center(of: "https://t.me/a")
+        XCTAssertTrue(cell.hitTest(text.convert(tg, to: cell), with: nil) === text)
+        XCTAssertTrue(text.activateLink(at: tg))
+        XCTAssertEqual(presentedCandidates(), ["https://t.me/a", "https://example.com/blog"])
+        try await dismiss()
+
+        // 「主页」离首行链接远，只命中它一个：直接打开，不弹选择面板。
+        let home = try center(of: "https://example.com/home")
+        XCTAssertEqual(text.linkCandidates(at: home).map(\.url.absoluteString), ["https://example.com/home"])
+        XCTAssertTrue(text.activateLink(at: home))
+        XCTAssertTrue(page.presentedViewController is SFSafariViewController)
+        try await dismiss()
+
+        // 点在签名文字下方的空白：仍落在「主页」的放大区内，由楼层转交签名处理，不会点空。
+        let below = text.convert(CGPoint(x: home.x, y: text.bounds.maxY + 6), to: cell.contentView)
+        XCTAssertFalse(cell.hitTest(cell.contentView.convert(below, to: cell), with: nil) is UIStackView, "签名下方的空白吞掉了点击")
+        cell.openLink(near: below)
+        XCTAssertTrue(page.presentedViewController is SFSafariViewController, "签名下方的空白没有打开链接")
+        try await dismiss()
     }
 
     /// 新版列表在签名排好后还会再量高度；宽度变化重建排版时会移除链接点击层，之后必须能补回来。

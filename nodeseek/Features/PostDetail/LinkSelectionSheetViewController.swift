@@ -15,7 +15,7 @@ final class LinkSelectionSheetViewController: UITableViewController {
         static let estimatedHeaderHeight: CGFloat = 74
     }
 
-    private let candidates: [DetailLinkCandidate]
+    let candidates: [DetailLinkCandidate]
     private let onSelect: (URL) -> Void
 
     init(

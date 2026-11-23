@@ -7,6 +7,8 @@ final class DetailBlockStack: UIStackView {
     var voteService: NodeSeekVoteServing?
     var onLink: ((URL) -> Void)?
     var onSignatureLinks: (([DetailLinkCandidate]) -> Void)?
+    /// 签名设置：文字里的链接按此放大点击区，重叠时由 onSignatureLinks 让用户选择。
+    var linkTargetSize: CGSize?
     var onPhotos: (([URL], Int) -> Void)?
     var onStickerSizeChange: (() -> Void)?
     var onSizeChange: (() -> Void)?
@@ -44,6 +46,10 @@ final class DetailBlockStack: UIStackView {
             case .text(let snapshot):
                 let text = DetailSelectableTextView(snapshot: snapshot, scale: traitCollection.displayScale,
                     onLink: { [weak self] in self?.onLink?($0) }, stickerSizeChanged: { [weak self] in self?.onStickerSizeChange?() })
+                if let size = linkTargetSize {
+                    text.linkTargetSize = size
+                    text.onLinkCandidates = { [weak self] in self?.onSignatureLinks?($0) }
+                }
                 stack.addArrangedSubview(text.accessibleContainer())
             case .quote(let children):
                 append(children, to: quote(in: stack), width: DetailQuoteLayout.contentWidth(width))
