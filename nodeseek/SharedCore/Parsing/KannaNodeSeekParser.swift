@@ -271,6 +271,11 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             attribute: "src"
         ).flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
         let authorName = firstText(in: item, xpaths: [XPathRules.postAuthor, XPathRules.fallbackAuthor]) ?? ""
+        let authorProfileURL = firstAttribute(
+            in: item,
+            xpaths: [XPathRules.postAuthor, XPathRules.postAvatar + "/ancestor::a[1]"],
+            attribute: "href"
+        ).flatMap(normalizeUserProfileURL)
         let nodeName = firstText(in: item, xpaths: [XPathRules.postNode, XPathRules.fallbackNode])
         let viewNode = item.at_xpath(XPathRules.viewCount)
         let viewText = viewNode?["title"] ?? viewNode?.text ?? ""
@@ -294,7 +299,8 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             isPinned: isPinned,
             isLocked: isLocked,
             requiredReadingLevel: requiredReadingLevel,
-            avatarURL: avatarURL
+            avatarURL: avatarURL,
+            authorProfileURL: authorProfileURL
         )
     }
 

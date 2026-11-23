@@ -794,6 +794,7 @@ struct KannaNodeSeekParserTests {
         let post = try #require(try parser.parsePostList(html: html).first)
 
         #expect(post.authorName.isEmpty)
+        #expect(post.authorProfileURL == nil)
         #expect(post.avatarURL == nil)
     }
 
@@ -834,6 +835,7 @@ struct KannaNodeSeekParserTests {
         #expect(!post.isLocked)
         #expect(post.title.contains("服务器行业黑话大全"))
         #expect(post.authorName == "斯巴达")
+        #expect(post.authorProfileURL?.path == "/space/1769")
         #expect(post.nodeName == "日常")
         #expect(post.replyCount == 2403)
         #expect(post.viewCount == 169842)

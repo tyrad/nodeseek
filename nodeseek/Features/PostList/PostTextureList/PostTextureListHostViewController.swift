@@ -35,6 +35,9 @@ final class PostTextureListHostViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = UIColor.systemBackground
         listView.delegate = self
+        listView.onOpenAuthorPreview = { [weak self] profile in
+            self?.navigationController?.pushViewController(profile, animated: true)
+        }
         listView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(listView)
         NSLayoutConstraint.activate([
