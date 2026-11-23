@@ -23,6 +23,12 @@ struct DetailSignatureDocumentTests {
         ])])
     }
 
+    @Test func leadingRulesAreDroppedLikeTexture() throws {
+        // 取自 1075091 #3 的签名：旧版只画文字下方的分隔线，开头的 <hr> 不显示。
+        let html = "<hr>\n<hr>\n<p>签名</p>\n<hr>\n"
+        #expect(blocks(html) == [.paragraph([.text("签名", [], nil)]), .divider])
+    }
+
     @Test func headingsBreaksAndWhitespaceFollowTheWebpage() throws {
         let html = "<h2><strong><a href=\"https://t.me/vps\">VPS交流群</a></strong>  |\n <a href=\"/space/1\">主页</a></h2><p>第一行<br>  第二行 </p>"
         #expect(blocks(html) == [
