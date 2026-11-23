@@ -310,6 +310,16 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(distance, ceil(pointSize * 1.42), accuracy: 0.5)
     }
 
+    func testInlineCodeUsesSmallerTextureCodeSize() throws {
+        let appearance = DetailTextAppearance(width: 320, pointSize: 17, scale: 2, dark: false)
+        let segment = DetailTextSegment(runs: [.text("甲", [], nil), .text("乙", [.code], nil)], pointSize: 17)
+        let snapshot = try DetailTextTypesetter.layout([segment], appearance: appearance, width: 320)
+        // 旧版样式表行内代码为 13，正文 17（取自 1074978 #3）。
+        let body = try XCTUnwrap(snapshot.characters.first).rect.width
+        let code = try XCTUnwrap(snapshot.characters.last).rect.width
+        XCTAssertEqual(code / body, 13.0 / 17.0, accuracy: 0.05)
+    }
+
     func testBlockSpacingMatchesTextureStyleSheet() throws {
         let appearance = DetailTextAppearance(width: 320, pointSize: 17, scale: 2, dark: false)
         func bottom(of word: String, in snapshot: DetailTextSnapshot) throws -> CGFloat {

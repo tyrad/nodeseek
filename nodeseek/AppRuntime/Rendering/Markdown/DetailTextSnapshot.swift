@@ -128,12 +128,14 @@ nonisolated enum DetailTextTypesetter {
             for run in segment.runs {
                 switch run {
                 case let .text(string, style, url):
-                    var font = style.contains(.code) ? UIFont.monospacedSystemFont(ofSize: pointSize, weight: .regular) : UIFont.systemFont(ofSize: pointSize)
+                    // 旧版样式表行内代码固定比正文小一档（13 对 17），随字号设置同比缩放。
+                    var font = style.contains(.code) ? UIFont.monospacedSystemFont(ofSize: (appearance.pointSize * 13 / 17).rounded(), weight: .regular)
+                        : UIFont.systemFont(ofSize: pointSize)
                     var options = font.fontDescriptor.symbolicTraits
                     if style.contains(.bold) && !segment.isSignature { options.insert(.traitBold) }
                     if style.contains(.italic) && !segment.isSignature { options.insert(.traitItalic) }
                     if let descriptor = font.fontDescriptor.withSymbolicTraits(options) {
-                        font = UIFont(descriptor: descriptor, size: pointSize)
+                        font = UIFont(descriptor: descriptor, size: font.pointSize)
                     }
                     var attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: url == nil ? foreground : runLinkColor]
                     if let url { attrs[linkTarget] = url }
