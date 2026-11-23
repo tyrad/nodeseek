@@ -417,9 +417,33 @@ final class MeViewController: UIViewController {
             onLogFile: { [weak self] in
                 self?.router.navigateToLogFile()
             },
-            onDetailTest: nil
+            onDetailTest: detailTestAction
         )
     }
+
+    // 底部标签布局从「我」进入设置，详情测试也要能用，规则与侧栏入口一致。
+    private var detailTestAction: (@MainActor () -> Void)? {
+        #if DEBUG
+        return { [weak self] in self?.openDetailTestFromPasteboard() }
+        #else
+        return nil
+        #endif
+    }
+
+    #if DEBUG
+    private func openDetailTestFromPasteboard() {
+        guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }
+        let raw = UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string ?? ""
+        guard let target = PostDetailTestTarget(rawValue: raw) else {
+            let message = "剪贴板里没有可打开的 NodeSeek 帖子详情链接，例如 \(NodeSeekSite.postURL(id: "705039", page: 1).absoluteString)"
+            let alert = UIAlertController(title: "错误", message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "确定", style: .default))
+            (navigationController?.topViewController ?? self).present(alert, animated: true)
+            return
+        }
+        router.navigateToPostDetail(post: target.post, page: target.page, initialAnchorID: target.anchorID)
+    }
+    #endif
 
     /// 登录状态变化后刷新首页列表（未登录看不到部分分类内容）。
     private func reloadHomeList() {
