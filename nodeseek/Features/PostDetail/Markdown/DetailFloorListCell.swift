@@ -552,29 +552,45 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         didInstall?()
     }
 
-    func loadSignature(_ html: String, for floor: DetailFloorRequest) {
+    /// 正文与签名的动图都按是否在可视区内播放。
+    func refreshPlayback() {
+        body.refreshPlayback()
+        signatureStack?.refreshPlayback()
+    }
+
+    /// 签名用 TextKit 排版，字号单独给出；结构不支持时退回网页渲染。
+    func loadSignature(_ html: String, pointSize: CGFloat, for floor: DetailFloorRequest) {
+        let appearance = DetailTextAppearance(width: floor.appearance.width, pointSize: pointSize,
+                                              scale: floor.appearance.scale, dark: floor.appearance.dark)
         let request = DetailFloorRequest(id: floor.id, version: floor.version, source: .init(html: html, visibleMarkdown: nil),
-                                         appearance: floor.appearance, baseURL: floor.baseURL)
+                                         appearance: appearance, baseURL: floor.baseURL)
         signatureLoading = true
-        signatureTask = body.renderer.start(request) { [weak self] _, layout in
+        signatureTask = body.renderer.startSignature(request) { [weak self] _, layout in
             guard let self, self.request == floor else { return }
             self.signatureLoading = false
-            guard case .webpage(let blocks) = layout else { self.didInstall?(); return }
             let signature = DetailBlockStack()
             signature.axis = .vertical
             signature.spacing = 4
             signature.onLink = self.body.onLink
             signature.onSignatureLinks = self.body.onSignatureLinks
             signature.onPhotos = self.body.onPhotos
+            signature.onStickerSizeChange = self.body.onStickerSizeChange
             signature.imageSize = self.body.imageSize
             signature.onImageSize = self.body.onImageSize
             signature.onSizeChange = self.body.onSizeChange
             signature.viewport = self.body.viewport
             self.signatureStack = signature
+            signature.accessibilityIdentifier = "detail-signature"
             signature.isLayoutMarginsRelativeArrangement = true
             signature.directionalLayoutMargins = .init(top: 0, leading: self.textIndent, bottom: 0, trailing: 0)
             self.stack.insertArrangedSubview(signature, at: 3)
-            signature.appendLegacy(PostDetailViewController.styledSignatureBlocks(blocks), to: signature, width: floor.appearance.width)
+            switch layout {
+            case .native(let blocks):
+                signature.append(blocks, to: signature, width: floor.appearance.width)
+            case .webpage(let blocks):
+                signature.appendLegacy(PostDetailViewController.styledSignatureBlocks(blocks), to: signature, width: floor.appearance.width)
+            }
+            signature.refreshPlayback()
             self.didInstall?()
         }
     }

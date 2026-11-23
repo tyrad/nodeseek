@@ -274,6 +274,10 @@ final class DetailCollectionTests: XCTestCase {
         (root as? UIButton).map { [$0] } ?? root.subviews.flatMap(allButtons)
     }
 
+    private func allSubviews(_ root: UIView) -> [UIView] {
+        root.subviews + root.subviews.flatMap(allSubviews)
+    }
+
     private func allLabels(_ root: UIView) -> [UILabel] {
         (root as? UILabel).map { [$0] } ?? root.subviews.flatMap(allLabels)
     }
@@ -557,7 +561,7 @@ final class DetailCollectionTests: XCTestCase {
         let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
         let window = try pagingWindow(for: page)
         defer { window.isHidden = true; window.rootViewController = nil }
-        // 取自 703863 的真实签名：一行多个链接，以及单独一个链接。
+        // 仿 703863 的签名：同一行挨着两个链接。
         let signature = "<p><a href=\"https://t.me/a\">我的TG</a> | <a href=\"https://example.com/blog\">个人博客</a></p>"
         let comment = Comment(id: "9", anchorID: "9", authorName: "Alice", avatarURL: nil, floorText: "#9",
                               createdAtText: nil, contentHTML: "<p>正文</p>", signatureHTML: signature,
@@ -574,13 +578,17 @@ final class DetailCollectionTests: XCTestCase {
         for _ in 0..<300 where covered() { try await Task.sleep(nanoseconds: 10_000_000) }
         XCTAssertFalse(covered())
         window.layoutIfNeeded()
-        let links = allButtons(cell.contentView).filter { String(describing: type(of: $0)).contains("LinkOverlay") }
-        XCTAssertEqual(links.count, 2, "签名链接没有生成可点区域")
-        for link in links {
-            let center = link.convert(CGPoint(x: link.bounds.midX, y: link.bounds.midY), to: window)
-            let hit = window.hitTest(center, with: nil)
-            XCTAssertTrue(hit === link, "点签名链接命中的是 \(hit.map { String(describing: type(of: $0)) } ?? "nil")")
+        // 签名改用 TextKit：和正文一样由可选文本视图处理链接，点在链接文字上打开对应地址。
+        let signatureView = try XCTUnwrap(allSubviews(cell.contentView).first { $0.accessibilityIdentifier == "detail-signature" })
+        let text = try XCTUnwrap(allSubviews(signatureView).compactMap { $0 as? DetailSelectableTextView }.first, "签名没有用 TextKit 渲染")
+        var opened: [URL] = []
+        for url in [URL(string: "https://t.me/a")!, URL(string: "https://example.com/blog")!] {
+            let box = try XCTUnwrap(text.snapshot.characters.first { $0.link == url })
+            let center = CGPoint(x: box.rect.midX, y: box.rect.midY)
+            XCTAssertTrue(window.hitTest(text.convert(center, to: window), with: nil) === text, "点签名链接没有落到签名文字上")
+            if let hit = text.linkHit(at: center) { opened.append(hit.url) }
         }
+        XCTAssertEqual(opened.map(\.absoluteString), ["https://t.me/a", "https://example.com/blog"])
     }
 
     /// 新版列表在签名排好后还会再量高度；宽度变化重建排版时会移除链接点击层，之后必须能补回来。

@@ -329,7 +329,8 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             cell.renderTask = cell.body.renderer.start(request, deliver: cell.receiver.install)
         }
         if PostSignatureDisplaySettings.shared.showsSignatures, let signature, !signature.isEmpty {
-            cell.loadSignature(signature, for: request)
+            let font = UIFontMetrics(forTextStyle: .body).scaledFont(for: AppTypography.signatureFont(), compatibleWith: list.traitCollection)
+            cell.loadSignature(signature, pointSize: font.pointSize, for: request)
         }
         return cell
     }
@@ -409,7 +410,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     }
 
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
-        (cell as? DetailFloorListCell)?.body.refreshPlayback()
+        (cell as? DetailFloorListCell)?.refreshPlayback()
         showPendingHighlight(on: cell)
         if indexPath.item == 0 { scheduleBatchFetchCheck() }
     }
@@ -442,7 +443,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     }
 
     func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
-        (cell as? DetailFloorListCell)?.body.refreshPlayback()
+        (cell as? DetailFloorListCell)?.refreshPlayback()
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
@@ -452,7 +453,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         if scrollView.contentOffset.y > lastOffsetY { scheduleBatchFetchCheck() }
         lastOffsetY = scrollView.contentOffset.y
         page?.scrollViewDidScroll(scrollView)
-        for case let floor as DetailFloorListCell in view.visibleCells { floor.body.refreshPlayback() }
+        for case let floor as DetailFloorListCell in view.visibleCells { floor.refreshPlayback() }
     }
     func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint,
                                    targetContentOffset: UnsafeMutablePointer<CGPoint>) {

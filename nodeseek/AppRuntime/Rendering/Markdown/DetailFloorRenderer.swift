@@ -47,6 +47,26 @@ nonisolated struct DetailFloorRenderer: Sendable {
         }
     }
 
+    /// 签名只有 HTML：能转成原生块就用 TextKit 排版（appearance.pointSize 为签名字号），否则退回网页渲染。
+    @MainActor
+    func startSignature(_ request: DetailFloorRequest, deliver: @escaping Delivery) -> Task<Void, Never> {
+        Task.detached(priority: .userInitiated) {
+            onStep?(.parse, request)
+            let blocks = DetailSignatureDocument.blocks(html: request.source.html, baseURL: request.baseURL)
+            guard !Task.isCancelled else { return }
+            onStep?(.layout, request)
+            let result: DetailFloorLayout
+            if let blocks, let laid = try? layout(blocks, appearance: request.appearance, width: request.appearance.width, signature: true) {
+                result = .native(laid)
+            } else {
+                result = .webpage(DTCoreTextHTMLContentRenderer().render(fragment: request.source.html, baseURL: request.baseURL,
+                                                                          maxImageWidth: request.appearance.width))
+            }
+            guard !Task.isCancelled else { return }
+            await deliver(request, result)
+        }
+    }
+
     @MainActor
     func startTab(_ section: DetailDocument.Tab, appearance: DetailTextAppearance, width: CGFloat,
                   deliver: @escaping @MainActor @Sendable ([DetailLayoutBlock]) -> Void) -> Task<Void, Never> {
@@ -58,7 +78,7 @@ nonisolated struct DetailFloorRenderer: Sendable {
     }
 
     private func layout(_ blocks: [DetailDocument.Block], appearance: DetailTextAppearance, width: CGFloat,
-                        inQuote: Bool = false) throws -> [DetailLayoutBlock] {
+                        inQuote: Bool = false, signature: Bool = false) throws -> [DetailLayoutBlock] {
         var result: [DetailLayoutBlock] = []
         var paragraphs: [DetailTextSegment] = []
         func flush() throws {
@@ -71,7 +91,7 @@ nonisolated struct DetailFloorRenderer: Sendable {
             try Task.checkCancellation()
             switch block {
             case .paragraph(let runs):
-                paragraphs.append(.init(runs: runs, pointSize: appearance.pointSize))
+                paragraphs.append(.init(runs: runs, pointSize: appearance.pointSize, isSignature: signature))
                 // 网页保留报告链接，详情页另在链接下展示可预览的报告图。
                 if runs.count == 1, case let .text(label, _, url?) = runs[0],
                    label == url.absoluteString, DetailImageURLRules.isCheckPlaceReportSVG(url) {
