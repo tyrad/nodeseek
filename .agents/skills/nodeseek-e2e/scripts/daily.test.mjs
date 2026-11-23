@@ -632,3 +632,26 @@ daily('textkit-guest-hidden-post', async ({ ui, ids, click, log, start, t }) => 
   assert.equal((await ids('label == "帖子不存在"')).length, 0, '仍显示帖子不存在');
   t.diagnostic('游客打开 ' + guestHiddenPost + ' 显示登录入口');
 }, textKit);
+
+// 签名改用 TextKit 后链接是无障碍链接元素。站点只给登录用户输出签名，需 member 设备。
+daily('textkit-signature-link', async ctx => {
+  const { fixture, ids, wda, attr, t } = ctx;
+  const { rect, findInMiddle } = textKitHelpers(ctx);
+  // 703863 多数回复带签名，签名里都有站外链接。
+  await fixture(imagePost);
+  const { rect: area } = await findInMiddle('name == "detail-signature"', '屏幕中段没有签名');
+  let link;
+  for (const el of await ids('type == "XCUIElementTypeLink" AND visible == 1')) {
+    const r = await rect(el);
+    if (r.y >= area.y && r.y + r.height <= area.y + area.height + 1) { link = { el, r }; break; }
+  }
+  assert.ok(link, '签名里没有可识别的链接');
+  const label = await attr(link.el, 'label');
+  // 用真实触摸点链接文字中心；站外地址打开内置浏览器，站内地址进入对应页面。
+  await wda('/wda/tap', { x: link.r.x + link.r.width / 2, y: link.r.y + link.r.height / 2 });
+  const opened = await waitFor(async () => {
+    if ((await ids('label IN {"完成", "Done"} AND type == "XCUIElementTypeButton"')).length) return '内置浏览器';
+    if (!(await ids('name == "post-detail-textkit-collection" AND visible == 1')).length) return '新页面';
+  }, '点签名链接「' + label + '」没有反应');
+  t.diagnostic('点签名链接「' + label + '」后打开' + opened);
+}, textKit);

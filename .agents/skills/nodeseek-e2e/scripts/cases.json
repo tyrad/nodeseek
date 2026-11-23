@@ -239,5 +239,12 @@
       "daily"
     ],
     "setup": "阅读模式，未登录设备（SIMULATOR_ID 指向游客设备），帖子 1062816；临时启用 TextKit，只读"
+  },
+  "textkit-signature-link": {
+    "title": "新版详情页点签名里的链接能打开",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，已登录设备（站点只给登录用户输出签名），帖子 703863；临时启用 TextKit，只读，会打开签名里的链接"
   }
 }
