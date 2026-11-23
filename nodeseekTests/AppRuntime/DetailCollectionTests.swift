@@ -1017,6 +1017,40 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertFalse(floors.isEmpty)
         XCTAssertTrue(floors.allSatisfy(\.contentInstalled))
     }
+
+    func testAppSwitcherSnapshotAppearanceFlipDoesNotRebuildFloors() async throws {
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let window = try pagingWindow(for: page)
+        defer { window.isHidden = true; window.rootViewController = nil }
+        page.render(detail: makePagedDetail(1...5, pageNumber: 1, next: nil))
+        let collection = try XCTUnwrap(page.collectionList)
+        window.layoutIfNeeded()
+        try await Task.sleep(nanoseconds: 300_000_000)
+        func versions() -> [Int] {
+            collection.view.visibleCells.compactMap { ($0 as? DetailFloorListCell)?.request?.version }.sorted()
+        }
+        let installed = versions()
+        XCTAssertFalse(installed.isEmpty)
+        // 切后台时系统为任务切换器拍浅色和深色快照，外观会来回切一次，回到前台时已复原。
+        var inBackground = true
+        collection.isAppInBackground = { inBackground }
+        for style in [UIUserInterfaceStyle.dark, .unspecified] {
+            window.overrideUserInterfaceStyle = style
+            window.layoutIfNeeded()
+            collection.updateAppearance()
+            window.layoutIfNeeded()
+        }
+        inBackground = false
+        collection.updateAppearance()
+        window.layoutIfNeeded()
+        XCTAssertEqual(versions(), installed)
+        // 前台真正切换外观仍要重排文字颜色。
+        window.overrideUserInterfaceStyle = .dark
+        window.layoutIfNeeded()
+        collection.updateAppearance()
+        window.layoutIfNeeded()
+        XCTAssertNotEqual(versions(), installed)
+    }
 }
 
 private extension UIView {

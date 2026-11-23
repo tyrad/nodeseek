@@ -75,6 +75,9 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             }
             return footer
         }
+        // 后台期间外观若真的变了，回到前台再补一次重排。
+        NotificationCenter.default.addObserver(self, selector: #selector(appWillEnterForeground),
+                                               name: UIApplication.willEnterForegroundNotification, object: nil)
         cache.totalCostLimit = 24 * 1024 * 1024
         cache.countLimit = 80
     }
@@ -85,10 +88,17 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
                      pointSize: font.pointSize, scale: view.traitCollection.displayScale, dark: view.traitCollection.userInterfaceStyle == .dark)
     }
 
+    /// 切后台时系统为任务切换器拍浅色和深色快照，外观会来回切一次；此时整页重建会清空高度、回前台后列表跳动。
+    var isAppInBackground: () -> Bool = { UIApplication.shared.applicationState == .background }
+
     func updateAppearance() {
-        guard view.bounds.width > 0, previousAppearance != appearance else { return }
+        guard view.bounds.width > 0, !isAppInBackground(), previousAppearance != appearance else { return }
         previousAppearance = appearance
         invalidate()
+    }
+
+    @objc private func appWillEnterForeground() {
+        DispatchQueue.main.async { [weak self] in self?.updateAppearance() }
     }
 
     func invalidate() {
