@@ -24,7 +24,7 @@ nonisolated enum DetailSignatureDocument {
             return nil
         }
         builder.flush()
-        // 旧版签名开头的分隔线不显示，只保留内容之后的；否则与正文之间会多出一道线。
+        // 签名开头的分隔线不显示，只保留内容之后的；否则与正文之间会多出一道线。
         let blocks = Array(builder.blocks.drop { $0 == .divider })
         return blocks.isEmpty ? nil : blocks
     }

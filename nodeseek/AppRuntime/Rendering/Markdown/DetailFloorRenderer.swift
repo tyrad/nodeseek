@@ -124,7 +124,7 @@ nonisolated struct DetailFloorRenderer: Sendable {
                         result += try layout(item, appearance: appearance, width: width, inQuote: inQuote, listLevel: level)
                     }
                 }
-                // 旧版列表末项与后文间距和段落相同。
+                // 列表末项与后文的间距和段落相同。
                 if let last = paragraphs.indices.last, paragraphs[last].isListItem { paragraphs[last].endsList = true }
             case .tabs(let tabs):
                 try flush()

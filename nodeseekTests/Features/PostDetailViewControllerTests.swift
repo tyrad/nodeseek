@@ -237,7 +237,6 @@ struct PostDetailViewControllerTests {
         let header = PostDetailHeaderContent(detail: detail)
         let updates = [
             header.updatingFavoriteSubmitting(true),
-            header.updatingFavoriteReaction(count: 1, isCollected: true),
             header.updatingLikeReaction(count: 1, isClicked: true),
             header.updatingChickenLegReaction(count: 1, isClicked: true),
             header.updatingOpposeReaction(count: 1, isClicked: true)
