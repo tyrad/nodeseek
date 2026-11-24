@@ -126,6 +126,8 @@ make e2e-case CASE=push-cold
 | `deeplink-search-tabs` | 多 Tab 分别配置有、无搜索标签，连点相同链接后核对关键词和用户范围，切回或返回一次即见首页 |
 | `deeplink-user-compose` | 进入用户主页，打开带换行及特殊字符的预填帖，再次打开链接仍保留编辑内容；退出时保留原草稿 |
 
+验证分享菜单时，在「快捷指令」导入[三份模板](../../../docs/features/deep-link/README.md)。从 Safari 分享示例帖子，核对原生帖号 893437 和第一页；从支持分享文字的 App 选中 `Swift & iOS`，核对搜索框完整保留 `&`；分享同一段文字给发帖模板，输入标题，核对标题与正文后关闭，保留已有草稿。系统首次询问是否允许传给 NS Connect 时，点「允许一次」。
+
 域名匹配、地址规范化、非 HTTP(S) 协议和畸形帖子路径由 `make spm-test` 中的 `AppDeepLinkTests` 覆盖。
 
 ## TextKit 详情页分页
