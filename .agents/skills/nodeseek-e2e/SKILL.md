@@ -111,7 +111,7 @@ make e2e-case CASE=push-cold
 
 [系统推送脚本](scripts/push.test.mjs) 使用 `xcrun simctl push` 投递含唯一标题的回复通知，由本机 `axe` 点按 SpringBoard 上实际显示的通知。后台用例连续投递两条到同一楼层的新通知；冷启动用例先退出 App 进程。每次只点一次，核对帖子 1016685 的第 18 楼和正文标记，再只点一次返回，必须看见首页。报告目录中的 `*-notification.png`、`*-detail.png`、`*-returned.png` 分别记录这三步。若返回后仍显示同一楼，检查 SceneDelegate 和通知中心代理是否处理了同一次系统响应。模拟投递覆盖设备端展示、点按和 App 路由；生产 APNs 服务的投递需另行验证。
 
-[常用功能脚本](scripts/daily.test.mjs) 中，`home-paging` 核对首页刷新、排序和第二页加载；`quote-cancel` 在固定评论取消引用并逐字读回自己的输入；`photo-return` 用帖子 703863 的配图验证大图返回；`last-page-filter` 检查只看楼主、恢复全部和末页导航；`inbox-reply` 从通知记录取得帖子及楼层，重开核对已读；`favorite-sync` 临时收藏帖子 1016685，从「我的收藏」重开并恢复初始状态。有站内通知时优先使用未读样本；全部已读时单独注明。无通知或固定帖已被用户收藏时，报告中的跳过项不计入通过数。
+[常用功能脚本](scripts/daily.test.mjs) 中，`home-paging` 核对首页刷新、排序和第二页加载；`quote-cancel` 在固定评论取消引用并逐字读回自己的输入；`photo-return` 用帖子 703863 的配图验证长按出现分享和保存选项，收起菜单后可返回原帖；`last-page-filter` 检查只看楼主、恢复全部和末页导航；`inbox-reply` 从通知记录取得帖子及楼层，重开核对已读；`favorite-sync` 临时收藏帖子 1016685，从「我的收藏」重开并恢复初始状态。有站内通知时优先使用未读样本；全部已读时单独注明。无通知或固定帖已被用户收藏时，报告中的跳过项不计入通过数。
 
 ## 后续发布回归功能点
 

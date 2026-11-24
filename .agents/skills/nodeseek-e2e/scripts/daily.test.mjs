@@ -106,11 +106,19 @@ daily('quote-cancel', async ({ ui, agent, fixture, start }) => {
   await start();
 });
 
-daily('photo-return', async ({ agent, ui, fixture }) => {
+daily('photo-return', async ({ agent, ui, wda, fixture }) => {
   await fixture(imagePost);
   await agent.aiAct('在楼主正文里找到第一张内嵌配图，点它进入全屏预览。需要时轻微滚动。跳过头像、表情和外部链接。');
   await ui.get('detail-photo-action-button');
   await agent.aiAssert('大图预览已显示实际图片内容，图片已结束加载。');
+  const { width, height } = await wda('/window/size');
+  await wda('/wda/touchAndHold', { x: width / 2, y: height / 2, duration: 0.85 });
+  await ui.get('分享图片');
+  await ui.get('保存到相册');
+  simctl('io', device, 'screenshot', join(out, 'photo-return-menu.png'));
+  await agent.aiAct('只收起图片操作菜单，留在大图预览。若没有取消按钮，点菜单外的空白处。');
+  await waitFor(async () => !(await ui.find('保存到相册')), '图片操作菜单没有关闭');
+  await ui.get('detail-photo-action-button');
   await agent.aiAct('关闭这张大图预览，回到原帖。');
   assert.ok(!await ui.find('detail-photo-action-button'));
   await agent.aiAssert('已回到帖子正文，刚才打开的正文配图仍在当前可见位置。');

@@ -39,6 +39,7 @@ final class DetailPhotoBrowserPresenter: NSObject, JXPhotoBrowserDelegate {
         }
 
         let browser = DetailPhotoBrowserController()
+        browser.register(DetailPhotoCell.self, forReuseIdentifier: DetailPhotoCell.identifier)
         browser.delegate = self
         browser.initialIndex = min(max(initialIndex, 0), imageURLs.count - 1)
         // 源图还在屏幕上就从它缩放进出；不在屏幕上或开启减少动态效果时直接淡入淡出。
@@ -71,10 +72,16 @@ final class DetailPhotoBrowserPresenter: NSObject, JXPhotoBrowserDelegate {
         cellForItemAt index: Int,
         at indexPath: IndexPath
     ) -> JXPhotoBrowserAnyCell {
-        browser.dequeueReusableCell(
-            withReuseIdentifier: JXZoomImageCell.reuseIdentifier,
+        let cell = browser.dequeueReusableCell(
+            withReuseIdentifier: DetailPhotoCell.identifier,
             for: indexPath
-        ) as! JXZoomImageCell
+        ) as! DetailPhotoCell
+        cell.onLongPress = { [weak self, weak browser] sourceView, point in
+            guard let browser else { return }
+            let anchor = CGRect(origin: point, size: CGSize(width: 1, height: 1))
+            self?.presentActionMenu(from: browser, sourceView: sourceView, sourceRect: anchor)
+        }
+        return cell
     }
 
     func photoBrowser(_ browser: JXPhotoBrowserViewController, willDisplay cell: JXPhotoBrowserAnyCell, at index: Int) {
@@ -151,16 +158,22 @@ final class DetailPhotoBrowserPresenter: NSObject, JXPhotoBrowserDelegate {
         hiddenThumbnail = nil
     }
 
-    private func presentActionMenu(from browser: JXPhotoBrowserViewController, sourceView: UIView) {
+    private func presentActionMenu(
+        from browser: JXPhotoBrowserViewController,
+        sourceView: UIView,
+        sourceRect: CGRect? = nil
+    ) {
+        guard browser.presentedViewController == nil else { return }
         guard imageURLs.indices.contains(browser.pageIndex) else {
             showMessage("当前图片无效", in: browser)
             return
         }
 
+        let anchor = sourceRect ?? sourceView.bounds
         let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
         alert.addAction(UIAlertAction(title: "分享图片", style: .default) { [weak self, weak browser, weak sourceView] _ in
             guard let self, let browser, let sourceView else { return }
-            self.shareCurrentImage(from: browser, sourceView: sourceView)
+            self.shareCurrentImage(from: browser, sourceView: sourceView, sourceRect: anchor)
         })
         alert.addAction(UIAlertAction(title: "保存到相册", style: .default) { [weak self, weak browser] _ in
             guard let self, let browser else { return }
@@ -168,11 +181,11 @@ final class DetailPhotoBrowserPresenter: NSObject, JXPhotoBrowserDelegate {
         })
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         alert.popoverPresentationController?.sourceView = sourceView
-        alert.popoverPresentationController?.sourceRect = sourceView.bounds
+        alert.popoverPresentationController?.sourceRect = anchor
         browser.present(alert, animated: true)
     }
 
-    private func shareCurrentImage(from browser: JXPhotoBrowserViewController, sourceView: UIView) {
+    private func shareCurrentImage(from browser: JXPhotoBrowserViewController, sourceView: UIView, sourceRect: CGRect) {
         guard imageURLs.indices.contains(browser.pageIndex) else {
             showMessage("当前图片无效", in: browser)
             return
@@ -188,7 +201,7 @@ final class DetailPhotoBrowserPresenter: NSObject, JXPhotoBrowserDelegate {
                         let fileURL = try Self.writeTemporaryShareFile(payload: payload, index: browser.pageIndex)
                         let activity = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
                         activity.popoverPresentationController?.sourceView = sourceView
-                        activity.popoverPresentationController?.sourceRect = sourceView.bounds
+                        activity.popoverPresentationController?.sourceRect = sourceRect
                         browser.present(activity, animated: true)
                     } catch {
                         self.showMessage("分享失败", in: browser)
@@ -257,5 +270,27 @@ final class DetailPhotoBrowserPresenter: NSObject, JXPhotoBrowserDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak alert] in
             alert?.dismiss(animated: true)
         }
+    }
+}
+
+private final class DetailPhotoCell: JXZoomImageCell {
+    static let identifier = "DetailPhotoCell"
+    var onLongPress: ((UIView, CGPoint) -> Void)?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(imagePressed(_:)))
+        imageView.isUserInteractionEnabled = true
+        imageView.addGestureRecognizer(longPress)
+        singleTapGesture.require(toFail: longPress)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    @objc private func imagePressed(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        onLongPress?(imageView, gesture.location(in: imageView))
     }
 }
