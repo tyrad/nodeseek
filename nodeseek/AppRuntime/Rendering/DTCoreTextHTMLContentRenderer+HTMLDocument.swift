@@ -7,7 +7,7 @@
 
 import Foundation
 
-extension DTCoreTextHTMLContentRenderer {
+nonisolated extension DTCoreTextHTMLContentRenderer {
     func wrapHTML(fragment: String, baseURL: URL) -> String {
         let bodySize = cssPixelSize(basePointSize: 17)
         let h1Size = cssPixelSize(basePointSize: 24)

@@ -10,7 +10,7 @@ import Foundation
 import Kanna
 import UIKit
 
-extension DTCoreTextHTMLContentRenderer {
+nonisolated extension DTCoreTextHTMLContentRenderer {
     func logDiagnostics(_ message: String) {
         guard NodeSeekDebugConfig.enableDetailRenderDiagnostics else { return }
         AppLog.info(.rendering, message)

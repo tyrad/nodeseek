@@ -27,6 +27,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     private func connectWindow(to windowScene: UIWindowScene, options connectionOptions: UIScene.ConnectionOptions) {
         let window = UIWindow(windowScene: windowScene)
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-DetailTextKitPrototype") {
+            window.rootViewController = UINavigationController(rootViewController: DetailMarkdownPrototypeController.demo())
+            self.window = window
+            window.makeKeyAndVisible()
+            return
+        }
+        #endif
         appRouter.window = window
         let launchedFromPush = connectionOptions.notificationResponse != nil || !connectionOptions.urlContexts.isEmpty
         window.rootViewController = appRouter.makeRootViewController()

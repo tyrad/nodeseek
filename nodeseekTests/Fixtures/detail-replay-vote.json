@@ -1,0 +1,39 @@
+{
+  "path": "/post-917518-1",
+  "commentID": "12452832",
+  "reference": "nsapp://vote?id=3108",
+  "success": true,
+  "vote": {
+    "id": 3108,
+    "isPublic": true,
+    "items": [
+      {
+        "count": 23,
+        "text": "plus",
+        "vote_item_id": 14131,
+        "voted": false
+      },
+      {
+        "count": 7,
+        "text": "pro",
+        "vote_item_id": 14132,
+        "voted": true
+      },
+      {
+        "count": 0,
+        "text": "free",
+        "vote_item_id": 14133,
+        "voted": false
+      },
+      {
+        "count": 3,
+        "text": "中转",
+        "vote_item_id": 14134,
+        "voted": false
+      }
+    ],
+    "locked": false,
+    "multiple": false,
+    "title": "大家订阅codex的哪种套餐"
+  }
+}

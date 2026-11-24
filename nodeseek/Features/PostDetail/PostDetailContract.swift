@@ -47,7 +47,7 @@ protocol PostDetailPresenterProtocol: AnyObject {
     /// 页码面板选中某页：清空已加载评论，从该页重新加载。
     func didSelectCommentPage(_ page: Int)
     func didTapLogin()
-    func didApproachCommentEnd()
+    @discardableResult func didApproachCommentEnd() -> Bool
     func didTapRefreshCommentsAtEnd()
     func didTapSendReply(content: String)
     func didTapFavorite()

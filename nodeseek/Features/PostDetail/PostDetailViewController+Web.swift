@@ -5,7 +5,6 @@
 //  Created by Codex on 2026/4/30.
 //
 
-import AsyncDisplayKit
 import SafariServices
 import UIKit
 
@@ -133,8 +132,7 @@ extension PostDetailViewController {
     func handleLoadedCommentAnchorIfNeeded(for url: URL) -> Bool {
         guard let anchorID = currentPostCommentAnchorID(from: url),
               anchorID != "0",
-              let comment = loadedComment(matchingAnchorID: anchorID),
-              let indexPath = indexPathForLoadedComment(comment) else {
+              let (comment, indexPath) = loadedCommentLocation(matching: anchorID) else {
             return false
         }
 
@@ -167,26 +165,23 @@ extension PostDetailViewController {
         return route.anchorID
     }
 
-    private func loadedComment(matchingAnchorID anchorID: String) -> Comment? {
-        let normalizedTarget = normalizedAnchorText(anchorID)
-        guard normalizedTarget.isEmpty == false else { return nil }
-        return comments.first { comment in
-            normalizedAnchorText(comment.anchorID) == normalizedTarget
-                || normalizedAnchorText(comment.floorText) == normalizedTarget
+    private func loadedCommentLocation(matching anchorID: String) -> (Comment, IndexPath)? {
+        let target = normalizedAnchorText(anchorID)
+        guard !target.isEmpty else { return nil }
+        var match: (Comment, IndexPath)?
+        for (row, detailRow) in detailRows.enumerated() {
+            guard case .comment(let index) = detailRow else { continue }
+            let comment = comments[index]
+            guard normalizedAnchorText(comment.anchorID) == target || normalizedAnchorText(comment.floorText) == target else { continue }
+            let location = (comment, IndexPath(row: row, section: 0))
+            // 首页置顶副本也可能没有热评标记。续页后的同楼普通回复才处在连续的阅读位置。
+            if !comment.isHot {
+                match = location
+            } else if match == nil {
+                match = location
+            }
         }
-    }
-
-    private func indexPathForLoadedComment(_ comment: Comment) -> IndexPath? {
-        guard let commentIndex = comments.firstIndex(where: { $0.id == comment.id }),
-              let row = detailRows.firstIndex(where: {
-                  if case .comment(let index) = $0 {
-                      return index == commentIndex
-                  }
-                  return false
-              }) else {
-            return nil
-        }
-        return IndexPath(row: row, section: 0)
+        return match
     }
 
     private func isLoadedCommentVisible(anchorID: String, indexPath: IndexPath) -> Bool {
@@ -195,7 +190,7 @@ extension PostDetailViewController {
             return testVisibleAnchorIDs.contains(normalizedAnchorText(anchorID))
         }
         #endif
-        return tableNode.indexPathsForVisibleRows().contains(indexPath)
+        return collectionList.view.indexPathsForVisibleItems.contains(indexPath)
     }
 
     private func presentLoadedCommentPreview(comment: Comment, anchorID: String) {
@@ -207,7 +202,7 @@ extension PostDetailViewController {
         testPresentedPreviewUsesBottomSheet = true
         testPresentedPreviewShowsFullPostButton = wasOpenedFromInitialAnchor
         #endif
-        let renderedContent = commentRenderedCache[comment.id] ?? Self.makeRenderedContent(
+        let renderedContent = Self.makeRenderedContent(
             html: comment.contentHTML,
             signatureHTML: comment.signatureHTML,
             baseURL: baseURL,
@@ -335,30 +330,12 @@ extension PostDetailViewController {
         testHighlightedAnchorID = normalizedAnchorText(anchorID)
         testPresentedLoadedCommentID = nil
         #endif
-        tableNode.scrollToRow(at: indexPath, at: .middle, animated: true)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
-            guard let self else { return }
-            switch self.tableNode.nodeForRow(at: indexPath) {
-            case let node as PostBodyCellNode:
-                node.flashAnchorHighlight()
-            case let node as CommentCellNode:
-                node.flashAnchorHighlight()
-            default:
-                break
-            }
-        }
+        collectionList.scrollToAnchor(at: indexPath.row)
     }
 
     func indexPathForCurrentPageAnchor(_ anchorID: String) -> IndexPath? {
-        if let commentIndex = comments.firstIndex(where: { comment in
-            comment.anchorID == anchorID || comment.floorText == "#\(anchorID)"
-        }), let row = detailRows.firstIndex(where: {
-            if case .comment(let index) = $0 {
-                return index == commentIndex
-            }
-            return false
-        }) {
-            return IndexPath(row: row, section: 0)
+        if let (_, path) = loadedCommentLocation(matching: anchorID) {
+            return path
         }
 
         guard anchorID == "0", currentHeaderContent != nil,

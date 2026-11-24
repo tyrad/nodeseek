@@ -607,6 +607,40 @@ struct NodeSeekServiceTests {
         }
     }
 
+    @Test func guestNotFoundPageAsksToLoginButMemberSeesMissingPost() async throws {
+        let guestHTML = try FixtureLoader.html(named: "post-404-guest")
+        let finalURL = URL(string: "https://www.nodeseek.com/post-1062816-1")!
+        func load(_ html: String) async throws -> NodeSeekResult<PostDetail> {
+            let service = NodeSeekService(
+                baseURL: URL(string: "https://www.nodeseek.com/")!,
+                htmlClient: StaticHTMLClient(response: HTMLResponse(statusCode: 404, headers: [:], finalURL: finalURL, html: html)),
+                currentAccountStore: nil
+            )
+            return try await service.loadPostDetail(postID: "1062816", page: 1)
+        }
+
+        // 站点对游客隐藏部分帖子时只回 404 错误页，游客应先登录再看。
+        guard case .challenge(.loginRequired(let url)) = try await load(guestHTML) else {
+            Issue.record("游客打开 404 错误页应提示登录")
+            return
+        }
+        #expect(url == finalURL)
+
+        // 已登录仍是 404，才是帖子确实不存在。
+        let member = Data(#"{"pageType":"error","user":{"member_id":31037,"member_name":"缭雾","rank":1,"coin":330,"stardust":2}}"#.utf8).base64EncodedString()
+        let memberHTML = guestHTML.replacingOccurrences(
+            of: #"<script id="temp-script" type="application/json">[^<]*</script>"#,
+            with: #"<script id="temp-script" type="application/json">\#(member)</script>"#,
+            options: .regularExpression
+        )
+        #expect(memberHTML != guestHTML)
+        guard case .value(let detail) = try await load(memberHTML) else {
+            Issue.record("已登录打开 404 错误页应显示帖子不存在")
+            return
+        }
+        #expect(detail.title == "帖子不存在")
+    }
+
     private func accountHTML(displayName: String) -> String {
         """
         <header>

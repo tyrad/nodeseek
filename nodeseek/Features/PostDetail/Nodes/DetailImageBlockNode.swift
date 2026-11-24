@@ -154,6 +154,8 @@ final class DetailImageBlockView: UIView {
     private var canDisplayImage = false
 
     var isPlayingWebP: Bool { animationBinding.isPlaying }
+    var url: URL { imageBlock.url }
+    var imageKind: DetailImageKind { resolvedImageKind }
 
     init(
         imageBlock: RenderedImageBlock,
@@ -272,7 +274,7 @@ final class DetailImageBlockView: UIView {
     }
 
     @objc
-    private func handleTap() {
+    func handleTap() {
         DetailPhotoTransitionAnchor.record(imageView: imageView, url: imageBlock.url)
         onImageTapped()
     }

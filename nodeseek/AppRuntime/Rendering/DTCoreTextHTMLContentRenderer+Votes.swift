@@ -1,6 +1,6 @@
 import Foundation
 
-extension DTCoreTextHTMLContentRenderer {
+nonisolated extension DTCoreTextHTMLContentRenderer {
     func renderVoteParts(_ parts: [NodeSeekVoteParser.Part], baseURL: URL, maxImageWidth: CGFloat) -> [RenderedContentBlock] {
         parts.flatMap { part -> [RenderedContentBlock] in
             switch part {

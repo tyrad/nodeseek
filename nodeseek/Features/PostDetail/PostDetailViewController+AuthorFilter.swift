@@ -5,7 +5,6 @@
 //  Created by Codex on 2026/10/29.
 //
 
-import AsyncDisplayKit
 import UIKit
 
 extension PostDetailViewController {
@@ -91,31 +90,10 @@ extension PostDetailViewController {
         }
     }
 
-    /// 筛选中匹配行只会追加在末尾；提示条文案变化（如变为「暂无」）时单独刷新。
-    func appendAuthorFilteredRows(fromRowCount oldRowCount: Int, bannerChanged: Bool) {
-        let rows = detailRows
-        let insertedRows = (oldRowCount..<max(oldRowCount, rows.count)).map { IndexPath(row: $0, section: 0) }
-        let bannerRows: [IndexPath] = bannerChanged
-            ? rows.indices.filter { if case .authorFilterBanner = rows[$0] { return true }; return false }
-                .map { IndexPath(row: $0, section: 0) }
-            : []
-        guard insertedRows.isEmpty == false || bannerRows.isEmpty == false else { return }
-        tableNode.performBatch(animated: false, updates: { [weak self] in
-            guard let self else { return }
-            if insertedRows.isEmpty == false {
-                self.tableNode.insertRows(at: insertedRows, with: .none)
-            }
-            if bannerRows.isEmpty == false {
-                self.tableNode.reloadRows(at: bannerRows, with: .none)
-            }
-        })
-        AppLog.debug(.postDetail, "详情作者筛选局部插入完成: inserted=\(insertedRows.count), bannerReloaded=\(bannerRows.isEmpty == false)")
-    }
-
     private func scrollAfterAuthorFilterChange(focusingCommentID: String?) {
         let rows = detailRows
         let targetRow: Int
-        let position: UITableView.ScrollPosition
+        let position: UICollectionView.ScrollPosition
         if let focusingCommentID,
            let commentIndex = comments.firstIndex(where: { $0.id == focusingCommentID }),
            let row = rows.firstIndex(where: {
@@ -123,7 +101,7 @@ extension PostDetailViewController {
                return false
            }) {
             targetRow = row
-            position = .middle
+            position = .centeredVertically
         } else if let row = rows.firstIndex(where: { if case .authorFilterBanner = $0 { return true }; return false }) {
             targetRow = row
             position = .top
@@ -134,8 +112,7 @@ extension PostDetailViewController {
 
         DispatchQueue.main.async { [weak self] in
             guard let self, self.isViewLoaded else { return }
-            guard targetRow < self.tableNode(self.tableNode, numberOfRowsInSection: 0) else { return }
-            self.tableNode.scrollToRow(at: IndexPath(row: targetRow, section: 0), at: position, animated: false)
+            self.collectionList.scroll(to: targetRow, position: position)
         }
     }
 }

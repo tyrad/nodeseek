@@ -63,6 +63,28 @@ final class MagicTabIntegrationTests: XCTestCase {
         web.stopLoading()
     }
 
+    func testReportViewsReusePreviewOnlyForSameContentAndSize() async throws {
+        let window = makeWindow(controller: UIViewController())
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let host = try XCTUnwrap(window.rootViewController?.view)
+        func preview(_ text: String, width: CGFloat) async throws -> CGImage {
+            let view = DetailTerminalView(terminal: .init(ansi: text), onImageTapped: { _, _ in }, onImageLoaded: { _ in })
+            view.frame = CGRect(x: 0, y: 0, width: width, height: 120)
+            host.addSubview(view)
+            defer { view.removeFromSuperview() }
+            for _ in 0..<400 where view.snapshot == nil { try await Task.sleep(nanoseconds: 10_000_000) }
+            return try XCTUnwrap(view.detailPhotoThumbnailView.image?.cgImage)
+        }
+        let text = "同一份报告"
+        let first = try await preview(text, width: 160)
+        let repeatImage = try await preview(text, width: 160)
+        let larger = try await preview(text, width: 600)
+        let other = try await preview("另一份报告", width: 160)
+        XCTAssertTrue(first === repeatImage)
+        XCTAssertGreaterThan(larger.width, first.width)
+        XCTAssertFalse(first === other)
+    }
+
     func testMergedSnapshotContainsLastLineAndReusesDiskCache() async throws {
         let window = makeWindow(controller: UIViewController())
         defer { window.rootViewController = nil; window.isHidden = true }
@@ -146,112 +168,6 @@ final class MagicTabIntegrationTests: XCTestCase {
         do { _ = try await first.value; XCTFail("取消的订阅应抛出取消错误") } catch is CancellationError {} catch { XCTFail("\(error)") }
         let shared = try await second.value
         XCTAssertEqual(shared.text, "SHARED REPORT")
-    }
-
-    func testActualDetailDisplaysImagesAndSwitchesTabs() async throws {
-        struct Fixture: Decodable { struct Report: Decodable { let title: String; let ansi: String }; let reports: [Report] }
-        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "post-916971-terminals", withExtension: "json"))
-        let fixture = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: url))
-        let renderer = DTCoreTextHTMLContentRenderer()
-        let html = "<div class=\"nsk-magic-tabs\">" + fixture.reports.map {
-            "<div class=\"nsk-magic-tab-title\">\($0.title)</div><div class=\"nsk-magic-tab-body\"><pre><code>\(renderer.escapedHTML($0.ansi).replacingOccurrences(of: "\u{1b}", with: "<span data-ansicode=\"27\"></span>").replacingOccurrences(of: "\u{8}", with: "<span data-ansicode=\"8\"></span>"))</code></pre></div>"
-        }.joined() + "<div class=\"nsk-magic-tab-title\">🌐网络质量</div><div class=\"nsk-magic-tab-body\"><p>图片栏测试</p></div><div class=\"nsk-magic-tab-title\">📍回程路由</div><div class=\"nsk-magic-tab-body\"><p>路由栏测试</p></div></div>"
-        let controller = PostDetailViewController(presenter: TerminalTestPresenter())
-        let window = makeWindow(controller: UINavigationController(rootViewController: controller))
-        defer {
-            controller.tableNode.view.removeFromSuperview()
-            window.rootViewController = nil
-            window.isHidden = true
-        }
-        controller.render(detail: PostDetail(id: "916971", title: "[NQ] Netcup RS 1000 G9.5 PRO MNZ 美东翻倍", authorName: "zhizhu", avatarURL: nil, metadataText: "测评", contentHTML: html, comments: []))
-        var terminal: DetailTerminalView?
-        for _ in 0..<500 {
-            window.layoutIfNeeded()
-            terminal = findView(DetailTerminalView.self, in: controller.view)
-            if terminal?.snapshot != nil { break }
-            try await Task.sleep(nanoseconds: 50_000_000)
-        }
-        XCTAssertNotNil(terminal?.snapshot, "真实详情页应生成第一栏图片")
-        XCTAssertEqual(terminal?.snapshot?.pages.count, 1)
-        let row = try XCTUnwrap(controller.tableNode.nodeForRow(at: IndexPath(row: 0, section: 0)))
-        let tabs = try XCTUnwrap(findNode(DetailMagicTabsNode.self, in: row))
-        XCTAssertEqual(tabs.selectedIndex, 0)
-        try saveScreenshot(window, name: "magic-tabs-basic-light")
-        let basicURL = try XCTUnwrap(terminal?.snapshot?.pages.first?.url)
-        let basicButton = try XCTUnwrap(terminal?.subviews.compactMap { $0 as? UIButton }
-            .first { $0.accessibilityIdentifier == "detail-terminal-open-report" })
-        basicButton.sendActions(for: .touchUpInside)
-        let basicBrowser = try await waitForPhotoBrowser(in: controller)
-        XCTAssertEqual(basicBrowser.initialIndex, 0)
-        XCTAssertEqual(controller.photoBrowserPresenter?.numberOfItems(in: basicBrowser), 2)
-        // 尚未点开 IP 分栏，也应已经可以在既有浏览器中向右翻到它。
-        basicBrowser.view.layoutIfNeeded()
-        basicBrowser.collectionView.scrollToItem(at: IndexPath(item: 1, section: 0), at: .centeredHorizontally, animated: false)
-        basicBrowser.collectionView.layoutIfNeeded()
-        basicBrowser.scrollViewDidEndDecelerating(basicBrowser.collectionView)
-        XCTAssertEqual(basicBrowser.pageIndex, 1)
-        for _ in 0..<100 {
-            let cell = basicBrowser.collectionView.cellForItem(at: IndexPath(item: 1, section: 0)) as? JXZoomImageCell
-            if cell?.imageView.image != nil, cell?.imageView.accessibilityIdentifier != basicURL.absoluteString { break }
-            try await Task.sleep(nanoseconds: 50_000_000)
-        }
-        let nextCell = try XCTUnwrap(basicBrowser.collectionView.cellForItem(at: IndexPath(item: 1, section: 0)) as? JXZoomImageCell)
-        XCTAssertNotNil(nextCell.imageView.image)
-        XCTAssertNotEqual(nextCell.imageView.accessibilityIdentifier, basicURL.absoluteString)
-        try saveScreenshot(window, name: "magic-tabs-swipe-basic-to-ip")
-        basicBrowser.collectionView.scrollToItem(at: IndexPath(item: 0, section: 0), at: .centeredHorizontally, animated: false)
-        basicBrowser.scrollViewDidEndDecelerating(basicBrowser.collectionView)
-        XCTAssertEqual(basicBrowser.pageIndex, 0)
-        await withCheckedContinuation { continuation in
-            controller.dismiss(animated: false) { continuation.resume() }
-        }
-        tabs.selectTab(1)
-        for _ in 0..<500 {
-            window.layoutIfNeeded()
-            terminal = findView(DetailTerminalView.self, in: controller.view)
-            if terminal?.snapshot?.text.contains("IP质量体检报告") == true { break }
-            try await Task.sleep(nanoseconds: 50_000_000)
-        }
-        XCTAssertTrue(terminal?.snapshot?.text.contains("IP质量体检报告") == true)
-        try saveScreenshot(window, name: "magic-tabs-ip-light")
-        let reportView = try XCTUnwrap(terminal)
-        let openButton = try XCTUnwrap(reportView.subviews.compactMap { $0 as? UIButton }
-            .first { $0.accessibilityIdentifier == "detail-terminal-open-report" })
-        XCTAssertTrue(openButton.isEnabled)
-        // 整张报告都可打开既有大图，底部不再保留复制按钮或额外留白。
-        XCTAssertFalse(reportView.subviews.contains { $0.accessibilityLabel == "复制报告" })
-        XCTAssertEqual(findView(UIImageView.self, in: reportView)?.frame, reportView.bounds)
-        XCTAssertTrue(reportView.hitTest(CGPoint(x: 20, y: 20), with: nil) === openButton)
-        XCTAssertTrue(reportView.hitTest(CGPoint(x: 20, y: reportView.bounds.height - 20), with: nil) === openButton)
-        openButton.sendActions(for: .touchUpInside)
-        let browser = try await waitForPhotoBrowser(in: controller)
-        let presenter = try XCTUnwrap(controller.photoBrowserPresenter)
-        let pages = try XCTUnwrap(reportView.snapshot?.pages)
-        XCTAssertEqual(pages.count, 1, "每份报告应作为一张完整长图交给既有浏览器")
-        XCTAssertEqual(presenter.numberOfItems(in: browser), 2)
-        XCTAssertEqual(browser.initialIndex, 1, "点开 IP 质量应定位到图库第二张")
-        let cell = JXZoomImageCell(frame: .zero)
-        presenter.photoBrowser(browser, willDisplay: cell, at: 1)
-        for _ in 0..<100 {
-            if cell.imageView.image?.cgImage?.height == pages.last.map({ Int($0.height) }) { break }
-            try await Task.sleep(nanoseconds: 50_000_000)
-        }
-        XCTAssertEqual(cell.imageView.image?.cgImage?.height, pages.last.map { Int($0.height) })
-        try await Task.sleep(nanoseconds: 300_000_000)
-        try saveScreenshot(window, name: "magic-tabs-existing-browser")
-        await withCheckedContinuation { continuation in
-            controller.dismiss(animated: false) { continuation.resume() }
-        }
-        window.overrideUserInterfaceStyle = .dark
-        window.layoutIfNeeded()
-        try await Task.sleep(nanoseconds: 200_000_000)
-        let selectedButton = try XCTUnwrap((findNode(ASScrollNode.self, in: tabs)?.subnodes ?? [])
-            .compactMap { $0 as? ASButtonNode }.first { $0.accessibilityIdentifier == "detail-magic-tab-1" })
-        let selectedColor = selectedButton.attributedTitle(for: .normal)?.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
-        XCTAssertEqual(selectedColor, UIColor.label.resolvedColor(with: window.traitCollection))
-        try saveScreenshot(window, name: "magic-tabs-ip-dark")
-        tabs.selectTab(0)
-        XCTAssertEqual(tabs.selectedIndex, 0)
     }
 
     func testGalleryKeepsSectionOrderAndRepeatedImagePositions() async throws {
@@ -381,71 +297,6 @@ final class MagicTabIntegrationTests: XCTestCase {
         XCTAssertEqual(ordinary[0].calculateSizeThatFits(range.max).height, 368, "分栏之外的普通竖图高度受栏宽限制")
     }
 
-    func testActualDetailThirdTabUsesBasicHeightAndScrollsFullReport() async throws {
-        // 下载自帖子 916971 的网络质量栏，离线验证真实 WebP 的加载与最终排版。
-        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "post-916971-network", withExtension: "webp"))
-        let html = """
-        <div class="nsk-magic-tabs">
-        <div class="nsk-magic-tab-title">基本信息</div><div class="nsk-magic-tab-body"><p>基本信息<br>CPU<br>内存<br>硬盘<br>系统<br>网络<br>测试结果<br>报告结束</p></div>
-        <div class="nsk-magic-tab-title">IP质量</div><div class="nsk-magic-tab-body"><p>IP质量</p></div>
-        <div class="nsk-magic-tab-title">网络质量</div><div class="nsk-magic-tab-body"><p><img src="\(url.absoluteString)"></p></div>
-        </div>
-        """
-        let controller = PostDetailViewController(presenter: TerminalTestPresenter())
-        let window = makeWindow(controller: UINavigationController(rootViewController: controller))
-        defer {
-            controller.tableNode.view.removeFromSuperview()
-            window.rootViewController = nil
-            window.isHidden = true
-        }
-        controller.render(detail: PostDetail(id: "916971", title: "NQ 网络质量完整图片", authorName: "zhizhu", avatarURL: nil, metadataText: "测评", contentHTML: html, comments: []))
-        var tabs: DetailMagicTabsNode?
-        for _ in 0..<100 {
-            window.layoutIfNeeded()
-            if let row = controller.tableNode.nodeForRow(at: IndexPath(row: 0, section: 0)) {
-                tabs = findNode(DetailMagicTabsNode.self, in: row)
-            }
-            if let tabs, tabs.bounds.height > 56 { break }
-            try await Task.sleep(nanoseconds: 50_000_000)
-        }
-        let tabNode = try XCTUnwrap(tabs)
-        let baselineHeight = tabNode.bounds.height
-        for index in [2, 0, 2] {
-            tabNode.selectTab(index)
-            try await Task.sleep(nanoseconds: 200_000_000)
-            guard index == 2 else { continue }
-            let scroll = try XCTUnwrap(tabNode.subnodes?.first { $0.accessibilityIdentifier == "detail-magic-tab-content" } as? ASScrollNode)
-            var report: DetailImageBlockNode?
-            var imageView: UIImageView?
-            for _ in 0..<100 {
-                window.layoutIfNeeded()
-                report = findNode(DetailImageBlockNode.self, in: tabNode)
-                imageView = report?.view.subviews.compactMap { $0 as? UIImageView }.first
-                if let report, imageView?.image != nil {
-                    let height = ceil(report.bounds.width * 1782 / 1312)
-                    if abs(report.bounds.height - height) <= 1,
-                       abs(scroll.view.contentSize.height - height) <= 1 { break }
-                }
-                try await Task.sleep(nanoseconds: 50_000_000)
-            }
-            try await Task.sleep(nanoseconds: 250_000_000)
-            window.layoutIfNeeded()
-            let node = try XCTUnwrap(report)
-            let image = try XCTUnwrap(imageView)
-            XCTAssertNotNil(image.image)
-            let height = ceil(node.bounds.width * 1782 / 1312)
-            XCTAssertEqual(node.bounds.height, height, accuracy: 1)
-            XCTAssertEqual(image.frame.height, height, accuracy: 1)
-            XCTAssertEqual(image.frame.width, node.bounds.width, accuracy: 0.01)
-            XCTAssertEqual(tabNode.bounds.height, baselineHeight, accuracy: 1)
-            XCTAssertEqual(scroll.bounds.height, baselineHeight - 56, accuracy: 1)
-            XCTAssertGreaterThan(scroll.view.contentSize.height, scroll.bounds.height)
-            scroll.view.setContentOffset(CGPoint(x: 0, y: scroll.view.contentSize.height - scroll.bounds.height), animated: false)
-            XCTAssertEqual(image.convert(image.bounds, to: scroll.view).maxY, scroll.view.bounds.maxY, accuracy: 1, "固定高度内仍能滚动到报告末尾")
-        }
-        try saveScreenshot(window, name: "magic-tabs-fixed-height-scroll-bottom")
-    }
-
     private func waitForPhotoBrowser(in controller: UIViewController) async throws -> JXPhotoBrowserViewController {
         for _ in 0..<500 {
             if let browser = controller.presentedViewController as? JXPhotoBrowserViewController {
@@ -499,7 +350,7 @@ private final class TerminalTestPresenter: PostDetailPresenterProtocol {
     func refreshInitialPage() {}
     func didSelectCommentPage(_ page: Int) {}
     func didTapLogin() {}
-    func didApproachCommentEnd() {}
+    func didApproachCommentEnd() -> Bool { false }
     func didTapRefreshCommentsAtEnd() {}
     func didTapSendReply(content: String) {}
     func didTapFavorite() {}

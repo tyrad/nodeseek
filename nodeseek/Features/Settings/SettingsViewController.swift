@@ -1204,6 +1204,46 @@ final class PostDetailDebugLinksViewController: UITableViewController {
         tableView.backgroundColor = UIColor.systemGroupedBackground
         title = "调试链接"
         tableView.accessibilityIdentifier = "post-detail-debug-links-table-view"
+        var actions = [UIAction(title: "TextKit") { [weak self] _ in
+            self?.navigationController?.pushViewController(DetailMarkdownPrototypeController.demo(), animated: true)
+        }]
+        let targets = ["1067722", "917518"] + links.compactMap { $0.target?.post.id }
+        for id in targets {
+            actions.append(UIAction(title: "#\(id)") { [weak self] _ in
+                Task { await self?.openPrototypePost(id) }
+            })
+        }
+        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "TextKit", image: nil, primaryAction: nil, menu: UIMenu(children: actions))
+    }
+
+    private func showPrototype(id: String, source: DetailFloorSource) {
+        let page = DetailMarkdownPrototypeController(id: id, source: source)
+        navigationController?.pushViewController(page, animated: true)
+    }
+
+    private func openPrototypePost(_ id: String) async {
+        do {
+            switch try await NodeSeekService().loadPostDetail(postID: id) {
+            case .value(let detail):
+                let chooser = UIAlertController(title: detail.title, message: nil, preferredStyle: .actionSheet)
+                let floors = [("#0", id, DetailFloorSource(post: detail))] + detail.comments.map {
+                    ($0.floorText ?? $0.id, $0.id, DetailFloorSource(comment: $0))
+                }
+                for (label, floor, source) in floors {
+                    chooser.addAction(UIAlertAction(title: label, style: .default) { [weak self] _ in self?.showPrototype(id: floor, source: source) })
+                }
+                chooser.addAction(UIAlertAction(title: NSLocalizedString("cancel", tableName: "DetailPrototype", comment: ""), style: .cancel))
+                chooser.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItem
+                present(chooser, animated: true)
+            case .challenge(let challenge): showPrototypeError(challenge.logDescription)
+            }
+        } catch { showPrototypeError(error.localizedDescription) }
+    }
+
+    private func showPrototypeError(_ message: String) {
+        let alert = UIAlertController(title: "TextKit", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: NSLocalizedString("close", tableName: "DetailPrototype", comment: ""), style: .default))
+        present(alert, animated: true)
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {

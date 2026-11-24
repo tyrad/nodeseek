@@ -114,6 +114,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
     let authorProfileURL: URL?
     let metadataText: String?
     let contentHTML: String
+    let visibleMarkdown: String?
     let signatureHTML: String?
     private(set) var likeCount: Int?
     private(set) var isLikeClicked: Bool
@@ -141,6 +142,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
         authorProfileURL: URL? = nil,
         metadataText: String?,
         contentHTML: String,
+        visibleMarkdown: String? = nil,
         signatureHTML: String? = nil,
         likeCount: Int? = nil,
         isLikeClicked: Bool = false,
@@ -167,6 +169,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
         self.authorProfileURL = authorProfileURL
         self.metadataText = metadataText
         self.contentHTML = contentHTML
+        self.visibleMarkdown = visibleMarkdown
         self.signatureHTML = signatureHTML
         self.likeCount = likeCount
         self.isLikeClicked = isLikeClicked
@@ -278,6 +281,7 @@ nonisolated struct Comment: Equatable, Sendable {
     /// 当前登录用户发的评论，可以编辑。
     let isOwnComment: Bool
     /// 页面配置里的原始 Markdown，引用时按网页逻辑逐行加 "> "；热评等不在当前页配置里的评论为 nil。
+    let hasVisibleMarkdown: Bool
     let markdown: String?
     let editedAtTitleText: String?
 
@@ -303,6 +307,7 @@ nonisolated struct Comment: Equatable, Sendable {
         isOpposeClicked: Bool = false,
         isOwnComment: Bool = false,
         markdown: String? = nil,
+        hasVisibleMarkdown: Bool = false,
         editedAtTitleText: String? = nil
     ) {
         self.id = id
@@ -326,6 +331,7 @@ nonisolated struct Comment: Equatable, Sendable {
         self.isOpposeClicked = isOpposeClicked
         self.isOwnComment = isOwnComment
         self.markdown = markdown
+        self.hasVisibleMarkdown = hasVisibleMarkdown
         self.editedAtTitleText = editedAtTitleText
     }
 
@@ -352,6 +358,7 @@ nonisolated struct Comment: Equatable, Sendable {
             isOpposeClicked: isOpposeClicked,
             isOwnComment: isOwnComment,
             markdown: markdown,
+            hasVisibleMarkdown: hasVisibleMarkdown,
             editedAtTitleText: editedAtTitleText
         )
     }
@@ -379,6 +386,7 @@ nonisolated struct Comment: Equatable, Sendable {
             isOpposeClicked: isOpposeClicked,
             isOwnComment: isOwnComment,
             markdown: markdown,
+            hasVisibleMarkdown: hasVisibleMarkdown,
             editedAtTitleText: editedAtTitleText
         )
     }
@@ -406,6 +414,7 @@ nonisolated struct Comment: Equatable, Sendable {
             isOpposeClicked: isClicked,
             isOwnComment: isOwnComment,
             markdown: markdown,
+            hasVisibleMarkdown: hasVisibleMarkdown,
             editedAtTitleText: editedAtTitleText
         )
     }

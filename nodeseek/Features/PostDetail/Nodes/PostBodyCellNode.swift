@@ -456,7 +456,7 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         }
     }
 
-    private static func reactionCountText(_ count: Int) -> String {
+    static func reactionCountText(_ count: Int) -> String {
         let safeCount = max(0, count)
         if safeCount < 10_000 {
             return "\(safeCount)"

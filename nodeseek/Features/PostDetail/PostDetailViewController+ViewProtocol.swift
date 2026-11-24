@@ -5,13 +5,7 @@
 //  Created by Codex on 2026/4/30.
 //
 
-import AsyncDisplayKit
 import UIKit
-
-private struct DetailCommentRenderSnapshot {
-    let cache: [String: [RenderedContentBlock]]
-    let renderedIDs: Set<String>
-}
 
 extension PostDetailViewController: PostDetailViewProtocol {
     func updateLoadMoreCommentsFooter() {
@@ -52,18 +46,18 @@ extension PostDetailViewController: PostDetailViewProtocol {
 
     func hideLoadingMoreComments() {
         loadMoreCommentsIndicator.stopAnimating()
-        lastBatchFetchRequestedCommentCount = nil
+        collectionList.didFinishLoadingMore()
         updateLoadMoreCommentsFooter()
     }
 
     func hideLoading() {
         loadingIndicator.stopAnimating()
+        collectionList.scheduleBatchFetchCheck()
         updateReplyButtonVisibility()
     }
 
     func showError(message: String) {
         pendingPageJumpScroll = false
-        cancelPendingInitialContentReveal()
         hideLoadingSkeleton()
         let alert = UIAlertController(title: "错误", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "确定", style: .default))
@@ -132,194 +126,76 @@ extension PostDetailViewController: PostDetailViewProtocol {
         title = nil
         loginButton.isHidden = true
         showsReplyEntry = detail.isRestricted == false
-        let targetPage = max(1, detail.page)
-        if shouldPrepareInitialContentReveal {
-            prepareInitialContentReveal(for: detail, targetPage: targetPage)
-            return
+        if currentHeaderContent?.postID != detail.id || detail.isRestricted { authorFilter = nil }
+        resetAuthorFilterAutoLoad()
+        // 后续页解析出的正文可能是该页第一楼，已有主楼时沿用，避免把回复当成主楼。
+        let keepHeader = !detail.isRestricted && detail.page > 1 && currentHeaderContent?.postID == detail.id
+            && (detail.contentHTML.isEmpty || currentHeaderContent?.contentHTML.isEmpty == false)
+        if !keepHeader {
+            collectionList.headerSource = .init(post: detail)
+            configureHeader(.init(detail: detail))
         }
-        cancelPendingInitialContentReveal()
-        let shouldScrollToTop = pendingPageJumpScroll
-        pendingPageJumpScroll = false
-        let existingHeaderContent = currentHeaderContent
-        let existingRenderedContent = headerRenderedContent
-        var existingComments: [String: Comment] = [:]
-        for comment in comments {
-            existingComments[comment.id] = comment
+        if displayMode == .skeleton { collectionList.coverUntilSettled(timeout: initialContentRevealTimeout) }
+        displayMode = .content
+        hasRenderedDetailContent = true
+        currentPage = max(1, detail.page)
+        comments = detail.comments
+        loadedCommentPageRanges = [currentPage: 0..<comments.count]
+        pagination = detail.pagination
+        collectionList.resetPagination()
+        collectionList.reload()
+        updateLoadMoreCommentsFooter()
+        updateReplyButtonVisibility()
+        if pendingPageJumpScroll {
+            pendingPageJumpScroll = false
+            collectionList.scroll(to: currentPage == 1 ? 0 : pageCompletionScrollRow(), position: .top)
         }
-        let existingCommentRenderedCache = commentRenderedCache
-        let existingRenderedCommentIDs = renderedCommentIDs
-        let isSamePageRefresh = hasRenderedDetailContent
-            && targetPage == currentPage
-            && existingHeaderContent?.postID == detail.id
-        let nextHeaderContent = PostDetailHeaderContent(detail: detail)
-        let canReuseHeaderRender = isSamePageRefresh
-            && existingHeaderContent?.contentHTML == nextHeaderContent.contentHTML
-            && existingHeaderContent?.signatureHTML == nextHeaderContent.signatureHTML
-            && existingRenderedContent != nil
-        let shouldPreserveHeader = hasRenderedDetailContent
-            && targetPage != 1
-            && existingHeaderContent?.postID == detail.id
-            && existingHeaderContent?.contentHTML.isEmpty == false
-        renderGeneration += 1
-        let headerContent = shouldPreserveHeader ? existingHeaderContent! : nextHeaderContent
-        let renderedHeaderContent = (shouldPreserveHeader || canReuseHeaderRender) ? existingRenderedContent : nil
-        let commentRenderSnapshot: DetailCommentRenderSnapshot
-        if isSamePageRefresh {
-            commentRenderSnapshot = preservedRenderedCommentSnapshot(
-                previousComments: existingComments,
-                previousCache: existingCommentRenderedCache,
-                previousRenderedIDs: existingRenderedCommentIDs,
-                nextComments: detail.comments
-            )
-        } else {
-            commentRenderSnapshot = DetailCommentRenderSnapshot(cache: [:], renderedIDs: [])
-        }
-        let nextPagination = detail.pagination
-            ?? (shouldPreserveHeader ? fallbackPagination(from: pagination, currentPage: detail.page) : nil)
-
-        applyDetailContent(
-            targetPage: targetPage,
-            headerContent: headerContent,
-            renderedHeaderContent: renderedHeaderContent,
-            pagination: nextPagination,
-            comments: detail.comments,
-            commentRenderSnapshot: commentRenderSnapshot,
-            shouldScrollToTop: shouldScrollToTop,
-            shouldScheduleMissingRender: true
-        )
+        consumeInitialAnchorIfNeeded()
+        if authorFilter != nil { scheduleAuthorFilterAutoLoadIfNeeded(newMatchCount: authorFilterMatchedCount) }
     }
 
     func appendCommentPage(detail: PostDetail) {
-        guard hasRenderedDetailContent else {
+        guard hasRenderedDetailContent, !detail.isRestricted else {
             render(detail: detail)
             return
         }
-
+        if loadedCommentPageRanges[detail.page] != nil {
+            refreshCurrentCommentPage(detail: detail)
+            return
+        }
         let oldCommentCount = comments.count
-        let hasHeader = currentHeaderContent != nil
-        let commentRowOffset = hasHeader ? 2 : 0
-        let oldRowCount = detailRows.count
         let oldAuthorFilterBannerText = authorFilterBannerText
         currentPage = max(currentPage, detail.page)
         pagination = detail.pagination
         comments.append(contentsOf: detail.comments)
         loadedCommentPageRanges[detail.page] = oldCommentCount..<comments.count
-        if let authorFilter {
-            appendAuthorFilteredRows(
-                fromRowCount: oldRowCount,
-                bannerChanged: oldAuthorFilterBannerText != authorFilterBannerText
-            )
-            preheatCommentRender(for: detail.comments.filter(authorFilter.matches))
-            updateLoadMoreCommentsFooter()
-            updateReplyButtonVisibility()
-            scheduleAuthorFilterAutoLoadIfNeeded(newMatchCount: detail.comments.filter(authorFilter.matches).count)
-            return
-        }
-        var insertedRows: [IndexPath] = []
-        if hasHeader, oldCommentCount == 0, comments.isEmpty == false {
-            // 初次有评论时，需要补上 header 与评论之间的分割行。
-            insertedRows.append(IndexPath(row: 1, section: 0))
-        }
-        insertedRows.append(contentsOf: (oldCommentCount..<comments.count).map { commentIndex in
-            IndexPath(row: commentRowOffset + commentIndex, section: 0)
-        })
-
-        if insertedRows.isEmpty {
-            return
-        }
-
-        tableNode.performBatch(animated: false, updates: { [weak self] in
-            self?.tableNode.insertRows(at: insertedRows, with: .none)
-        })
-        AppLog.debug(.postDetail, "详情评论局部插入完成: inserted=\(insertedRows.count), totalComments=\(comments.count)")
-        preheatCommentRender(for: detail.comments)
+        collectionList.appendComments(in: oldCommentCount..<comments.count, pageNumber: detail.page,
+                                      bannerChanged: oldAuthorFilterBannerText != authorFilterBannerText)
         updateLoadMoreCommentsFooter()
         updateReplyButtonVisibility()
+        if let authorFilter { scheduleAuthorFilterAutoLoadIfNeeded(newMatchCount: detail.comments.filter(authorFilter.matches).count) }
     }
 
     func refreshCurrentCommentPage(detail: PostDetail) {
-        guard hasRenderedDetailContent else {
-            render(detail: detail)
-            return
-        }
-        guard let oldRange = loadedCommentPageRanges[detail.page],
+        guard hasRenderedDetailContent, !detail.isRestricted,
+              let oldRange = loadedCommentPageRanges[detail.page],
               oldRange.lowerBound >= 0,
               oldRange.upperBound <= comments.count else {
             render(detail: detail)
             return
         }
-
-        let oldComments = Array(comments[oldRange])
-        let newComments = detail.comments
-        let commonCount = min(oldComments.count, newComments.count)
-        let hasHeader = currentHeaderContent != nil
-        let oldTotalCount = comments.count
-        let commentRowOffset = hasHeader ? 2 : 0
-        let reloadRows = (0..<commonCount).compactMap { offset -> IndexPath? in
-            let oldComment = oldComments[offset]
-            let newComment = newComments[offset]
-            guard oldComment != newComment else { return nil }
-            comments[oldRange.lowerBound + offset] = newComments[offset]
-            if oldComment.contentHTML != newComment.contentHTML || oldComment.signatureHTML != newComment.signatureHTML {
-                commentRenderedCache[newComment.id] = nil
-                renderedCommentIDs.remove(newComment.id)
-                commentRenderInFlight.remove(newComment.id)
-            }
-            return IndexPath(row: commentRowOffset + oldRange.lowerBound + offset, section: 0)
+        let delta = detail.comments.count - oldRange.count
+        let previous = Dictionary(comments[oldRange].map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        comments.replaceSubrange(oldRange, with: detail.comments)
+        loadedCommentPageRanges[detail.page] = oldRange.lowerBound..<(oldRange.lowerBound + detail.comments.count)
+        shiftLoadedCommentPageRanges(after: detail.page, delta: delta)
+        if detail.page == currentPage { pagination = detail.pagination }
+        // 只重配内容有变化的楼层：全量重配会清空正文和签名再异步回填，高度先缩后涨，把底部位置顶回去。
+        collectionList.reload(refresh: false)
+        for comment in detail.comments where previous[comment.id].map({ $0 != comment }) == true {
+            collectionList.refresh(commentID: comment.id)
         }
-
-        var deleteRows: [IndexPath] = []
-        var insertRows: [IndexPath] = []
-        if oldComments.count > newComments.count {
-            deleteRows = (newComments.count..<oldComments.count).map { offset in
-                IndexPath(row: commentRowOffset + oldRange.lowerBound + offset, section: 0)
-            }
-            for comment in oldComments[newComments.count..<oldComments.count] {
-                commentRenderedCache[comment.id] = nil
-                renderedCommentIDs.remove(comment.id)
-                commentRenderInFlight.remove(comment.id)
-            }
-            comments.removeSubrange((oldRange.lowerBound + newComments.count)..<oldRange.upperBound)
-        } else if newComments.count > oldComments.count {
-            let inserted = Array(newComments[oldComments.count..<newComments.count])
-            comments.insert(contentsOf: inserted, at: oldRange.upperBound)
-            insertRows = (oldComments.count..<newComments.count).map { offset in
-                IndexPath(row: commentRowOffset + oldRange.lowerBound + offset, section: 0)
-            }
-        }
-
-        loadedCommentPageRanges[detail.page] = oldRange.lowerBound..<(oldRange.lowerBound + newComments.count)
-        shiftLoadedCommentPageRanges(after: detail.page, delta: newComments.count - oldComments.count)
-        pagination = detail.pagination
-        currentPage = max(currentPage, detail.page)
-
-        if hasHeader, oldTotalCount > 0, comments.isEmpty {
-            deleteRows.append(IndexPath(row: 1, section: 0))
-        } else if hasHeader, oldTotalCount == 0, comments.isEmpty == false {
-            insertRows.insert(IndexPath(row: 1, section: 0), at: 0)
-        }
-
-        if authorFilter != nil {
-            // 筛选中的行号与评论下标不对应，当前页刷新直接整表重载。
-            reloadTableData()
-        } else {
-            tableNode.performBatch(animated: false, updates: { [weak self] in
-                guard let self else { return }
-                if deleteRows.isEmpty == false {
-                    self.tableNode.deleteRows(at: deleteRows, with: .none)
-                }
-                if insertRows.isEmpty == false {
-                    self.tableNode.insertRows(at: insertRows, with: .none)
-                }
-                if reloadRows.isEmpty == false {
-                    self.tableNode.reloadRows(at: reloadRows, with: .none)
-                }
-            })
-        }
-        AppLog.debug(.postDetail, "详情评论当前页局部刷新完成: page=\(detail.page), reload=\(reloadRows.count), insert=\(insertRows.count), delete=\(deleteRows.count), totalComments=\(comments.count)")
-        preheatCommentRender(for: newComments)
         updateLoadMoreCommentsFooter()
-        updateReplyButtonVisibility()
     }
 
     func updateAuthorRiskWarning(postID: String, isVisible: Bool) {
@@ -327,13 +203,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
         let wasVisible = authorRiskWarningPostID == postID
         authorRiskWarningPostID = isVisible ? postID : nil
         guard wasVisible != isVisible, isViewLoaded, displayMode == .content else { return }
-        // 等待 Texture 完成在途的 cell 创建，避免查询结果早于正文节点就绪。
-        tableNode.onDidFinishProcessingUpdates { [weak self] in
-            guard let self, self.currentHeaderContent?.postID == postID,
-                  let row = self.detailRows.firstIndex(where: { if case .header = $0 { return true }; return false }),
-                  let node = self.tableNode.nodeForRow(at: IndexPath(row: row, section: 0)) as? PostBodyCellNode else { return }
-            node.updateAuthorRiskWarning(isVisible: self.authorRiskWarningPostID == postID)
-        }
+        collectionList.refreshHeader()
     }
 
     func updatePostBody(detail: PostDetail) {
@@ -341,293 +211,30 @@ extension PostDetailViewController: PostDetailViewProtocol {
             render(detail: detail)
             return
         }
-        let nextContent = PostDetailHeaderContent(detail: detail)
-        guard let previousContent = currentHeaderContent else {
-            configureHeader(nextContent, renderedContent: headerRenderedContent)
-            scheduleHeaderReload()
-            return
-        }
-
-        if Self.isHeaderLayoutEquivalent(previousContent, nextContent) {
-            currentHeaderContent = nextContent
-            if let row = detailRows.firstIndex(where: { if case .header = $0 { return true }; return false }),
-               let node = tableNode.nodeForRow(at: IndexPath(row: row, section: 0)) as? PostBodyCellNode {
-                node.updateLikeReaction(count: nextContent.likeCount, isClicked: nextContent.isLikeClicked)
-                node.updateChickenLegReaction(count: nextContent.chickenLegCount, isClicked: nextContent.isChickenLegClicked)
-                node.updateOpposeReaction(count: nextContent.opposeCount, isClicked: nextContent.isOpposeClicked)
-                node.updateFavoriteReaction(count: nextContent.favoriteCount, isCollected: nextContent.isFavoriteCollected)
-            }
-            return
-        }
-
-        configureHeader(nextContent, renderedContent: headerRenderedContent)
-        scheduleHeaderReload()
+        collectionList.headerSource = .init(post: detail)
+        configureHeader(PostDetailHeaderContent(detail: detail))
+        collectionList.refreshHeader()
     }
 
     func updateCommentLike(commentID: String, count: Int?, isClicked: Bool) {
-        guard let commentIndex = comments.firstIndex(where: { $0.id == commentID }) else { return }
-        comments[commentIndex] = comments[commentIndex].updatingLikeReaction(count: count, isClicked: isClicked)
-
-        guard let row = detailRows.firstIndex(where: {
-            if case .comment(let index) = $0 {
-                return index == commentIndex
-            }
-            return false
-        }) else { return }
-
-        let indexPath = IndexPath(row: row, section: 0)
-        if let node = tableNode.nodeForRow(at: indexPath) as? CommentCellNode {
-            node.updateLikeReaction(count: count, isClicked: isClicked)
-            return
+        for index in comments.indices where comments[index].id == commentID {
+            comments[index] = comments[index].updatingLikeReaction(count: count, isClicked: isClicked)
         }
-
-        scheduleRowsReload([indexPath])
+        collectionList.refresh(commentID: commentID)
     }
 
     func updateCommentChickenLeg(commentID: String, count: Int?, isClicked: Bool) {
-        guard let commentIndex = comments.firstIndex(where: { $0.id == commentID }) else { return }
-        comments[commentIndex] = comments[commentIndex].updatingChickenLegReaction(count: count, isClicked: isClicked)
-
-        guard let row = detailRows.firstIndex(where: {
-            if case .comment(let index) = $0 {
-                return index == commentIndex
-            }
-            return false
-        }) else { return }
-
-        let indexPath = IndexPath(row: row, section: 0)
-        if let node = tableNode.nodeForRow(at: indexPath) as? CommentCellNode {
-            node.updateChickenLegReaction(count: count, isClicked: isClicked)
-            return
+        for index in comments.indices where comments[index].id == commentID {
+            comments[index] = comments[index].updatingChickenLegReaction(count: count, isClicked: isClicked)
         }
-
-        scheduleRowsReload([indexPath])
+        collectionList.refresh(commentID: commentID)
     }
 
     func updateCommentOppose(commentID: String, count: Int?, isClicked: Bool) {
-        guard let commentIndex = comments.firstIndex(where: { $0.id == commentID }) else { return }
-        comments[commentIndex] = comments[commentIndex].updatingOpposeReaction(count: count, isClicked: isClicked)
-
-        guard let row = detailRows.firstIndex(where: {
-            if case .comment(let index) = $0 {
-                return index == commentIndex
-            }
-            return false
-        }) else { return }
-
-        let indexPath = IndexPath(row: row, section: 0)
-        if let node = tableNode.nodeForRow(at: indexPath) as? CommentCellNode {
-            node.updateOpposeReaction(count: count, isClicked: isClicked)
-            return
+        for index in comments.indices where comments[index].id == commentID {
+            comments[index] = comments[index].updatingOpposeReaction(count: count, isClicked: isClicked)
         }
-
-        scheduleRowsReload([indexPath])
-    }
-
-    private static func isHeaderLayoutEquivalent(
-        _ lhs: PostDetailHeaderContent,
-        _ rhs: PostDetailHeaderContent
-    ) -> Bool {
-        lhs.postID == rhs.postID
-            && lhs.title == rhs.title
-            && lhs.requiredReadingLevel == rhs.requiredReadingLevel
-            && lhs.authorName == rhs.authorName
-            && lhs.authorBadgeTexts == rhs.authorBadgeTexts
-            && lhs.avatarURL == rhs.avatarURL
-            && lhs.authorProfileURL == rhs.authorProfileURL
-            && lhs.metadataText == rhs.metadataText
-            && lhs.contentHTML == rhs.contentHTML
-            && lhs.signatureHTML == rhs.signatureHTML
-    }
-
-    private var shouldPrepareInitialContentReveal: Bool {
-        hasRenderedDetailContent == false && displayMode == .skeleton
-    }
-
-    private func cancelPendingInitialContentReveal() {
-        pendingInitialContentRevealGeneration = nil
-        initialContentRevealWorkItem?.cancel()
-        initialContentRevealWorkItem = nil
-    }
-
-    private func prepareInitialContentReveal(for detail: PostDetail, targetPage: Int) {
-        renderGeneration += 1
-        let generation = renderGeneration
-        pendingInitialContentRevealGeneration = generation
-        initialContentRevealWorkItem?.cancel()
-        tableReloadWorkItem?.cancel()
-        pendingReloadIndexPaths.removeAll()
-
-        let headerContent = PostDetailHeaderContent(detail: detail)
-        let baseURL = baseURL
-        let headerWidth = availableHeaderContentWidth
-        let commentWidth = availableCommentContentWidth
-        let showsSignature = PostSignatureDisplaySettings.shared.showsSignatures
-
-        let timeoutWorkItem = DispatchWorkItem { [weak self] in
-            self?.revealInitialContent(
-                detail: detail,
-                targetPage: targetPage,
-                headerContent: headerContent,
-                renderedHeaderContent: nil,
-                renderedCommentCache: [:],
-                renderedCommentIDs: [],
-                generation: generation,
-                shouldScheduleMissingRender: true
-            )
-        }
-        initialContentRevealWorkItem = timeoutWorkItem
-        DispatchQueue.main.asyncAfter(
-            deadline: .now() + initialContentRevealTimeout,
-            execute: timeoutWorkItem
-        )
-
-        renderQueue.async { [weak self] in
-            let renderedHeaderContent = Self.makeRenderedContent(
-                html: headerContent.contentHTML,
-                signatureHTML: headerContent.signatureHTML,
-                baseURL: baseURL,
-                maxImageWidth: headerWidth,
-                showsSignature: showsSignature
-            )
-            var renderedCommentCache: [String: [RenderedContentBlock]] = [:]
-            var renderedCommentIDs = Set<String>()
-
-            for comment in detail.comments {
-                let renderedContent = Self.makeRenderedContent(
-                    html: comment.contentHTML,
-                    signatureHTML: comment.signatureHTML,
-                    baseURL: baseURL,
-                    maxImageWidth: commentWidth,
-                    showsSignature: showsSignature
-                )
-                renderedCommentIDs.insert(comment.id)
-                if let renderedContent {
-                    renderedCommentCache[comment.id] = renderedContent
-                }
-            }
-
-            DispatchQueue.main.async {
-                self?.revealInitialContent(
-                    detail: detail,
-                    targetPage: targetPage,
-                    headerContent: headerContent,
-                    renderedHeaderContent: renderedHeaderContent,
-                    renderedCommentCache: renderedCommentCache,
-                    renderedCommentIDs: renderedCommentIDs,
-                    generation: generation,
-                    shouldScheduleMissingRender: false
-                )
-            }
-        }
-    }
-
-    private func revealInitialContent(
-        detail: PostDetail,
-        targetPage: Int,
-        headerContent: PostDetailHeaderContent,
-        renderedHeaderContent: [RenderedContentBlock]?,
-        renderedCommentCache: [String: [RenderedContentBlock]],
-        renderedCommentIDs: Set<String>,
-        generation: Int,
-        shouldScheduleMissingRender: Bool
-    ) {
-        guard pendingInitialContentRevealGeneration == generation else { return }
-        pendingInitialContentRevealGeneration = nil
-        initialContentRevealWorkItem?.cancel()
-        initialContentRevealWorkItem = nil
-
-        applyDetailContent(
-            targetPage: targetPage,
-            headerContent: headerContent,
-            renderedHeaderContent: renderedHeaderContent,
-            pagination: detail.pagination,
-            comments: detail.comments,
-            commentRenderSnapshot: DetailCommentRenderSnapshot(
-                cache: renderedCommentCache,
-                renderedIDs: renderedCommentIDs
-            ),
-            shouldScrollToTop: false,
-            shouldScheduleMissingRender: shouldScheduleMissingRender
-        )
-    }
-
-    private func applyDetailContent(
-        targetPage: Int,
-        headerContent: PostDetailHeaderContent,
-        renderedHeaderContent: [RenderedContentBlock]?,
-        pagination: PostDetailPagination?,
-        comments: [Comment],
-        commentRenderSnapshot: DetailCommentRenderSnapshot,
-        shouldScrollToTop: Bool,
-        shouldScheduleMissingRender: Bool
-    ) {
-        if currentHeaderContent?.postID != headerContent.postID {
-            authorFilter = nil
-        }
-        resetAuthorFilterAutoLoad()
-        currentPage = targetPage
-        hasRenderedDetailContent = true
-        displayMode = .content
-        configureHeader(headerContent, renderedContent: renderedHeaderContent)
-        self.pagination = pagination
-        self.comments = comments
-        loadedCommentPageRanges = [targetPage: 0..<comments.count]
-        commentRenderedCache = commentRenderSnapshot.cache
-        renderedCommentIDs = commentRenderSnapshot.renderedIDs
-        commentRenderInFlight.removeAll(keepingCapacity: true)
-        reloadTableData()
-        if shouldScrollToTop {
-            // 跳到第 1 页时回到主楼顶部，其他页停在该页第一条评论。
-            let targetRow = targetPage == 1 ? 0 : pageCompletionScrollRow()
-            #if DEBUG
-            pendingScrollToRow = targetRow
-            #endif
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                self.tableNode.scrollToRow(
-                    at: IndexPath(row: targetRow, section: 0),
-                    at: .top,
-                    animated: false
-                )
-            }
-        }
-
-        if shouldScheduleMissingRender {
-            if renderedHeaderContent == nil {
-                scheduleHeaderRender(for: headerContent)
-            }
-            preheatCommentRender(for: comments)
-        }
-        updateLoadMoreCommentsFooter()
-        updateReplyButtonVisibility()
-        consumeInitialAnchorIfNeeded()
-        if authorFilter != nil {
-            scheduleAuthorFilterAutoLoadIfNeeded(newMatchCount: authorFilterMatchedCount)
-        }
-    }
-
-    private func preservedRenderedCommentSnapshot(
-        previousComments: [String: Comment],
-        previousCache: [String: [RenderedContentBlock]],
-        previousRenderedIDs: Set<String>,
-        nextComments: [Comment]
-    ) -> DetailCommentRenderSnapshot {
-        var nextCache: [String: [RenderedContentBlock]] = [:]
-        var nextRenderedIDs: Set<String> = []
-
-        for comment in nextComments {
-            guard previousComments[comment.id]?.contentHTML == comment.contentHTML,
-                  previousRenderedIDs.contains(comment.id) else {
-                continue
-            }
-            nextRenderedIDs.insert(comment.id)
-            if let cached = previousCache[comment.id] {
-                nextCache[comment.id] = cached
-            }
-        }
-
-        return DetailCommentRenderSnapshot(cache: nextCache, renderedIDs: nextRenderedIDs)
+        collectionList.refresh(commentID: commentID)
     }
 
     func setReplySubmitting(_ isSubmitting: Bool) {
@@ -652,7 +259,6 @@ extension PostDetailViewController: PostDetailViewProtocol {
     }
 
     func renderLoginRequired(message: String) {
-        cancelPendingInitialContentReveal()
         title = nil
         loginButton.isHidden = false
         showsReplyEntry = false
@@ -660,11 +266,9 @@ extension PostDetailViewController: PostDetailViewProtocol {
         updateReplyContext(for: .plain)
         dismissReplyEditor()
         updateReplyButtonVisibility()
-        renderGeneration += 1
         hasRenderedDetailContent = true
         displayMode = .content
         let existing = currentHeaderContent
-        headerRenderedContent = nil
         let headerContent = PostDetailHeaderContent(
             postID: existing?.postID ?? "login-required",
             title: existing?.title ?? "需要登录",
@@ -673,16 +277,14 @@ extension PostDetailViewController: PostDetailViewProtocol {
             metadataText: existing?.metadataText,
             contentHTML: message
         )
-        configureHeader(headerContent, renderedContent: nil)
+        configureHeader(headerContent)
         authorFilter = nil
         resetAuthorFilterAutoLoad()
         pagination = nil
         comments = []
-        commentRenderedCache.removeAll(keepingCapacity: true)
-        renderedCommentIDs.removeAll(keepingCapacity: true)
-        commentRenderInFlight.removeAll(keepingCapacity: true)
-        reloadTableData()
-        scheduleHeaderRender(for: headerContent)
+        loadedCommentPageRanges.removeAll()
+        collectionList.headerSource = .init(html: message, visibleMarkdown: nil)
+        collectionList.invalidate()
         updateLoadMoreCommentsFooter()
     }
 
@@ -708,6 +310,7 @@ extension PostDetailViewController: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         guard gestureRecognizer is UITapGestureRecognizer else { return true }
         guard let touchedView = touch.view else { return true }
+        if touchedView.isDescendant(of: collectionList.view) { return false }
         return touchedView.isDescendant(of: replyEditorContainer) == false
     }
 }

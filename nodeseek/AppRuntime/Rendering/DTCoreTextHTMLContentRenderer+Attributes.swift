@@ -9,7 +9,7 @@ import DTCoreText
 import Foundation
 import UIKit
 
-extension DTCoreTextHTMLContentRenderer {
+nonisolated extension DTCoreTextHTMLContentRenderer {
     private var blockquoteTextColor: UIColor {
         UIColor { traits in
             traits.userInterfaceStyle == .dark ? UIColor.secondaryLabel : ReadingColors.text

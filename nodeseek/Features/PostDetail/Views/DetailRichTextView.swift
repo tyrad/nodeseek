@@ -33,6 +33,7 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
     private var fixedQuoteImageAttachments = Set<ObjectIdentifier>()
     // 附件对象可能被其他节点改写；尺寸快照必须由当前视图独立保存。
     private var layoutAttachmentSizes: [ObjectIdentifier: CGSize] = [:]
+    private var sourceText = NSAttributedString()
     private var lastLayoutWidth: CGFloat = 0
     private let diagnosticID = String(UUID().uuidString.prefix(8))
     private var pendingRelayoutWorkItem: DispatchWorkItem?
@@ -154,7 +155,8 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
             else { return }
             fixedQuoteImageAttachments.insert(ObjectIdentifier(attachment))
         }
-        attributedString = text
+        sourceText = text
+        attributedString = resolvedDisplayText()
         logDiagnostics(
             "configure length=\(attributedString.length) bounds=\(Self.string(from: bounds.size)) attachments=\(attachmentDiagnostics())"
         )
@@ -212,9 +214,19 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
         return richTextSize(constrainedToWidth: width)
     }
 
+    // Core Text 会把字色固化到 glyph run。用视图的外观解析，换主题时再从原始富文本生成。
+    private func resolvedDisplayText() -> NSAttributedString {
+        let display = NSMutableAttributedString(attributedString: sourceText)
+        sourceText.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: sourceText.length)) { value, range, _ in
+            if let color = value as? UIColor {
+                display.addAttribute(.foregroundColor, value: color.resolvedColor(with: traitCollection), range: range)
+            }
+        }
+        return display
+    }
+
     private func rebuildAttributedTextLayout() {
-        let snapshot = NSAttributedString(attributedString: attributedString)
-        attributedString = snapshot
+        attributedString = resolvedDisplayText()
         removeAllCustomViews()
         removeAllCustomViewsForLinks()
         recordLayoutAttachmentSizes()
@@ -881,8 +893,11 @@ final class DetailRichTextView: DTAttributedTextContentView, DTAttributedTextCon
             adjustedBounds.size.width = width
             bounds = adjustedBounds
         }
+        let hadLinkViews = subviews.contains { $0 is DetailLinkOverlayButton }
         layoutFrame = nil
         _ = layoutFrame
+        // 重建排版会移除链接点击层；新版列表在本视图布局之后还会量尺寸，之后不再布局，需当场补回，否则链接点不动。
+        if hadLinkViews { layoutSubviews(in: .infinite) }
         let size = super.intrinsicContentSize
         logDiagnostics(
             "richTextSize width=\(Self.numberString(width)) result=\(Self.string(from: size)) bounds=\(Self.string(from: bounds.size)) attachments=\(attachmentDiagnostics())"

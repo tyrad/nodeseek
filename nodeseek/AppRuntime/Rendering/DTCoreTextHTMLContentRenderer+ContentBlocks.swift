@@ -10,7 +10,7 @@ import Foundation
 import Kanna
 import UIKit
 
-extension DTCoreTextHTMLContentRenderer {
+nonisolated extension DTCoreTextHTMLContentRenderer {
     func renderContentBlocks(
         fragment: String,
         baseURL: URL,
@@ -1025,7 +1025,7 @@ private struct TableCellTextUnit {
 }
 
 private extension Character {
-    var isTableCellWhitespace: Bool {
+    nonisolated var isTableCellWhitespace: Bool {
         self == " "
             || self == "\t"
             || self == "\r"

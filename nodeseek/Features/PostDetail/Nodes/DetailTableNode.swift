@@ -194,14 +194,19 @@ enum DetailContentBlockNodeFactory {
     }
 }
 
-final class DetailQuoteBlockNode: ASDisplayNode, ThemeRefreshableNode {
-    private enum Layout {
-        static let borderWidth: CGFloat = 3
-        static let cornerRadius: CGFloat = 4
-        static let contentSpacing: CGFloat = 8
-        static let blockSpacing: CGFloat = 8
-        static let insets = UIEdgeInsets(top: 12, left: 8, bottom: 12, right: 10)
+nonisolated enum DetailQuoteLayout {
+    static let borderWidth: CGFloat = 3
+    static let cornerRadius: CGFloat = 4
+    static let blockSpacing: CGFloat = 8
+    static let insets = UIEdgeInsets(top: 12, left: 8, bottom: 12, right: 10)
+
+    static func contentWidth(_ width: CGFloat) -> CGFloat {
+        max(1, width - borderWidth - insets.left - insets.right)
     }
+}
+
+final class DetailQuoteBlockNode: ASDisplayNode, ThemeRefreshableNode {
+    private typealias Layout = DetailQuoteLayout
 
     private let children: [ASDisplayNode]
     private let borderNode = ASDisplayNode()
@@ -243,13 +248,7 @@ final class DetailQuoteBlockNode: ASDisplayNode, ThemeRefreshableNode {
         contentStack.children = children
         contentStack.style.flexGrow = 1
         contentStack.style.flexShrink = 1
-        let contentInsets = UIEdgeInsets(
-            top: Layout.insets.top,
-            left: Layout.contentSpacing,
-            bottom: Layout.insets.bottom,
-            right: Layout.insets.right
-        )
-        let paddedContent = ASInsetLayoutSpec(insets: contentInsets, child: contentStack)
+        let paddedContent = ASInsetLayoutSpec(insets: Layout.insets, child: contentStack)
         paddedContent.style.flexGrow = 1
         paddedContent.style.flexShrink = 1
 
@@ -290,7 +289,7 @@ final class DetailIFrameLinkNode: ASDisplayNode {
     }
 }
 
-private final class DetailIFrameLinkView: UIControl {
+final class DetailIFrameLinkView: UIControl {
     private let iframeBlock: RenderedIFrameLinkBlock
     private let onTapped: () -> Void
     private let titleLabel = UILabel()
@@ -679,7 +678,7 @@ enum DetailCodeBlockLayout {
     }
 }
 
-private final class DetailTableScrollView: UIScrollView {
+final class DetailTableScrollView: UIScrollView {
     private let table: RenderedTableBlock
     private let tableImageURLs: [URL]
     private let onImageTapped: ([URL], Int) -> Void
@@ -900,8 +899,9 @@ private final class DetailTableCellView: UIView {
                 .foregroundColor: textColor
             ]
         )
+        // 只上色不加 .link：UILabel 会把 .link 画成系统蓝，点击由 DetailTableLinkTapHandler 按区间处理。
         for link in links where NSMaxRange(link.nsRange) <= attributed.length {
-            attributed.addAttributes(NodeSeekLinkStyle.attributes(url: link.url), range: link.nsRange)
+            attributed.addAttribute(.foregroundColor, value: NodeSeekLinkStyle.color, range: link.nsRange)
         }
         return attributed
     }

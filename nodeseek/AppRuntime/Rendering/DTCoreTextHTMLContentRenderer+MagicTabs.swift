@@ -8,7 +8,7 @@
 import Foundation
 import Kanna
 
-extension DTCoreTextHTMLContentRenderer {
+nonisolated extension DTCoreTextHTMLContentRenderer {
     func expandNodeSeekMagicTabs(in fragment: String) -> String {
         guard fragment.contains("nsk-magic-tabs") else { return fragment }
         guard let document = try? HTML(

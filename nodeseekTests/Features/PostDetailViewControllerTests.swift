@@ -164,9 +164,9 @@ struct FrequentPostBrowsingReproductionTests {
                 await waitForDetailContent(in: controller)
                 try await verify(controller, window: window, label: "refresh-\(iteration)-again")
             } else if scenario == "scroll" {
-                controller.tableNode.view.setContentOffset(CGPoint(x: 0, y: 700), animated: false)
+                controller.collectionList.view.setContentOffset(CGPoint(x: 0, y: 700), animated: false)
                 try await Task.sleep(nanoseconds: 100_000_000)
-                controller.tableNode.view.setContentOffset(.zero, animated: false)
+                controller.collectionList.view.setContentOffset(.zero, animated: false)
                 try await verify(controller, window: window, label: "scroll-\(iteration)-return")
             } else if scenario == "reopen" {
                 navigation.popViewController(animated: false)
@@ -301,10 +301,10 @@ struct PostDetailViewControllerTests {
     @Test func authorRiskWarningPersistsAfterReactionUpdateAndIgnoresOtherPosts() {
         let controller = PostDetailViewController(presenter: SpyPostDetailPresenter())
         let detail = PostDetail(id: "975028", title: "测试帖子", authorName: "楼主", avatarURL: nil, metadataText: "拼车", contentHTML: "正文", comments: [])
-        controller.configureHeader(PostDetailHeaderContent(detail: detail), renderedContent: nil)
+        controller.configureHeader(PostDetailHeaderContent(detail: detail))
         controller.updateAuthorRiskWarning(postID: detail.id, isVisible: true)
         #expect(controller.authorRiskWarningPostID == detail.id)
-        controller.configureHeader(PostDetailHeaderContent(detail: detail.updatingPostLikeState(count: 1, isClicked: true)), renderedContent: nil)
+        controller.configureHeader(PostDetailHeaderContent(detail: detail.updatingPostLikeState(count: 1, isClicked: true)))
         controller.updateAuthorRiskWarning(postID: detail.id, isVisible: true)
         #expect(controller.authorRiskWarningPostID == detail.id)
         controller.updateAuthorRiskWarning(postID: "other", isVisible: true)
@@ -319,65 +319,6 @@ struct PostDetailViewControllerTests {
         let normal = PostBodyCellNode(content: header, renderedContent: [], onImageTapped: { _, _ in }, onTextLayoutInvalidated: {})
         let warning = PostBodyCellNode(content: header, renderedContent: [], onImageTapped: { _, _ in }, showsAuthorRiskWarning: true, onTextLayoutInvalidated: {})
         #expect(warning.layoutThatFits(range).size.height > normal.layoutThatFits(range).size.height + 60)
-    }
-
-    @Test func updatingAuthorBadgesReloadsHeaderAndPreservesRenderedBody() async throws {
-        let controller = PostDetailViewController(presenter: SpyPostDetailPresenter())
-        controller.loadViewIfNeeded()
-        let detail = PostDetail(
-            id: "956253", title: "标签测试", authorName: "Neutralize", avatarURL: nil,
-            metadataText: "刚刚", contentHTML: "<p>正文</p>", comments: []
-        )
-        controller.render(detail: detail)
-        await waitForDetailContent(in: controller)
-        let didRenderBody = await waitUntil { controller.headerRenderedContent != nil && controller.pendingReloadIndexPaths.isEmpty }
-        #expect(didRenderBody)
-        controller.headerRenderedContent = [.unsupported(reason: "cached-header")]
-
-        controller.updatePostBody(detail: PostDetail(
-            id: detail.id, title: detail.title, authorName: detail.authorName,
-            authorBadgeTexts: ["临时禁言"], avatarURL: nil,
-            metadataText: detail.metadataText, contentHTML: detail.contentHTML, comments: []
-        ))
-        #expect(controller.pendingReloadIndexPaths == [IndexPath(row: 0, section: 0)])
-        #expect(controller.headerRenderedContent?.testUnsupportedReasons() == ["cached-header"])
-        await tearDownPostDetailTextureViewController(controller)
-    }
-
-    @Test(arguments: [false, true])
-    func authorRiskWarningUpdatesExistingCellWithoutReload(isVisible: Bool) async throws {
-        let controller = PostDetailViewController(presenter: SpyPostDetailPresenter())
-        controller.loadViewIfNeeded()
-        controller.view.frame = CGRect(x: 0, y: 0, width: 320, height: 800)
-        controller.view.layoutIfNeeded()
-        let detail = PostDetail(id: "975028", title: "测试帖子", authorName: "楼主", avatarURL: nil, metadataText: "拼车", contentHTML: "<p>保持原来的正文</p>", comments: [])
-        controller.render(detail: detail)
-        await waitForDetailContent(in: controller)
-        let didRenderBody = await waitUntil { controller.headerRenderedContent != nil && controller.pendingReloadIndexPaths.isEmpty }
-        #expect(didRenderBody)
-        controller.tableNode.waitUntilAllUpdatesAreProcessed()
-        let indexPath = IndexPath(row: 0, section: 0)
-        let originalNode = try #require(controller.tableNode.nodeForRow(at: indexPath) as? PostBodyCellNode)
-        let range = ASSizeRange(min: .zero, max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude))
-        let originalHeight = originalNode.layoutThatFits(range).size.height
-
-        controller.updateAuthorRiskWarning(postID: detail.id, isVisible: isVisible)
-        #expect(controller.pendingReloadIndexPaths.isEmpty)
-        controller.tableNode.waitUntilAllUpdatesAreProcessed()
-        #expect(controller.tableNode.nodeForRow(at: indexPath) === originalNode)
-        let updatedHeight = originalNode.layoutThatFits(range).size.height
-        if isVisible {
-            #expect(updatedHeight > originalHeight + 60)
-        } else {
-            #expect(updatedHeight == originalHeight)
-        }
-
-        controller.updateAuthorRiskWarning(postID: detail.id, isVisible: false)
-        #expect(controller.pendingReloadIndexPaths.isEmpty)
-        controller.tableNode.waitUntilAllUpdatesAreProcessed()
-        #expect(controller.tableNode.nodeForRow(at: indexPath) === originalNode)
-        #expect(originalNode.layoutThatFits(range).size.height == originalHeight)
-        await tearDownPostDetailTextureViewController(controller)
     }
 
     @Test func startsWithSkeletonRowsEvenWhenInitialHeaderExists() async throws {
@@ -399,8 +340,7 @@ struct PostDetailViewControllerTests {
 
         viewController.loadViewIfNeeded()
 
-        let tableView = try #require(viewController.view.firstSubview(of: UITableView.self))
-        #expect(tableView.tableHeaderView == nil)
+        _ = try #require(viewController.view.firstSubview(of: UICollectionView.self))
         #expect(viewController.testRowCount(inSection: 0) == 5)
 
         viewController.render(detail: PostDetail(
@@ -430,7 +370,7 @@ struct PostDetailViewControllerTests {
         viewController.loadViewIfNeeded()
         viewController.showLoading()
 
-        _ = try #require(viewController.view.firstSubview(of: UITableView.self))
+        _ = try #require(viewController.view.firstSubview(of: UICollectionView.self))
         #expect(viewController.testRowCount(inSection: 0) == 5)
 
         viewController.render(detail: PostDetail(
@@ -445,35 +385,6 @@ struct PostDetailViewControllerTests {
         await waitForDetailContent(in: viewController, expectedRowCount: 1)
 
         #expect(viewController.testRowCount(inSection: 0) == 1)
-    }
-
-    @Test func initialDetailKeepsSkeletonUntilBodyRenderCompletes() async throws {
-        let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
-
-        viewController.loadViewIfNeeded()
-        viewController.showLoading()
-        viewController.render(detail: PostDetail(
-            id: "703863",
-            title: "详情标题",
-            authorName: "ipv4",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            comments: [
-                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: "1min ago", contentHTML: "<p>评论一</p>")
-            ],
-        ))
-
-        #expect(viewController.testRowCount(inSection: 0) == 5)
-
-        await waitUntil {
-            viewController.testRowCount(inSection: 0) == 3
-                && viewController.headerRenderedContent != nil
-                && viewController.renderedCommentIDs.contains("1")
-        }
-
-        #expect(viewController.testRowCount(inSection: 0) == 3)
     }
 
     @Test func detailWithPaginationKeepsOnlyContentRows() async throws {
@@ -505,7 +416,7 @@ struct PostDetailViewControllerTests {
         ))
         await waitForDetailContent(in: viewController, expectedRowCount: 4)
 
-        _ = try #require(viewController.view.firstSubview(of: UITableView.self))
+        _ = try #require(viewController.view.firstSubview(of: UICollectionView.self))
         #expect(viewController.testRowCount(inSection: 0) == 4)
     }
 
@@ -660,11 +571,11 @@ struct PostDetailViewControllerTests {
         ))
         await waitForDetailContent(in: viewController, expectedRowCount: 3)
 
-        let button = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-refresh-comments-at-end-button"))
+        let button = try #require(viewController.loadMoreCommentsContainer.firstButton(accessibilityIdentifier: "post-detail-refresh-comments-at-end-button"))
         #expect(button.isHidden == false)
         #expect(button.configuration?.title == "点击加载新评论")
         #expect(button.configuration?.image == nil)
-        let footer = try #require(viewController.tableNode.view.tableFooterView)
+        let footer = viewController.loadMoreCommentsContainer
         #expect(footer.subviews.contains { $0.backgroundColor == .separator })
 
         button.sendActions(for: .touchUpInside)
@@ -803,49 +714,6 @@ struct PostDetailViewControllerTests {
         #expect(viewController.testHeaderContent()?.contentHTML == "<p>原帖正文</p>")
     }
 
-    @Test func refreshingSamePageReusesRenderedContentWhenOnlyMetadataChanges() async throws {
-        let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
-        let detail = PostDetail(
-            id: "703863",
-            title: "详情标题",
-            authorName: "ipv4",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>原帖正文</p>",
-            comments: [
-                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: "1min ago", contentHTML: "<p>评论一</p>")
-            ],
-            page: 1
-        )
-
-        viewController.loadViewIfNeeded()
-        viewController.render(detail: detail)
-        await waitForDetailContent(in: viewController)
-        let headerCache = [RenderedContentBlock.unsupported(reason: "cached-header")]
-        let commentCache = [RenderedContentBlock.unsupported(reason: "cached-comment")]
-        viewController.headerRenderedContent = headerCache
-        viewController.commentRenderedCache["1"] = commentCache
-        viewController.renderedCommentIDs.insert("1")
-
-        viewController.render(detail: PostDetail(
-            id: "703863",
-            title: "详情标题",
-            authorName: "ipv4",
-            avatarURL: nil,
-            metadataText: "1 分钟前",
-            contentHTML: "<p>原帖正文</p>",
-            comments: [
-                Comment(id: "1", authorName: "a", avatarURL: nil, floorText: "#1", createdAtText: "2min ago", contentHTML: "<p>评论一</p>")
-            ],
-            page: 1
-        ))
-
-        #expect(viewController.headerRenderedContent?.testUnsupportedReasons() == ["cached-header"])
-        #expect(viewController.commentRenderedCache["1"]?.testUnsupportedReasons() == ["cached-comment"])
-        #expect(viewController.renderedCommentIDs.contains("1"))
-    }
-
     @Test func updatingPostBodyWithReactionOnlyDoesNotTriggerHeaderReload() async throws {
         let presenter = SpyPostDetailPresenter()
         let viewController = PostDetailViewController(presenter: presenter)
@@ -866,9 +734,6 @@ struct PostDetailViewControllerTests {
         viewController.render(detail: detail)
         await waitForDetailContent(in: viewController, expectedRowCount: 1)
 
-        let headerCache = [RenderedContentBlock.unsupported(reason: "cached-header")]
-        viewController.headerRenderedContent = headerCache
-
         viewController.updatePostBody(detail: PostDetail(
             id: "703863",
             title: "详情标题",
@@ -882,7 +747,6 @@ struct PostDetailViewControllerTests {
             page: 1
         ))
 
-        #expect(viewController.headerRenderedContent?.testUnsupportedReasons() == ["cached-header"])
         #expect(viewController.testHeaderContent()?.favoriteCount == 2)
         #expect(viewController.testHeaderContent()?.isFavoriteCollected == true)
     }
@@ -932,9 +796,9 @@ struct PostDetailViewControllerTests {
         #expect(viewController.testRowCount(inSection: 0) == 3)
     }
 
-    @Test func tappingPostChickenLegRequiresConfirmationBeforeSubmitting() throws {
+    @Test func tappingPostChickenLegRequiresConfirmationBeforeSubmitting() async throws {
         let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
+        let viewController = PostDetailViewController(presenter: presenter, accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true))
         let header = PostDetailHeaderContent(
             postID: "710379",
             title: "带操作区的主题",
@@ -952,6 +816,8 @@ struct PostDetailViewControllerTests {
         }
 
         viewController.handlePostChickenLegTap(header)
+        // 先确认已登录，再弹出确认框。
+        _ = await waitUntil(timeout: 2) { confirmationContext != nil }
 
         #expect(confirmationContext == .postChickenLeg)
         #expect(presenter.didTapPostChickenLegCount == 0)
@@ -962,9 +828,9 @@ struct PostDetailViewControllerTests {
         #expect(presenter.didTapPostChickenLegCount == 1)
     }
 
-    @Test func tappingCommentChickenLegRequiresConfirmationBeforeSubmitting() throws {
+    @Test func tappingCommentChickenLegRequiresConfirmationBeforeSubmitting() async throws {
         let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
+        let viewController = PostDetailViewController(presenter: presenter, accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true))
         let comment = Comment(
             id: "9835758",
             authorName: "mist",
@@ -982,6 +848,8 @@ struct PostDetailViewControllerTests {
         }
 
         viewController.handleCommentChickenLegTap(comment)
+        // 先确认已登录，再弹出确认框。
+        _ = await waitUntil(timeout: 2) { confirmationContext != nil }
 
         #expect(confirmationContext == .commentChickenLeg)
         #expect(presenter.chickenLeggedCommentIDs.isEmpty)
@@ -992,9 +860,9 @@ struct PostDetailViewControllerTests {
         #expect(presenter.chickenLeggedCommentIDs == ["9835758"])
     }
 
-    @Test func tappingPostLikeRequiresConfirmationBeforeSubmitting() throws {
+    @Test func tappingPostLikeRequiresConfirmationBeforeSubmitting() async throws {
         let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
+        let viewController = PostDetailViewController(presenter: presenter, accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true))
         let header = PostDetailHeaderContent(
             postID: "710379",
             title: "带操作区的主题",
@@ -1012,6 +880,8 @@ struct PostDetailViewControllerTests {
         }
 
         viewController.handlePostLikeTap(header)
+        // 先确认已登录，再弹出确认框。
+        _ = await waitUntil(timeout: 2) { confirmationContext != nil }
 
         #expect(confirmationContext == .postLike)
         #expect(presenter.didTapPostLikeCount == 0)
@@ -1022,9 +892,9 @@ struct PostDetailViewControllerTests {
         #expect(presenter.didTapPostLikeCount == 1)
     }
 
-    @Test func tappingCommentLikeRequiresConfirmationBeforeSubmitting() throws {
+    @Test func tappingCommentLikeRequiresConfirmationBeforeSubmitting() async throws {
         let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
+        let viewController = PostDetailViewController(presenter: presenter, accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true))
         let comment = Comment(
             id: "9835758",
             authorName: "mist",
@@ -1042,6 +912,8 @@ struct PostDetailViewControllerTests {
         }
 
         viewController.handleCommentLikeTap(comment)
+        // 先确认已登录，再弹出确认框。
+        _ = await waitUntil(timeout: 2) { confirmationContext != nil }
 
         #expect(confirmationContext == .commentLike)
         #expect(presenter.likedCommentIDs.isEmpty)
@@ -1052,9 +924,9 @@ struct PostDetailViewControllerTests {
         #expect(presenter.likedCommentIDs == ["9835758"])
     }
 
-    @Test func tappingPostOpposeRequiresConfirmationBeforeSubmitting() throws {
+    @Test func tappingPostOpposeRequiresConfirmationBeforeSubmitting() async throws {
         let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
+        let viewController = PostDetailViewController(presenter: presenter, accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true))
         let header = PostDetailHeaderContent(
             postID: "710379",
             title: "带操作区的主题",
@@ -1072,6 +944,8 @@ struct PostDetailViewControllerTests {
         }
 
         viewController.handlePostOpposeTap(header)
+        // 先确认已登录，再弹出确认框。
+        _ = await waitUntil(timeout: 2) { confirmationContext != nil }
 
         #expect(confirmationContext == .postOppose)
         #expect(presenter.didTapPostOpposeCount == 0)
@@ -1082,9 +956,9 @@ struct PostDetailViewControllerTests {
         #expect(presenter.didTapPostOpposeCount == 1)
     }
 
-    @Test func tappingCommentOpposeRequiresConfirmationBeforeSubmitting() throws {
+    @Test func tappingCommentOpposeRequiresConfirmationBeforeSubmitting() async throws {
         let presenter = SpyPostDetailPresenter()
-        let viewController = PostDetailViewController(presenter: presenter)
+        let viewController = PostDetailViewController(presenter: presenter, accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true))
         let comment = Comment(
             id: "9835758",
             authorName: "mist",
@@ -1102,6 +976,8 @@ struct PostDetailViewControllerTests {
         }
 
         viewController.handleCommentOpposeTap(comment)
+        // 先确认已登录，再弹出确认框。
+        _ = await waitUntil(timeout: 2) { confirmationContext != nil }
 
         #expect(confirmationContext == .commentOppose)
         #expect(presenter.opposedCommentIDs.isEmpty)
@@ -1240,7 +1116,12 @@ struct PostDetailViewControllerTests {
             currentPage: 2
         )
         let navigationController = UINavigationController(rootViewController: viewController)
-        viewController.loadViewIfNeeded()
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = navigationController
+        window.makeKeyAndVisible()
+        window.layoutIfNeeded()
+        defer { window.isHidden = true; window.rootViewController = nil }
         viewController.render(detail: PostDetail(
             id: "703863",
             title: "详情标题",
@@ -1293,7 +1174,7 @@ struct PostDetailViewControllerTests {
         await waitForDetailContent(in: viewController)
 
         // 预期：header + entryHint + divider + 1 comment
-        #expect(viewController.testRowCount() == 4)
+        #expect(viewController.testRowCount(inSection: 0) == 4)
         #expect(viewController.testDetailRowKinds() == ["header", "entryHint", "postRepliesDivider", "comment"])
     }
 
@@ -1317,7 +1198,7 @@ struct PostDetailViewControllerTests {
         viewController.openFullPostFromEntryHint()
         #expect(presenter.selectedCommentPages == [5, 1])
         #expect(viewController.testOpenedFullPostPage() == nil)
-        await tearDownPostDetailTextureViewController(viewController)
+        await tearDownPostDetailViewController(viewController)
     }
 
     @Test func jumpingBackToFirstPageHidesEntryHint() async throws {
@@ -1333,7 +1214,7 @@ struct PostDetailViewControllerTests {
         await waitForDetailContent(in: viewController)
 
         #expect(viewController.testDetailRowKinds().contains("entryHint") == false)
-        await tearDownPostDetailTextureViewController(viewController)
+        await tearDownPostDetailViewController(viewController)
     }
 
     private func makePageJumpDetail(page: Int) -> PostDetail {
@@ -1355,15 +1236,6 @@ struct PostDetailViewControllerTests {
                 nextPage: page < 5 ? page + 1 : nil
             )
         )
-    }
-
-    @Test func entryHintCellRefreshesAppearanceWhenThemeChanges() {
-        let node = PostDetailEntryHintCellNode(page: 6, onOpenFullPost: {})
-        node.layoutIfNeeded()
-
-        let didRefresh = node.refreshAppearanceForCurrentTraits()
-
-        #expect(didRefresh)
     }
 
     @Test func detailTextureCellsCanBeConstructedOffMainThread() async throws {
@@ -2272,6 +2144,10 @@ struct PostDetailViewControllerTests {
         let color = try #require(label.attributedText?.foregroundColor(for: "#AFF"))
 
         #expect(color.isClose(to: NodeSeekLinkStyle.color))
+        // UILabel 遇到 .link 会改用系统蓝绘制，点击已按区间命中，不需要这个属性。
+        let text = try #require(label.attributedText)
+        let range = (text.string as NSString).range(of: "#AFF")
+        #expect(text.attribute(.link, at: range.location, effectiveRange: nil) == nil)
     }
 
     @Test func codeBlockNodeKeepsViewportWidthForLongLines() {
@@ -2474,7 +2350,7 @@ struct PostDetailViewControllerTests {
         #expect(viewController.testPresentedPreviewUsesBottomSheet())
         #expect(viewController.testPresentedPreviewShowsFullPostButton() == false)
         #expect(viewController.testHighlightedAnchorID() == nil)
-        await tearDownPostDetailTextureViewController(viewController)
+        await tearDownPostDetailViewController(viewController)
     }
 
     @Test func loadedCommentPreviewFollowsDarkInterfaceStyleAndUsesSystemColors() async throws {
@@ -2534,7 +2410,7 @@ struct PostDetailViewControllerTests {
         )
         #expect(revealButton.configuration?.baseBackgroundColor == .secondarySystemBackground)
         #expect(revealButton.configuration?.baseForegroundColor == .label)
-        await tearDownPostDetailTextureViewController(viewController, window: window)
+        await tearDownPostDetailViewController(viewController, window: window)
     }
 
     @Test func fullPostPreviewActionOpensPostFromBeginning() async throws {
@@ -2573,7 +2449,7 @@ struct PostDetailViewControllerTests {
 
         #expect(viewController.testOpenedFullPostPage() == 1)
         #expect(viewController.testOpenedFullPostAnchorWasNil())
-        await tearDownPostDetailTextureViewController(viewController)
+        await tearDownPostDetailViewController(viewController)
     }
 
     @Test func floorPreviewShowsFullPostActionOnlyForInitialAnchorDetail() async throws {
@@ -2615,7 +2491,7 @@ struct PostDetailViewControllerTests {
         viewController.handleContentLinkTap(url)
 
         #expect(viewController.testPresentedPreviewShowsFullPostButton())
-        await tearDownPostDetailTextureViewController(viewController)
+        await tearDownPostDetailViewController(viewController)
     }
 
     @Test func loadedVisibleFloorLinkUsesExistingHighlightInsteadOfPreview() async throws {
@@ -2991,7 +2867,7 @@ struct PostDetailViewControllerTests {
             viewController.presentedViewController is LinkSelectionSheetViewController
         }
         #expect(didPresentSheet)
-        await tearDownPostDetailTextureViewController(viewController, window: window)
+        await tearDownPostDetailViewController(viewController, window: window)
     }
 
     @Test func richTextNodeUpdatesMeasuredHeightAfterNormalImageLoads() throws {
@@ -3628,60 +3504,6 @@ struct PostDetailViewControllerTests {
         #expect(after > before + 50)
     }
 
-    @Test func portraitImagesGrowInPlaceAfterRealFileLoads() async throws {
-        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
-        let window = UIWindow(windowScene: scene)
-        window.frame = scene.coordinateSpace.bounds
-        let controller = PostDetailViewController(presenter: SpyPostDetailPresenter())
-        window.rootViewController = UINavigationController(rootViewController: controller)
-        window.makeKeyAndVisible()
-        window.layoutIfNeeded()
-        defer {
-            controller.tableNode.view.removeFromSuperview()
-            window.rootViewController = nil
-            window.isHidden = true
-        }
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        let data = UIGraphicsImageRenderer(size: CGSize(width: 600, height: 900), format: format).jpegData(withCompressionQuality: 0.8) { context in
-            UIColor.systemOrange.setFill()
-            context.fill(CGRect(x: 0, y: 0, width: 600, height: 900))
-            UIColor.systemBlue.setFill()
-            context.fill(CGRect(x: 0, y: 800, width: 600, height: 100))
-        }
-        let urls = (0..<3).map { directory.appendingPathComponent("portrait-\($0).jpg") }
-        for url in urls { try data.write(to: url) }
-        let html = urls.map { "<p><img src='\($0.absoluteString)'></p>" }.joined()
-        controller.render(detail: PostDetail(
-            id: UUID().uuidString, title: "多张竖图高度回流", authorName: "Probe", avatarURL: nil,
-            metadataText: "", contentHTML: html, comments: []
-        ))
-        await waitForDetailContent(in: controller)
-        let hasCell = await waitUntil(timeout: 3) {
-            controller.tableNode.nodeForRow(at: IndexPath(row: 0, section: 0)) is PostBodyCellNode
-        }
-        #expect(hasCell)
-        let cell = try #require(controller.tableNode.nodeForRow(at: IndexPath(row: 0, section: 0)) as? PostBodyCellNode)
-        func images(in node: ASDisplayNode) -> [DetailImageBlockNode] {
-            if let image = node as? DetailImageBlockNode { return [image] }
-            return (node.subnodes ?? []).flatMap { images(in: $0) }
-        }
-        let allVisible = await waitUntil(timeout: 5) {
-            window.layoutIfNeeded()
-            let nodes = images(in: cell)
-            return nodes.count == urls.count && nodes.allSatisfy { node in
-                guard let view = node.view.subviews.first as? UIImageView, view.image != nil else { return false }
-                return abs(node.bounds.height - node.bounds.width) < 1 && view.frame.maxY <= node.bounds.height + 0.5
-            }
-        }
-        #expect(allVisible)
-        #expect(controller.tableNode.nodeForRow(at: IndexPath(row: 0, section: 0)) === cell)
-        #expect(urls.allSatisfy { controller.cachedDetailImageSize(for: $0) == CGSize(width: 600, height: 900) })
-    }
-
     @Test func imageBlockWaitsForFinalRowHeightBeforeShowingPortrait() {
         let waiting = DetailImageBlockLayout.visibleImage(
             originalSize: CGSize(width: 1200, height: 1800),
@@ -3849,6 +3671,28 @@ struct PostDetailViewControllerTests {
 
 @MainActor
 struct ReplyLoginNavigationRegressionTests {
+    @Test func guestReactionAndFavoriteOpenLoginWithoutSubmitting() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let detail = PostDetailViewController(presenter: presenter, accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: false))
+        let navigation = UINavigationController(rootViewController: detail)
+        detail.loadViewIfNeeded()
+        var confirmations = 0
+        detail.actionConfirmationPresenter = { _, _, _ in confirmations += 1 }
+        let header = PostDetailHeaderContent(postID: "1", title: "主题", authorName: "mist", avatarURL: nil,
+                                             metadataText: nil, contentHTML: "<p>正文</p>", likeCount: 1)
+        // 与回复、引用一致：游客点赞、收藏先提示登录，不弹确认框也不提交。
+        detail.handlePostLikeTap(header)
+        let likeOpensLogin = await waitUntil(timeout: 3) { navigation.topViewController is LoginWebViewController }
+        try #require(likeOpensLogin)
+        navigation.popViewController(animated: false)
+        detail.handleFavoriteTap()
+        let favoriteOpensLogin = await waitUntil(timeout: 3) { navigation.topViewController is LoginWebViewController }
+        #expect(favoriteOpensLogin)
+        #expect(confirmations == 0)
+        #expect(presenter.didTapPostLikeCount == 0)
+        #expect(presenter.didTapFavoriteCount == 0)
+    }
+
     @Test func doubleTapWhileWaitingForGuestAccountOpensOneLoginPage() async throws {
         let detail = PostDetailViewController(
             presenter: SpyPostDetailPresenter(),
@@ -4581,17 +4425,12 @@ struct PostDetailLoginViewControllerTests {
     }
 
     private func tapCommentAction(_ label: String, floor: Int, in controller: PostDetailViewController) throws {
-        let table = controller.tableNode
-        table.waitUntilAllUpdatesAreProcessed()
-        let cells = (0..<table.numberOfRows(inSection: 0)).compactMap { row in
-            table.nodeForRow(at: IndexPath(row: row, section: 0)) as? CommentCellNode
+        let comment = try #require(controller.comments.first { $0.floorText == "#\(floor)" })
+        if label == "引用评论" {
+            controller.handleQuote(comment)
+        } else {
+            controller.handleReply(to: comment)
         }
-        let cell = try #require(cells.first { $0.debugHeaderTopLineText.split(separator: " ").last == "#\(floor)" })
-        _ = cell.view
-        cell.layoutIfNeeded()
-        let buttons = (cell.subnodes ?? []).compactMap { $0 as? ASButtonNode }
-        let button = try #require(buttons.first { $0.accessibilityLabel == label })
-        button.sendActions(forControlEvents: .touchUpInside, with: nil)
     }
 
     @Test func contextBarScrollsWhenTargetsOverflowVisibleRows() async throws {
@@ -4948,7 +4787,7 @@ private final class InMemoryFloatingControlPositionStore: FloatingControlPositio
     }
 }
 
-private final class SpyPostDetailPresenter: PostDetailPresenterProtocol {
+final class SpyPostDetailPresenter: PostDetailPresenterProtocol {
     private(set) var loadCount = 0
     private(set) var didTapLoginCount = 0
     private(set) var didApproachCommentEndCount = 0
@@ -4979,8 +4818,14 @@ private final class SpyPostDetailPresenter: PostDetailPresenterProtocol {
         didTapLoginCount += 1
     }
 
-    func didApproachCommentEnd() {
+    var acceptsBatchFetch = true
+    /// 真实 presenter 发起请求时会立即显示底部加载指示器。
+    var onApproachCommentEnd: (() -> Void)?
+
+    func didApproachCommentEnd() -> Bool {
         didApproachCommentEndCount += 1
+        onApproachCommentEnd?()
+        return acceptsBatchFetch
     }
 
     func didTapRefreshCommentsAtEnd() {
@@ -5182,7 +5027,7 @@ private extension UIView {
 
 private extension PostDetailViewController {
     func testRowCount(inSection section: Int) -> Int {
-        tableNode(ASTableNode(style: .plain), numberOfRowsInSection: section)
+        displayMode == .skeleton ? 1 + skeletonCommentRowCount : detailRows.count
     }
 
     var testNavigationAuthorTitleIsVisible: Bool {
@@ -5204,10 +5049,6 @@ private extension PostDetailViewController {
         let mirror = Mirror(reflecting: value)
         guard mirror.displayStyle == .optional else { return nil }
         return mirror.children.first?.value as? PostDetailHeaderContent
-    }
-
-    func testPendingScrollRow() -> Int? {
-        Mirror(reflecting: self).children.first { $0.label == "pendingScrollToRow" }?.value as? Int
     }
 
     func testPresentedLoadedCommentID() -> String? {
@@ -5368,13 +5209,13 @@ private func waitUntil(
 }
 
 @MainActor
-private func tearDownPostDetailTextureViewController(
+private func tearDownPostDetailViewController(
     _ viewController: PostDetailViewController,
     window: UIWindow? = nil
 ) async {
     viewController.dismiss(animated: false)
     viewController.presentedViewController?.dismiss(animated: false)
-    viewController.tableNode.view.removeFromSuperview()
+    viewController.collectionList.view.removeFromSuperview()
     window?.rootViewController = nil
     window?.isHidden = true
     await Task.yield()

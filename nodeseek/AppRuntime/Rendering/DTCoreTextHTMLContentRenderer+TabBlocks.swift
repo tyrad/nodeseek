@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 import Kanna
 
-extension DTCoreTextHTMLContentRenderer {
+nonisolated extension DTCoreTextHTMLContentRenderer {
     func renderMagicTabs(in fragment: String, baseURL: URL, maxImageWidth: CGFloat) -> [RenderedContentBlock]? {
         guard fragment.contains("nsk-magic-tabs"),
               let document = try? HTML(html: "<div id=\"__tabs_root__\">\(fragment)</div>", encoding: .utf8),

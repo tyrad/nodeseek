@@ -606,6 +606,23 @@ struct KannaNodeSeekParserTests {
         #expect(detail.favoriteCount == 10)
     }
 
+    @Test func favoriteCountIgnoresEditorNameAndYearBeforeMenuIsMounted() throws {
+        let url = URL(string: "https://www.nodeseek.com/post-1068729-1")!
+        let parser = KannaNodeSeekParser(baseURL: url)
+        for count in [nil, 0, 2026] as [Int?] {
+            let config = count.map { "<script id='nodeseek-captured-config' type='application/json'>{\"postData\":{\"collectionCount\":\($0)}}</script>" } ?? ""
+            let html = """
+            <div class="nsk-post"><div class="post-title"><h1><a class="post-title-link">主题</a></h1></div>
+            <div id="0" data-comment-id="1" class="content-item">
+            <span class="date-updated" title="Edited 2026-11-20 22:06:19 by 珍宝收藏家">edited 8min ago</span>
+            <article class="post-content"><a title="收藏教程 2019">第 2 章</a></article>
+            <div class="comment-menu-mount"></div></div></div>\(config)
+            """
+            let detail = try parser.parsePostDetail(html: html, url: url)
+            #expect(detail.favoriteCount == count)
+        }
+    }
+
     @Test func parsesFavoriteCountFromRenderedMenuBeforeGenericStarMatches() throws {
         let html = """
         <div class="nsk-post">
@@ -657,7 +674,7 @@ struct KannaNodeSeekParserTests {
     func legacyFavoriteButtonReadsOnlyStandaloneSiblingCounts(text: String, expected: Int?) throws {
         let html = """
         <div class="nsk-post"><div class="post-title"><h1>测试</h1></div>
-          <div id="0" class="content-item"><article class="post-content">正文</article>
+          <div id="0" class="content-item"><article class="post-content">正文<span class="comment-menu-mount"></span></article>
             <button title="收藏"></button><span>\(text)</span>
           </div>
         </div>
@@ -1036,6 +1053,39 @@ struct KannaNodeSeekParserTests {
         #expect(detail.isRestricted)
         #expect(detail.contentHTML == "本帖已经被用户设为私有，您没有阅读权限")
         #expect(detail.comments.isEmpty)
+    }
+
+    @Test(arguments: [
+        ("404 Not Found😭", nil), ("请在 24 小时后重试", nil),
+        ("403 权限不足，查看本帖需要 Lv. 2，您当前 Lv1", 2),
+        ("您当前 Lv3，权限不足", nil), ("需要注册用户才能查看", nil)
+    ] as [(String, Int?)])
+    func onlyAnExplicitRequiredLevelProducesABadge(notice: String, level: Int?) throws {
+        let parser = KannaNodeSeekParser(baseURL: URL(string: "https://www.nodeseek.com")!)
+        let html = "<title>NodeSeek</title><div id='nsk-body'><div id='nsk-body-left'><p>\(notice)</p></div></div>"
+        let detail = try parser.parsePostDetail(html: html, url: URL(string: "https://www.nodeseek.com/post-42-1")!)
+        #expect(detail.requiredReadingLevel == level)
+        #expect(detail.isRestricted)
+        #expect(detail.visibleMarkdown == nil)
+        #expect(detail.contentHTML == notice)
+        if notice.hasPrefix("404") {
+            #expect(detail.title == NSLocalizedString("帖子不存在", tableName: "DetailPrototype", comment: ""))
+        }
+    }
+
+    @Test func ordinaryPostCanDiscuss404WithoutBecomingUnavailable() throws {
+        let html = """
+        <div id="nsk-body"><div id="nsk-body-left"><div class="nsk-post">
+        <div class="post-title"><h1><a class="post-title-link">排查 404</a></h1></div>
+        <div class="content-item"><article class="post-content"><p>404 Not Found😭</p></article></div>
+        </div></div></div>
+        """
+        let url = URL(string: "https://www.nodeseek.com/post-42-1")!
+        let detail = try KannaNodeSeekParser(baseURL: url).parsePostDetail(html: html, url: url)
+        #expect(detail.title == "排查 404")
+        #expect(!detail.isRestricted)
+        #expect(detail.requiredReadingLevel == nil)
+        #expect(detail.contentHTML.contains("404 Not Found"))
     }
 
     @Test func parsesUnknownNodeSeekEmptyStateNoticeFromBodyLeftFallback() throws {

@@ -6,7 +6,6 @@
 //
 
 import UIKit
-import AsyncDisplayKit
 
 enum PostDetailLinkDestination {
     case vote(Int)
@@ -199,22 +198,12 @@ class PostDetailViewController: UIViewController {
     var currentHeaderContent: PostDetailHeaderContent?
     var authorRiskWarningPostID: String?
     var pagination: PostDetailPagination?
-    var headerRenderedContent: [RenderedContentBlock]?
     var comments: [Comment] = []
     var loadedCommentPageRanges: [Int: Range<Int>] = [:]
-    var commentRenderedCache: [String: [RenderedContentBlock]] = [:]
-    var renderedCommentIDs: Set<String> = []
-    var commentRenderInFlight: Set<String> = []
     var detailImageSizeCache: [URL: CGSize] = [:]
-    var renderGeneration: Int = 0
     let sourcePostURL: URL?
     var photoBrowserPresenter: DetailPhotoBrowserPresenter?
-    var attachmentLayoutRefreshWorkItem: DispatchWorkItem?
-    var tableReloadWorkItem: DispatchWorkItem?
-    var initialContentRevealWorkItem: DispatchWorkItem?
-    var pendingInitialContentRevealGeneration: Int?
     var pendingInitialAnchorID: String?
-    var pendingReloadIndexPaths: Set<IndexPath> = []
     var displayMode: DisplayMode = .skeleton
     var hasRenderedDetailContent = false
     var showsReplyEntry = false
@@ -223,7 +212,6 @@ class PostDetailViewController: UIViewController {
     var replyContextBarHeightConstraint: NSLayoutConstraint?
     var replyStickerPickerHeightConstraint: NSLayoutConstraint?
     let leadingScreensForBatching: CGFloat = 2.0
-    var lastBatchFetchRequestedCommentCount: Int?
     var authorFilter: PostDetailAuthorFilter?
     var authorFilterAutoLoadStreak = 0
     var authorFilterAutoLoadWorkItem: DispatchWorkItem?
@@ -247,7 +235,6 @@ class PostDetailViewController: UIViewController {
         viewController.present(alert, animated: true)
     }
     #if DEBUG
-    var pendingScrollToRow: Int?
     var testVisibleAnchorIDs: Set<String>?
     var testPresentedLoadedCommentID: String?
     var testHighlightedAnchorID: String?
@@ -266,13 +253,10 @@ class PostDetailViewController: UIViewController {
     let nodeImageUploadClient: NodeImageUploading
     let pasteboardStringWriter: PasteboardStringWriter
     var imageUploadTask: Task<Void, Never>?
-    let renderQueue = DispatchQueue(
-        label: "com.nodeseek.app.postdetail.render",
-        qos: .userInitiated
-    )
     let initialContentRevealTimeout: TimeInterval = 0.6
 
-    let tableNode = ASTableNode(style: .plain)
+    private(set) lazy var collectionList = PostDetailCollectionList(page: self)
+    var detailScrollView: UIScrollView { collectionList.view }
     var toastHideWorkItem: DispatchWorkItem?
     lazy var toastIconWidthConstraint = toastIconView.widthAnchor.constraint(equalToConstant: 18)
     lazy var toastLabelLeadingConstraint = toastLabel.leadingAnchor.constraint(equalTo: toastIconView.trailingAnchor, constant: 8)
@@ -612,11 +596,8 @@ class PostDetailViewController: UIViewController {
         self.pasteboardStringWriter = pasteboardStringWriter
         super.init(nibName: nil, bundle: nil)
 
-        if let initialHeader {
-            currentHeaderContent = initialHeader
-            headerRenderedContent = nil
-            scheduleHeaderRender(for: initialHeader)
-        }
+        _ = collectionList
+        currentHeaderContent = initialHeader
     }
 
     required init?(coder: NSCoder) {
@@ -624,8 +605,6 @@ class PostDetailViewController: UIViewController {
     }
 
     deinit {
-        attachmentLayoutRefreshWorkItem?.cancel()
-        tableReloadWorkItem?.cancel()
         toastHideWorkItem?.cancel()
         authorFilterAutoLoadWorkItem?.cancel()
         pageIndicatorHideWorkItem?.cancel()
@@ -653,6 +632,7 @@ class PostDetailViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        collectionList.updateAppearance()
         floatingReplyButtonContainer.updateFloatingEdgeInsets(
             in: view,
             horizontalAnchorView: replyButtonAnchorView
@@ -720,25 +700,17 @@ class PostDetailViewController: UIViewController {
 
     func updateTableContentInsets() {
         let bottomInset = view.safeAreaInsets.bottom
-        tableNode.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: bottomInset, right: 0)
-        tableNode.view.verticalScrollIndicatorInsets.bottom = bottomInset
+        let insets = UIEdgeInsets(top: 0, left: 0, bottom: bottomInset, right: 0)
+        collectionList.view.contentInset = insets
+        detailScrollView.verticalScrollIndicatorInsets.bottom = bottomInset
     }
 
     func setupUI() {
         view.backgroundColor = UIColor.systemBackground
-        tableNode.dataSource = self
-        tableNode.delegate = self
-        tableNode.leadingScreensForBatching = leadingScreensForBatching
-        // 屏幕上方的图片加载后变高时，保持当前可见内容位置不动。
-        tableNode.automaticallyAdjustsContentOffset = true
-        tableNode.view.backgroundColor = UIColor.systemBackground
-        tableNode.view.separatorStyle = .none
-        tableNode.view.showsVerticalScrollIndicator = true
-        tableNode.view.tableFooterView = loadMoreCommentsContainer
         updateTableContentInsets()
-        tableNode.view.translatesAutoresizingMaskIntoConstraints = false
+        detailScrollView.translatesAutoresizingMaskIntoConstraints = false
 
-        view.addSubview(tableNode.view)
+        view.addSubview(detailScrollView)
         view.addSubview(loadingIndicator)
         loginButton.addTarget(self, action: #selector(loginButtonTapped), for: .touchUpInside)
         loadMoreCommentsRefreshButton.addTarget(self, action: #selector(refreshCommentsAtEndTapped), for: .touchUpInside)
@@ -769,10 +741,10 @@ class PostDetailViewController: UIViewController {
         self.replyContextBarHeightConstraint = replyContextBarHeightConstraint
         self.replyStickerPickerHeightConstraint = replyStickerPickerHeightConstraint
         NSLayoutConstraint.activate([
-            tableNode.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableNode.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableNode.view.topAnchor.constraint(equalTo: view.topAnchor),
-            tableNode.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            detailScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            detailScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            detailScrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            detailScrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
             loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
@@ -898,16 +870,7 @@ class PostDetailViewController: UIViewController {
     }
 
     private func invalidateRenderedContentAndReload() {
-        renderGeneration += 1
-        commentRenderInFlight.removeAll(keepingCapacity: true)
-        commentRenderedCache.removeAll(keepingCapacity: true)
-        renderedCommentIDs.removeAll(keepingCapacity: true)
-        if let currentHeaderContent {
-            headerRenderedContent = nil
-            scheduleHeaderRender(for: currentHeaderContent)
-        }
-        reloadTableData()
-        preheatCommentRender(for: comments)
+        collectionList.invalidate()
     }
 
     func configureReplyEditor() {
@@ -945,14 +908,13 @@ class PostDetailViewController: UIViewController {
         tapGesture.cancelsTouchesInView = false
         tapGesture.delegate = self
         view.addGestureRecognizer(tapGesture)
-        tableNode.view.keyboardDismissMode = .onDrag
+        detailScrollView.keyboardDismissMode = .onDrag
     }
 
-    func configureHeader(_ content: PostDetailHeaderContent, renderedContent: [RenderedContentBlock]?) {
+    func configureHeader(_ content: PostDetailHeaderContent) {
         currentHeaderContent = content
-        headerRenderedContent = renderedContent
         configureNavigationAuthorTitle(with: content)
-        updateNavigationAuthorVisibility(contentOffsetY: tableNode.contentOffset.y, animated: false)
+        updateNavigationAuthorVisibility(contentOffsetY: detailScrollView.contentOffset.y, animated: false)
     }
 
     func configureNavigationAuthorTitle(with content: PostDetailHeaderContent) {
@@ -984,10 +946,8 @@ class PostDetailViewController: UIViewController {
     }
 
     func reloadTableData() {
-        tableReloadWorkItem?.cancel()
-        pendingReloadIndexPaths.removeAll()
         guard isViewLoaded else { return }
-        tableNode.reloadData()
+        collectionList.reload()
     }
 
     func cachedDetailImageSize(for url: URL) -> CGSize? {
@@ -1010,54 +970,10 @@ class PostDetailViewController: UIViewController {
     }
 
     #if DEBUG
-    func testRowCount() -> Int {
-        tableNode(tableNode, numberOfRowsInSection: 0)
-    }
-
     var testPendingInitialAnchorID: String? {
         pendingInitialAnchorID
     }
     #endif
-
-    func scheduleHeaderReload() {
-        guard currentHeaderContent != nil else { return }
-        guard displayMode == .content else { return }
-        guard let row = detailRows.firstIndex(where: { if case .header = $0 { return true }; return false }) else { return }
-        scheduleRowsReload([IndexPath(row: row, section: 0)])
-    }
-
-    func scheduleCommentReload(commentID: String) {
-        guard let commentIndex = comments.firstIndex(where: { $0.id == commentID }) else { return }
-        guard let row = detailRows.firstIndex(where: {
-            if case .comment(let index) = $0 {
-                return index == commentIndex
-            }
-            return false
-        }) else { return }
-        scheduleRowsReload([IndexPath(row: row, section: 0)])
-    }
-
-    func scheduleRowsReload(_ indexPaths: [IndexPath]) {
-        guard isViewLoaded else { return }
-        let rowCount = tableNode(self.tableNode, numberOfRowsInSection: 0)
-        let validIndexPaths = indexPaths.filter { $0.section == 0 && $0.row >= 0 && $0.row < rowCount }
-        guard validIndexPaths.isEmpty == false else { return }
-
-        pendingReloadIndexPaths.formUnion(validIndexPaths)
-        tableReloadWorkItem?.cancel()
-
-        let workItem = DispatchWorkItem { [weak self] in
-            guard let self, self.isViewLoaded else { return }
-            let reloadIndexPaths = self.pendingReloadIndexPaths.sorted {
-                $0.section == $1.section ? $0.row < $1.row : $0.section < $1.section
-            }
-            self.pendingReloadIndexPaths.removeAll()
-            guard reloadIndexPaths.isEmpty == false else { return }
-            self.tableNode.reloadRows(at: reloadIndexPaths, with: .none)
-        }
-        tableReloadWorkItem = workItem
-        DispatchQueue.main.async(execute: workItem)
-    }
 
     func showLoadingSkeletonIfNeeded() {
         guard hasRenderedDetailContent == false else { return }

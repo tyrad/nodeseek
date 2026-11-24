@@ -34,7 +34,7 @@ enum DetailSVGContentRules {
     }
 }
 
-enum DetailImageURLRules {
+nonisolated enum DetailImageURLRules {
     /// TQ 导出的分栏 PNG 已是完整报告，应按长图展示。
     static func isTCPQualityReportImage(_ url: URL) -> Bool {
         guard ["http", "https"].contains(url.scheme?.lowercased()),

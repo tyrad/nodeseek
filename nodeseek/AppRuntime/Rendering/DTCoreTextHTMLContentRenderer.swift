@@ -9,7 +9,7 @@ import DTCoreText
 import Foundation
 import UIKit
 
-enum NodeSeekLinkStyle {
+nonisolated enum NodeSeekLinkStyle {
     static let color = UIColor(red: 15 / 255, green: 128 / 255, blue: 85 / 255, alpha: 1)
 
     static func attributes(url: URL) -> [NSAttributedString.Key: Any] {
@@ -20,7 +20,7 @@ enum NodeSeekLinkStyle {
     }
 }
 
-enum NodeSeekSignatureStyle {
+nonisolated enum NodeSeekSignatureStyle {
     static let linkAttribute = NSAttributedString.Key("NodeSeekSignatureLinkAttribute")
     static let textColor = UIColor.secondaryLabel
     static let linkColor = UIColor(red: 111 / 255, green: 163 / 255, blue: 143 / 255, alpha: 0.76)
@@ -34,7 +34,7 @@ enum NodeSeekSignatureStyle {
     }
 }
 
-struct DTCoreTextHTMLContentRenderer {
+nonisolated struct DTCoreTextHTMLContentRenderer {
     let stickerAspectRatioProvider: any StickerAspectRatioProviding
 
     enum Layout {
@@ -207,7 +207,7 @@ struct DTCoreTextHTMLContentRenderer {
     }
 }
 
-enum DetailAttachmentAttributes {
+nonisolated enum DetailAttachmentAttributes {
     static let fixedQuoteImage = NSAttributedString.Key("NodeSeekFixedQuoteImage")
 
     static func value(named name: String, in attributes: [AnyHashable: Any]?) -> String? {

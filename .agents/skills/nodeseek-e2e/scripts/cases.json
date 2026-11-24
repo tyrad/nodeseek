@@ -149,18 +149,95 @@
     ],
     "setup": "已登录阅读布局；短暂修改测试账号的私人收藏，恢复原状态"
   },
-  "thread-pagination": {
-    "title": "指定帖连续阅读跨页、跳末页并返回第一页",
-    "profiles": [
-      "daily"
-    ],
-    "setup": "阅读模式，公开帖子 1069173；游客或已登录均可，只更新本机浏览记录"
-  },
   "logout-session": {
     "title": "退出登录后检查我的、已打开的收藏、阅读侧栏与冷启动会话",
     "profiles": [
       "logout"
     ],
-    "setup": "专用 Profile 设备；必要时登录本机测试账号，需已有收藏，结束时保留游客状态"
+    "setup": "暂停运行，需 E2E_ALLOW_LOGOUT=1；专用 Profile 设备；必要时登录本机测试账号，需已有收藏，结束时保留游客状态"
+  },
+  "textkit-pagination": {
+    "title": "新版连续续页、末页回弹及页码面板往返",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，公开帖 1069173；临时启用 TextKit，只读"
+  },
+  "textkit-backscroll": {
+    "title": "新版从第三页原始 21 楼回滑至第二页十几楼再前进",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，公开帖 1067259；核对固定楼层 ID 和请求数，只读"
+  },
+  "textkit-paging-timing": {
+    "title": "拉过页底时超时、新手势重试、慢响应追加及末页回弹",
+    "profiles": [
+      "gesture"
+    ],
+    "setup": "AXe、iOS 模拟器；受控 HTML 传输，无需账号或网络"
+  },
+  "textkit-drag-on-button": {
+    "title": "新版在楼层底栏按钮上按住再拖动，列表滚动且不触发按钮",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，公开帖 1067259；临时启用 TextKit，只读"
+  },
+  "textkit-floor-menu": {
+    "title": "新版长按楼层弹出菜单，复制写入剪贴板，只看 TA 后从筛选条恢复",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，公开帖 1067259；临时启用 TextKit，会写本机剪贴板，只读"
+  },
+  "textkit-gallery": {
+    "title": "新版测评帖点图打开跨标签图集，左右翻页，关闭后回到原图位置",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，公开测评帖 1067722；临时启用 TextKit，只读"
+  },
+  "textkit-floor-gallery": {
+    "title": "新版点主楼配图打开同楼图集，从点中的那张开始，左右翻页后回到原图位置",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，公开帖 1072089；临时启用 TextKit，只读"
+  },
+  "textkit-guest-reaction-login": {
+    "title": "新版游客点主楼点赞、收藏先进入登录页，不弹确认框",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "须用游客设备（SIMULATOR_ID 指定）；公开帖 1071908，临时启用 TextKit；已登录设备会取消确认框并报错，不提交"
+  },
+  "textkit-link-color": {
+    "title": "新版正文与表格里的链接为站点绿，不出现系统蓝",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，公开帖 1071908；临时启用 TextKit，只读，保存逐屏截图"
+  },
+  "textkit-dark-text": {
+    "title": "新版详情页在暗黑下打开或中途切换外观，文字颜色跟着变",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，公开帖 1071908；临时启用 TextKit，会切换模拟器外观并在结束时还原"
+  },
+  "textkit-guest-hidden-post": {
+    "title": "游客打开对游客隐藏的帖子，显示登录入口而不是帖子不存在",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，未登录设备（SIMULATOR_ID 指向游客设备），帖子 1062816；临时启用 TextKit，只读"
+  },
+  "textkit-signature-link": {
+    "title": "新版详情页点签名里的链接能打开",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，已登录设备（站点只给登录用户输出签名），帖子 703863；临时启用 TextKit，只读，会打开签名里的链接"
   }
 }

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import DTCoreText
 
 enum CommentCopyTextFormatter {
     static func plainText(for comment: Comment, baseURL: URL) -> String {
@@ -24,16 +25,23 @@ enum CommentCopyTextFormatter {
         return plainText(from: blocks)
     }
 
-    static func plainText(from blocks: [RenderedContentBlock]) -> String {
-        normalizedText(blocks.compactMap { text(from: $0) }.joined(separator: "\n"))
+    static func plainText(from blocks: [RenderedContentBlock], includingStickerCodes: Bool = false) -> String {
+        normalizedText(blocks.compactMap { text(from: $0, includingStickerCodes: includingStickerCodes) }.joined(separator: "\n"))
     }
 
-    private static func text(from block: RenderedContentBlock) -> String? {
+    private static func text(from block: RenderedContentBlock, includingStickerCodes: Bool) -> String? {
         switch block {
         case .vote(let id):
             return "nsapp://vote?id=\(id)"
         case .text(let attributedText):
-            return attributedText.string
+            guard includingStickerCodes else { return attributedText.string }
+            let text = NSMutableString(string: attributedText.string)
+            attributedText.enumerateAttribute(.attachment, in: NSRange(location: 0, length: attributedText.length), options: .reverse) { value, range, _ in
+                guard let url = (value as? DTTextAttachment)?.contentURL,
+                      let token = NodeSeekStickerLibrary.token(for: url) else { return }
+                text.replaceCharacters(in: range, with: ":\(token):")
+            }
+            return text as String
         case .table(let table):
             let rows = table.rows.map { row in
                 row.cells.map(\.text).joined(separator: "\t")
@@ -44,12 +52,13 @@ enum CommentCopyTextFormatter {
         case .terminal(let terminal):
             return DTCoreTextHTMLContentRenderer().stripANSICodes(from: terminal.ansi)
         case .tabs(let tabs):
-            return tabs.sections.map { $0.title + "\n" + plainText(from: $0.blocks) }.joined(separator: "\n")
+            return tabs.sections.map { $0.title + "\n" + plainText(from: $0.blocks, includingStickerCodes: includingStickerCodes) }.joined(separator: "\n")
         case .quote(let quoteBlock):
-            return plainText(from: quoteBlock.children)
+            return plainText(from: quoteBlock.children, includingStickerCodes: includingStickerCodes)
         case .iframeLink(let iframe):
             return iframe.openURL.absoluteString
         case .image(let image):
+            if includingStickerCodes, let token = NodeSeekStickerLibrary.token(for: image.url) { return ":\(token):" }
             return image.altText
         case .imagePlaceholder, .unsupported:
             return nil
