@@ -204,6 +204,12 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
                 Self.pushPostDetail(post: PostListRouter.postSummary(from: record), page: 1, anchorID: nil, from: viewController)
             }
             return viewController
+        case .hot:
+            let viewController = HotListViewController()
+            viewController.onSelectPost = { [weak viewController] post in
+                Self.pushPostDetail(post: post, page: 1, anchorID: nil, from: viewController)
+            }
+            return viewController
         case .discussions:
             let viewController = UserDiscussionsViewController(title: item.title)
             viewController.onSelectPost = { [weak viewController] post, page, anchorID in

@@ -130,6 +130,14 @@ class PostListRouter: PostListRouterProtocol {
         show(recentViewController)
     }
 
+    func navigateToHotList() {
+        let hotListViewController = HotListViewController()
+        hotListViewController.onSelectPost = { [weak self, weak hotListViewController] post in
+            self?.pushPostDetail(post: post, page: 1, anchorID: nil, from: hotListViewController)
+        }
+        show(hotListViewController)
+    }
+
     func navigateToUserDiscussions() {
         let viewController = UserDiscussionsViewController()
         viewController.onSelectPost = { [weak self, weak viewController] post, page, anchorID in

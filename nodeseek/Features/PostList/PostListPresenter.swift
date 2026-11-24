@@ -122,6 +122,10 @@ class PostListPresenter: PostListPresenterProtocol {
         router.navigateToRecentVisitedPosts(visitedStore: visitedStore)
     }
 
+    func didTapHotList() {
+        router.navigateToHotList()
+    }
+
     func didTapUserDiscussions() {
         router.navigateToUserDiscussions()
     }
