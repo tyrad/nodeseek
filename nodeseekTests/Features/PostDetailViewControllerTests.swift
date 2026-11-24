@@ -2600,7 +2600,7 @@ struct PostDetailViewControllerTests {
 
     @Test func resolvesOtherNodeSeekLinksToWebView() throws {
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
-        let url = try #require(URL(string: "/member?t=linda", relativeTo: baseURL)?.absoluteURL)
+        let url = try #require(URL(string: "/member?q=linda", relativeTo: baseURL)?.absoluteURL)
 
         let destination = try #require(PostDetailLinkResolver.destination(for: url, baseURL: baseURL))
 
@@ -2608,7 +2608,75 @@ struct PostDetailViewControllerTests {
             Issue.record("Expected web destination")
             return
         }
-        #expect(resolvedURL.absoluteString == "https://www.nodeseek.com/member?t=linda")
+        #expect(resolvedURL.absoluteString == "https://www.nodeseek.com/member?q=linda")
+    }
+
+    @Test func resolvesMentionLinksToMemberName() throws {
+        let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
+        let url = try #require(URL(string: "/member?t=%E5%B0%8F%E6%98%8E", relativeTo: baseURL)?.absoluteURL)
+
+        let destination = try #require(PostDetailLinkResolver.destination(for: url, baseURL: baseURL))
+
+        guard case .memberName(let name, let resolvedURL) = destination else {
+            Issue.record("Expected member name destination")
+            return
+        }
+        #expect(name == "小明")
+        #expect(resolvedURL.absoluteString == "https://www.nodeseek.com/member?t=%E5%B0%8F%E6%98%8E")
+    }
+
+    @Test func mentionOfLoadedAuthorOpensNativeProfileWithoutLookup() async throws {
+        let finder = StubMemberFinder(result: .success([]))
+        let (controller, navigation) = mentionTestController(finder: finder)
+        controller.handleContentLinkTap(try #require(URL(string: "https://www.nodeseek.com/member?t=Alice")))
+        let opened = await waitUntil { navigation.topViewController is UserProfileViewController }
+        #expect(opened)
+        #expect(navigation.topViewController.flatMap(Self.profileUID) == 1541)
+        #expect(finder.keywords.isEmpty)
+    }
+
+    @Test func mentionOfOtherUserLooksUpExactNameAndOpensNativeProfile() async throws {
+        let finder = StubMemberFinder(result: .success([
+            member(9, "Bobby"), member(7, "bob")
+        ]))
+        let (controller, navigation) = mentionTestController(finder: finder)
+        controller.handleContentLinkTap(try #require(URL(string: "https://www.nodeseek.com/member?t=Bob")))
+        let opened = await waitUntil { navigation.topViewController is UserProfileViewController }
+        #expect(opened)
+        #expect(navigation.topViewController.flatMap(Self.profileUID) == 7)
+        #expect(finder.keywords == ["Bob"])
+    }
+
+    @Test func mentionLookupFailureFallsBackToWebPage() async throws {
+        let finder = StubMemberFinder(result: .failure(URLError(.notConnectedToInternet)))
+        let (controller, navigation) = mentionTestController(finder: finder)
+        controller.handleContentLinkTap(try #require(URL(string: "https://www.nodeseek.com/member?t=Carol")))
+        let opened = await waitUntil { navigation.topViewController is NodeSeekWebViewController }
+        #expect(opened)
+        #expect((navigation.topViewController as? NodeSeekWebViewController)?.testInitialURL.absoluteString == "https://www.nodeseek.com/member?t=Carol")
+    }
+
+    private func mentionTestController(finder: StubMemberFinder) -> (PostDetailViewController, UINavigationController) {
+        let controller = PostDetailViewController(presenter: SpyPostDetailPresenter())
+        controller.memberFinder = finder
+        let navigation = UINavigationController(rootViewController: controller)
+        controller.loadViewIfNeeded()
+        controller.render(detail: PostDetail(
+            id: "1", title: "标题", authorName: "Poster", avatarURL: nil, metadataText: nil, contentHTML: "正文",
+            comments: [Comment(id: "11", authorName: "Alice", avatarURL: nil,
+                               authorProfileURL: URL(string: "https://www.nodeseek.com/space/1541"),
+                               floorText: "#1", createdAtText: nil, contentHTML: "回复")]
+        ))
+        return (controller, navigation)
+    }
+
+    private func member(_ uid: Int, _ name: String) -> UserConnectionRecord {
+        UserConnectionRecord(uid: uid, name: name, rank: nil, coin: nil, stardust: nil, bio: nil,
+                             postCount: nil, commentCount: nil, fans: nil, followed: nil)
+    }
+
+    private static func profileUID(_ viewController: UIViewController) -> Int? {
+        Mirror(reflecting: viewController).children.first { $0.label == "uid" }?.value as? Int
     }
 
     @Test func resolvesNodeSeekSpaceLinksToUserProfile() throws {
@@ -5096,6 +5164,18 @@ private extension PostDetailViewController {
             if text.hasPrefix("skeletonComment") { return "skeletonComment" }
             return text
         }
+    }
+}
+
+private final class StubMemberFinder: UserSearchLoading {
+    let result: Result<[UserConnectionRecord], Error>
+    private(set) var keywords: [String] = []
+
+    init(result: Result<[UserConnectionRecord], Error>) { self.result = result }
+
+    func findMembers(keyword: String) async throws -> [UserConnectionRecord] {
+        keywords.append(keyword)
+        return try result.get()
     }
 }
 

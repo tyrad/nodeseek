@@ -87,6 +87,8 @@ extension PostDetailViewController {
             showDetailDestination(viewController)
         case .userProfile(let url):
             openUserInfo(profileURL: url)
+        case .memberName(let name, let url):
+            openMember(named: name, fallbackURL: url)
         case .web(let url):
             let webViewController = NodeSeekWebViewController(url: url)
             showDetailDestination(webViewController)
@@ -312,6 +314,29 @@ extension PostDetailViewController {
     func openUserInfo(profileURL: URL) {
         let viewController = UserProfileRouter.makeViewController(profileURL: profileURL)
         showDetailDestination(viewController)
+    }
+
+    /// 本页楼主或回复者里有同名用户时直接用其主页链接；否则按名字查 uid，查不到再打开网页。
+    func openMember(named name: String, fallbackURL: URL) {
+        let authors = [(currentHeaderContent?.authorName, currentHeaderContent?.authorProfileURL)]
+            + comments.map { ($0.authorName, $0.authorProfileURL) }
+        if let url = authors.first(where: { $0.0?.caseInsensitiveCompare(name) == .orderedSame && $0.1.flatMap(UserProfileRouter.nativeUID) != nil })?.1 {
+            openUserInfo(profileURL: url)
+            return
+        }
+        guard memberLookupTask == nil else { return }
+        let finder = memberFinder
+        memberLookupTask = Task { [weak self] in
+            let records = try? await finder.findMembers(keyword: name)
+            guard let self else { return }
+            memberLookupTask = nil
+            // 搜索是模糊匹配，只认名字完全相同（忽略大小写）的那一位。
+            if let uid = records?.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame })?.uid {
+                showDetailDestination(UserProfileViewController(uid: uid))
+            } else {
+                showDetailDestination(NodeSeekWebViewController(url: fallbackURL))
+            }
+        }
     }
 
     func consumeInitialAnchorIfNeeded() {
