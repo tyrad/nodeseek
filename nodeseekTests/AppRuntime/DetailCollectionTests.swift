@@ -305,9 +305,9 @@ final class DetailCollectionTests: XCTestCase {
         let segment = DetailTextSegment(runs: [.text(text, [], nil)], pointSize: pointSize)
         let snapshot = try DetailTextTypesetter.layout([segment], appearance: appearance, width: 220)
 
-        // 旧版按 CSS line-height 1.42 排版，大字号下行距随字号放大，中西混排也保持同一行距。
+        // 行高随字号放大，中西混排也保持同一行距。
         let distance = snapshot.lines[1].maxY - snapshot.lines[0].maxY
-        XCTAssertEqual(distance, ceil(pointSize * 1.42), accuracy: 0.5)
+        XCTAssertEqual(distance, ceil(pointSize * DetailTextTypesetter.bodyLineHeight), accuracy: 0.5)
     }
 
     func testInlineCodeKeepsBodySizeWithGaps() throws {
@@ -337,8 +337,8 @@ final class DetailCollectionTests: XCTestCase {
         last.endsList = true
         let after = DetailTextSegment(runs: [.text("结尾", [], nil)], pointSize: 17)
         let snapshot = try DetailTextTypesetter.layout([body, heading, item, last, after], appearance: appearance, width: 320)
-        // 行高取 ceil(字号 × 1.42)，标题 ×1.28；段后 12、标题前 18 后 8、列表项之间 6。
-        let bodyLine = ceil(17 * 1.42), headingLine = ceil(22 * 1.28)
+        // 正文行高取 ceil(字号 × bodyLineHeight)，标题 ×1.28；段后 12、标题前 18 后 8、列表项之间 6。
+        let bodyLine = ceil(17 * DetailTextTypesetter.bodyLineHeight), headingLine = ceil(22 * 1.28)
         XCTAssertEqual(try bottom(of: "标题", in: snapshot) - bottom(of: "正文", in: snapshot), 12 + 18 + headingLine, accuracy: 1)
         XCTAssertEqual(try bottom(of: "甲", in: snapshot) - bottom(of: "标题", in: snapshot), 8 + bodyLine, accuracy: 1)
         XCTAssertEqual(try bottom(of: "乙", in: snapshot) - bottom(of: "甲", in: snapshot), 6 + bodyLine, accuracy: 1)

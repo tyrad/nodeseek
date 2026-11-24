@@ -92,6 +92,8 @@ nonisolated struct DetailTextSegment: Sendable {
 nonisolated enum DetailTextTypesetter {
     // 使用自有属性保存跳转目标，避免 NSLayoutManager 强制覆盖站点链接颜色及下划线。
     private static let linkTarget = NSAttributedString.Key("DetailTextLinkTarget")
+    /// 正文行高是字号的倍数。
+    static let bodyLineHeight: CGFloat = 1.3
     /// 行内代码底色两侧的间隙。
     private static let codeGap: CGFloat = 4
 
@@ -167,7 +169,12 @@ nonisolated enum DetailTextTypesetter {
             // 按 CSS line-height 排版：行高为字号乘倍数后取整，额外行距不再叠加。
             style.lineSpacing = 0
             // 签名行距为 2，约为字号的 1.2 倍再加 2。
-            style.minimumLineHeight = segment.isSignature ? ceil(pointSize * 1.2 + 2) : ceil(pointSize * (segment.isHeading ? 1.28 : 1.42))
+            style.minimumLineHeight = segment.isSignature ? ceil(pointSize * 1.2 + 2) : ceil(pointSize * (segment.isHeading ? 1.28 : Self.bodyLineHeight))
+            // 中文回退到苹方，自然行高约 1.4 倍，只设下限压不下来；含表情的段落不封顶，免得表情盖住上一行。
+            if !segment.isSignature, !segment.isHeading,
+               !segment.runs.contains(where: { if case .sticker = $0 { return true } else { return false } }) {
+                style.maximumLineHeight = style.minimumLineHeight
+            }
             if segment.isListItem {
                 // 列表符号顶格，换行悬挂缩进 22；引用内不缩进。
                 let nested = CGFloat(max(0, segment.listLevel - 1)) * 22
