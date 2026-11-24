@@ -21,7 +21,7 @@ final class AppDeepLinkRouter {
             pending = (route, url)
             return
         }
-        guard nav.presentedViewController == nil else { return }
+        guard nav.presentedViewController == nil, !(top is LoginWebViewController) else { return }
         let visible = (top as? UITabBarController)?.selectedViewController ?? top
         if visible === lastPage, lastURL == url.absoluteString { return }
         composeTask?.cancel()

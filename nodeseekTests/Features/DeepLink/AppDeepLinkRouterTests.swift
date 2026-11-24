@@ -18,6 +18,17 @@ struct AppDeepLinkRouterTests {
         #expect(nav.viewControllers.count == 2)
     }
 
+    @Test func activeLoginKeepsItsNavigationStack() throws {
+        let app = AppRouter()
+        let nav = try #require(app.makeRootViewController() as? UINavigationController)
+        let source = try #require(nav.topViewController)
+        LoginWebViewController.open(from: source)
+        let url = try #require(URL(string: "nsconnect://user/1"))
+        AppDeepLinkRouter().open(.user(1), url: url, in: app)
+        #expect(nav.topViewController is LoginWebViewController)
+        #expect(nav.viewControllers.count == 2)
+    }
+
     @Test(arguments: [false, true])
     func searchInTabsReusesTheDestination(hasSearchTab: Bool) throws {
         let suite = UUID().uuidString
