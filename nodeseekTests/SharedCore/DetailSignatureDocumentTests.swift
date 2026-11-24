@@ -23,6 +23,11 @@ struct DetailSignatureDocumentTests {
         ])])
     }
 
+    @Test func linkedImageFallsBackSoTheLinkStaysTappable() {
+        // 用图片做入口的签名：图片外层的链接是作者要的跳转，原生图片块带不了链接，整段退回网页渲染。
+        #expect(blocks(#"<p><a href="https://example.com/shop"><img src="https://example.com/banner.png"></a></p>"#) == nil)
+    }
+
     @Test func leadingRulesAreDroppedLikeTexture() throws {
         // 取自 1075091 #3 的签名：旧版只画文字下方的分隔线，开头的 <hr> 不显示。
         let html = "<hr>\n<hr>\n<p>签名</p>\n<hr>\n"
