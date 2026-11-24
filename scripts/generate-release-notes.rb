@@ -9,15 +9,14 @@ require "uri"
 
 # 根据 Git 历史生成 GitHub Release 说明：
 # - 统一以当前提交可达的最近一次打包/发布 tag 为对比基线，不区分预发布与正式版
-# - 启用 AI 总结时（默认通过 GitHub Models 免配 Key），自动合并未上线功能迭代与开发期修复，并剔除已撤回的中间过程
-# - 原始提交（含工程与文档类）统一折叠保留；AI 不可用时自动降级为规则分组，不阻塞打包
+# - 配置 API Key 时（默认 DeepSeek OpenAI 兼容接口），自动合并未上线功能迭代与开发期修复，并剔除已撤回的中间过程
+# - 原始提交（含工程与文档类）统一折叠保留；未配置 Key 或调用失败时自动降级为规则分组，不阻塞打包
 module ReleaseNotesGenerator
   RELEASE_TAG_PATTERN = /\Aios\/v(\d+(?:\.\d+){1,2})(?:-build\.(\d+))?\z/.freeze
   COMMIT_SUBJECT_PATTERN = /\A([a-zA-Z][a-zA-Z0-9_-]*)(?:\(([^)]*)\))?(!)?:\s*(.+)\z/.freeze
 
-  DEFAULT_API_BASE = "https://models.github.ai/inference"
-  DEFAULT_MODEL = "openai/gpt-4.1-mini"
-  DEFAULT_FALLBACK_MODELS = %w[openai/gpt-4.1-mini openai/gpt-4o-mini].freeze
+  DEFAULT_API_BASE = "https://api.deepseek.com/v1"
+  DEFAULT_MODEL = "deepseek-chat"
   DEFAULT_TIMEOUT_SECONDS = 45
   MAX_AI_INPUT_CHARS = 12_000
 
@@ -236,18 +235,9 @@ module ReleaseNotesGenerator
     URI.parse(endpoint)
   end
 
-  def candidate_models(ai_config)
+  def resolved_model(ai_config)
     configured = ai_config.model.to_s.strip
-    configured = DEFAULT_MODEL if configured.empty?
-
-    api_base = ai_config.api_base.to_s.strip
-    api_base = DEFAULT_API_BASE if api_base.empty?
-
-    if api_base.include?("models.github.ai") && configured == DEFAULT_MODEL
-      DEFAULT_FALLBACK_MODELS
-    else
-      [configured]
-    end
+    configured.empty? ? DEFAULT_MODEL : configured
   end
 
   def build_ai_user_prompt(version:, previous_tag:, commits:)
@@ -308,54 +298,46 @@ module ReleaseNotesGenerator
     api_base = ai_config.api_base.to_s.strip
     api_base = DEFAULT_API_BASE if api_base.empty?
     uri = chat_completions_uri(api_base)
+    model_name = resolved_model(ai_config)
     timeout = (ai_config.timeout || DEFAULT_TIMEOUT_SECONDS).to_i
     requester = http_requester || method(:default_http_post)
     user_prompt = build_ai_user_prompt(version: version, previous_tag: previous_tag, commits: user_commits)
 
-    last_error = nil
-    candidate_models(ai_config).each do |model_name|
-      begin
-        headers = {
+    begin
+      status_code, body = requester.call(
+        uri: uri,
+        headers: {
           "Content-Type" => "application/json",
-          "Accept" => uri.host == "models.github.ai" ? "application/vnd.github+json" : "application/json",
+          "Accept" => "application/json",
           "Authorization" => "Bearer #{ai_config.api_key.strip}"
-        }
-        headers["X-GitHub-Api-Version"] = "2022-11-28" if uri.host == "models.github.ai"
+        },
+        payload: {
+          model: model_name,
+          temperature: 0.2,
+          max_tokens: 1500,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: user_prompt }
+          ]
+        },
+        timeout: timeout
+      )
 
-        status_code, body = requester.call(
-          uri: uri,
-          headers: headers,
-          payload: {
-            model: model_name,
-            temperature: 0.2,
-            max_tokens: 1500,
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT },
-              { role: "user", content: user_prompt }
-            ]
-          },
-          timeout: timeout
-        )
-
-        unless status_code >= 200 && status_code < 300
-          snippet = body.gsub(/\s+/, " ")[0, 200]
-          last_error = "model #{model_name} returned HTTP #{status_code}: #{snippet}"
-          next
-        end
-
-        parsed = JSON.parse(body)
-        content = parsed.dig("choices", 0, "message", "content")
-        cleaned = sanitize_ai_summary(content)
-        return cleaned if cleaned
-
-        last_error = "model #{model_name} returned empty or invalid markdown"
-      rescue StandardError => e
-        last_error = "model #{model_name} failed: #{e.class}: #{e.message}"
+      unless status_code >= 200 && status_code < 300
+        snippet = body.gsub(/\s+/, " ")[0, 200]
+        raise "model #{model_name} returned HTTP #{status_code}: #{snippet}"
       end
-    end
 
-    warn_io.puts("[release-notes] AI summarization unavailable (#{last_error}), falling back to rule-based notes.") if warn_io
-    nil
+      parsed = JSON.parse(body)
+      content = parsed.dig("choices", 0, "message", "content")
+      cleaned = sanitize_ai_summary(content)
+      return cleaned if cleaned
+
+      raise "model #{model_name} returned empty or invalid markdown"
+    rescue StandardError => e
+      warn_io.puts("[release-notes] AI summarization unavailable (#{e.class}: #{e.message}), falling back to rule-based notes.") if warn_io
+      nil
+    end
   end
 
   def render(version:, build_number:, source_ref:, release_tag:, commit:, previous_tag:, commits:, repository: nil, ai_summary: nil)
@@ -478,7 +460,7 @@ if __FILE__ == $PROGRAM_NAME
     ai_enabled: env_ai_enabled,
     api_base: ENV["RELEASE_NOTES_API_BASE"] || ReleaseNotesGenerator::DEFAULT_API_BASE,
     model: ENV["RELEASE_NOTES_MODEL"] || ReleaseNotesGenerator::DEFAULT_MODEL,
-    api_key: ENV["RELEASE_NOTES_API_KEY"] || ENV["GITHUB_TOKEN"] || ENV["GH_TOKEN"],
+    api_key: ENV["RELEASE_NOTES_API_KEY"],
     timeout: (ENV["RELEASE_NOTES_AI_TIMEOUT"] || ReleaseNotesGenerator::DEFAULT_TIMEOUT_SECONDS).to_i
   }
 

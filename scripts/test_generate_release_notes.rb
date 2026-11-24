@@ -132,7 +132,7 @@ class ReleaseNotesGeneratorTest < Minitest::Test
     end
   end
 
-  def test_ai_summary_merges_changes_and_collapses_all_raw_commits
+  def test_ai_summary_with_deepseek_merges_changes_and_collapses_all_raw_commits
     with_temp_repo do |dir|
       create_commit(dir, "a.txt", "1", "feat(init): 初始化")
       git(dir, "tag", "ios/v1.4.2-build.20261119064405")
@@ -158,9 +158,9 @@ class ReleaseNotesGeneratorTest < Minitest::Test
 
       ai_config = ReleaseNotesGenerator::AIConfig.new(
         enabled: true,
-        api_base: "https://models.github.ai/inference",
-        model: "openai/gpt-4.1-mini",
-        api_key: "ghs_test_token",
+        api_base: ReleaseNotesGenerator::DEFAULT_API_BASE,
+        model: ReleaseNotesGenerator::DEFAULT_MODEL,
+        api_key: "sk-deepseek-test",
         timeout: 30
       )
 
@@ -178,11 +178,10 @@ class ReleaseNotesGeneratorTest < Minitest::Test
 
       assert_equal 1, captured_requests.length
       req = captured_requests.first
-      assert_equal "https://models.github.ai/inference/chat/completions", req[:uri]
-      assert_equal "Bearer ghs_test_token", req[:headers]["Authorization"]
-      assert_equal "application/vnd.github+json", req[:headers]["Accept"]
-      assert_equal "2022-11-28", req[:headers]["X-GitHub-Api-Version"]
-      assert_equal "openai/gpt-4.1-mini", req[:payload][:model]
+      assert_equal "https://api.deepseek.com/v1/chat/completions", req[:uri]
+      assert_equal "Bearer sk-deepseek-test", req[:headers]["Authorization"]
+      assert_equal "application/json", req[:headers]["Accept"]
+      assert_equal "deepseek-chat", req[:payload][:model]
 
       # 验证发给模型的提交按时间从早到晚排列，且过滤掉了 docs 提交
       user_msg = req[:payload][:messages][1][:content]
@@ -199,30 +198,27 @@ class ReleaseNotesGeneratorTest < Minitest::Test
     end
   end
 
-  def test_ai_falls_back_to_secondary_github_model_when_primary_throttled
+  def test_missing_api_key_silently_skips_ai_and_uses_rule_based_notes
     with_temp_repo do |dir|
       create_commit(dir, "a.txt", "1", "feat(init): 初始化")
       git(dir, "tag", "ios/v1.4.2-build.20261119064405")
 
       create_commit(dir, "b.txt", "1", "feat(hot-list): 新增热榜页")
-      head = create_commit(dir, "c.txt", "1", "fix(hot-list): 修复热榜异常")
+      head = create_commit(dir, "c.txt", "1", "fix(detail): 修复翻页问题")
 
-      tried_models = []
-      fake_http = lambda do |payload:, **|
-        tried_models << payload[:model]
-        if payload[:model] == "openai/gpt-4.1-mini"
-          [429, "rate limited"]
-        else
-          [200, JSON.generate(choices: [{ message: { content: "### 新功能\n\n- **热榜**：新增热榜页" } }])]
-        end
+      called = false
+      fake_http = lambda do |**|
+        called = true
+        [200, "{}"]
       end
 
+      warn_buf = StringIO.new
       ai_config = ReleaseNotesGenerator::AIConfig.new(
         enabled: true,
-        api_base: "https://models.github.ai/inference",
-        model: "openai/gpt-4.1-mini",
-        api_key: "ghs_test_token",
-        timeout: 30
+        api_base: ReleaseNotesGenerator::DEFAULT_API_BASE,
+        model: ReleaseNotesGenerator::DEFAULT_MODEL,
+        api_key: "",
+        timeout: 10
       )
 
       notes = ReleaseNotesGenerator.generate(
@@ -233,11 +229,14 @@ class ReleaseNotesGeneratorTest < Minitest::Test
         release_tag: "ios/v1.5.0-build.20261125050000",
         commit: head,
         ai_config: ai_config,
-        http_requester: fake_http
+        http_requester: fake_http,
+        warn_io: warn_buf
       )
 
-      assert_equal %w[openai/gpt-4.1-mini openai/gpt-4o-mini], tried_models
-      assert_includes notes, "- **热榜**：新增热榜页"
+      refute called, "未配置 API Key 时不应发起 HTTP 请求"
+      assert_equal "", warn_buf.string
+      assert_includes notes, "### 新功能\n\n- **hot-list**：新增热榜页"
+      assert_includes notes, "### 问题修复\n\n- **detail**：修复翻页问题"
     end
   end
 
@@ -257,9 +256,9 @@ class ReleaseNotesGeneratorTest < Minitest::Test
       warn_buf = StringIO.new
       ai_config = ReleaseNotesGenerator::AIConfig.new(
         enabled: true,
-        api_base: "https://models.github.ai/inference",
-        model: "openai/gpt-4.1-mini",
-        api_key: "ghs_test_token",
+        api_base: ReleaseNotesGenerator::DEFAULT_API_BASE,
+        model: ReleaseNotesGenerator::DEFAULT_MODEL,
+        api_key: "sk-deepseek-test",
         timeout: 5
       )
 
@@ -298,9 +297,9 @@ class ReleaseNotesGeneratorTest < Minitest::Test
 
       ai_config = ReleaseNotesGenerator::AIConfig.new(
         enabled: true,
-        api_base: "https://models.github.ai/inference",
-        model: "openai/gpt-4.1-mini",
-        api_key: "ghs_test_token",
+        api_base: ReleaseNotesGenerator::DEFAULT_API_BASE,
+        model: ReleaseNotesGenerator::DEFAULT_MODEL,
+        api_key: "sk-deepseek-test",
         timeout: 10
       )
 
@@ -323,8 +322,8 @@ class ReleaseNotesGeneratorTest < Minitest::Test
 
   def test_chat_completions_uri_handles_both_base_and_full_endpoint
     assert_equal(
-      "https://models.github.ai/inference/chat/completions",
-      ReleaseNotesGenerator.chat_completions_uri("https://models.github.ai/inference/").to_s
+      "https://api.deepseek.com/v1/chat/completions",
+      ReleaseNotesGenerator.chat_completions_uri("https://api.deepseek.com/v1/").to_s
     )
     assert_equal(
       "https://example.com/v1/chat/completions",
