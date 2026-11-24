@@ -30,3 +30,6 @@
 "头像上传失败，请稍后重试" = "Couldn't upload photo. Try again later.";
 "移动和缩放" = "Move and Scale";
 "选取" = "Choose";
+"退出登录" = "Log Out";
+"将清除 NodeSeek 登录 Cookie 和本地账号状态。" = "This will clear your NodeSeek login cookies and local account data.";
+"正在退出登录…" = "Logging Out…";

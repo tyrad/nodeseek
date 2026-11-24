@@ -331,6 +331,35 @@ struct HiddenWebViewAutomationPageMatchTests {
 
 @MainActor
 struct ProfileEditPageTests {
+    @Test func logoutFitsBelowListAndRequiresConfirmation() throws {
+        let page = ProfileEditViewController(
+            uid: 1,
+            account: AccountResponse(displayName: "测试", isLoggedIn: true),
+            client: ProfileEditClientStub()
+        )
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 375, height: 667))
+        let navigation = UINavigationController(rootViewController: page)
+        window.rootViewController = navigation
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+
+        let views = Self.descendants(of: page.view)
+        let button = try #require(views.first { $0.accessibilityIdentifier == "profile-edit-logout" } as? UIButton)
+        let table = try #require(views.compactMap { $0 as? UITableView }.first)
+
+        for category in [UIContentSizeCategory.large, .extraExtraExtraLarge, .accessibilityExtraExtraExtraLarge] {
+            navigation.setOverrideTraitCollection(UITraitCollection(preferredContentSizeCategory: category), forChild: page)
+            window.layoutIfNeeded()
+            #expect(table.frame.maxY <= button.frame.minY)
+            #expect(button.bounds.height >= 44)
+            #expect(page.view.safeAreaLayoutGuide.layoutFrame.contains(button.frame))
+        }
+
+        button.sendActions(for: .touchUpInside)
+        let alert = try #require(page.presentedViewController as? UIAlertController)
+        #expect(alert.actions.map(\.style) == [.cancel, .destructive])
+    }
+
     @Test func loadFailureShowsRetryBelowAvatar() async throws {
         let client = ProfileEditClientStub()
         client.loadError = UserContentClientError.rejected("网络错误")

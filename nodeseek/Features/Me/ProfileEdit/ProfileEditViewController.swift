@@ -25,6 +25,8 @@ final class ProfileEditViewController: UIViewController {
     private let client: ProfileEditClienting
     private let avatarUploader: ProfileAvatarUploading
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
+    private let logoutButton = UIButton(type: .system)
+    private let onLogout: () -> Void
     private let headerView = ProfileEditAvatarHeaderView()
     private let statusView = ProfileEditStatusView()
     private var loadState = LoadState.loading
@@ -37,8 +39,10 @@ final class ProfileEditViewController: UIViewController {
         uid: Int,
         account: AccountResponse,
         client: ProfileEditClienting? = nil,
-        avatarUploader: ProfileAvatarUploading? = nil
+        avatarUploader: ProfileAvatarUploading? = nil,
+        onLogout: @escaping () -> Void = {}
     ) {
+        self.onLogout = onLogout
         self.uid = uid
         self.account = account
         self.client = client ?? NodeSeekProfileEditClient()
@@ -60,6 +64,7 @@ final class ProfileEditViewController: UIViewController {
         view.backgroundColor = .systemGroupedBackground
         view.accessibilityIdentifier = "profile-edit-page"
         setupNavigationItem()
+        setupLogoutButton()
         setupTableView()
         NotificationCenter.default.addObserver(
             self,
@@ -106,6 +111,53 @@ final class ProfileEditViewController: UIViewController {
         navigationItem.rightBarButtonItem = moreItem
     }
 
+    private func setupLogoutButton() {
+        logoutButton.setTitle(Self.text("退出登录"), for: .normal)
+        logoutButton.tintColor = .systemRed
+        logoutButton.backgroundColor = .secondarySystemGroupedBackground
+        logoutButton.layer.cornerRadius = 12
+        logoutButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        updateLogoutFont()
+        logoutButton.accessibilityIdentifier = "profile-edit-logout"
+        logoutButton.addAction(UIAction { [weak self] _ in self?.confirmLogout() }, for: .touchUpInside)
+        logoutButton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(logoutButton)
+        NSLayoutConstraint.activate([
+            logoutButton.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
+            logoutButton.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
+            logoutButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
+            logoutButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44)
+        ])
+    }
+
+    private func updateLogoutFont() {
+        logoutButton.titleLabel?.font = UIFontMetrics(forTextStyle: .body).scaledFont(
+            for: AppTypography.font(basePointSize: 17)
+        )
+    }
+
+    private func confirmLogout() {
+        let alert = UIAlertController(
+            title: Self.text("退出登录"),
+            message: Self.text("将清除 NodeSeek 登录 Cookie 和本地账号状态。"),
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: Self.text("取消"), style: .cancel))
+        alert.addAction(UIAlertAction(title: Self.text("退出登录"), style: .destructive) { [weak self] _ in
+            guard let self else { return }
+            view.isUserInteractionEnabled = false
+            logoutButton.setTitle(Self.text("正在退出登录…"), for: .normal)
+            Task {
+                await DefaultSettingsSessionManager().logout()
+                self.onLogout()
+                if self.navigationController?.topViewController === self {
+                    self.navigationController?.popViewController(animated: true)
+                }
+            }
+        })
+        present(alert, animated: true)
+    }
+
     private func setupTableView() {
         tableView.dataSource = self
         tableView.delegate = self
@@ -116,7 +168,7 @@ final class ProfileEditViewController: UIViewController {
             tableView.topAnchor.constraint(equalTo: view.topAnchor),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            tableView.bottomAnchor.constraint(equalTo: logoutButton.topAnchor, constant: -8)
         ])
         headerView.configure(account: account)
         headerView.onChangeAvatar = { [weak self] in self?.pickAvatar() }
@@ -133,6 +185,7 @@ final class ProfileEditViewController: UIViewController {
     }
 
     @objc private func appTextSizeDidChange() {
+        updateLogoutFont()
         headerView.updateTextSize()
         view.setNeedsLayout()
         tableView.reloadData()

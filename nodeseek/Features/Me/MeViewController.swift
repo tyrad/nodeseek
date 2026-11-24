@@ -325,7 +325,10 @@ final class MeViewController: UIViewController {
             navigationController?.pushViewController(NodeSeekWebViewController(url: NodeSeekSite.profileSettingsURL), animated: true)
             return
         }
-        navigationController?.pushViewController(ProfileEditViewController(uid: uid, account: account), animated: true)
+        let editor = ProfileEditViewController(uid: uid, account: account) { [weak self] in
+            self?.didLogOut()
+        }
+        navigationController?.pushViewController(editor, animated: true)
     }
 
     private func toggleTodayProgress() {
@@ -412,15 +415,16 @@ final class MeViewController: UIViewController {
         }
     }
 
+    private func didLogOut() {
+        NodeSeekNotificationUnreadCountEvent.post(.zero)
+        accountDidChange(AccountResponse(displayName: "游客", isLoggedIn: false))
+        accountController.refreshIfNeeded(force: true)
+        reloadHomeList()
+    }
+
     @objc private func settingsTapped() {
         router.navigateToSettings(
-            onLogout: { [weak self] in
-                NodeSeekNotificationUnreadCountEvent.post(.zero)
-                // 本地账号已清掉，先直接切到未登录，不等网络确认
-                self?.accountDidChange(AccountResponse(displayName: "游客", isLoggedIn: false))
-                self?.accountController.refreshIfNeeded(force: true)
-                self?.reloadHomeList()
-            },
+            onLogout: { [weak self] in self?.didLogOut() },
             onLogFile: { [weak self] in
                 self?.router.navigateToLogFile()
             },
