@@ -33,7 +33,11 @@ final class HotListViewController: UIViewController, TabReselectHandling {
         return stack
     }()
 
-    init(repository: HotListRepository = HotListService.shared, settings: HotListSourceSettings = .shared) {
+    init(
+        repository: HotListRepository = HotListService.shared,
+        settings: HotListSourceSettings = .shared,
+        visitedStore: VisitedPostStoreProtocol = VisitedPostStore.shared
+    ) {
         self.repository = repository
         self.settings = settings
         kinds = settings.kindOrder
@@ -41,7 +45,7 @@ final class HotListViewController: UIViewController, TabReselectHandling {
         super.init(nibName: nil, bundle: nil)
         title = HotListL10n.text("热榜")
         for kind in kinds {
-            pages[kind] = HotListPageViewController(kind: kind, repository: repository)
+            pages[kind] = HotListPageViewController(kind: kind, repository: repository, visitedStore: visitedStore)
         }
     }
 

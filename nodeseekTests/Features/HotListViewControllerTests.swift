@@ -32,6 +32,24 @@ private final class HotListFakeLoader: @unchecked Sendable {
     }
 }
 
+private final class HotListFakeVisitedStore: VisitedPostStoreProtocol {
+    private(set) var visitedIDs: Set<String>
+    private(set) var markedPosts: [PostSummary] = []
+
+    init(visitedIDs: Set<String> = []) {
+        self.visitedIDs = visitedIDs
+    }
+
+    func isVisited(postID: String) -> Bool { visitedIDs.contains(postID) }
+    func markVisited(post: PostSummary, visitedAt: Date) {
+        visitedIDs.insert(post.id)
+        markedPosts.append(post)
+    }
+    func recentRecords(limit: Int) -> [VisitedPostRecord] { [] }
+    func recentRecords(offset: Int, limit: Int) -> [VisitedPostRecord] { [] }
+    func clearAll() { visitedIDs.removeAll() }
+}
+
 @MainActor
 struct HotListViewControllerTests {
     private func makeSettings() -> HotListSourceSettings {
@@ -41,11 +59,16 @@ struct HotListViewControllerTests {
     /// 页面在显示时才请求，需挂到窗口上触发生命周期。
     private func makeViewController(
         _ loader: HotListFakeLoader,
-        settings: HotListSourceSettings? = nil
+        settings: HotListSourceSettings? = nil,
+        visitedStore: HotListFakeVisitedStore? = nil
     ) -> (HotListViewController, UIWindow) {
         let settings = settings ?? makeSettings()
         let repository = HotListRepository(settings: settings, loader: { try loader.load($0) })
-        let viewController = HotListViewController(repository: repository, settings: settings)
+        let viewController = HotListViewController(
+            repository: repository,
+            settings: settings,
+            visitedStore: visitedStore ?? HotListFakeVisitedStore()
+        )
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         window.rootViewController = UINavigationController(rootViewController: viewController)
         window.makeKeyAndVisible()
@@ -116,6 +139,32 @@ struct HotListViewControllerTests {
         withExtendedLifetime(window) {}
     }
 
+    @Test func sharesVisitedStateWithHomeAndMarksTappedPostAsRead() async throws {
+        let loader = HotListFakeLoader()
+        // 帖子 11 已在首页读过
+        let visitedStore = HotListFakeVisitedStore(visitedIDs: ["11"])
+        let (viewController, window) = makeViewController(loader, visitedStore: visitedStore)
+        try await waitUntil { table(viewController, .realtime)?.numberOfRows(inSection: 0) == 2 }
+        let page = try #require(viewController.page(for: .realtime))
+        page.tableView.layoutIfNeeded()
+
+        #expect(titleColor(page, row: 0) == .secondaryLabel)
+        #expect(titleColor(page, row: 1) == ReadingColors.unreadTitle)
+
+        page.tableView(page.tableView, didSelectRowAt: IndexPath(row: 1, section: 0))
+        #expect(visitedStore.markedPosts.map(\.id) == ["12"])
+        #expect(visitedStore.markedPosts.first?.title == "第二名")
+        page.tableView.layoutIfNeeded()
+        #expect(titleColor(page, row: 1) == .secondaryLabel)
+        withExtendedLifetime(window) {}
+    }
+
+    private func titleColor(_ page: HotListPageViewController, row: Int) -> UIColor? {
+        let cell = page.tableView.cellForRow(at: IndexPath(row: row, section: 0))
+        // 标题是第一个两行的标签
+        return cell?.contentView.hotListLabels().first { $0.numberOfLines == 2 }?.textColor
+    }
+
     @Test func failureWithoutCacheShowsRetryAndRecovers() async throws {
         let loader = HotListFakeLoader()
         loader.setFails(true)
@@ -174,6 +223,10 @@ struct HotListViewControllerTests {
 }
 
 private extension UIView {
+    func hotListLabels() -> [UILabel] {
+        ((self as? UILabel).map { [$0] } ?? []) + subviews.flatMap { $0.hotListLabels() }
+    }
+
     func hotListFirstView(accessibilityIdentifier: String) -> UIView? {
         if self.accessibilityIdentifier == accessibilityIdentifier { return self }
         for subview in subviews {

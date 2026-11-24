@@ -11,6 +11,8 @@ final class HotListPageViewController: UIViewController, UITableViewDataSource, 
     var onSelectPost: ((PostSummary) -> Void)?
 
     private let repository: HotListRepository
+    /// 与首页列表共用已读记录，点过的帖子在两处都显示为已读。
+    private let visitedStore: VisitedPostStoreProtocol
     private var entries: [HotListEntry] = []
     private var snapshot: HotListSnapshot?
     private var lastLoadFailed = false
@@ -33,9 +35,10 @@ final class HotListPageViewController: UIViewController, UITableViewDataSource, 
     }()
     let tableView = UITableView(frame: .zero, style: .plain)
 
-    init(kind: HotListKind, repository: HotListRepository) {
+    init(kind: HotListKind, repository: HotListRepository, visitedStore: VisitedPostStoreProtocol = VisitedPostStore.shared) {
         self.kind = kind
         self.repository = repository
+        self.visitedStore = visitedStore
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -71,6 +74,10 @@ final class HotListPageViewController: UIViewController, UITableViewDataSource, 
             load(userInitiated: false)
         }
         renderStrip()
+        // 从首页或详情返回时，同步其他地方新读过的帖子
+        if let visible = tableView.indexPathsForVisibleRows, !visible.isEmpty {
+            tableView.reloadRows(at: visible, with: .none)
+        }
     }
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -260,7 +267,8 @@ final class HotListPageViewController: UIViewController, UITableViewDataSource, 
         (cell as? HotListCell)?.configure(
             rank: indexPath.row + 1,
             entry: entry,
-            timeText: entry.postedAt.map(relativeText(for:))
+            timeText: entry.postedAt.map(relativeText(for:)),
+            isVisited: visitedStore.isVisited(postID: String(entry.postID))
         )
         return cell
     }
@@ -268,7 +276,11 @@ final class HotListPageViewController: UIViewController, UITableViewDataSource, 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         guard entries.indices.contains(indexPath.row) else { return }
-        onSelectPost?(entries[indexPath.row].postSummary)
+        let post = entries[indexPath.row].postSummary
+        // 点击即记为已读，和首页一样不等详情加载完成
+        visitedStore.markVisited(post: post, visitedAt: Date())
+        tableView.reloadRows(at: [indexPath], with: .none)
+        onSelectPost?(post)
     }
 
     private static func stripFont() -> UIFont {

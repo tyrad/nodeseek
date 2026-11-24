@@ -125,7 +125,8 @@ final class HotListCell: UITableViewCell {
         applyMetaRowAxis()
     }
 
-    func configure(rank: Int, entry: HotListEntry, timeText: String?) {
+    /// 已读标题用次级色，与首页列表一致。
+    func configure(rank: Int, entry: HotListEntry, timeText: String?, isVisited: Bool) {
         applyFonts()
         representedPostID = String(entry.postID)
         rankLabel.text = "\(rank)"
@@ -136,6 +137,7 @@ final class HotListCell: UITableViewCell {
         )
         rankLabel.textColor = isTop ? .label : .secondaryLabel
         titleLabel.text = entry.title
+        titleLabel.textColor = isVisited ? .secondaryLabel : ReadingColors.unreadTitle
         metaLabel.text = [entry.authorName, entry.categoryTitle, timeText]
             .compactMap { $0?.isEmpty == false ? $0 : nil }
             .joined(separator: " · ")
