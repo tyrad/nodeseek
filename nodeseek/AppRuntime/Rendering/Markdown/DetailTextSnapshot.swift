@@ -92,6 +92,8 @@ nonisolated struct DetailTextSegment: Sendable {
 nonisolated enum DetailTextTypesetter {
     // 使用自有属性保存跳转目标，避免 NSLayoutManager 强制覆盖站点链接颜色及下划线。
     private static let linkTarget = NSAttributedString.Key("DetailTextLinkTarget")
+    /// 行内代码底色两侧的间隙。
+    private static let codeGap: CGFloat = 4
 
     // 附件只负责预留空间。显式透明图避免 TextKit 在媒体视图下绘制默认文件图标。
     private static let attachmentPlaceholder: UIImage = {
@@ -111,6 +113,7 @@ nonisolated enum DetailTextTypesetter {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineSpacing = DTCoreTextHTMLContentRenderer.Layout.bodyLineSpacing
         var attachments: [(index: Int, size: CGSize, token: String, url: URL)] = []
+        var codeRanges: [NSRange] = []
         for (index, segment) in segments.enumerated() {
             if index > 0 {
                 // 两个换行保留复制出的段落。空行单独测量，避免按正文字号撑高。
@@ -140,6 +143,15 @@ nonisolated enum DetailTextTypesetter {
                     var attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: url == nil ? foreground : runLinkColor]
                     if let url { attrs[linkTarget] = url }
                     if style.contains(.strike) { attrs[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
+                    if style.contains(.code), !string.isEmpty {
+                        // 底色左右各留出间隙，避免贴住前后文字。
+                        if storage.length > start { storage.addAttribute(.kern, value: Self.codeGap, range: NSRange(location: storage.length - 1, length: 1)) }
+                        codeRanges.append(NSRange(location: storage.length, length: (string as NSString).length))
+                        let code = NSMutableAttributedString(string: string, attributes: attrs)
+                        code.addAttribute(.kern, value: Self.codeGap, range: NSRange(location: code.length - 1, length: 1))
+                        storage.append(code)
+                        continue
+                    }
                     storage.append(NSAttributedString(string: string, attributes: attrs))
                 case let .sticker(token, url):
                     let original = StickerAspectRatioCache.shared.cachedSourceSize(for: url) ?? .zero
@@ -205,6 +217,26 @@ nonisolated enum DetailTextTypesetter {
             index = NSMaxRange(range)
         }
 
+        // 行内代码按行合并字符框，画圆角底色；只缩小字号不够醒目。
+        var codeBoxes: [CGRect] = []
+        for range in codeRanges {
+            var box: (line: Int, rect: CGRect)?
+            for character in characters where NSIntersectionRange(character.range, range).length > 0 {
+                let glyph = CGRect(x: character.rect.minX, y: character.rect.minY,
+                                   width: NSMaxRange(character.range) == NSMaxRange(range) ? character.rect.width - Self.codeGap : character.rect.width,
+                                   height: character.rect.height)
+                if let current = box, current.line == character.line {
+                    box = (current.line, current.rect.union(glyph))
+                } else {
+                    if let current = box { codeBoxes.append(current.rect) }
+                    box = (character.line, glyph)
+                }
+            }
+            if let current = box { codeBoxes.append(current.rect) }
+        }
+        codeBoxes = codeBoxes.map { $0.insetBy(dx: -Self.codeGap / 2, dy: 0) }
+        let codeFill = UIColor.secondarySystemFill.resolvedColor(with: traits)
+
         var tiles: [DetailTextSnapshot.Tile] = []
         let format = UIGraphicsImageRendererFormat()
         format.scale = appearance.scale
@@ -216,6 +248,10 @@ nonisolated enum DetailTextTypesetter {
             let glyphRange = layout.glyphRange(forBoundingRect: rect, in: container)
             let image = UIGraphicsImageRenderer(size: rect.size, format: format).image { _ in
                 let origin = CGPoint(x: 0, y: -rect.minY)
+                codeFill.setFill()
+                for box in codeBoxes where box.intersects(rect) {
+                    UIBezierPath(roundedRect: box.offsetBy(dx: 0, dy: -rect.minY), cornerRadius: 3).fill()
+                }
                 layout.drawBackground(forGlyphRange: glyphRange, at: origin)
                 layout.drawGlyphs(forGlyphRange: glyphRange, at: origin)
             }

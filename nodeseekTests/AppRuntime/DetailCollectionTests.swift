@@ -310,14 +310,17 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(distance, ceil(pointSize * 1.42), accuracy: 0.5)
     }
 
-    func testInlineCodeUsesSmallerTextureCodeSize() throws {
+    func testInlineCodeUsesSmallerTextureCodeSizeWithGaps() throws {
         let appearance = DetailTextAppearance(width: 320, pointSize: 17, scale: 2, dark: false)
-        let segment = DetailTextSegment(runs: [.text("甲", [], nil), .text("乙", [.code], nil)], pointSize: 17)
+        let segment = DetailTextSegment(runs: [.text("甲", [], nil), .text("乙乙", [.code], nil), .text("丙", [], nil)], pointSize: 17)
         let snapshot = try DetailTextTypesetter.layout([segment], appearance: appearance, width: 320)
+        let boxes = snapshot.characters.map(\.rect)
+        XCTAssertEqual(boxes.count, 4)
         // 旧版样式表行内代码为 13，正文 17（取自 1074978 #3）。
-        let body = try XCTUnwrap(snapshot.characters.first).rect.width
-        let code = try XCTUnwrap(snapshot.characters.last).rect.width
-        XCTAssertEqual(code / body, 13.0 / 17.0, accuracy: 0.05)
+        XCTAssertEqual(boxes[1].width / boxes[3].width, 13.0 / 17.0, accuracy: 0.05)
+        // 代码底色两侧留有间隙，不贴住前后文字。
+        XCTAssertGreaterThanOrEqual(boxes[1].minX - boxes[0].minX, boxes[3].width + 3)
+        XCTAssertGreaterThanOrEqual(boxes[3].minX - boxes[2].minX, boxes[1].width + 3)
     }
 
     func testBlockSpacingMatchesTextureStyleSheet() throws {
