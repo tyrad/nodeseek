@@ -35,6 +35,9 @@ final class PostSummaryCell: UITableViewCell {
         return label
     }()
 
+    var onOpenAuthorPreview: ((UIViewController) -> Void)?
+    private lazy var authorPreviewInteraction = UIContextMenuInteraction(delegate: self)
+
     private var item: PostListItem?
     private var layout: PostSummaryLayout?
     /// 搜索结果的关键词；行自己补算排版（切换深浅色、宽度变化）时也要带上，首页始终为空。
@@ -53,6 +56,8 @@ final class PostSummaryCell: UITableViewCell {
         super.prepareForReuse()
         AvatarImageLoader.shared.cancel(on: avatarImageView)
         avatarImageView.image = nil
+        onOpenAuthorPreview = nil
+        avatarImageView.isUserInteractionEnabled = false
         item = nil
         layout = nil
         searchHighlightTerms = []
@@ -74,6 +79,10 @@ final class PostSummaryCell: UITableViewCell {
 
         let hasDisplayableAuthor = AuthorDisplayPolicy.isDisplayable(item.post.authorName)
         avatarImageView.isHidden = !hasDisplayableAuthor
+        avatarImageView.isUserInteractionEnabled = hasDisplayableAuthor && item.post.authorProfileURL != nil && onOpenAuthorPreview != nil
+        if avatarImageView.isUserInteractionEnabled, authorPreviewInteraction.view == nil {
+            avatarImageView.addInteraction(authorPreviewInteraction)
+        }
 
         // 同一帖子仅刷新访问状态时不重复请求头像。
         guard hasDisplayableAuthor, previousPostID != item.post.id || avatarImageView.image == nil else { return }
@@ -136,5 +145,26 @@ final class PostSummaryCell: UITableViewCell {
         contentView.addSubview(avatarImageView)
         contentView.addSubview(titleLabel)
         contentView.addSubview(metadataLabel)
+    }
+}
+
+extension PostSummaryCell: UIContextMenuInteractionDelegate {
+    func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        configurationForMenuAtLocation location: CGPoint
+    ) -> UIContextMenuConfiguration? {
+        guard let url = item?.post.authorProfileURL, onOpenAuthorPreview != nil else { return nil }
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: {
+            UserProfileRouter.makeViewController(profileURL: url)
+        })
+    }
+
+    func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        willPerformPreviewActionForMenuWith configuration: UIContextMenuConfiguration,
+        animator: UIContextMenuInteractionCommitAnimating
+    ) {
+        guard let preview = animator.previewViewController, let onOpenAuthorPreview else { return }
+        animator.addCompletion { onOpenAuthorPreview(preview) }
     }
 }

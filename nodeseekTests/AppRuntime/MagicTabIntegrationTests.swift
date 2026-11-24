@@ -240,7 +240,9 @@ final class MagicTabIntegrationTests: XCTestCase {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         let preview = UIGraphicsImageRenderer(size: CGSize(width: 368, height: 425), format: format).image { _ in }
-        imageView.image = UIImage(cgImage: try XCTUnwrap(preview.cgImage), scale: 2, orientation: .up)
+        let thumbnail = UIImage(cgImage: try XCTUnwrap(preview.cgImage), scale: 2, orientation: .up)
+        let block = try XCTUnwrap(imageNode.view as? DetailImageBlockView)
+        block.applyLoadedImage(.init(image: thumbnail, resolvedKind: nil, originalSize: CGSize(width: 1840, height: 2125)))
         imageNode.view.frame = CGRect(x: 0, y: 0, width: 368, height: 425)
         imageNode.view.layoutSubviews()
         XCTAssertEqual(imageView.contentMode, .scaleAspectFit, "内部 UIImageView 也应沿用报告类型")
@@ -280,7 +282,9 @@ final class MagicTabIntegrationTests: XCTestCase {
             let format = UIGraphicsImageRendererFormat()
             format.scale = 1
             let preview = UIGraphicsImageRenderer(size: original, format: format).image { _ in }
-            imageView.image = UIImage(cgImage: try XCTUnwrap(preview.cgImage), scale: 16, orientation: .up)
+            let thumbnail = UIImage(cgImage: try XCTUnwrap(preview.cgImage), scale: 16, orientation: .up)
+            let block = try XCTUnwrap(node.view as? DetailImageBlockView)
+            block.applyLoadedImage(.init(image: thumbnail, resolvedKind: nil, originalSize: original))
             node.view.frame = CGRect(x: 0, y: 0, width: 368, height: expectedHeight)
             node.view.layoutSubviews()
             XCTAssertEqual(imageView.contentMode, .scaleAspectFit)
@@ -290,7 +294,7 @@ final class MagicTabIntegrationTests: XCTestCase {
         let ordinary = DetailContentBlockNodeFactory.makeNodes(from: [.image(.init(url: sources[0].0, altText: nil))],
             onImageTapped: { _, _ in }, onLinkTapped: { _ in }, onTextLayoutInvalidated: {},
             imageSizeProvider: { _ in sources[0].1 })
-        XCTAssertEqual(ordinary[0].calculateSizeThatFits(range.max).height, 184, "分栏之外仍沿用普通图片展示规则")
+        XCTAssertEqual(ordinary[0].calculateSizeThatFits(range.max).height, 368, "分栏之外的普通竖图高度受栏宽限制")
     }
 
     private func waitForPhotoBrowser(in controller: UIViewController) async throws -> JXPhotoBrowserViewController {

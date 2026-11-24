@@ -23,6 +23,7 @@ final class PostTextureListView: UIView {
     }
 
     weak var delegate: PostTextureListViewDelegate?
+    var onOpenAuthorPreview: ((UIViewController) -> Void)?
     var onScroll: ((UIScrollView) -> Void)?
 
     var keyboardDismissBackgrounds: [UIView] { [self, tableView, errorStackView] }
@@ -480,7 +481,10 @@ extension PostTextureListView: UITableViewDataSource {
                 for: indexPath
             )
             let item = items[indexPath.row]
-            (cell as? PostSummaryCell)?.configure(with: item, layout: layout(for: item), searchHighlightTerms: searchHighlightTerms)
+            if let cell = cell as? PostSummaryCell {
+                cell.onOpenAuthorPreview = onOpenAuthorPreview
+                cell.configure(with: item, layout: layout(for: item), searchHighlightTerms: searchHighlightTerms)
+            }
             return cell
         case .skeleton, .firstPageError:
             return tableView.dequeueReusableCell(

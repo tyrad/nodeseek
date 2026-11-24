@@ -47,7 +47,7 @@ struct AutoCheckInAutomationScriptTests {
     @Test func boardStateNetworkErrorUsesNormalizedPayload() {
         let source = AutoCheckInAutomationScript.boardStateSource
 
-        #expect(source.contains("statusCode: null,\n          reason: \"network_error\""))
+        #expect(source.range(of: #"statusCode:\s*null,\s*reason:\s*"network_error""#, options: .regularExpression) != nil)
     }
 
     @Test func boardStateInvalidJSONDoesNotReportSuccessfulLoad() {

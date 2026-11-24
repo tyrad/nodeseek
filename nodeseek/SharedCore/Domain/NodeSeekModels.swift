@@ -50,6 +50,7 @@ nonisolated struct PostSummary: Equatable, Sendable {
     let isLocked: Bool
     let requiredReadingLevel: Int?
     let avatarURL: URL?
+    let authorProfileURL: URL?
 
     init(
         id: String,
@@ -63,7 +64,8 @@ nonisolated struct PostSummary: Equatable, Sendable {
         isPinned: Bool = false,
         isLocked: Bool = false,
         requiredReadingLevel: Int? = nil,
-        avatarURL: URL? = nil
+        avatarURL: URL? = nil,
+        authorProfileURL: URL? = nil
     ) {
         self.id = id
         self.title = title
@@ -77,6 +79,7 @@ nonisolated struct PostSummary: Equatable, Sendable {
         self.isLocked = isLocked
         self.requiredReadingLevel = requiredReadingLevel
         self.avatarURL = avatarURL
+        self.authorProfileURL = authorProfileURL
     }
 }
 

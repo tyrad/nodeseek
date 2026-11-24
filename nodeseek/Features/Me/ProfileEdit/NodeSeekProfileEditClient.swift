@@ -85,8 +85,8 @@ nonisolated struct ProfileWriteResult: Equatable {
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return nil
         }
-        // 限流等错误可能不带 success 字段，按状态码判断。
-        success = (200..<300).contains(status) && (object["success"] as? Bool ?? true)
+        let flag = object["success"] as? NSNumber
+        success = (200..<300).contains(status) && flag.map { CFGetTypeID($0) == CFBooleanGetTypeID() && $0.boolValue } == true
         message = object["message"] as? String
     }
 }

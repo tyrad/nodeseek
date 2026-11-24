@@ -143,6 +143,12 @@ struct NodeSeekProfileEditClientTests {
         #expect(fallback.calls.isEmpty)
     }
 
+    @Test func writeRequiresExplicitSuccess() {
+        for body in [#"{"message":"session expired"}"#, #"{"success":1}"#, #"{"success":null}"#] {
+            #expect(ProfileWriteResult(status: 200, data: Data(body.utf8))?.success == false)
+        }
+    }
+
     @Test func blockedSaveFallsBackToWebView() async throws {
         let fallback = ProfileSubmitterStub()
         let client = NodeSeekProfileEditClient(session: mockSession(status: 403, body: "<html>Just a moment...</html>"), fallbackSubmitter: fallback)

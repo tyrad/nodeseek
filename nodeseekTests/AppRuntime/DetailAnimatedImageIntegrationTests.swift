@@ -45,6 +45,8 @@ final class DetailAnimatedImageIntegrationTests: XCTestCase {
         XCTAssertTrue(second.isPlaying)
         NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
         XCTAssertFalse(second.isPlaying)
+        // Texture 在即将进入前台时恢复可见范围，模拟完整的系统通知顺序。
+        NotificationCenter.default.post(name: UIApplication.willEnterForegroundNotification, object: nil)
         NotificationCenter.default.post(name: UIApplication.didBecomeActiveNotification, object: nil)
         XCTAssertFalse(first.isPlaying)
         XCTAssertTrue(second.isPlaying)
