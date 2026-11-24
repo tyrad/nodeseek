@@ -152,6 +152,14 @@ struct DetailMarkdownParserTests {
         }
     }
 
+    @Test func replyThatMerelyMentionsDeletionKeepsItsMarkdown() throws {
+        // 取自 1067259 第 3 页 #22：作者自己写的「已删除」说明，网页正文与原文一致。
+        let text = "（已删除，不小心重复发布了上面的内容，抱歉——版主请帮忙删除）"
+        let payload = #"{"postData":{"comments":[{"commentId":1,"blocked":false,"markdown":"主帖"},{"commentId":2,"blocked":false,"markdown":"\#(text)"}]}}"#
+        let detail = try page(payload: payload, main: "<p>主帖</p>", reply: "<p>\(text)</p>")
+        #expect(DetailFloorSource(comment: detail.comments[0]).visibleMarkdown == text)
+    }
+
     @Test func pageNoticeOverridesAllRawContentButAReplyCannotRestrictThePage() throws {
         let payload = #"{"postData":{"comments":[{"commentId":1,"blocked":false,"markdown":"主帖"},{"commentId":2,"blocked":false,"markdown":"回复"}]}}"#
         let ordinary = try page(payload: payload, main: "主帖", reply: "<p>命令提示权限不足</p>")

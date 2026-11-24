@@ -487,9 +487,11 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
         let status = "contains(concat(' ', normalize-space(@class), ' '), ' blocked ') or contains(concat(' ', normalize-space(@class), ' '), ' deleted ') or contains(concat(' ', normalize-space(@class), ' '), ' restricted ')"
         let notices = ["权限不足", "无权查看", "已被删除", "已删除", "已屏蔽", "已被屏蔽", "登录后可见", "登陆后可见", "本帖需要"]
         let text = article.text ?? ""
-        guard !notices.contains(where: text.contains),
-              article.at_xpath("ancestor-or-self::*[\(status) or \(Self.hiddenElement)]") == nil,
+        guard article.at_xpath("ancestor-or-self::*[\(status) or \(Self.hiddenElement)]") == nil,
               article.at_xpath(".//*[\(status) or \(Self.hiddenElement)]") == nil else { return nil }
+        // 网页正文与原文一致时就是作者写的内容，即使文字里恰好有「已删除」等字样，也不会泄露隐藏内容。
+        if let visible = text.normalizedNonEmpty, markdown.normalizedNonEmpty == visible { return markdown }
+        guard !notices.contains(where: text.contains) else { return nil }
         if let visible = text.normalizedNonEmpty, article.at_css("a, img, video, pre, table, strong, em, blockquote, ul, ol, del, s, code, br, h1, h2, h3, h4, h5, h6") == nil,
            markdown.normalizedNonEmpty != visible {
             return nil
