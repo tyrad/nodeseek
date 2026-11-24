@@ -320,16 +320,20 @@ extension PostDetailViewController {
     func openMember(named name: String, fallbackURL: URL) {
         let authors = [(currentHeaderContent?.authorName, currentHeaderContent?.authorProfileURL)]
             + comments.map { ($0.authorName, $0.authorProfileURL) }
+        // 只认最后一次点击：之前还在查的名字作废，晚到的结果不再打开页面。
+        memberLookupTask?.cancel()
+        memberLookupTask = nil
         if let url = authors.first(where: { $0.0?.caseInsensitiveCompare(name) == .orderedSame && $0.1.flatMap(UserProfileRouter.nativeUID) != nil })?.1 {
             openUserInfo(profileURL: url)
             return
         }
-        guard memberLookupTask == nil else { return }
         let finder = memberFinder
         memberLookupTask = Task { [weak self] in
             let records = try? await finder.findMembers(keyword: name)
-            guard let self else { return }
+            guard let self, !Task.isCancelled else { return }
             memberLookupTask = nil
+            // 查询期间用户已离开详情页或打开了别的页面，就不再跳转。
+            guard (navigationController?.topViewController ?? self) === self, presentedViewController == nil else { return }
             // 搜索是模糊匹配，只认名字完全相同（忽略大小写）的那一位。
             if let uid = records?.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame })?.uid {
                 showDetailDestination(UserProfileViewController(uid: uid))

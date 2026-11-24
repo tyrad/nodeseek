@@ -2671,6 +2671,22 @@ struct PostDetailViewControllerTests {
         #expect((navigation.topViewController as? NodeSeekWebViewController)?.testInitialURL.absoluteString == "https://www.nodeseek.com/member?t=Carol")
     }
 
+    /// 慢网下先点需查询的人、再点本页的人：只打开最后点的那位，晚到的查询结果不再压一层页面。
+    @Test func laterMentionTapWinsOverSlowLookup() async throws {
+        let finder = StubMemberFinder(result: .success([member(7, "Carol"), member(8, "Dave")]))
+        finder.isGated = true
+        let (controller, navigation) = mentionTestController(finder: finder)
+        controller.handleContentLinkTap(try #require(URL(string: "https://www.nodeseek.com/member?t=Carol")))
+        #expect(await waitUntil { finder.keywords == ["Carol"] })
+        controller.handleContentLinkTap(try #require(URL(string: "https://www.nodeseek.com/member?t=Dave")))
+        #expect(await waitUntil { finder.keywords == ["Carol", "Dave"] })
+        finder.openGate()
+        #expect(await waitUntil { navigation.topViewController is UserProfileViewController })
+        try await Task.sleep(nanoseconds: 200_000_000)
+        #expect(navigation.viewControllers.count == 2)
+        #expect(navigation.topViewController.flatMap(Self.profileUID) == 8)
+    }
+
     private func mentionTestController(finder: StubMemberFinder) -> (PostDetailViewController, UINavigationController) {
         let controller = PostDetailViewController(presenter: SpyPostDetailPresenter())
         controller.memberFinder = finder
@@ -5185,11 +5201,21 @@ private extension PostDetailViewController {
 private final class StubMemberFinder: UserSearchLoading {
     let result: Result<[UserConnectionRecord], Error>
     private(set) var keywords: [String] = []
+    /// 打开后所有查询才返回，用来模拟慢网。
+    var isGated = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
 
     init(result: Result<[UserConnectionRecord], Error>) { self.result = result }
 
+    func openGate() {
+        isGated = false
+        waiters.forEach { $0.resume() }
+        waiters.removeAll()
+    }
+
     func findMembers(keyword: String) async throws -> [UserConnectionRecord] {
         keywords.append(keyword)
+        if isGated { await withCheckedContinuation { waiters.append($0) } }
         return try result.get()
     }
 }
