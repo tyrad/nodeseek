@@ -640,6 +640,50 @@ daily('textkit-guest-hidden-post', async ({ ui, ids, click, log, start, t }) => 
   t.diagnostic('游客打开 ' + guestHiddenPost + ' 显示登录入口');
 });
 
+// 917518 是开放中的公开投票帖。游客能读到选项，但站点只允许登录用户投票。
+const votePost = '917518';
+const voteHint = '请先登录后再投票。';
+
+async function openVoteCard({ fixture, ids, attr, scroll }, publicPost) {
+  await fixture(votePost, 1, undefined, { publicPost });
+  let status;
+  for (let i = 0; i < 8 && !(status = (await ids('name == "vote-status" AND visible == 1'))[0]); i++) {
+    if ((await ids('name BEGINSWITH "vote-option-" AND visible == 1')).length) break;
+    await scroll(.75, .45);
+  }
+  // 等投票读完，「正在加载投票…」只是中间态。
+  await waitFor(async () => {
+    const el = (await ids('name == "vote-status"'))[0];
+    const text = el && await attr(el, 'label');
+    return text !== '正在加载投票…' && ((await ids('name BEGINSWITH "vote-option-"')).length || text);
+  }, '投票卡片没有加载完成');
+  const el = (await ids('name == "vote-status"'))[0];
+  return { status: el ? await attr(el, 'label') : null, options: await ids('name BEGINSWITH "vote-option-"') };
+}
+
+daily('vote-guest-hint', async ctx => {
+  const { ids, attr, t } = ctx;
+  const { status, options } = await openVoteCard(ctx, true);
+  assert.equal(status, voteHint, '游客投票卡片没有显示登录提示');
+  assert.ok(options.length, '游客应仍能看到投票选项');
+  for (const el of options) assert.equal(await attr(el, 'enabled'), false, '游客的投票选项仍可点击');
+  assert.equal((await ids('name == "vote-submit"')).length, 0, '游客不应看到提交投票按钮');
+  t.diagnostic('游客打开 ' + votePost + '：' + options.length + ' 个选项只读，提示「' + status + '」');
+});
+
+daily('vote-member-open', async ctx => {
+  const { ids, attr, t } = ctx;
+  const { status, options } = await openVoteCard(ctx, false);
+  assert.notEqual(status, voteHint, '已登录账号仍显示登录提示');
+  assert.ok(options.length, '已登录账号没有读到投票选项');
+  const voted = status === '已投票';
+  if (!voted) {
+    for (const el of options) assert.equal(await attr(el, 'enabled'), true, '已登录且未投票时选项应可点击');
+    assert.equal((await ids('name == "vote-submit"')).length, 1, '已登录且未投票时应显示提交按钮');
+  }
+  t.diagnostic('已登录打开 ' + votePost + '：' + options.length + ' 个选项，' + (voted ? '账号已投过票' : '可选择并提交') + '，状态「' + (status ?? '无') + '」');
+});
+
 // 签名改用 TextKit 后链接是无障碍链接元素。站点只给登录用户输出签名，需 member 设备。
 daily('textkit-signature-link', async ctx => {
   const { fixture, ids, wda, attr, click, scroll, t } = ctx;
