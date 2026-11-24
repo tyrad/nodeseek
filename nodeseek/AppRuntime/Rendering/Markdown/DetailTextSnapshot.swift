@@ -131,8 +131,8 @@ nonisolated enum DetailTextTypesetter {
             for run in segment.runs {
                 switch run {
                 case let .text(string, style, url):
-                    // 旧版样式表行内代码固定比正文小一档（13 对 17），随字号设置同比缩放。
-                    var font = style.contains(.code) ? UIFont.monospacedSystemFont(ofSize: (appearance.pointSize * 13 / 17).rounded(), weight: .regular)
+                    // 行内代码与正文同字号，靠等宽字体和底色区分。
+                    var font = style.contains(.code) ? UIFont.monospacedSystemFont(ofSize: pointSize, weight: .regular)
                         : UIFont.systemFont(ofSize: pointSize)
                     var options = font.fontDescriptor.symbolicTraits
                     if style.contains(.bold) && !segment.isSignature { options.insert(.traitBold) }

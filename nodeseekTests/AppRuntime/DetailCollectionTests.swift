@@ -310,14 +310,14 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(distance, ceil(pointSize * 1.42), accuracy: 0.5)
     }
 
-    func testInlineCodeUsesSmallerTextureCodeSizeWithGaps() throws {
+    func testInlineCodeKeepsBodySizeWithGaps() throws {
         let appearance = DetailTextAppearance(width: 320, pointSize: 17, scale: 2, dark: false)
         let segment = DetailTextSegment(runs: [.text("甲", [], nil), .text("乙乙", [.code], nil), .text("丙", [], nil)], pointSize: 17)
         let snapshot = try DetailTextTypesetter.layout([segment], appearance: appearance, width: 320)
         let boxes = snapshot.characters.map(\.rect)
         XCTAssertEqual(boxes.count, 4)
-        // 旧版样式表行内代码为 13，正文 17（取自 1074978 #3）。
-        XCTAssertEqual(boxes[1].width / boxes[3].width, 13.0 / 17.0, accuracy: 0.05)
+        // 行内代码与正文同字号。
+        XCTAssertEqual(boxes[1].width, boxes[3].width, accuracy: 0.5)
         // 代码底色两侧留有间隙，不贴住前后文字。
         XCTAssertGreaterThanOrEqual(boxes[1].minX - boxes[0].minX, boxes[3].width + 3)
         XCTAssertGreaterThanOrEqual(boxes[3].minX - boxes[2].minX, boxes[1].width + 3)
