@@ -55,6 +55,8 @@ nonisolated enum DetailSignatureDocument {
                 case "code":
                     try visit(child, style: style.union(.code), link: link)
                 case "img":
+                    // 原生图片和表情都带不了外层链接，带链接的图交给网页渲染，免得点了只看大图。
+                    guard link == nil else { throw Unsupported() }
                     try image(child)
                 case "hr":
                     flush()

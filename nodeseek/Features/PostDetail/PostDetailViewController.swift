@@ -12,6 +12,8 @@ enum PostDetailLinkDestination {
     case currentPageAnchor(String)
     case nativePost(postID: String, page: Int, url: URL)
     case userProfile(URL)
+    /// 正文里的 @用户名，链接只带名字，需要换成 uid 才能进原生个人页。
+    case memberName(String, URL)
     case web(URL)
     case safari(URL)
     case externalApp(URL)
@@ -120,6 +122,11 @@ enum PostDetailLinkResolver {
         }
 
         let path = resolvedURL.path
+        if path == "/member", let name = URLComponents(url: resolvedURL, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "t" })?.value?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+            return .memberName(name, resolvedURL)
+        }
         if isUserProfilePath(path) {
             return .userProfile(resolvedURL)
         }
@@ -252,6 +259,9 @@ class PostDetailViewController: UIViewController {
     let nodeImageAPIKeyStore: NodeImageAPIKeyStoring
     let nodeImageUploadClient: NodeImageUploading
     let pasteboardStringWriter: PasteboardStringWriter
+    /// 按名字查 uid，供 @用户 跳原生个人页。
+    var memberFinder: any UserSearchLoading = NodeSeekUserContentClient()
+    var memberLookupTask: Task<Void, Never>?
     var imageUploadTask: Task<Void, Never>?
     let initialContentRevealTimeout: TimeInterval = 0.6
 
@@ -609,6 +619,7 @@ class PostDetailViewController: UIViewController {
         authorFilterAutoLoadWorkItem?.cancel()
         pageIndicatorHideWorkItem?.cancel()
         imageUploadTask?.cancel()
+        memberLookupTask?.cancel()
         NotificationCenter.default.removeObserver(self)
     }
 

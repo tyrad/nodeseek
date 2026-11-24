@@ -181,6 +181,8 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
     private var activeCommentPageRequest: CommentPageRequest?
     private var commentPageTracker = CommentPageTracker()
     private var currentDetail: PostDetail?
+    /// 跳页或刷新前已显示的分页状态；新页没加载成功时恢复，页面仍可续页和再跳页。
+    private var reloadRollback: (detail: PostDetail, page: Int, reloadPage: Int, nextPage: Int?, tracker: CommentPageTracker)?
     private var fallbackFavoriteCollectedState = false
     private var isSubmittingReply = false
     private var isSubmittingFavorite = false
@@ -239,11 +241,15 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         if let activeCommentPageRequest, activeCommentPageRequest.requestedPage != targetPage {
             staleInFlightPage = activeCommentPageRequest.requestedPage
         }
+        let previousReloadPage = reloadPage
         reloadPage = targetPage
-        reloadFromPage(targetPage)
+        reloadFromPage(targetPage, previousReloadPage: previousReloadPage)
     }
 
-    private func reloadFromPage(_ page: Int) {
+    private func reloadFromPage(_ page: Int, previousReloadPage: Int? = nil) {
+        if let currentDetail {
+            reloadRollback = (currentDetail, currentPage, previousReloadPage ?? reloadPage, nextCommentPage, commentPageTracker)
+        }
         view?.showLoading()
         activeCommentPageRequest = nil
         nextCommentPage = nil
@@ -666,6 +672,7 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
         }
         favoriteRollbackDetail = nil
         favoriteRollbackCollectedState = nil
+        reloadRollback = nil
         let commentRequest = activeCommentPageRequest
         activeCommentPageRequest = nil
         let loadedPage = max(1, response.detail.page)
@@ -821,12 +828,24 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
             view?.showFailureToast(message: "更多评论加载失败")
             return
         }
+        // 先恢复再收起加载：收起时页面会立即检查是否续页。
+        if failedRequest == nil { restoreReloadRollback() }
         view?.hideLoading()
         if case .replyRefresh = failedRequest {
             return
         } else {
             view?.showError(message: error)
         }
+    }
+
+    private func restoreReloadRollback() {
+        guard let rollback = reloadRollback else { return }
+        reloadRollback = nil
+        currentDetail = rollback.detail
+        currentPage = rollback.page
+        reloadPage = rollback.reloadPage
+        nextCommentPage = rollback.nextPage
+        commentPageTracker = rollback.tracker
     }
 
     func didCancelLoadPostDetail() {
@@ -836,6 +855,7 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
             view?.hideLoadingMoreComments()
             return
         }
+        if cancelledRequest == nil { restoreReloadRollback() }
         view?.hideLoading()
     }
 

@@ -73,6 +73,23 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         XCTAssertEqual(images.first?.accessibilityLabel, "甲")
     }
 
+    func testRepeatedImageOpensAtTheTappedPosition() async throws {
+        // 同楼重复使用同一张图（A、B、A），点第三张要从第三张打开，不能回到第一张。
+        let a = URL(string: "https://example.invalid/a.png")!
+        let b = URL(string: "https://example.invalid/b.png")!
+        let markdown = "![甲](\(a.absoluteString))\n\n![乙](\(b.absoluteString))\n\n![甲](\(a.absoluteString))"
+        let page = DetailMarkdownPrototypeController(id: "repeated-gallery", source: .init(html: "", visibleMarkdown: markdown))
+        let window = try host(page)
+        defer { window.isHidden = true }
+        try await waitFor { self.descendants(page.view, DetailImageBlockView.self).count == 3 }
+        let stack = try XCTUnwrap(descendants(page.view, DetailBlockStack.self).first)
+        var opened: ([URL], Int)?
+        stack.onPhotos = { opened = ($0, $1) }
+        descendants(page.view, DetailImageBlockView.self)[2].handleTap()
+        XCTAssertEqual(opened?.0, [a, b, a])
+        XCTAssertEqual(opened?.1, 2)
+    }
+
     func testTabImageOpensGalleryAcrossAllTabs() async throws {
         let first = URL(string: "https://example.invalid/tab-a.png")!
         let second = URL(string: "https://example.invalid/tab-b.png")!

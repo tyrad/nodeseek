@@ -305,9 +305,9 @@ final class DetailCollectionTests: XCTestCase {
         let segment = DetailTextSegment(runs: [.text(text, [], nil)], pointSize: pointSize)
         let snapshot = try DetailTextTypesetter.layout([segment], appearance: appearance, width: 220)
 
-        // 旧版按 CSS line-height 1.42 排版，大字号下行距随字号放大，中西混排也保持同一行距。
+        // 行高随字号放大，中西混排也保持同一行距。
         let distance = snapshot.lines[1].maxY - snapshot.lines[0].maxY
-        XCTAssertEqual(distance, ceil(pointSize * 1.42), accuracy: 0.5)
+        XCTAssertEqual(distance, ceil(pointSize * DetailTextTypesetter.bodyLineHeight), accuracy: 0.5)
     }
 
     func testInlineCodeKeepsBodySizeWithGaps() throws {
@@ -321,6 +321,22 @@ final class DetailCollectionTests: XCTestCase {
         // 代码底色两侧留有间隙，不贴住前后文字。
         XCTAssertGreaterThanOrEqual(boxes[1].minX - boxes[0].minX, boxes[3].width + 3)
         XCTAssertGreaterThanOrEqual(boxes[3].minX - boxes[2].minX, boxes[1].width + 3)
+    }
+
+    func testManyInlineCodesDoNotSlowLayoutDown() throws {
+        // 2 万字、500 段行内代码：底色计算曾对每段扫描全部字符，排版耗时是纯文字的约 9 倍。
+        func layout(code: Bool) throws -> TimeInterval {
+            let runs = (0..<500).flatMap { index -> [DetailDocument.Inline] in
+                [.text(String(repeating: "正文内容", count: 9) + " ", [], nil), .text("code\(index)", code ? [.code] : [], nil)]
+            }
+            let appearance = DetailTextAppearance(width: 360, pointSize: 17, scale: 3, dark: false)
+            let start = CFAbsoluteTimeGetCurrent()
+            _ = try DetailTextTypesetter.layout([DetailTextSegment(runs: runs, pointSize: 17)], appearance: appearance, width: 360)
+            return CFAbsoluteTimeGetCurrent() - start
+        }
+        let plain = try layout(code: false)
+        let code = try layout(code: true)
+        XCTAssertLessThan(code, plain * 2 + 0.05)
     }
 
     func testBlockSpacingMatchesTextureStyleSheet() throws {
@@ -337,8 +353,8 @@ final class DetailCollectionTests: XCTestCase {
         last.endsList = true
         let after = DetailTextSegment(runs: [.text("结尾", [], nil)], pointSize: 17)
         let snapshot = try DetailTextTypesetter.layout([body, heading, item, last, after], appearance: appearance, width: 320)
-        // 行高取 ceil(字号 × 1.42)，标题 ×1.28；段后 12、标题前 18 后 8、列表项之间 6。
-        let bodyLine = ceil(17 * 1.42), headingLine = ceil(22 * 1.28)
+        // 正文行高取 ceil(字号 × bodyLineHeight)，标题 ×1.28；段后 12、标题前 18 后 8、列表项之间 6。
+        let bodyLine = ceil(17 * DetailTextTypesetter.bodyLineHeight), headingLine = ceil(22 * 1.28)
         XCTAssertEqual(try bottom(of: "标题", in: snapshot) - bottom(of: "正文", in: snapshot), 12 + 18 + headingLine, accuracy: 1)
         XCTAssertEqual(try bottom(of: "甲", in: snapshot) - bottom(of: "标题", in: snapshot), 8 + bodyLine, accuracy: 1)
         XCTAssertEqual(try bottom(of: "乙", in: snapshot) - bottom(of: "甲", in: snapshot), 6 + bodyLine, accuracy: 1)

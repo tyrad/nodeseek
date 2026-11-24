@@ -296,24 +296,25 @@ final class DetailBlockStack: UIStackView {
         }
     }
 
-    /// 点图统一入口：标签内的图打开跨标签图集，其余用调用方给出的图集，从点中的那张开始。
-    private func openPhoto(_ url: URL, in view: UIView?, gallery: () -> [URL]) {
+    /// 点图统一入口：标签内的图打开跨标签图集，其余用调用方给出的图集和点中那张的位置。
+    /// 同一张图可能在楼里出现多次，位置按点中的视图算，不按地址查。
+    private func openPhoto(_ url: URL, in view: UIView?, gallery: () -> (urls: [URL], index: Int?)) {
         if let page = Self.tabPage(containing: view) { openTabGallery(page, tapped: url); return }
-        let urls = gallery()
-        guard let index = urls.firstIndex(of: url) else { onPhotos?([url], 0); return }
+        let (urls, index) = gallery()
+        guard let index, urls.indices.contains(index) else { onPhotos?([url], 0); return }
         onPhotos?(urls, index)
     }
 
     /// 整楼图片（含引用内，不含标签页）组成图集。
-    private func floorImageURLs() -> [URL] {
-        var urls: [URL] = []
+    private func floorImages() -> [DetailImageBlockView] {
+        var images: [DetailImageBlockView] = []
         func visit(_ view: UIView) {
             if view is TabPage { return }
-            if let image = view as? DetailImageBlockView { urls.append(image.url); return }
+            if let image = view as? DetailImageBlockView { images.append(image); return }
             view.subviews.forEach(visit)
         }
         visit(self)
-        return urls
+        return images
     }
 
     /// 标签内点图：先生成所有标签的图集（终端报告需截图，期间显示加载），失败时只看当前这张。
@@ -373,7 +374,7 @@ final class DetailBlockStack: UIStackView {
         let open: (URL) -> Void = { [weak self] in self?.onLink?($0) }
         let photos: ([URL], Int) -> Void = { [weak self, weak stack] urls, index in
             guard urls.indices.contains(index) else { return }
-            self?.openPhoto(urls[index], in: stack) { urls }
+            self?.openPhoto(urls[index], in: stack) { (urls, index) }
         }
         for block in blocks {
             switch block {
@@ -405,6 +406,7 @@ final class DetailBlockStack: UIStackView {
                 height = attach(view, to: stack, height: DetailImageLayout.reportPlaceholderSize(maxWidth: width).height)
             case .image(let image):
                 weak var height: NSLayoutConstraint?
+                weak var tapped: DetailImageBlockView?
                 // 标签内的图按报告图展示，点开后图集跨所有标签。
                 let inTab = Self.tabPage(containing: stack) != nil
                 let kind: DetailImageKind = inTab ? .report : DetailImageKind.resolved(isSticker: false, imageURL: image.url)
@@ -414,8 +416,12 @@ final class DetailBlockStack: UIStackView {
                     self?.onSizeChange?()
                 }, onImageTapped: { [weak self, weak stack] in
                     guard let self else { return }
-                    self.openPhoto(image.url, in: stack, gallery: self.floorImageURLs)
+                    self.openPhoto(image.url, in: stack) {
+                        let images = self.floorImages()
+                        return (images.map(\.url), images.firstIndex { $0 === tapped })
+                    }
                 })
+                tapped = view
                 // 同一进程内加载过的图按已知尺寸占位，复用或重新进入时不再先缩后撑。
                 let placeholder = imageSize?(image.url).map { DetailImageLayout.presentation(for: $0, maxWidth: width, kind: kind).size }
                     ?? (kind == .report ? DetailImageLayout.reportPlaceholderSize(maxWidth: width) : DetailImageLayout.normalPlaceholderSize(maxWidth: width))

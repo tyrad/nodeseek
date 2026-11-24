@@ -92,6 +92,8 @@ nonisolated struct DetailTextSegment: Sendable {
 nonisolated enum DetailTextTypesetter {
     // 使用自有属性保存跳转目标，避免 NSLayoutManager 强制覆盖站点链接颜色及下划线。
     private static let linkTarget = NSAttributedString.Key("DetailTextLinkTarget")
+    /// 正文行高是字号的倍数。
+    static let bodyLineHeight: CGFloat = 1.3
     /// 行内代码底色两侧的间隙。
     private static let codeGap: CGFloat = 4
 
@@ -167,7 +169,12 @@ nonisolated enum DetailTextTypesetter {
             // 按 CSS line-height 排版：行高为字号乘倍数后取整，额外行距不再叠加。
             style.lineSpacing = 0
             // 签名行距为 2，约为字号的 1.2 倍再加 2。
-            style.minimumLineHeight = segment.isSignature ? ceil(pointSize * 1.2 + 2) : ceil(pointSize * (segment.isHeading ? 1.28 : 1.42))
+            style.minimumLineHeight = segment.isSignature ? ceil(pointSize * 1.2 + 2) : ceil(pointSize * (segment.isHeading ? 1.28 : Self.bodyLineHeight))
+            // 中文回退到苹方，自然行高约 1.4 倍，只设下限压不下来；含表情的段落不封顶，免得表情盖住上一行。
+            if !segment.isSignature, !segment.isHeading,
+               !segment.runs.contains(where: { if case .sticker = $0 { return true } else { return false } }) {
+                style.maximumLineHeight = style.minimumLineHeight
+            }
             if segment.isListItem {
                 // 列表符号顶格，换行悬挂缩进 22；引用内不缩进。
                 let nested = CGFloat(max(0, segment.listLevel - 1)) * 22
@@ -219,9 +226,16 @@ nonisolated enum DetailTextTypesetter {
 
         // 行内代码按行合并字符框，画圆角底色；只缩小字号不够醒目。
         var codeBoxes: [CGRect] = []
+        // 字符框和代码区间都按文字顺序排列，一起往后走一遍，不必每段都扫描全部字符。
+        var cursor = 0
         for range in codeRanges {
             var box: (line: Int, rect: CGRect)?
-            for character in characters where NSIntersectionRange(character.range, range).length > 0 {
+            while cursor < characters.count, NSMaxRange(characters[cursor].range) <= range.location { cursor += 1 }
+            var next = cursor
+            while next < characters.count, characters[next].range.location < NSMaxRange(range) {
+                let character = characters[next]
+                next += 1
+                guard NSIntersectionRange(character.range, range).length > 0 else { continue }
                 let glyph = CGRect(x: character.rect.minX, y: character.rect.minY,
                                    width: NSMaxRange(character.range) == NSMaxRange(range) ? character.rect.width - Self.codeGap : character.rect.width,
                                    height: character.rect.height)
