@@ -12,7 +12,8 @@ final class HotListViewController: UIViewController, TabReselectHandling {
     }
 
     private let repository: HotListRepository
-    private let kinds = HotListKind.allCases
+    private let settings: HotListSourceSettings
+    private var kinds: [HotListKind]
     private var pages: [HotListKind: HotListPageViewController] = [:]
     private(set) var selectedKind: HotListKind = .realtime
     private var tabButtons: [HotListKind: CategoryTabButton] = [:]
@@ -32,8 +33,11 @@ final class HotListViewController: UIViewController, TabReselectHandling {
         return stack
     }()
 
-    init(repository: HotListRepository = HotListService.shared) {
+    init(repository: HotListRepository = HotListService.shared, settings: HotListSourceSettings = .shared) {
         self.repository = repository
+        self.settings = settings
+        kinds = settings.kindOrder
+        selectedKind = kinds.first ?? .realtime
         super.init(nibName: nil, bundle: nil)
         title = HotListL10n.text("热榜")
         for kind in kinds {
@@ -60,6 +64,10 @@ final class HotListViewController: UIViewController, TabReselectHandling {
         settingsItem.accessibilityIdentifier = "hot-list-settings-button"
         navigationItem.rightBarButtonItem = settingsItem
         setupPages()
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(kindOrderChanged),
+            name: HotListSourceSettings.orderDidChangeNotification, object: settings
+        )
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -90,14 +98,14 @@ final class HotListViewController: UIViewController, TabReselectHandling {
     // MARK: - Setup
 
     private func setupTabs() {
-        for kind in kinds {
+        for kind in HotListKind.allCases {
             let button = CategoryTabButton()
             button.setTitle(kind.tabTitle, for: .normal)
             button.accessibilityIdentifier = "hot-list-tab-\(kind.rawValue)"
             button.addAction(UIAction { [weak self] _ in self?.select(kind) }, for: .touchUpInside)
             tabButtons[kind] = button
-            tabStack.addArrangedSubview(button)
         }
+        arrangeTabButtons()
         tabStack.translatesAutoresizingMaskIntoConstraints = false
         tabStack.heightAnchor.constraint(equalToConstant: 40).isActive = true
         navigationItem.titleView = tabStack
@@ -122,6 +130,23 @@ final class HotListViewController: UIViewController, TabReselectHandling {
         }
     }
 
+    private func arrangeTabButtons() {
+        tabStack.arrangedSubviews.forEach { tabStack.removeArrangedSubview($0) }
+        for kind in kinds {
+            if let button = tabButtons[kind] { tabStack.addArrangedSubview(button) }
+        }
+    }
+
+    /// 设置页调整顺序后立即生效；当前看的榜单保持不变，列表数据和滚动位置都保留。
+    @objc private func kindOrderChanged() {
+        kinds = settings.kindOrder
+        arrangeTabButtons()
+        // 重新设置当前页，让分页控制器丢弃按旧顺序缓存的前后页
+        if let page = pages[selectedKind] {
+            pageViewController.setViewControllers([page], direction: .forward, animated: false)
+        }
+    }
+
     private func updateSelection(_ kind: HotListKind) {
         selectedKind = kind
         for (buttonKind, button) in tabButtons {
@@ -142,7 +167,7 @@ final class HotListViewController: UIViewController, TabReselectHandling {
     }
 
     @objc private func settingsTapped() {
-        navigationController?.pushViewController(HotListSettingsViewController(repository: repository), animated: true)
+        navigationController?.pushViewController(HotListSettingsViewController(repository: repository, settings: settings), animated: true)
     }
 }
 

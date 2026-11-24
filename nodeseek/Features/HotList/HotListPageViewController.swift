@@ -201,7 +201,10 @@ final class HotListPageViewController: UIViewController, UITableViewDataSource, 
                 self?.load(userInitiated: false)
             }
         } else if snapshot == nil {
-            tableView.backgroundView = HotListStateView.loading(text: HotListL10n.text("正在加载…"))
+            // 已在显示骨架屏时不重建，避免呼吸动画重新开始
+            if !(tableView.backgroundView is HotListSkeletonView) {
+                tableView.backgroundView = HotListSkeletonView()
+            }
         } else {
             tableView.backgroundView = HotListStateView.message(
                 symbolName: "flame",

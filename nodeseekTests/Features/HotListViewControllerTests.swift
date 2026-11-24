@@ -39,9 +39,13 @@ struct HotListViewControllerTests {
     }
 
     /// 页面在显示时才请求，需挂到窗口上触发生命周期。
-    private func makeViewController(_ loader: HotListFakeLoader) -> (HotListViewController, UIWindow) {
-        let repository = HotListRepository(settings: makeSettings(), loader: { try loader.load($0) })
-        let viewController = HotListViewController(repository: repository)
+    private func makeViewController(
+        _ loader: HotListFakeLoader,
+        settings: HotListSourceSettings? = nil
+    ) -> (HotListViewController, UIWindow) {
+        let settings = settings ?? makeSettings()
+        let repository = HotListRepository(settings: settings, loader: { try loader.load($0) })
+        let viewController = HotListViewController(repository: repository, settings: settings)
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         window.rootViewController = UINavigationController(rootViewController: viewController)
         window.makeKeyAndVisible()
@@ -58,6 +62,9 @@ struct HotListViewControllerTests {
         let (viewController, window) = makeViewController(loader)
         var selected: PostSummary?
         viewController.onSelectPost = { selected = $0 }
+
+        // 首次加载先显示骨架屏
+        #expect(table(viewController, .realtime)?.backgroundView is HotListSkeletonView)
 
         let titleView = try #require(viewController.navigationItem.titleView)
         #expect(titleView.hotListFirstView(accessibilityIdentifier: "hot-list-tab-realtime") != nil)
@@ -90,6 +97,25 @@ struct HotListViewControllerTests {
         withExtendedLifetime(window) {}
     }
 
+    @Test func savedOrderPutsWeeklyFirstAndOpensIt() async throws {
+        let loader = HotListFakeLoader()
+        let settings = makeSettings()
+        settings.setKindOrder([.weekly, .realtime, .daily])
+        let (viewController, window) = makeViewController(loader, settings: settings)
+
+        #expect(viewController.selectedKind == .weekly)
+        let stack = try #require(viewController.navigationItem.titleView as? UIStackView)
+        #expect(stack.arrangedSubviews.map(\.accessibilityIdentifier) == ["hot-list-tab-weekly", "hot-list-tab-realtime", "hot-list-tab-daily"])
+        try await waitUntil { table(viewController, .weekly)?.numberOfRows(inSection: 0) == 2 }
+        #expect(loader.requests == [HotListKind.weekly.defaultURL])
+
+        // 设置页改顺序后标签立即重排，当前榜单不变
+        settings.setKindOrder([.daily, .weekly, .realtime])
+        #expect(stack.arrangedSubviews.map(\.accessibilityIdentifier) == ["hot-list-tab-daily", "hot-list-tab-weekly", "hot-list-tab-realtime"])
+        #expect(viewController.selectedKind == .weekly)
+        withExtendedLifetime(window) {}
+    }
+
     @Test func failureWithoutCacheShowsRetryAndRecovers() async throws {
         let loader = HotListFakeLoader()
         loader.setFails(true)
@@ -111,13 +137,28 @@ struct HotListViewControllerTests {
         let viewController = HotListSettingsViewController(repository: repository, settings: makeSettings())
         viewController.loadViewIfNeeded()
 
-        #expect(viewController.tableView.numberOfSections == 3)
+        #expect(viewController.tableView.numberOfSections == 4)
         #expect(viewController.tableView.numberOfRows(inSection: 0) == 3)
         #expect(viewController.tableView.numberOfRows(inSection: 1) == 3)
-        let cell = viewController.tableView(viewController.tableView, cellForRowAt: IndexPath(row: 2, section: 1))
+        #expect(viewController.tableView.numberOfRows(inSection: 2) == 3)
+        let cell = viewController.tableView(viewController.tableView, cellForRowAt: IndexPath(row: 2, section: 2))
         let field = (cell as? HotListURLFieldCell)?.textField
         #expect(field?.text == HotListKind.weekly.defaultURL.absoluteString)
         #expect(field?.keyboardType == .URL)
+    }
+
+    @Test func movingOrderRowSavesNewOrder() {
+        let settings = makeSettings()
+        let repository = HotListRepository(settings: settings, loader: { _ in Data() })
+        let viewController = HotListSettingsViewController(repository: repository, settings: settings)
+        viewController.loadViewIfNeeded()
+
+        #expect(viewController.tableView.isEditing)
+        #expect(viewController.tableView(viewController.tableView, canMoveRowAt: IndexPath(row: 0, section: 0)))
+        #expect(!viewController.tableView(viewController.tableView, canMoveRowAt: IndexPath(row: 0, section: 2)))
+        viewController.tableView(viewController.tableView, moveRowAt: IndexPath(row: 2, section: 0), to: IndexPath(row: 0, section: 0))
+
+        #expect(settings.kindOrder == [.weekly, .realtime, .daily])
     }
 
     private func waitUntil(_ condition: @escaping @MainActor () -> Bool) async throws {

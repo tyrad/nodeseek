@@ -43,3 +43,5 @@
 "%@地址格式不正确" = "The %@ URL is not valid.";
 "%@地址无法使用" = "The %@ URL can't be used";
 "请填写以 https:// 开头的完整地址，留空则使用默认地址。" = "Enter a full URL starting with https://, or leave it empty to use the default.";
+"榜单顺序" = "List Order";
+"拖动调整顺序，排在第一的榜单默认打开。" = "Drag to reorder. The first list opens by default.";

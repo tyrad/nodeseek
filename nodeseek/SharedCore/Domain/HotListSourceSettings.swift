@@ -9,6 +9,7 @@ import Foundation
 nonisolated final class HotListSourceSettings: @unchecked Sendable {
     static let shared = HotListSourceSettings()
     static let didChangeNotification = Notification.Name("HotListSourceSettingsDidChange")
+    static let orderDidChangeNotification = Notification.Name("HotListSourceSettingsOrderDidChange")
 
     private let userDefaults: UserDefaults
 
@@ -44,6 +45,29 @@ nonisolated final class HotListSourceSettings: @unchecked Sendable {
         setURLs([:])
     }
 
+    /// 榜单显示顺序，排在第一的默认打开。存储值缺项或重复时按默认顺序补齐。
+    var kindOrder: [HotListKind] {
+        let stored = (userDefaults.stringArray(forKey: Self.orderKey) ?? []).compactMap(HotListKind.init(rawValue:))
+        return Self.normalizedOrder(stored)
+    }
+
+    func setKindOrder(_ order: [HotListKind]) {
+        let normalized = Self.normalizedOrder(order)
+        guard normalized != kindOrder else { return }
+        if normalized == HotListKind.allCases {
+            userDefaults.removeObject(forKey: Self.orderKey)
+        } else {
+            userDefaults.set(normalized.map(\.rawValue), forKey: Self.orderKey)
+        }
+        NotificationCenter.default.post(name: Self.orderDidChangeNotification, object: self)
+    }
+
+    static func normalizedOrder(_ order: [HotListKind]) -> [HotListKind] {
+        var seen = Set<HotListKind>()
+        let unique = order.filter { seen.insert($0).inserted }
+        return unique + HotListKind.allCases.filter { !seen.contains($0) }
+    }
+
     /// 只接受带主机名的 http/https 地址。
     static func validatedURL(from text: String) -> URL? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -57,6 +81,8 @@ nonisolated final class HotListSourceSettings: @unchecked Sendable {
         }
         return url
     }
+
+    private static let orderKey = "hotList.kindOrder"
 
     private static func key(for kind: HotListKind) -> String {
         "hotList.sourceURL.\(kind.rawValue)"

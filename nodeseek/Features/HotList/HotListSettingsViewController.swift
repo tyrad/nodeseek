@@ -8,6 +8,7 @@ import UIKit
 /// 热榜设置：展示数据来源，允许改三个接口地址。保存前逐个请求校验，任一失败都不保存。
 final class HotListSettingsViewController: UITableViewController, UITextFieldDelegate {
     private enum Section: Int, CaseIterable {
+        case order
         case source
         case urls
         case reset
@@ -24,6 +25,7 @@ final class HotListSettingsViewController: UITableViewController, UITextFieldDel
     private let repository: HotListRepository
     private let settings: HotListSourceSettings
     private var drafts: [HotListKind: String] = [:]
+    private var kindOrder: [HotListKind]
     private var lastUpdatedText = HotListL10n.text("尚未更新")
     private var isSaving = false {
         didSet { navigationItem.rightBarButtonItem?.isEnabled = !isSaving }
@@ -38,6 +40,7 @@ final class HotListSettingsViewController: UITableViewController, UITextFieldDel
     init(repository: HotListRepository, settings: HotListSourceSettings = .shared) {
         self.repository = repository
         self.settings = settings
+        kindOrder = settings.kindOrder
         super.init(style: .insetGrouped)
         title = HotListL10n.text("热榜设置")
         loadDrafts()
@@ -58,6 +61,9 @@ final class HotListSettingsViewController: UITableViewController, UITextFieldDel
         )
         navigationItem.rightBarButtonItem?.accessibilityIdentifier = "hot-list-settings-save"
         tableView.keyboardDismissMode = .interactive
+        // 常驻编辑状态只为显示顺序区的拖动手柄，其他行照常点按和输入
+        tableView.isEditing = true
+        tableView.allowsSelectionDuringEditing = true
         tableView.register(HotListURLFieldCell.self, forCellReuseIdentifier: HotListURLFieldCell.reuseIdentifier)
     }
 
@@ -94,6 +100,7 @@ final class HotListSettingsViewController: UITableViewController, UITextFieldDel
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         switch Section(rawValue: section) {
+        case .order: return kindOrder.count
         case .source: return SourceRow.allCases.count
         case .urls: return HotListKind.allCases.count
         case .reset: return 1
@@ -103,6 +110,7 @@ final class HotListSettingsViewController: UITableViewController, UITextFieldDel
 
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         switch Section(rawValue: section) {
+        case .order: return HotListL10n.text("榜单顺序")
         case .source: return HotListL10n.text("数据来源")
         case .urls: return HotListL10n.text("接口地址")
         default: return nil
@@ -111,6 +119,7 @@ final class HotListSettingsViewController: UITableViewController, UITextFieldDel
 
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
         switch Section(rawValue: section) {
+        case .order: return HotListL10n.text("拖动调整顺序，排在第一的榜单默认打开。")
         case .source: return HotListL10n.text("榜单和热度由第三方统计，不是 NodeSeek 官方数据。")
         case .urls: return HotListL10n.text("接口需返回与默认地址相同格式的 JSON。保存时会先请求一次校验，失败则不保存。")
         default: return nil
@@ -119,6 +128,17 @@ final class HotListSettingsViewController: UITableViewController, UITextFieldDel
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         switch Section(rawValue: indexPath.section) {
+        case .order:
+            let kind = kindOrder[indexPath.row]
+            let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+            var content = cell.defaultContentConfiguration()
+            content.text = kind.sourceTitle
+            content.secondaryText = kind.rangeDescription
+            content.secondaryTextProperties.color = .secondaryLabel
+            cell.contentConfiguration = content
+            cell.selectionStyle = .none
+            cell.accessibilityIdentifier = "hot-list-order-\(kind.rawValue)"
+            return cell
         case .source:
             return sourceCell(row: SourceRow(rawValue: indexPath.row) ?? .provider)
         case .urls:
@@ -172,6 +192,38 @@ final class HotListSettingsViewController: UITableViewController, UITextFieldDel
         }
         cell.contentConfiguration = content
         return cell
+    }
+
+    // MARK: - Reorder
+
+    override func tableView(_ tableView: UITableView, editingStyleForRowAt indexPath: IndexPath) -> UITableViewCell.EditingStyle {
+        .none
+    }
+
+    override func tableView(_ tableView: UITableView, shouldIndentWhileEditingRowAt indexPath: IndexPath) -> Bool {
+        false
+    }
+
+    override func tableView(_ tableView: UITableView, canMoveRowAt indexPath: IndexPath) -> Bool {
+        indexPath.section == Section.order.rawValue
+    }
+
+    override func tableView(
+        _ tableView: UITableView,
+        targetIndexPathForMoveFromRowAt sourceIndexPath: IndexPath,
+        toProposedIndexPath proposedDestinationIndexPath: IndexPath
+    ) -> IndexPath {
+        // 只能在顺序区内拖动
+        let section = Section.order.rawValue
+        if proposedDestinationIndexPath.section < section { return IndexPath(row: 0, section: section) }
+        if proposedDestinationIndexPath.section > section { return IndexPath(row: kindOrder.count - 1, section: section) }
+        return proposedDestinationIndexPath
+    }
+
+    override func tableView(_ tableView: UITableView, moveRowAt sourceIndexPath: IndexPath, to destinationIndexPath: IndexPath) {
+        let kind = kindOrder.remove(at: sourceIndexPath.row)
+        kindOrder.insert(kind, at: destinationIndexPath.row)
+        settings.setKindOrder(kindOrder)
     }
 
     override func tableView(_ tableView: UITableView, shouldHighlightRowAt indexPath: IndexPath) -> Bool {

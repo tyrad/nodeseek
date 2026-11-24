@@ -5,19 +5,8 @@
 
 import UIKit
 
-/// 列表背景状态：加载中、空榜、加载失败。
+/// 列表背景状态：空榜、加载失败。加载中用 HotListSkeletonView。
 enum HotListStateView {
-    static func loading(text: String) -> UIView {
-        let indicator = UIActivityIndicatorView(style: .medium)
-        indicator.startAnimating()
-        let label = makeLabel(text, font: .preferredFont(forTextStyle: .subheadline), color: .secondaryLabel)
-        let stack = UIStackView(arrangedSubviews: [indicator, label])
-        stack.axis = .vertical
-        stack.spacing = 10
-        stack.alignment = .center
-        return wrap(stack, identifier: "hot-list-loading")
-    }
-
     static func message(
         symbolName: String,
         title: String,

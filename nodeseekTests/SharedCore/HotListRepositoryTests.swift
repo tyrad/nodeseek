@@ -115,6 +115,21 @@ struct HotListRepositoryTests {
         #expect(settings.url(for: .weekly) == HotListKind.weekly.defaultURL)
     }
 
+    @Test func kindOrderPersistsAndFillsMissingKinds() {
+        let settings = makeSettings()
+        #expect(settings.kindOrder == [.realtime, .daily, .weekly])
+
+        settings.setKindOrder([.weekly, .realtime, .daily])
+        #expect(settings.kindOrder == [.weekly, .realtime, .daily])
+
+        settings.setKindOrder([.daily, .daily])
+        #expect(settings.kindOrder == [.daily, .realtime, .weekly])
+
+        // 恢复接口地址不影响顺序
+        settings.resetToDefaults()
+        #expect(settings.kindOrder.first == .daily)
+    }
+
     @Test func validatesOnlyHTTPURLsWithHost() {
         #expect(HotListSourceSettings.validatedURL(from: " https://example.com/a.json ")?.absoluteString == "https://example.com/a.json")
         #expect(HotListSourceSettings.validatedURL(from: "ftp://example.com/a.json") == nil)
