@@ -28,6 +28,8 @@ nonisolated struct DetailDocument: Equatable, Sendable {
         case code(language: String?, text: String)
         case terminal(String)
         case image(alt: String, url: URL)
+        /// 地址无效的图片，按加载失败占位显示。
+        case brokenImage(alt: String)
         case vote(Int)
         case tabs([Tab])
         case divider

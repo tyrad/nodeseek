@@ -61,7 +61,7 @@ struct DetailMarkdownParserTests {
                 case .tabs(let tabs): for tab in tabs { paragraphs.append(tab.title); read(tab.blocks) }
                 case .code(_, let text), .terminal(let text): paragraphs.append(text)
                 case .image(_, let url): images.append(url)
-                case .vote, .divider: break
+                case .vote, .divider, .brokenImage: break
                 }
             }
         }
@@ -261,6 +261,11 @@ struct DetailMarkdownParserTests {
         ])])))
         // 网页没有链接的域名保持普通文字。
         #expect(try parse("README.md") == [.paragraph([.text("README.md", [], nil)])])
+    }
+
+    @Test func invalidImageAddressStaysNativeAsBrokenImage() throws {
+        // 取自 1074863 #1：图片地址只有 https://，网页显示加载失败。
+        #expect(try parse("![image](https://)-10+1") == [.brokenImage(alt: "image"), .paragraph([.text("-10+1", [], nil)])])
     }
 
     @Test func lineBreaksAroundImagesDoNotBecomeBlankParagraphs() throws {

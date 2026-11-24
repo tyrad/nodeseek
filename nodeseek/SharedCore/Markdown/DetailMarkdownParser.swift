@@ -206,7 +206,9 @@ nonisolated struct DetailMarkdownParser: Sendable {
         case is Emphasis: style.insert(.italic)
         case is Strikethrough: style.insert(.strike)
         case let image as Markdown.Image:
-            guard link == nil, let url = destination(image.source) else { throw ParseError.unsupported }
+            guard link == nil else { throw ParseError.unsupported }
+            // 网页对无效地址同样显示加载失败，不必为此整楼退回网页渲染。
+            guard let url = destination(image.source) else { return [.block(.brokenImage(alt: image.plainText))] }
             return [.block(.image(alt: image.plainText, url: mediaURLs[url] ?? url))]
         case let anchor as Markdown.Link:
             if let raw = anchor.destination, let url = URL(string: raw), let id = NodeSeekVoteParser.voteID(in: url) {

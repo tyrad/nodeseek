@@ -73,6 +73,16 @@ final class DetailBlockStack: UIStackView {
                 case .terminal(let ansi): appendLegacy([.terminal(.init(ansi: ansi))], to: stack, width: width)
                 case .code(_, let text): appendLegacy([.codeBlock(.init(text: text))], to: stack, width: width)
                 case .table(let rows): appendLegacy([.table(Self.table(rows))], to: stack, width: width)
+                case .brokenImage(let alt):
+                    let placeholder = DetailImagePlaceholderView()
+                    placeholder.showFailure(true)
+                    if !alt.isEmpty { placeholder.accessibilityValue = alt }
+                    // 与加载失败的图片同尺寸，靠左排列。
+                    let size = DetailImagePlaceholderView.failureSize(maxWidth: width)
+                    let row = UIView()
+                    row.addSubview(placeholder)
+                    placeholder.frame = CGRect(origin: .zero, size: size)
+                    attach(row, to: stack, height: size.height)
                 case .divider:
                     let line = UIView()
                     line.backgroundColor = .separator
@@ -345,7 +355,7 @@ final class DetailBlockStack: UIStackView {
             case .list(_, let items): return items.flatMap(galleryBlocks)
             case .table(let rows): return [.table(table(rows))]
             case .tabs(let tabs): return [.tabs(.init(id: "", sections: tabs.map { .init(title: $0.title, blocks: galleryBlocks($0.blocks)) }))]
-            case .paragraph, .heading, .code, .vote, .divider: return []
+            case .paragraph, .heading, .code, .vote, .divider, .brokenImage: return []
             }
         }
     }
