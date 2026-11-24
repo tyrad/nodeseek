@@ -63,6 +63,8 @@ iOS 26.5，Debug，列表宽 402 pt。
 
 复跑时使用项目已有的 make 入口，设备参数见项目验证约定。对照脚本依赖 Python 和 Pillow。
 
+旧版 Texture 列表已于 2026-11-24 删除，下列对照命令只能在删除前的提交 `6bd02c5` 上复跑；当前代码只保留 `DetailBaselineTests`，结果写入 `.build/detail-baseline/results`。
+
 ```sh
 make xcode-test-class TEST="DetailCollectionBaselineTests DetailCollectionTests"
 python3 scripts/compare-detail-lists.py .build/detail-baseline/results .build/detail-list/results .build/detail-list/sim-comparison

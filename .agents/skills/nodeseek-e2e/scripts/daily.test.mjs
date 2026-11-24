@@ -120,7 +120,7 @@ daily('last-page-filter', async ({ agent, ui, fixture, scroll, log, ids, attr })
   // 703863 的首楼作者是 ipv4；第一页有其他作者，也有楼主自己的回复。
   await fixture(imagePost);
   const offsetBeforeFilter = log().length;
-  await agent.aiAct('长按楼主的首楼正文打开菜单，点「只看楼主」。');
+  await agent.aiAct('长按主楼正文里没有内容的空白处（如最后一行文字右侧的空白）打开楼层菜单，点「只看楼主」。长按文字会选字，长按头像或作者行会弹出主页预览，都不是要找的菜单。');
   await agent.aiAssert('界面显示「只看楼主的回复」，可见的回复均来自楼主，或显示筛选后的空状态。');
   const authors = () => ids('name == "comment-author-name" AND visible == 1');
   for (let i = 0; i < 5 && !(await authors()).length; i++) await scroll(.72, .45);
@@ -218,11 +218,11 @@ daily('favorite-sync', async ({ ui, agent, fixture, start, sidebar, log, t }) =>
   }
 });
 
-async function shortLastPage({ t, ui, wda, ids, click, scroll, fixture, log, agent }, textKit) {
+async function shortLastPage({ t, ui, wda, ids, click, scroll, fixture, log, agent }) {
   const post = '1069173';
   const indicator = 'post-detail-page-indicator';
   await fixture(post, 1, undefined, { publicPost: true });
-  assert.equal((await ids('name == "post-detail-textkit-collection"')).length, textKit ? 1 : 0, '实际列表引擎不符');
+  assert.equal((await ids('name == "post-detail-textkit-collection"')).length, 1, '没有打开新版详情列表');
   const offset = log().lastIndexOf('开始加载帖子详情，postID=' + post + ', page=1');
   assert.ok(offset >= 0);
   const floors = async () => {
@@ -235,7 +235,7 @@ async function shortLastPage({ t, ui, wda, ids, click, scroll, fixture, log, age
         return floor ? [Number(floor[1])] : [];
       });
   };
-  const shot = name => simctl('io', device, 'screenshot', join(out, (textKit ? 'textkit-pagination-' : 'thread-pagination-') + name + '.png'));
+  const shot = name => simctl('io', device, 'screenshot', join(out, 'textkit-pagination-' + name + '.png'));
   async function openPicker() {
     for (let attempt = 0; attempt < 4; attempt++) {
       await scroll(.65, .48);
@@ -269,19 +269,17 @@ async function shortLastPage({ t, ui, wda, ids, click, scroll, fixture, log, age
     shot(name);
     const bottom = await floors();
     assert.ok(bottom.some(n => n > (last - 1) * 10 && n <= last * 10), '到底后楼层不属于末页：' + bottom);
-    if (textKit) {
-      const anchor = '#' + Math.max(...bottom);
-      const rect = () => ui.element(anchor, '/rect');
-      const y = (await rect()).y;
-      const logOffset = log().length;
-      await scroll(.81, .35);
-      let stable = 0;
-      await waitFor(async () => {
-        stable = Math.abs((await rect()).y - y) <= 1 ? stable + 1 : 0;
-        return stable >= 2;
-      }, '回弹结束后末楼位置偏移超过 1 pt');
-      assert.doesNotMatch(log().slice(logOffset), /触发详情评论加载更多:/);
-    }
+    const anchor = '#' + Math.max(...bottom);
+    const rect = () => ui.element(anchor, '/rect');
+    const y = (await rect()).y;
+    const logOffset = log().length;
+    await scroll(.81, .35);
+    let stable = 0;
+    await waitFor(async () => {
+      stable = Math.abs((await rect()).y - y) <= 1 ? stable + 1 : 0;
+      return stable >= 2;
+    }, '回弹结束后末楼位置偏移超过 1 pt');
+    assert.doesNotMatch(log().slice(logOffset), /触发详情评论加载更多:/);
     t.diagnostic(name + '：底部显示 ' + bottom.join(',') + ' 楼，' + label);
   }
   // 两页同时在列表中时，底部可能还露着第一页的最后几楼。
@@ -298,8 +296,7 @@ async function shortLastPage({ t, ui, wda, ids, click, scroll, fixture, log, age
   shot('first');
 }
 
-daily('thread-pagination', ctx => shortLastPage(ctx, false), ['-postDetail.useTextKitList', 'NO']);
-daily('textkit-pagination', ctx => shortLastPage(ctx, true), ['-postDetail.useTextKitList', 'YES']);
+daily('textkit-pagination', shortLastPage);
 
 daily('textkit-backscroll', async ({ t, ids, wda, scroll, fixture, log }) => {
   const post = '1067259';
@@ -330,13 +327,12 @@ daily('textkit-backscroll', async ({ t, ids, wda, scroll, fixture, log }) => {
   const requests = [...log().slice(offset).matchAll(/开始加载帖子详情，postID=1067259, page=(\d+)/g)].map(m => Number(m[1]));
   for (const n of [1, 2, 3]) assert.equal(requests.filter(p => p === n).length, 1, '页 ' + n + ' 请求次数异常：' + requests);
   t.diagnostic('第 3 页 #21 → ' + previous + ' → 原 #21，请求页序列 ' + requests);
-}, ['-postDetail.useTextKitList', 'YES']);
+});
 
 // 新版详情页交互回归：只读公开帖，用控件标识、坐标和日志判断，不依赖登录。
 const textKitPost = '1067259';
 const reviewPost = '1067722';
 const floorGalleryPost = '1072089';
-const textKit = ['-postDetail.useTextKitList', 'YES'];
 
 function textKitHelpers({ wda, ids, scroll }) {
   const rect = async el => (await wda('/element/' + el + '/rect'));
@@ -383,7 +379,7 @@ daily('textkit-drag-on-button', async ctx => {
   assert.notDeepEqual(after, before, '从按钮上拖动后列表没有滚动');
   assert.ok(!(await ids('name == "post-detail-reply-context-remove-button-0"')).length, '拖动误触发了回复');
   t.diagnostic('拖动前 ' + before.join(',') + ' → 拖动后 ' + after.join(','));
-}, textKit);
+});
 
 daily('textkit-floor-menu', async ctx => {
   const { fixture, ids, wda, click, attr, t } = ctx;
@@ -433,7 +429,7 @@ daily('textkit-floor-menu', async ctx => {
   t.diagnostic('长按楼层 ' + reply.name + '，筛选作者 ' + filtered[0] + '（首个可见作者 ' + author + '）');
   await click(clear);
   await waitFor(async () => !(await ids('name == "detail-author-filter-clear"')).length, '点「查看全部」后筛选条仍在');
-}, textKit);
+});
 
 // 点图后核对图集：张数、起始图、左右翻页，关闭后原图回到原位置。
 async function checkGallery({ ids, wda, click, attr, log, t }, el, query, { tappedURL, minCount, why }) {
@@ -474,7 +470,7 @@ daily('textkit-gallery', async ctx => {
   const report = 'name == "detail-terminal-open-report" AND visible == 1';
   const el = await waitFor(async () => (await ctx.ids(report))[0], '测评报告图没有生成');
   await checkGallery(ctx, el, report, { minCount: 2, why: '应包含所有标签的图' });
-}, textKit);
+});
 
 daily('textkit-floor-gallery', async ctx => {
   // 1072089 主楼有多张普通配图。
@@ -496,7 +492,7 @@ daily('textkit-floor-gallery', async ctx => {
   assert.ok(target, '主楼里找不到第二张配图');
   const tappedURL = await ctx.attr(target, 'value');
   await checkGallery(ctx, target, image, { tappedURL, minCount: 2, why: '应包含同楼其它配图' });
-}, textKit);
+});
 
 const linkColorPost = '1071908';
 
@@ -522,7 +518,7 @@ daily('textkit-guest-reaction-login', async ctx => {
     t.diagnostic('游客点「' + label + '」进入登录页');
   }
   await start();
-}, textKit);
+});
 
 // 统计截图中的站点绿与系统蓝文字像素：表格等处的链接须为站点绿，不能出现系统蓝。
 function countLinkPixels(png) {
@@ -559,7 +555,7 @@ daily('textkit-link-color', async ctx => {
   // 站点绿也用于分节标题，只说明截图有效；判断依据是没有系统蓝。
   assert.ok(green > 200, '前几屏没有站点绿的文字');
   assert.equal(blueShots.length, 0, '出现系统蓝链接：' + blueShots.join(','));
-}, textKit);
+});
 
 // 统计正文区：背景亮度中位数，以及亮字、暗字像素数。浅色字在黑底上才看得见，反之亦然。
 function textPixels(png) {
@@ -613,7 +609,7 @@ daily('textkit-dark-text', async ctx => {
   } finally {
     simctl('ui', device, 'appearance', original || 'light');
   }
-}, textKit);
+});
 
 // 站点对游客隐藏的帖子只回 404 错误页，游客应看到登录入口而不是「帖子不存在」。
 const guestHiddenPost = '1062816';
@@ -634,7 +630,7 @@ daily('textkit-guest-hidden-post', async ({ ui, ids, click, log, start, t }) => 
   assert.ok(button);
   assert.equal((await ids('label == "帖子不存在"')).length, 0, '仍显示帖子不存在');
   t.diagnostic('游客打开 ' + guestHiddenPost + ' 显示登录入口');
-}, textKit);
+});
 
 // 签名改用 TextKit 后链接是无障碍链接元素。站点只给登录用户输出签名，需 member 设备。
 daily('textkit-signature-link', async ctx => {
@@ -678,4 +674,4 @@ daily('textkit-signature-link', async ctx => {
   await click(await row(b.label));
   const opened = await waitFor(left, '从面板选择「' + b.label + '」后没有打开');
   t.diagnostic('点「' + a.label + '」与「' + b.label + '」之间弹出选择面板（' + rows.join('；') + '），选「' + b.label + '」后打开' + opened);
-}, textKit);
+});

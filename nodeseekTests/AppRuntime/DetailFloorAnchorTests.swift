@@ -53,7 +53,7 @@ final class DetailFloorAnchorTests: XCTestCase {
             return PostDetail(id: "1067259", title: "帖子", authorName: "B", avatarURL: nil,
                               metadataText: nil, contentHTML: "", comments: comments, page: page)
         }
-        let controller = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let controller = PostDetailViewController(presenter: SpyPostDetailPresenter())
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
         window.rootViewController = controller
@@ -75,7 +75,7 @@ final class DetailFloorAnchorTests: XCTestCase {
         controller.appendCommentPage(detail: detail(Array(21...30), page: 3))
         XCTAssertEqual(try targetIndex("20"), 24)
         XCTAssertEqual(try targetIndex("21"), 25)
-        let list = try XCTUnwrap(controller.collectionList)
+        let list = controller.collectionList
         let originalRow = try XCTUnwrap(controller.indexPathForCurrentPageAnchor("20"))
         window.layoutIfNeeded()
         for _ in 0..<30 {
@@ -88,7 +88,7 @@ final class DetailFloorAnchorTests: XCTestCase {
         XCTAssertEqual(controller.testHighlightedAnchorID, "20")
         XCTAssertTrue(list.view.indexPathsForVisibleItems.contains(originalRow))
         XCTAssertNil(controller.testPresentedLoadedCommentID)
-        let direct = PostDetailViewController(presenter: SpyPostDetailPresenter(), currentPage: 3, usesTextKitList: true)
+        let direct = PostDetailViewController(presenter: SpyPostDetailPresenter(), currentPage: 3)
         direct.loadViewIfNeeded()
         direct.render(detail: detail(Array(21...30), page: 3))
         XCTAssertNil(direct.indexPathForCurrentPageAnchor("20"))
@@ -98,7 +98,7 @@ final class DetailFloorAnchorTests: XCTestCase {
     func testTappingVisibleFloorHighlightsOnlyTheTargetAndReuseClearsIt() async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
-        let page = PostDetailViewController(presenter: SpyPostDetailPresenter(), usesTextKitList: true)
+        let page = PostDetailViewController(presenter: SpyPostDetailPresenter())
         window.rootViewController = page
         window.makeKeyAndVisible()
         defer { window.isHidden = true; window.rootViewController = nil }
@@ -109,7 +109,7 @@ final class DetailFloorAnchorTests: XCTestCase {
         page.render(detail: PostDetail(id: "10", title: "标题", authorName: "Bob", avatarURL: nil,
                                       metadataText: nil, contentHTML: "主帖", visibleMarkdown: "主帖", comments: comments))
         window.layoutIfNeeded()
-        let list = try XCTUnwrap(page.collectionList?.view)
+        let list = try XCTUnwrap(page.collectionList.view)
         page.handleContentLinkTap(try XCTUnwrap(URL(string: "https://www.nodeseek.com/post-10-1#2")))
         let path = try XCTUnwrap(page.indexPathForCurrentPageAnchor("2"))
         let target = try XCTUnwrap(list.cellForItem(at: path) as? DetailFloorListCell)

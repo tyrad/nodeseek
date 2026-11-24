@@ -14,7 +14,7 @@ final class DetailEntryHintTests: XCTestCase {
 
     private func checkHint(afterJump: Bool) throws {
         let presenter = SpyPostDetailPresenter()
-        let page = PostDetailViewController(presenter: presenter, currentPage: afterJump ? 1 : 7, usesTextKitList: true)
+        let page = PostDetailViewController(presenter: presenter, currentPage: afterJump ? 1 : 7)
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
         let navigation = UINavigationController(rootViewController: page)
@@ -38,7 +38,7 @@ final class DetailEntryHintTests: XCTestCase {
         }
         page.render(detail: detail(7))
         window.layoutIfNeeded()
-        let host = try XCTUnwrap(page.collectionList)
+        let host = page.collectionList
         host.scroll(to: 1, position: .top)
         host.view.layoutIfNeeded()
         let cell = try XCTUnwrap(host.view.cellForItem(at: IndexPath(item: 1, section: 0)))

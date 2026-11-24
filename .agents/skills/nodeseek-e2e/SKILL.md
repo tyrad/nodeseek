@@ -13,7 +13,6 @@ description: 为 NodeSeek iOS 客户端编写和无人值守运行 Midscene 发�
 
 | 要验证的问题 | 单跑命令 | 如何判断 |
 | --- | --- | --- |
-| 短末页滑到底时是否仍显示上一页 | `make e2e-case CASE=thread-pagination` | 在公开帖 1069173 连续滑过第 10 楼，核对底部楼层及页码，再从面板跳到末页并回到第一页 |
 | 已登录用户能否打开发帖页再返回 | `make e2e-case CASE=member-compose` | 原生标题、正文和发布按钮出现，关闭后首页列表恢复 |
 | 看到「已存本机」时杀进程会不会丢稿 | `make e2e-case CASE=draft-autosave` | 冷启动后恢复本轮标题和完整正文 |
 | 搜「搬瓦工」能否打开对应的帖子 | `make e2e-case CASE=member-search` | 结果标题命中关键词，详情标题与选中的结果一致 |
@@ -117,7 +116,7 @@ make e2e-case CASE=push-cold
 
 ## TextKit 详情页分页
 
-[分页与回弹的详细用例](../../../docs/testing/detail-textkit-pagination-e2e.md)列出逐步操作、触发时机、坐标容差和证据位置。`thread-pagination` 在 Texture 上跑同一短末页对照，`textkit-pagination` 验收新版连续分页、回弹与跳页，`textkit-backscroll` 从第三页普通 #21 回读第二页。`textkit-paging-timing` 使用 AXe 和受控 HTML 在指定模拟器上验证慢响应和失败重试；报告在 `.build/detail-paging-e2e/`，实站用例沿用 daily 的 JUnit 和截图。
+[分页与回弹的详细用例](../../../docs/testing/detail-textkit-pagination-e2e.md)列出逐步操作、触发时机、坐标容差和证据位置。`textkit-pagination` 在公开帖 1069173 验收连续分页、回弹与跳页，`textkit-backscroll` 从第三页普通 #21 回读第二页。`textkit-paging-timing` 使用 AXe 和受控 HTML 在指定模拟器上验证慢响应和失败重试；报告在 `.build/detail-paging-e2e/`，实站用例沿用 daily 的 JUnit 和截图。
 
 ## 后续发布回归功能点
 

@@ -1,7 +1,6 @@
 "copy" = "複製正文";
 "cancel" = "取消";
 "close" = "關閉";
-"use-list" = "詳情頁使用 TextKit 列表";
 "more" = "樓層操作";
 "entry-opened-on-page" = "目前從第 %ld 頁進入";
 "entry-starts-at-page" = "目前從第 %ld 頁開始";

@@ -58,7 +58,7 @@ final class DetailPagingGestureTests: XCTestCase {
         let service = NodeSeekService(htmlClient: transport, currentAccountStore: nil)
         let interactor = PostDetailInteractor(post: post, service: service)
         let presenter = PostDetailPresenter(interactor: interactor, router: PostDetailRouter())
-        let page = PostDetailViewController(presenter: presenter, usesTextKitList: true)
+        let page = PostDetailViewController(presenter: presenter)
         interactor.presenter = presenter
         presenter.setView(page)
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
@@ -67,7 +67,7 @@ final class DetailPagingGestureTests: XCTestCase {
         window.rootViewController = UINavigationController(rootViewController: page)
         window.makeKeyAndVisible()
         defer { window.isHidden = true; window.rootViewController = nil }
-        let list = try XCTUnwrap(page.collectionList?.view)
+        let list = try XCTUnwrap(page.collectionList.view)
         var trace = "time,condition,offset,end,rows,dragging,decelerating\n"
         defer { try? trace.write(to: dir.appendingPathComponent("scroll.csv"), atomically: true, encoding: .utf8) }
         func until(_ message: String, _ condition: () async -> Bool) async throws {

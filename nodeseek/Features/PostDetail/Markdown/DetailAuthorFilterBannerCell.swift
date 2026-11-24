@@ -1,6 +1,6 @@
 import UIKit
 
-/// 「只看 TA」筛选条，样式与 Texture 版 `PostDetailAuthorFilterBannerCellNode` 一致：图标、说明和反色的「查看全部」按钮。
+/// 「只看 TA」筛选条：图标、说明和反色的「查看全部」按钮。
 final class DetailAuthorFilterBannerCell: UICollectionViewCell {
     private let card = UIStackView()
     private let icon = UIImageView()

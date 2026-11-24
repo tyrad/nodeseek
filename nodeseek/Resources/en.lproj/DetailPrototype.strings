@@ -1,7 +1,6 @@
 "copy" = "Copy Markdown";
 "cancel" = "Cancel";
 "close" = "Close";
-"use-list" = "Use TextKit in post details";
 "more" = "Floor actions";
 "entry-opened-on-page" = "Opened on page %ld";
 "entry-starts-at-page" = "Starting from page %ld";

@@ -3,7 +3,6 @@
 //  nodeseek
 //
 
-import AsyncDisplayKit
 import UIKit
 
 extension PostDetailViewController {
@@ -39,18 +38,11 @@ extension PostDetailViewController {
     var visibleCommentPage: Int {
         let firstLoadedPage = loadedCommentPageRanges.keys.min() ?? currentPage
         guard isViewLoaded else { return firstLoadedPage }
-        let rows = collectionList?.rows ?? detailRows
-        let visibleRows: [Int]
-        if let list = collectionList?.view {
-            let endY = list.contentSize.height - list.bounds.height + list.adjustedContentInset.bottom
-            let atEnd = pagination?.nextPage == nil && endY > -list.adjustedContentInset.top && list.contentOffset.y >= endY - 1
-            visibleRows = list.indexPathsForVisibleItems.map(\.row).sorted(by: atEnd ? (>) : (<))
-        } else {
-            let table = tableNode.view
-            let atBottom = table.contentSize.height > 0
-                && table.bounds.maxY - table.adjustedContentInset.bottom >= table.contentSize.height - 1
-            visibleRows = tableNode.indexPathsForVisibleRows().map(\.row).sorted(by: atBottom ? (>) : (<))
-        }
+        let rows = collectionList.rows
+        let list = collectionList.view
+        let endY = list.contentSize.height - list.bounds.height + list.adjustedContentInset.bottom
+        let atEnd = pagination?.nextPage == nil && endY > -list.adjustedContentInset.top && list.contentOffset.y >= endY - 1
+        let visibleRows = list.indexPathsForVisibleItems.map(\.row).sorted(by: atEnd ? (>) : (<))
         for row in visibleRows where row < rows.count {
             guard case .comment(let commentIndex) = rows[row] else { continue }
             if let page = loadedCommentPageRanges.first(where: { $0.value.contains(commentIndex) })?.key {

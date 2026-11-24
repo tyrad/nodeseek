@@ -1,4 +1,3 @@
-import AsyncDisplayKit
 import Kingfisher
 import UIKit
 import XCTest
@@ -103,11 +102,10 @@ private final class RefreshClock: NSObject {
 }
 
 @MainActor
-class DetailBaselineTests: XCTestCase {
-    var usesTextKit: Bool { false }
+final class DetailBaselineTests: XCTestCase {
 
     private func configureMedia(_ urls: [String: String], on vc: PostDetailViewController) {
-        guard let list = vc.collectionList else { return }
+        let list = vc.collectionList
         for (raw, replacement) in urls {
             if let original = URL(string: raw, relativeTo: NodeSeekSite.baseURL)?.absoluteURL,
                let local = URL(string: replacement) {
@@ -151,7 +149,7 @@ class DetailBaselineTests: XCTestCase {
 
     private func host(page: ReplayPage, anchor: Int?, in window: UIWindow) -> PostDetailViewController {
         let vc = PostDetailViewController(presenter: SpyPostDetailPresenter(), currentPage: page.page,
-                                          initialAnchorID: anchor.map(String.init), usesTextKitList: usesTextKit)
+                                          initialAnchorID: anchor.map(String.init))
         window.rootViewController = UINavigationController(rootViewController: vc)
         window.makeKeyAndVisible()
         window.layoutIfNeeded()
@@ -172,15 +170,9 @@ class DetailBaselineTests: XCTestCase {
     }
 
     private func cell(for item: ReplayPage.Item, in vc: PostDetailViewController) -> (IndexPath, UIView)? {
-        if let list = vc.collectionList {
-            guard let index = vc.indexPathForCurrentPageAnchor(String(item.floor)),
-                  let cell = list.view.cellForItem(at: index) as? DetailFloorListCell, cell.contentInstalled, cell.bounds.height > 0 else { return nil }
-            return (index, cell)
-        }
-        guard (item.main ? vc.headerRenderedContent != nil : vc.renderedCommentIDs.contains(item.id)),
-              let index = vc.indexPathForCurrentPageAnchor(String(item.floor)),
-              let node = vc.tableNode.nodeForRow(at: index), node.bounds.height > 0 else { return nil }
-        return (index, node.view)
+        guard let index = vc.indexPathForCurrentPageAnchor(String(item.floor)),
+              let cell = vc.collectionList.view.cellForItem(at: index) as? DetailFloorListCell, cell.contentInstalled, cell.bounds.height > 0 else { return nil }
+        return (index, cell)
     }
 
     private func wait(_ label: String, timeout: Double = 12, until ready: () -> Bool) async throws {
@@ -194,7 +186,7 @@ class DetailBaselineTests: XCTestCase {
     private func save(_ data: Data, name: String, type: String) throws {
         #if targetEnvironment(simulator)
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent(usesTextKit ? ".build/detail-list/results" : ".build/detail-baseline/results")
+            .deletingLastPathComponent().appendingPathComponent(".build/detail-baseline/results")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try data.write(to: root.appendingPathComponent(name), options: .atomic)
         #else
@@ -278,8 +270,8 @@ class DetailBaselineTests: XCTestCase {
                         vc.render(detail: page.detail(using: placeholder ? waiting : loaded))
                         for item in targets {
                             let name = "\(page.path.dropFirst())-\(item.floor)-\(style == .dark ? "dark" : "light")-\(size)-\(placeholder ? "placeholder" : "body")"
-                            if let list = vc.collectionList, let index = vc.indexPathForCurrentPageAnchor(String(item.floor)) {
-                                list.scroll(to: index.row, position: .top)
+                            if let index = vc.indexPathForCurrentPageAnchor(String(item.floor)) {
+                                vc.collectionList.scroll(to: index.row, position: .top)
                             }
                             try await wait(name) { self.cell(for: item, in: vc) != nil }
                             let (index, renderedCell) = try XCTUnwrap(cell(for: item, in: vc))
@@ -287,8 +279,7 @@ class DetailBaselineTests: XCTestCase {
                                 XCTAssertTrue(floor.request?.source.visibleMarkdown == item.markdown, name)
                                 if let markdown = item.markdown { XCTAssertTrue(floor.copyText == markdown, name) }
                             }
-                            if let list = vc.collectionList { list.scroll(to: index.row, position: .top) }
-                            else { vc.tableNode.scrollToRow(at: index, at: .top, animated: false) }
+                            vc.collectionList.scroll(to: index.row, position: .top)
                             try await wait(name + "-visible") {
                                 guard let (_, cell) = self.cell(for: item, in: vc), cell.window === window else { return false }
                                 return !self.bodyViews(cell).isEmpty
@@ -430,30 +421,18 @@ extension DetailBaselineTests {
         // 由现有渲染器取得这个样本实际使用的目录，保留原文件，测完恢复。
         let seed = host(page: review, anchor: nil, in: window)
         let ansi: RenderedTerminalBlock
-        if usesTextKit {
-            let source = DetailFloorSource(html: main.html, visibleMarkdown: main.markdown)
-            guard case .native(let document) = DetailMarkdownParser(baseURL: NodeSeekSite.baseURL).render(source) else {
-                throw NSError(domain: "测评未使用 Markdown", code: 1)
-            }
-            let tabs = document.blocks.compactMap { block -> [DetailDocument.Tab]? in
-                if case .tabs(let sections) = block { return sections }
-                return nil
-            }
-            ansi = try XCTUnwrap(tabs.first?.first?.blocks.compactMap { block -> RenderedTerminalBlock? in
-                if case .terminal(let text) = block { return .init(ansi: text) }
-                return nil
-            }.first)
-        } else {
-            let blocks = DTCoreTextHTMLContentRenderer().render(fragment: main.html, baseURL: NodeSeekSite.baseURL)
-            let sections = blocks.compactMap { block -> RenderedMagicTabsBlock? in
-                if case .tabs(let tabs) = block { return tabs }
-                return nil
-            }
-            ansi = try XCTUnwrap(sections.first?.sections.first?.blocks.compactMap { block -> RenderedTerminalBlock? in
-                if case .terminal(let terminal) = block { return terminal }
-                return nil
-            }.first)
+        let source = DetailFloorSource(html: main.html, visibleMarkdown: main.markdown)
+        guard case .native(let document) = DetailMarkdownParser(baseURL: NodeSeekSite.baseURL).render(source) else {
+            throw NSError(domain: "测评未使用 Markdown", code: 1)
         }
+        let tabs = document.blocks.compactMap { block -> [DetailDocument.Tab]? in
+            if case .tabs(let sections) = block { return sections }
+            return nil
+        }
+        ansi = try XCTUnwrap(tabs.first?.first?.blocks.compactMap { block -> RenderedTerminalBlock? in
+            if case .terminal(let text) = block { return .init(ansi: text) }
+            return nil
+        }.first)
         let snapshot = try await TerminalSnapshotRenderer.shared.render(ansi, in: seed.view)
         let cachedReport = try XCTUnwrap(snapshot.pages.first?.url.deletingLastPathComponent())
         let savedReport = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -505,10 +484,7 @@ extension DetailBaselineTests {
                     let table = vc.detailScrollView
                     try await wait("第 3 页完成布局") {
                         guard let lastItem = third.items.last, let path = vc.indexPathForCurrentPageAnchor(String(lastItem.floor)) else { return false }
-                        if let list = vc.collectionList {
-                            return list.view.layoutAttributesForItem(at: path) != nil
-                        }
-                        return self.cell(for: lastItem, in: vc) != nil && path.row < vc.tableNode.view.numberOfRows(inSection: 0)
+                        return vc.collectionList.view.layoutAttributesForItem(at: path) != nil
                     }
                     let base = table.contentOffset.y
                     let end = max(base, table.contentSize.height - table.bounds.height + table.adjustedContentInset.bottom)
@@ -530,9 +506,4 @@ extension DetailBaselineTests {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try save(encoder.encode(runs), name: "page-timing.json", type: "public.json")
     }
-}
-
-@MainActor
-final class DetailCollectionBaselineTests: DetailBaselineTests {
-    override var usesTextKit: Bool { true }
 }

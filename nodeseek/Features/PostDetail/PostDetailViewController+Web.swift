@@ -5,7 +5,6 @@
 //  Created by Codex on 2026/4/30.
 //
 
-import AsyncDisplayKit
 import SafariServices
 import UIKit
 
@@ -177,7 +176,6 @@ extension PostDetailViewController {
             let location = (comment, IndexPath(row: row, section: 0))
             // 首页置顶副本也可能没有热评标记。续页后的同楼普通回复才处在连续的阅读位置。
             if !comment.isHot {
-                if collectionList == nil { return location }
                 match = location
             } else if match == nil {
                 match = location
@@ -192,7 +190,7 @@ extension PostDetailViewController {
             return testVisibleAnchorIDs.contains(normalizedAnchorText(anchorID))
         }
         #endif
-        return (collectionList?.view.indexPathsForVisibleItems ?? tableNode.indexPathsForVisibleRows()).contains(indexPath)
+        return collectionList.view.indexPathsForVisibleItems.contains(indexPath)
     }
 
     private func presentLoadedCommentPreview(comment: Comment, anchorID: String) {
@@ -204,7 +202,7 @@ extension PostDetailViewController {
         testPresentedPreviewUsesBottomSheet = true
         testPresentedPreviewShowsFullPostButton = wasOpenedFromInitialAnchor
         #endif
-        let renderedContent = commentRenderedCache[comment.id] ?? Self.makeRenderedContent(
+        let renderedContent = Self.makeRenderedContent(
             html: comment.contentHTML,
             signatureHTML: comment.signatureHTML,
             baseURL: baseURL,
@@ -332,19 +330,7 @@ extension PostDetailViewController {
         testHighlightedAnchorID = normalizedAnchorText(anchorID)
         testPresentedLoadedCommentID = nil
         #endif
-        if let collectionList { collectionList.scrollToAnchor(at: indexPath.row); return }
-        tableNode.scrollToRow(at: indexPath, at: .middle, animated: true)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
-            guard let self else { return }
-            switch self.tableNode.nodeForRow(at: indexPath) {
-            case let node as PostBodyCellNode:
-                node.flashAnchorHighlight()
-            case let node as CommentCellNode:
-                node.flashAnchorHighlight()
-            default:
-                break
-            }
-        }
+        collectionList.scrollToAnchor(at: indexPath.row)
     }
 
     func indexPathForCurrentPageAnchor(_ anchorID: String) -> IndexPath? {

@@ -181,6 +181,8 @@
 
 ## 复跑
 
+旧版 Texture 列表已于 2026-11-24 删除，下列对照命令只能在删除前的提交 `6bd02c5` 上复跑；当前代码只保留 `DetailBaselineTests`，结果写入 `.build/detail-baseline/results`。
+
 ```sh
 # 两版分开运行，避免内存互相影响
 make xcode-test-class TEST="DetailBaselineTests" SIMULATOR_ID=<UDID>

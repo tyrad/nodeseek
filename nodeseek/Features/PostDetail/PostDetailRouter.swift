@@ -39,8 +39,7 @@ class PostDetailRouter: PostDetailRouterProtocol {
             initialHeader: post.map(PostDetailHeaderContent.init(post:)),
             sourcePostURL: post?.url,
             currentPage: page,
-            initialAnchorID: initialAnchorID,
-            usesTextKitList: PostDetailViewController.usesTextKitListSetting
+            initialAnchorID: initialAnchorID
         )
         
         presenter.setView(view)

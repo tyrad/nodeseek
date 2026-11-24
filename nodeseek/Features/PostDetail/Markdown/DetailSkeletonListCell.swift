@@ -1,6 +1,6 @@
 import UIKit
 
-/// 首次加载时的占位楼层，尺寸与 `PostDetailSkeletonCellNode` 的实际显示一致，切换列表实现时首屏观感不变。
+/// 首次加载时的占位楼层，尺寸贴近真实楼层，避免内容到达时首屏跳动。
 /// Texture 版在纵向栈里未应用宽度比例，文字条实际铺满整行，这里按实际效果还原。
 final class DetailSkeletonListCell: UICollectionViewCell {
     enum Kind {
