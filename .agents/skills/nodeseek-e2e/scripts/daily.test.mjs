@@ -846,3 +846,44 @@ daily('deeplink-safari-probe', async ({ ui, start, ids, wda }) => {
   openSystemLink('nsconnect://probe');
   await ui.get('probe-monitor-table');
 });
+
+daily('deeplink-search-tabs', async ({ ui, ids }) => {
+  for (const withSearch of [false, true]) {
+    const tabs = withSearch ? '(home,search,me)' : '(home,notification,me)';
+    simctl('launch', '--terminate-running-process', device, bundle,
+      '-appNavigationLayout.layout', 'tabs', '-appNavigationLayout.tabItems', tabs);
+    await ui.get('main-tab-home');
+    const url = 'nsconnect://search?q=Swift&scope=user';
+    openSystemLink(url);
+    openSystemLink(url);
+    assert.equal(await ui.value('search-keyword-text-field'), 'Swift');
+    await waitFor(async () => (await ids('type == "XCUIElementTypeButton" AND label IN {"用户", "Users"} AND selected == 1')).length, '用户搜索未被选中');
+    if (withSearch) {
+      await ui.tap('main-tab-home');
+    } else {
+      await ui.tap('search-back-button');
+    }
+    await ui.get('main-tab-home');
+    assert.ok(!await ui.find('search-keyword-text-field'));
+  }
+});
+
+daily('deeplink-user-compose', async ({ ui, start }) => {
+  await start();
+  openSystemLink('nsconnect://user/1');
+  await ui.get('user-profile-name');
+  const title = '分享 & 预填';
+  const body = '第一行\nA + B #尾';
+  const link = 'nsconnect://compose?title=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(body);
+  openSystemLink(link);
+  assert.equal(await ui.value('new-discussion-title'), title);
+  assert.equal(await ui.value('new-discussion-body'), body);
+  openSystemLink('nsconnect://compose?title=other');
+  assert.equal(await ui.value('new-discussion-title'), title);
+  await ui.tap('关闭');
+  const choice = await waitFor(async () => {
+    for (const label of ['保留旧草稿', '放弃草稿']) if (await ui.find(label)) return label;
+  }, '缺少草稿处理选项');
+  await ui.tap(choice);
+  await ui.get('user-profile-name');
+});

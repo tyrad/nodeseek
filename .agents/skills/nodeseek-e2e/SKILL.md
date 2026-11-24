@@ -116,15 +116,17 @@ make e2e-case CASE=push-cold
 
 ## 外部深链
 
-用 `make e2e-case CASE=<编号>` 单跑。三条都通过系统的 `simctl openurl` 投递到已安装的 App。
+用 `make e2e-case CASE=<编号>` 单跑。这些用例通过系统的 `simctl openurl` 投递到已安装的 App。
 
 | 编号 | 验收 |
 | --- | --- |
 | `deeplink-post` | 连续三次打开 `nsconnect://post/893437`，仅加载一次第一页，点一次返回首页后同一链接可再次打开 |
 | `deeplink-floor` | 冷启动传入编码的 NodeSeek 网页链接，热启动传入带页码和楼层的直接深链；两次都看到帖子 1016685 第 18 楼的评论 14299736，一次返回首页 |
 | `deeplink-safari-probe` | 打开站外链接能在 Safari 浏览控制器看到目标域名，关闭后回到首页；随后打开 `nsconnect://probe` 进入探针列表 |
+| `deeplink-search-tabs` | 多 Tab 分别配置有、无搜索标签，连点相同链接后核对关键词和用户范围，切回或返回一次即见首页 |
+| `deeplink-user-compose` | 进入用户主页，打开带换行及特殊字符的预填帖，再次打开链接仍保留编辑内容；退出时保留原草稿 |
 
-域名匹配、地址规范化、非 HTTP(S) 协议和畸形帖子路径由 `make spm-test` 中的 `NodeSeekWebDeepLinkTests` 覆盖。
+域名匹配、地址规范化、非 HTTP(S) 协议和畸形帖子路径由 `make spm-test` 中的 `AppDeepLinkTests` 覆盖。
 
 ## TextKit 详情页分页
 

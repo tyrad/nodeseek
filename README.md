@@ -22,6 +22,8 @@ NS Connect 是一个开源、非官方的 NodeSeek iOS 客户端，基于 Textur
 
 > 接入通知能力，自行部署 https://github.com/tyrad/ns-apns
 
+快捷指令可以从 iOS 分享菜单打开链接、搜索选中文字或预填帖子。[下载模板并查看 URL Scheme](docs/features/deep-link/README.md)
+
 ## 支持的功能
 
 ### 浏览与搜索

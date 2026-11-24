@@ -281,5 +281,19 @@
       "daily"
     ],
     "setup": "阅读模式，member 专用设备；只读"
+  },
+  "deeplink-search-tabs": {
+    "title": "多 Tab 打开用户搜索，重复点同一个链接只跳一次",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "member 专用设备，临时用启动参数覆盖底栏组合"
+  },
+  "deeplink-user-compose": {
+    "title": "从用户主页打开发帖预填，编辑中再点链接保留原内容",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "已登录的阅读模式设备，退出时保留原有草稿或清除本条测试草稿"
   }
 }
