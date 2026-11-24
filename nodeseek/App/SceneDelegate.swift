@@ -63,11 +63,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     private func handle(urlContexts: Set<UIOpenURLContext>) {
         for url in urlContexts.map(\.url) {
             if let link = ProbeWidgetLink(url: url) {
-                PushNotificationDeepLink.handle(.probe(link))
+                appRouter.openDeepLink(.probe(link), url: url)
                 return
             }
             if let route = NodeSeekWebDeepLink.route(for: url) {
-                appRouter.open(route)
+                appRouter.openDeepLink(route, url: url)
                 return
             }
         }

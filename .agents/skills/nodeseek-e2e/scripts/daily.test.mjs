@@ -808,10 +808,17 @@ function openSystemLink(link) {
 daily('deeplink-post', async ({ ui, start, log }) => {
   await start();
   const offset = log().length;
-  openSystemLink('nsconnect://post/893437');
+  const link = 'nsconnect://post/893437';
+  for (let tap = 0; tap < 3; tap++) openSystemLink(link);
   const first = await waitFor(() => log().slice(offset).match(/开始加载帖子详情，postID=(\d+), page=(\d+)/), '没有加载深链指定的帖子');
   assert.deepEqual(first.slice(1), ['893437', '1']);
   await waitFor(() => log().slice(offset).includes('帖子详情加载成功，postID=893437,'), '893437 首页未加载成功');
+  assert.equal(log().slice(offset).match(/开始加载帖子详情，postID=893437, page=1\b/g)?.length, 1);
+  await ui.tap('BackButton');
+  await ui.get(home);
+  const reopened = log().length;
+  openSystemLink(link);
+  await waitFor(() => log().slice(reopened).includes('帖子详情加载成功，postID=893437,'), '返回后再次点同一链接没有重新打开帖子');
   await ui.tap('BackButton');
   await ui.get(home);
 });
