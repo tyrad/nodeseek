@@ -369,6 +369,7 @@ platform :ios do
     )
     verify_ipa_version(options[:version])
     write_build_provenance
+    require File.join(ROOT, "fastlane/altool_upload_receipt")
     upload_to_testflight(
       **testflight_upload_options,
       **testflight_distribution_options
