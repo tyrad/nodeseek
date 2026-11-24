@@ -567,6 +567,7 @@ private final class UXAuditPostListPresenter: PostListPresenterProtocol {
     func didTapCheckIn() {}
     func didTapNotification(url: URL) {}
     func didTapRecentVisited() {}
+    func didTapHotList() {}
     func didTapUserDiscussions() {}
     func didTapUserComments() {}
     func didTapUserCollections() {}

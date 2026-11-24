@@ -34,6 +34,7 @@ enum MainTabItem: String, CaseIterable {
     case home
     case notification
     case recent
+    case hot
     case discussions
     case collections
     case comments
@@ -52,6 +53,7 @@ enum MainTabItem: String, CaseIterable {
         case .home: return "首页"
         case .notification: return "通知"
         case .recent: return "最近浏览"
+        case .hot: return HotListL10n.text("热榜")
         case .discussions: return "我的帖子"
         case .collections: return "我的收藏"
         case .comments: return "我的评论"
@@ -67,6 +69,7 @@ enum MainTabItem: String, CaseIterable {
         case .home: return "house"
         case .notification: return "bell"
         case .recent: return "clock"
+        case .hot: return "flame"
         case .discussions: return "doc.text"
         case .collections: return "star"
         case .comments: return "bubble.left"

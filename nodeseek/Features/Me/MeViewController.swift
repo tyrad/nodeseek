@@ -39,6 +39,7 @@ final class MeViewController: UIViewController {
     private let collectionsRow = MeListRowView(symbolName: "bookmark", title: "我的收藏")
     private let checkInRow = MeListRowView(symbolName: "checkmark.seal", title: "每日签到")
     private let recentRow = MeListRowView(symbolName: "clock.arrow.circlepath", title: "最近浏览")
+    private let hotListRow = MeListRowView(symbolName: "flame", title: HotListL10n.text("热榜"))
     private let probeRow = MeListRowView(symbolName: "server.rack", title: "探针")
     private let mailRow = MeListRowView(symbolName: "envelope", title: SeekMailL10n.text("邮箱"))
 
@@ -107,7 +108,7 @@ final class MeViewController: UIViewController {
 
     @objc private func appTextSizeDidChange() {
         profileCard.updateTextSize()
-        [checkInRow, discussionsRow, commentsRow, collectionsRow, recentRow, probeRow, mailRow].forEach { $0.updateTextSize() }
+        [checkInRow, discussionsRow, commentsRow, collectionsRow, recentRow, hotListRow, probeRow, mailRow].forEach { $0.updateTextSize() }
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -156,7 +157,7 @@ final class MeViewController: UIViewController {
         contentStack.addArrangedSubview(contentHeader)
         contentStack.setCustomSpacing(7, after: contentHeader)
         contentStack.addArrangedSubview(Self.makeGroup([discussionsRow, commentsRow, collectionsRow]))
-        contentStack.addArrangedSubview(Self.makeGroup([checkInRow, recentRow]))
+        contentStack.addArrangedSubview(Self.makeGroup([checkInRow, recentRow, hotListRow]))
         let toolsHeader = Self.makeSectionHeader("工具")
         contentStack.addArrangedSubview(toolsHeader)
         contentStack.setCustomSpacing(7, after: toolsHeader)
@@ -185,6 +186,7 @@ final class MeViewController: UIViewController {
         collectionsRow.addTarget(self, action: #selector(collectionsTapped), for: .touchUpInside)
         checkInRow.addTarget(self, action: #selector(checkInTapped), for: .touchUpInside)
         recentRow.addTarget(self, action: #selector(recentTapped), for: .touchUpInside)
+        hotListRow.addTarget(self, action: #selector(hotListTapped), for: .touchUpInside)
         probeRow.addTarget(self, action: #selector(probeTapped), for: .touchUpInside)
         mailRow.addTarget(self, action: #selector(mailTapped), for: .touchUpInside)
         discussionsRow.accessibilityIdentifier = "me-discussions-row"
@@ -192,6 +194,7 @@ final class MeViewController: UIViewController {
         collectionsRow.accessibilityIdentifier = "me-collections-row"
         checkInRow.accessibilityIdentifier = "me-check-in-row"
         recentRow.accessibilityIdentifier = "me-recent-row"
+        hotListRow.accessibilityIdentifier = "me-hot-list-row"
         probeRow.accessibilityIdentifier = "me-probe-row"
         mailRow.accessibilityIdentifier = "me-mail-row"
     }
@@ -379,6 +382,10 @@ final class MeViewController: UIViewController {
 
     @objc private func recentTapped() {
         router.navigateToRecentVisitedPosts(visitedStore: visitedStore)
+    }
+
+    @objc private func hotListTapped() {
+        router.navigateToHotList()
     }
 
     @objc private func probeTapped() {

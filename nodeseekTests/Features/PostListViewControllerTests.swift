@@ -543,6 +543,7 @@ struct PostListViewControllerTests {
         let notificationButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-notification-button"))
         let searchButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-search-button"))
         let recentVisitedButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-recent-visited-button"))
+        let hotListButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-hot-list-button"))
         let probeButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-probe-button"))
         let mailButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-mail-button"))
         let settingsButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-side-menu-settings-button"))
@@ -575,6 +576,8 @@ struct PostListViewControllerTests {
         #expect(searchButton.configuration?.image != nil)
         #expect(recentVisitedButton.configuration?.title == "最近浏览")
         #expect(recentVisitedButton.configuration?.image != nil)
+        #expect(hotListButton.configuration?.title == "热榜")
+        #expect(hotListButton.configuration?.image != nil)
         #expect(probeButton.configuration?.title == "探针")
         #expect(probeButton.configuration?.image != nil)
         #expect(mailButton.configuration?.title == "邮箱")
@@ -592,7 +595,8 @@ struct PostListViewControllerTests {
         #expect(backdrop.isHidden == false)
         #expect(backdrop.alpha == 1)
         #expect(accountHeaderButton.frame.contains(avatar.frame))
-        #expect(recentVisitedButton.frame.maxY < probeButton.frame.minY)
+        #expect(recentVisitedButton.frame.maxY < hotListButton.frame.minY)
+        #expect(hotListButton.frame.maxY < probeButton.frame.minY)
         #expect(probeButton.frame.maxY < settingsButton.frame.minY)
         #expect(searchButton.frame.maxY < recentVisitedButton.frame.minY)
         #expect(notificationButton.frame.maxY < searchButton.frame.minY)
@@ -1093,6 +1097,7 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
     private(set) var notificationUnreadCountUpdates: [NodeSeekNotificationUnreadCount] = []
     private(set) var didTapLoginCount = 0
     private(set) var didTapRecentVisitedCount = 0
+    private(set) var didTapHotListCount = 0
     private(set) var didTapSearchCount = 0
     private(set) var didTapNewDiscussionCount = 0
     private(set) var didTapCheckInCount = 0
@@ -1145,6 +1150,10 @@ private final class SpyPostListPresenter: PostListPresenterProtocol {
 
     func didTapRecentVisited() {
         didTapRecentVisitedCount += 1
+    }
+
+    func didTapHotList() {
+        didTapHotListCount += 1
     }
 
     func didTapSearch() {

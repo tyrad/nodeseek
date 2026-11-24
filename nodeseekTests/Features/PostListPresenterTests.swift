@@ -283,6 +283,15 @@ struct PostListPresenterTests {
         #expect(router.recentVisitedStore === visitedStore)
     }
 
+    @Test func tappingHotListRoutesToHotList() {
+        let router = SpyPostListRouter()
+        let presenter = makePresenter(router: router)
+
+        presenter.didTapHotList()
+
+        #expect(router.navigateToHotListCount == 1)
+    }
+
     @Test func tappingUserContentEntriesRoutesToDedicatedPages() {
         let router = SpyPostListRouter()
         let presenter = makePresenter(router: router)
@@ -575,6 +584,7 @@ private final class SpyPostListRouter: PostListRouterProtocol {
     var navigateToNewDiscussionCount = 0
     var navigateToSearchCount = 0
     var navigateToProbeMonitorCount = 0
+    var navigateToHotListCount = 0
     var navigateToMailCount = 0
     var navigateToSettingsCount = 0
     var navigateToPostCategoryPreferencesCount = 0
@@ -641,6 +651,10 @@ private final class SpyPostListRouter: PostListRouterProtocol {
 
     func navigateToSearch() {
         navigateToSearchCount += 1
+    }
+
+    func navigateToHotList() {
+        navigateToHotListCount += 1
     }
 
     func navigateToProbeMonitor() {
