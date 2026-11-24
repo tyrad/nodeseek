@@ -10,8 +10,6 @@ import UIKit
 final class AppRouter {
 
     weak var window: UIWindow?
-    private var lastPushedURL: String?
-    private weak var lastDeepLinkPage: UIViewController?
     private let layoutSettings: AppNavigationLayoutSettings
     private var layoutObserver: NSObjectProtocol?
     private weak var rootViewController: UIViewController?
@@ -44,7 +42,7 @@ final class AppRouter {
         case .reading:
             root = UINavigationController(rootViewController: PostListRouter.createModule())
         case .tabs:
-            root = UINavigationController(rootViewController: MainTabBarController())
+            root = UINavigationController(rootViewController: MainTabBarController(layoutSettings: layoutSettings))
         }
         rootViewController = root
         PushNotificationDeepLink.attach(self)
@@ -54,17 +52,6 @@ final class AppRouter {
     @MainActor
     func push(_ viewController: UIViewController) {
         navigationController?.pushViewController(viewController, animated: true)
-    }
-
-    func openDeepLink(_ route: PushNotificationRoute, url: URL) {
-        guard let navigationController else { return }
-        let previous = navigationController.topViewController
-        if let lastDeepLinkPage, previous === lastDeepLinkPage, lastPushedURL == url.absoluteString { return }
-        open(route)
-        if let page = navigationController.topViewController, page !== previous {
-            lastPushedURL = url.absoluteString
-            lastDeepLinkPage = page
-        }
     }
 
     /// 布局设置变化后直接替换根界面；登录态存在 Cookie 中，不受影响。

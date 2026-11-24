@@ -27,6 +27,17 @@ struct NewDiscussionPresenterTests {
         #expect(store.saved == oldDraft)
     }
 
+    @Test func deepLinkPrefillsEditorAndPreservesExistingDraft() {
+        let prefill = NewDiscussionDraft(title: "分享的标题", content: "A & B")
+        let (presenter, store, _, submitter, view) = makePresenter(saved: oldDraft, initialDraft: prefill)
+        presenter.viewDidLoad()
+        #expect(view.filledDrafts == [prefill])
+        #expect(presenter.state.pendingDraft == oldDraft)
+        presenter.closeKeepingPendingDraft()
+        #expect(store.saved == oldDraft)
+        #expect(submitter.submissions.isEmpty)
+    }
+
     @Test func typingBeforeDecidingNeverOverwritesOldDraft() async throws {
         let (presenter, store, _, _, _) = makePresenter(saved: oldDraft)
         presenter.viewDidLoad()
@@ -410,6 +421,7 @@ struct NewDiscussionPresenterTests {
 
     private func makePresenter(
         saved: NewDiscussionDraft? = nil,
+        initialDraft: NewDiscussionDraft = .init(),
         submitter: StubDiscussionSubmitter = StubDiscussionSubmitter()
     ) -> (NewDiscussionPresenter, MemoryDraftStore, SpyNewDiscussionRouter, StubDiscussionSubmitter, SpyNewDiscussionView) {
         let store = MemoryDraftStore(saved: saved)
@@ -419,6 +431,7 @@ struct NewDiscussionPresenterTests {
             router: router,
             draftStore: store,
             submitter: submitter,
+            initialDraft: initialDraft,
             autosaveDelayNanoseconds: 1_000_000
         )
         presenter.view = view

@@ -11,6 +11,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
     private let appRouter = AppRouter()
+    private let deepLinkRouter = AppDeepLinkRouter()
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
@@ -51,25 +52,20 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         if let response = connectionOptions.notificationResponse {
             PushNotificationDeepLink.handle(response)
         }
-        handle(urlContexts: connectionOptions.urlContexts)
+        if !deepLinkRouter.openPending(in: appRouter) {
+            handle(urlContexts: connectionOptions.urlContexts)
+        }
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         handle(urlContexts: URLContexts)
     }
 
-    /// 小组件用 `nsconnect://probe/...`；外部（Loon、快捷指令、其它 App）用
-    /// `nsconnect://post/<id>[-<page>]` 直达帖子，或用 `nsconnect://open?url=<网页链接>` 打开网页。
     private func handle(urlContexts: Set<UIOpenURLContext>) {
-        for url in urlContexts.map(\.url) {
-            if let link = ProbeWidgetLink(url: url) {
-                appRouter.openDeepLink(.probe(link), url: url)
-                return
-            }
-            if let route = NodeSeekWebDeepLink.route(for: url) {
-                appRouter.openDeepLink(route, url: url)
-                return
-            }
+        for context in urlContexts {
+            guard let route = AppDeepLink.route(for: context.url) else { continue }
+            deepLinkRouter.open(route, url: context.url, in: appRouter)
+            return
         }
     }
 

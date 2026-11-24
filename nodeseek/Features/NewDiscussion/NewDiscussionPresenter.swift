@@ -26,6 +26,7 @@ final class NewDiscussionPresenter: NewDiscussionPresenterProtocol {
         router: NewDiscussionRouterProtocol,
         draftStore: NewDiscussionDraftStoring,
         submitter: NodeSeekDiscussionSubmitting,
+        initialDraft: NewDiscussionDraft = .init(),
         mode: NewDiscussionMode = .create,
         editor: NodeSeekDiscussionEditing? = nil,
         autosaveDelayNanoseconds: UInt64 = 1_000_000_000
@@ -33,6 +34,7 @@ final class NewDiscussionPresenter: NewDiscussionPresenterProtocol {
         self.router = router
         self.draftStore = draftStore
         self.submitter = submitter
+        self.draft = initialDraft
         self.mode = mode
         self.editor = editor
         self.autosaveDelayNanoseconds = autosaveDelayNanoseconds
@@ -133,6 +135,10 @@ final class NewDiscussionPresenter: NewDiscussionPresenterProtocol {
         }
         if let saved = draftStore.load(), saved.hasContent {
             pendingDraft = saved
+        }
+        if draft.hasContent {
+            view?.fill(draft)
+            persistDraftIfAllowed()
         }
         render()
         loadUserLevel()

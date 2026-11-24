@@ -398,6 +398,7 @@ final class SearchViewController: UIViewController {
 
     /// 从首页推入或模态弹出时可返回；作为 Tab 根页面时没有上一页。
     private var canGoBack: Bool {
+        if parent is MainTabBarController { return false }
         if let navigationController, navigationController.viewControllers.first !== self {
             return true
         }
@@ -705,6 +706,11 @@ final class SearchViewController: UIViewController {
             }
         }
         updateContentVisibility()
+    }
+
+    func submitDeepLinkSearch(query: String, scope: SearchScope) {
+        loadViewIfNeeded()
+        submitSearch(record: SearchHistoryRecord(query: query, category: .all, scope: scope))
     }
 
     private func submitSearch(record: SearchHistoryRecord) {

@@ -17,10 +17,11 @@ final class NewDiscussionRouter: NewDiscussionRouterProtocol {
     static func createModule(
         draftStore: NewDiscussionDraftStoring = UserDefaultsNewDiscussionDraftStore(),
         submitter: NodeSeekDiscussionSubmitting = WebViewNodeSeekDiscussionSubmitter(),
+        initialDraft: NewDiscussionDraft = .init(),
         onPublished: @escaping (NodeSeekPostRoute?) -> Void
     ) -> UINavigationController {
         let router = NewDiscussionRouter(onPublished: onPublished)
-        let presenter = NewDiscussionPresenter(router: router, draftStore: draftStore, submitter: submitter)
+        let presenter = NewDiscussionPresenter(router: router, draftStore: draftStore, submitter: submitter, initialDraft: initialDraft)
         let view = NewDiscussionViewController(presenter: presenter)
         presenter.view = view
         router.viewController = view

@@ -8,7 +8,6 @@ enum PushNotificationRoute: Equatable, Sendable {
     case inbox
     case atMeList
     case replyList
-    case externalWebPage(URL)
     case webPage(url: URL, title: String)
     /// 小组件点按：进探针列表，或直接进某台服务器的详情。
     case probe(ProbeWidgetLink)
