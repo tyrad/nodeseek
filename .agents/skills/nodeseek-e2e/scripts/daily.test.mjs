@@ -643,7 +643,7 @@ daily('textkit-guest-hidden-post', async ({ ui, ids, click, log, start, t }) => 
 });
 
 // 917518 是开放中的公开投票帖。游客能读到选项，但站点只允许登录用户投票。
-const votePost = '917518';
+const votePost = process.env.E2E_VOTE_POST || '917518';
 const voteHint = '请先登录后再投票。';
 
 async function openVoteCard({ fixture, ids, attr, scroll }, publicPost, post = votePost) {
@@ -699,7 +699,7 @@ daily('vote-member-open', async ctx => {
 // E2E_VOTE_POST 指定开放中且测试账号未投过的投票帖，E2E_VOTE_SUBMIT=1 时真实提交第一个选项。
 daily('vote-login-return', async ctx => {
   const { ui, ids, attr, click, wda, t } = ctx;
-  const post = process.env.E2E_VOTE_POST || votePost;
+  const post = votePost;
   const config = JSON.parse(readFileSync(join(process.env.HOME, '.config/nodeseek/e2e.json'), 'utf8'));
   const { E2E_MEMBER_USERNAME: username, E2E_MEMBER_PASSWORD: password } =
     parseEnv(readFileSync(process.env.E2E_MEMBER_ENV_FILE || config.memberEnvFile, 'utf8'));
