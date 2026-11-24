@@ -53,10 +53,11 @@ final class AppDeepLinkRouter {
             return
         case let .compose(title, body):
             composeTask = Task { [weak app, weak nav, weak top] in
-                let loggedIn = await TabLayoutAccountGate.isLoggedIn()
+                // 模拟器和真机都可能留有过期的账号快照，预填前确认当前会话。
+                let account = await CurrentAccountRefresher.shared.refreshIfNeeded(maxAge: 60)
                 guard !Task.isCancelled, let nav, let top, nav === app?.navigationController,
                       nav.topViewController === top, nav.presentedViewController == nil else { return }
-                guard loggedIn else {
+                guard account?.isLoggedIn == true else {
                     LoginWebViewController.open(from: top)
                     return
                 }
