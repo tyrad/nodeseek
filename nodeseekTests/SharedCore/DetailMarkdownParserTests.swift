@@ -152,12 +152,14 @@ struct DetailMarkdownParserTests {
         }
     }
 
-    @Test func replyThatMerelyMentionsDeletionKeepsItsMarkdown() throws {
-        // 取自 1067259 第 3 页 #22：作者自己写的「已删除」说明，网页正文与原文一致。
-        let text = "（已删除，不小心重复发布了上面的内容，抱歉——版主请帮忙删除）"
-        let payload = #"{"postData":{"comments":[{"commentId":1,"blocked":false,"markdown":"主帖"},{"commentId":2,"blocked":false,"markdown":"\#(text)"}]}}"#
-        let detail = try page(payload: payload, main: "<p>主帖</p>", reply: "<p>\(text)</p>")
-        #expect(DetailFloorSource(comment: detail.comments[0]).visibleMarkdown == text)
+    @Test func floorsThatMerelyMentionNoticeWordsKeepTheirMarkdown() throws {
+        // 取自 1067259 第 3 页 #22、1044406 #3、1058358 主楼：作者自己写到「已删除」「权限不足」，原文数据未标记屏蔽或删除。
+        let reply = "（已删除，不小心重复发布了上面的内容，抱歉——版主请帮忙删除）"
+        let main = "# 更新\n\n修复提示**权限不足**的问题，已删除旧配置"
+        let payload = #"{"postData":{"comments":[{"commentId":1,"blocked":false,"markdown":"\#(main.replacingOccurrences(of: "\n", with: "\\n"))"},{"commentId":2,"blocked":false,"markdown":"\#(reply)"}]}}"#
+        let detail = try page(payload: payload, main: "<h1>更新</h1><p>修复提示<strong>权限不足</strong>的问题，已删除旧配置</p>", reply: "<p>\(reply)</p>")
+        #expect(DetailFloorSource(post: detail).visibleMarkdown == main)
+        #expect(DetailFloorSource(comment: detail.comments[0]).visibleMarkdown == reply)
     }
 
     @Test func pageNoticeOverridesAllRawContentButAReplyCannotRestrictThePage() throws {
