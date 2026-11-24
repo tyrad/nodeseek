@@ -26,6 +26,7 @@ on:
 
 permissions:
   contents: write
+  models: read
 
 concurrency:
   group: testflight-${{ github.ref }}
@@ -230,51 +231,32 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
           RELEASE_BUILD_NUMBER: ${{ steps.release.outputs.build_number }}
+          RELEASE_NOTES_AI_ENABLED: "true"
+          RELEASE_NOTES_API_BASE: ${{ vars.RELEASE_NOTES_API_BASE || 'https://models.github.ai/inference' }}
+          RELEASE_NOTES_MODEL: ${{ vars.RELEASE_NOTES_MODEL || 'openai/gpt-4.1-mini' }}
+          RELEASE_NOTES_API_KEY: ${{ secrets.RELEASE_NOTES_API_KEY || github.token }}
         run: |
           set -euo pipefail
 
           release_title="iOS v${RELEASE_VERSION} (${RELEASE_BUILD_NUMBER})"
           release_tag="ios/v${RELEASE_VERSION}-build.${RELEASE_BUILD_NUMBER}"
-          # 手动触发的 TestFlight 构建也留存 IPA，但标为预发布，不抢 Latest
-          release_flags=()
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             source_ref="${GITHUB_REF_NAME}"
           else
             source_ref="${GITHUB_REF_NAME} (workflow_dispatch)"
-            release_title="${release_title} TestFlight"
-            release_flags=(--prerelease --latest=false)
           fi
           release_notes="$(mktemp)"
-          previous_release_tag="$(
-            git tag --merged "${GITHUB_SHA}" --sort=-v:refname 'ios/v*' \
-              | grep -E '^ios/v[0-9]+(\.[0-9]+){1,2}$' \
-              | grep -v -x "${GITHUB_REF_NAME}" \
-              | head -n 1 || true
-          )"
+          trap 'rm -f "${release_notes}"' EXIT
 
-          generated_notes="$(mktemp)"
-          generate_notes_args=(
-            "repos/${GITHUB_REPOSITORY}/releases/generate-notes"
-            -f "tag_name=${release_tag}"
-            -f "target_commitish=${GITHUB_SHA}"
-          )
-          if [[ -n "${previous_release_tag}" ]]; then
-            generate_notes_args+=(-f "previous_tag_name=${previous_release_tag}")
-          fi
-          gh api "${generate_notes_args[@]}" --jq '.body // ""' > "${generated_notes}"
-
-          cat > "${release_notes}" <<MARKDOWN
-          ## Build
-
-          - Version: ${RELEASE_VERSION}
-          - Build number: ${RELEASE_BUILD_NUMBER}
-          - Source ref: ${source_ref}
-          - Previous source tag: ${previous_release_tag:-none}
-          - Commit: ${GITHUB_SHA}
-
-          ## Changes
-          MARKDOWN
-          cat "${generated_notes}" >> "${release_notes}"
+          ruby scripts/generate-release-notes.rb \
+            --version "${RELEASE_VERSION}" \
+            --build-number "${RELEASE_BUILD_NUMBER}" \
+            --source-ref "${source_ref}" \
+            --release-tag "${release_tag}" \
+            --commit "${GITHUB_SHA}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --exclude-tag "${GITHUB_REF_NAME}" \
+            --output "${release_notes}"
 
           if gh release view "${release_tag}" >/dev/null 2>&1; then
             echo "Release ${release_tag} already exists. Refusing to replace existing release assets." >&2
@@ -284,8 +266,7 @@ jobs:
           gh release create "${release_tag}" \
               --target "${GITHUB_SHA}" \
               --title "${release_title}" \
-              --notes-file "${release_notes}" \
-              ${release_flags[@]+"${release_flags[@]}"}
+              --notes-file "${release_notes}"
 
           gh release upload "${release_tag}" \
             build/nodeseek.ipa \
