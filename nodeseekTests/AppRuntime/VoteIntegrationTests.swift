@@ -86,6 +86,41 @@ final class VoteIntegrationTests: XCTestCase {
         XCTAssertEqual(card.model.vote?.hasVoted, true)
     }
 
+    func testGuestSeesLoginHintAndCannotSubmit() async throws {
+        let service = VoteTestService()
+        service.guest = true
+        let controller = VoteViewController(voteID: 3108, service: service)
+        let window = makeWindow(controller: controller)
+        defer { window.isHidden = true }
+        let card = try XCTUnwrap(descendants(controller.view).compactMap { $0 as? DetailVoteView }.first)
+        await waitUntil { card.model.vote != nil }
+        let option = try XCTUnwrap(descendants(card).first { $0.accessibilityIdentifier == "vote-option-14131" })
+        XCTAssertFalse(option.isUserInteractionEnabled)
+        XCTAssertNil(descendants(card).first { $0.accessibilityIdentifier == "vote-submit" })
+        card.model.select(14131)
+        await card.model.submit()
+        XCTAssertTrue(service.submitted.isEmpty)
+        service.loadError = URLError(.badServerResponse)
+        await card.model.refresh()
+        let status = try XCTUnwrap(descendants(card).first { $0.accessibilityIdentifier == "vote-status" } as? UILabel)
+        XCTAssertEqual(status.text, VoteAuthenticationError.loginRequired.localizedDescription)
+        service.loadError = nil
+        service.guest = false
+        NotificationCenter.default.post(name: .nodeSeekLoginSessionDidClose, object: nil)
+        await waitUntil { card.model.vote != nil }
+        card.model.select(14131)
+        XCTAssertTrue(card.model.canSubmit)
+    }
+
+    func testGuestWebSessionBlocksWriteBeforePreflight() async throws {
+        let web = try await mockWebView()
+        _ = try await web.evaluateJavaScript("window.__config__ = {user:null}; true")
+        let result = try await web.callAsyncJavaScript(VoteAutomationScript.source, arguments: ["voteID": 3108, "operation": "submit", "ids": [14131], "timeoutMs": 1000], in: nil, contentWorld: .page) as? [String: Any]
+        XCTAssertEqual(result?["reason"] as? String, "login_required")
+        let count = try await web.evaluateJavaScript("window.requests.length") as? Int
+        XCTAssertEqual(count, 0)
+    }
+
     func testCardSelectionRequiresConfirmationWithoutUtilityButtons() async throws {
         let service = VoteTestService()
         let controller = UIViewController()

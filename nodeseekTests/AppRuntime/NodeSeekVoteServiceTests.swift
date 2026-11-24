@@ -97,6 +97,8 @@ final class NodeSeekVoteServiceTests: XCTestCase {
 
 @MainActor
 private final class VoteControlledClient: NodeSeekVoteServing {
+    func viewerIsGuest() async -> Bool { false }
+
     var loadCount = 0
     var submitCount = 0
     var onLoad: (Int) async throws -> NodeSeekVote = { _ in VoteTestService.makeVote() }

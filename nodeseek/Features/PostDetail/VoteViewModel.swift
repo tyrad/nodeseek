@@ -8,6 +8,7 @@ final class VoteViewModel {
     private(set) var selected: Set<Int> = []
     private(set) var busy = false
     private(set) var message: String?
+    private(set) var viewerIsGuest = false
     private(set) var requiresRefresh = false
     var onChange: (() -> Void)?
     private var generation = 0
@@ -48,10 +49,10 @@ final class VoteViewModel {
         refreshIfIdle()
     }
 
-    var canSubmit: Bool { !busy && !requiresRefresh && vote?.accepts(selected) == true }
+    var canSubmit: Bool { !viewerIsGuest && !busy && !requiresRefresh && vote?.accepts(selected) == true }
 
     func select(_ itemID: Int) {
-        guard !busy, !requiresRefresh, let vote, vote.canSubmit,
+        guard !viewerIsGuest, !busy, !requiresRefresh, let vote, vote.canSubmit,
               vote.items.contains(where: { $0.vote_item_id == itemID }) else { return }
         if vote.multiple {
             if selected.contains(itemID) { selected.remove(itemID) } else { selected.insert(itemID) }
@@ -61,6 +62,7 @@ final class VoteViewModel {
 
     func resetSession() {
         generation += 1
+        viewerIsGuest = false
         vote = nil
         selected = []
         busy = false
@@ -75,13 +77,21 @@ final class VoteViewModel {
         busy = true
         message = nil
         onChange?()
+        async let read = service.load(id: id)
+        let isGuest = await service.viewerIsGuest()
         do {
-            let result = try await service.load(id: id)
+            let result = try await read
             guard current == generation else { return }
+            viewerIsGuest = isGuest
             apply(result)
         } catch {
             guard current == generation else { return }
+            viewerIsGuest = isGuest || error is VoteAuthenticationError
             requiresRefresh = true
+            if viewerIsGuest {
+                vote = nil
+                selected = []
+            }
             message = error is CancellationError ? "登录状态已改变，请重新进入页面。" : error.localizedDescription
         }
         busy = false
@@ -98,6 +108,15 @@ final class VoteViewModel {
         do { try await service.submit(id: id, ids: selected) }
         catch { submissionError = error }
         guard current == generation else { return }
+        if submissionError is VoteAuthenticationError {
+            viewerIsGuest = true
+            selected = []
+            requiresRefresh = true
+            busy = false
+            message = nil
+            onChange?()
+            return
+        }
         // 写请求超时也可能已生效。重新读取完成前始终禁止再次提交。
         requiresRefresh = true
         do {
@@ -106,6 +125,11 @@ final class VoteViewModel {
             apply(result)
             message = result.hasVoted ? "已投票" : (submissionError?.localizedDescription ?? "已提交，请稍后重新进入页面确认结果。")
             if submissionError == nil && !result.hasVoted { requiresRefresh = true }
+        } catch is VoteAuthenticationError {
+            guard current == generation else { return }
+            viewerIsGuest = true
+            selected = []
+            message = nil
         } catch {
             guard current == generation else { return }
             message = "提交结果尚未确认，请重新进入页面后查看。"

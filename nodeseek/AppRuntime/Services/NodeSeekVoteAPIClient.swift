@@ -24,15 +24,32 @@ final class NodeSeekVoteAPIClient: NodeSeekVoteServing {
     private let cookieSession: NodeSeekCookieSessionManaging
     private let httpLoad: (URLRequest) async throws -> (Data, URLResponse)
     private let webRequest: (WebRequest) async throws -> Data
+    private let accountRefresher: CurrentAccountRefreshing
+    // 登录或退出后账号缓存可能仍是旧身份，下一次判断游客时强制重读。
+    private var accountMayHaveChanged = false
 
     init(
         cookieSession: NodeSeekCookieSessionManaging? = nil,
         httpLoad: @escaping (URLRequest) async throws -> (Data, URLResponse) = { try await URLSession.shared.data(for: $0) },
-        webRequest: ((WebRequest) async throws -> Data)? = nil
+        webRequest: ((WebRequest) async throws -> Data)? = nil,
+        accountRefresher: CurrentAccountRefreshing? = nil
     ) {
         self.cookieSession = cookieSession ?? NodeSeekCookieSession()
         self.httpLoad = httpLoad
         self.webRequest = webRequest ?? Self.requestInWebView
+        self.accountRefresher = accountRefresher ?? CurrentAccountRefresher.shared
+        NotificationCenter.default.addObserver(self, selector: #selector(sessionChanged), name: .nodeSeekLoginSessionDidClose, object: nil)
+    }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
+
+    @objc private func sessionChanged() { accountMayHaveChanged = true }
+
+    func viewerIsGuest() async -> Bool {
+        let force = accountMayHaveChanged
+        accountMayHaveChanged = false
+        let account = await accountRefresher.refreshIfNeeded(force: force, maxAge: 60)
+        return account?.isLoggedIn == false
     }
 
     func load(id: Int) async throws -> NodeSeekVote {
@@ -48,8 +65,9 @@ final class NodeSeekVoteAPIClient: NodeSeekVoteServing {
             result = try await webRequest(.load(id))
         } else {
             guard (200..<300).contains(response.statusCode) else {
+                if response.statusCode == 401 { throw VoteAuthenticationError.loginRequired }
                 let message = (try? JSONDecoder().decode(NodeSeekVoteResponse.self, from: data))?.message
-                throw NodeSeekVoteError(message: message ?? (response.statusCode == 401 ? "请先登录后参与投票。" : "无法读取投票，请稍后重新进入页面。"))
+                throw NodeSeekVoteError(message: message ?? "无法读取投票，请稍后重新进入页面。")
             }
             result = data
         }
@@ -110,6 +128,9 @@ final class NodeSeekVoteAPIClient: NodeSeekVoteServing {
             )
         }
         try Task.checkCancellation()
+        if result["reason"] as? String == "login_required" || result["statusCode"] as? Int == 401 {
+            throw VoteAuthenticationError.loginRequired
+        }
         guard result["ok"] as? Bool == true,
               let body = result["body"] as? String, let data = body.data(using: .utf8) else {
             throw NodeSeekVoteError(message: result["message"] as? String ?? "投票请求失败，请检查登录状态后重新进入页面。")

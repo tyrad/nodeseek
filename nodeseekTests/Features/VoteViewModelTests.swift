@@ -112,6 +112,9 @@ final class VoteViewModelTests: XCTestCase {
 
 @MainActor
 final class VoteTestService: NodeSeekVoteServing {
+    var guest = false
+    func viewerIsGuest() async -> Bool { guest }
+
     var vote = makeVote()
     var submitted: [Set<Int>] = []
     var loadError: Error?

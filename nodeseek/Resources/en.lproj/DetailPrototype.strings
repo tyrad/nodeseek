@@ -31,3 +31,5 @@
 "view-profile" = "View %@'s profile";
 "show-all" = "Show all";
 "image" = "Image";
+
+"vote.loginRequired" = "Sign in to vote.";

@@ -137,7 +137,7 @@ final class DetailVoteView: UIView {
                 option.configuration?.imagePadding = 10
                 option.configuration?.baseForegroundColor = .label
                 // 已投票的选项仍保持可读，不采用禁用按钮的浅色文字。
-                option.isUserInteractionEnabled = !model.busy && !model.requiresRefresh && vote.canSubmit
+                option.isUserInteractionEnabled = !model.viewerIsGuest && !model.busy && !model.requiresRefresh && vote.canSubmit
                 option.accessibilityTraits = selected ? [.button, .selected] : [.button]
                 if !option.isUserInteractionEnabled { option.accessibilityTraits.insert(.notEnabled) }
                 stack.addArrangedSubview(option)
@@ -145,7 +145,7 @@ final class DetailVoteView: UIView {
                     stack.addArrangedSubview(label("\(count) 票", style: .caption1, color: .secondaryLabel))
                 }
             }
-            if vote.canSubmit {
+            if vote.canSubmit && !model.viewerIsGuest {
                 stack.addArrangedSubview(label(vote.isPublic ? "公开投票，选择可被他人查看。提交后不可修改。" : "提交后不可修改。", style: .caption1, color: .secondaryLabel))
                 let submit = button("提交投票", identifier: "vote-submit") { [weak self] in self?.confirmSubmission() }
                 submit.configuration?.background.backgroundColor = .tertiarySystemFill
@@ -154,7 +154,9 @@ final class DetailVoteView: UIView {
                 stack.addArrangedSubview(submit)
             }
         }
-        if let message = model.message ?? (model.busy ? "正在加载投票…" : (model.vote?.hasVoted == true ? "已投票" : nil)) {
+        let showsLoginHint = model.viewerIsGuest && model.vote?.locked != true && model.vote?.hasVoted != true
+        let message = showsLoginHint ? VoteAuthenticationError.loginRequired.localizedDescription : model.message
+        if let message = message ?? (model.busy ? "正在加载投票…" : (model.vote?.hasVoted == true ? "已投票" : nil)) {
             let status = label(message, style: .footnote, color: .secondaryLabel)
             status.accessibilityIdentifier = "vote-status"
             stack.addArrangedSubview(status)

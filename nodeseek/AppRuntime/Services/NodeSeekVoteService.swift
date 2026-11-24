@@ -2,6 +2,7 @@ import Foundation
 
 @MainActor
 protocol NodeSeekVoteServing: AnyObject {
+    func viewerIsGuest() async -> Bool
     func load(id: Int) async throws -> NodeSeekVote
     func submit(id: Int, ids: Set<Int>) async throws
 }
@@ -9,6 +10,14 @@ protocol NodeSeekVoteServing: AnyObject {
 struct NodeSeekVoteError: LocalizedError {
     let message: String
     var errorDescription: String? { message }
+}
+
+enum VoteAuthenticationError: LocalizedError {
+    case loginRequired
+
+    var errorDescription: String? {
+        NSLocalizedString("vote.loginRequired", tableName: "DetailPrototype", comment: "游客投票提示")
+    }
 }
 
 extension Notification.Name {
@@ -50,6 +59,8 @@ final class NodeSeekVoteService: NodeSeekVoteServing {
         submissions.removeAll()
         revisions.removeAll()
     }
+
+    func viewerIsGuest() async -> Bool { await client.viewerIsGuest() }
 
     func load(id: Int) async throws -> NodeSeekVote {
         let generation = sessionGeneration

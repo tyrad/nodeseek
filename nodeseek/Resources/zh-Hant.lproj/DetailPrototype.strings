@@ -31,3 +31,5 @@
 "view-profile" = "查看 %@ 的主頁";
 "show-all" = "查看全部";
 "image" = "圖片";
+
+"vote.loginRequired" = "請先登入後再投票。";

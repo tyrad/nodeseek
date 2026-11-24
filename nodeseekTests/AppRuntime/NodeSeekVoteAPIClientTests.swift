@@ -65,6 +65,7 @@ final class NodeSeekVoteAPIClientTests: XCTestCase {
                 _ = try await service.load(id: 3108)
                 XCTFail("失败响应不应成功")
             } catch {
+                XCTAssertEqual(error is VoteAuthenticationError, status == 401)
                 XCTAssertEqual(webCalls, 0)
             }
         }
@@ -100,6 +101,19 @@ final class NodeSeekVoteAPIClientTests: XCTestCase {
         } catch { XCTAssertEqual(error.localizedDescription, "投票已删除") }
     }
 
+    func testLoginSessionChangeForcesFreshGuestCheck() async {
+        let refresher = VoteStaleGuestRefresher()
+        let client = NodeSeekVoteAPIClient(cookieSession: VoteSpyCookieSession(), accountRefresher: refresher)
+        let guestBeforeLogin = await client.viewerIsGuest()
+        XCTAssertTrue(guestBeforeLogin)
+        // 登录页关闭时未能写入账号，缓存仍是 60 秒内的游客快照。
+        NotificationCenter.default.post(name: .nodeSeekLoginSessionDidClose, object: nil)
+        let guestAfterLogin = await client.viewerIsGuest()
+        XCTAssertFalse(guestAfterLogin)
+        _ = await client.viewerIsGuest()
+        XCTAssertEqual(refresher.forces, [false, true, false])
+    }
+
     private func response(_ request: URLRequest, status: Int = 200, headers: [String: String] = [:]) -> HTTPURLResponse {
         HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)!
     }
@@ -113,4 +127,14 @@ private final class VoteSpyCookieSession: NodeSeekCookieSessionManaging {
     func captureWebViewSession() async {}
     func prepareMediaRequest() async {}
     func clearLoginSession() async {}
+}
+
+/// 非强制刷新时返回缓存的游客，强制刷新时返回已登录账号。
+private final class VoteStaleGuestRefresher: CurrentAccountRefreshing, @unchecked Sendable {
+    var forces: [Bool] = []
+    func cachedAccount() async -> AccountResponse? { nil }
+    func refreshIfNeeded(force: Bool, maxAge: TimeInterval) async -> AccountResponse? {
+        forces.append(force)
+        return AccountResponse(displayName: force ? "mistj" : "未登录", isLoggedIn: force)
+    }
 }

@@ -25,6 +25,7 @@ enum VoteAutomationScript {
     try {
       if (!Number.isSafeInteger(voteID) || voteID <= 0) throw new Error("投票编号无效");
       if (operation === "submit") {
+        if (window.__config__?.user === null) return {ok:false, reason:"login_required"};
         const current = await request("/api/vote/info/" + voteID, "GET");
         if (!current.ok) return current;
         const vote = JSON.parse(current.body).vote;
