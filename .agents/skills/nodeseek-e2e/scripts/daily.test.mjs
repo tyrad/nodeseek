@@ -788,3 +788,54 @@ daily('textkit-signature-link', async ctx => {
   const opened = await waitFor(left, '从面板选择「' + b.label + '」后没有打开');
   t.diagnostic('点「' + a.label + '」与「' + b.label + '」之间弹出选择面板（' + rows.join('；') + '），选「' + b.label + '」后打开' + opened);
 });
+
+const openWebLink = url => 'nsconnect://open?url=' + encodeURIComponent(url);
+
+// simctl 打开自定义协议时，部分系统会先由 SpringBoard 确认接收应用。
+function openSystemLink(link) {
+  simctl('openurl', device, link);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const screen = execFileSync('axe', ['describe-ui', '--udid', device], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+    const prompt = screen.match(/在.{0,3}NS Connect.{0,3}中打开|Open.{0,8}NS Connect/i);
+    if (prompt) {
+      const label = prompt[0].startsWith('在') ? '打开' : 'Open';
+      execFileSync('axe', ['tap', '--udid', device, '--label', label, '--element-type', 'Button', '--tap-style', 'physical']);
+      return;
+    }
+  }
+}
+
+daily('deeplink-post', async ({ ui, start, log }) => {
+  await start();
+  const offset = log().length;
+  openSystemLink('nsconnect://post/893437');
+  const first = await waitFor(() => log().slice(offset).match(/开始加载帖子详情，postID=(\d+), page=(\d+)/), '没有加载深链指定的帖子');
+  assert.deepEqual(first.slice(1), ['893437', '1']);
+  await waitFor(() => log().slice(offset).includes('帖子详情加载成功，postID=893437,'), '893437 首页未加载成功');
+  await ui.tap('BackButton');
+  await ui.get(home);
+});
+
+daily('deeplink-floor', async ({ ui, start }) => {
+  await start();
+  simctl('terminate', device, bundle);
+  for (const link of [openWebLink('https://www.nodeseek.com/post-1016685-2#18'), 'nsconnect://post/1016685-2?floor=18']) {
+    openSystemLink(link);
+    await ui.get('post-detail-edit-comment-18-14299736');
+    await ui.tap('BackButton');
+    await ui.get(home);
+  }
+});
+
+daily('deeplink-safari-probe', async ({ ui, start, ids, wda }) => {
+  await start();
+  openSystemLink(openWebLink('https://example.com/'));
+  const done = await waitFor(async () => (await ids('type == "XCUIElementTypeButton" AND (name == "DoneButton" OR label IN {"完成", "Done", "关闭", "Close"}) AND visible == 1'))[0], 'Safari 没有显示关闭按钮');
+  await waitFor(async () => (await ids('label CONTAINS[c] "example.com" OR value CONTAINS[c] "example.com"')).length, 'Safari 未显示目标域名');
+  const rect = await wda('/element/' + done + '/rect');
+  execFileSync('axe', ['tap', '--udid', device, '--tap-style', 'physical',
+    '-x', String(rect.x + rect.width / 2), '-y', String(rect.y + rect.height / 2)]);
+  await ui.get(home);
+  openSystemLink('nsconnect://probe');
+  await ui.get('probe-monitor-table');
+});

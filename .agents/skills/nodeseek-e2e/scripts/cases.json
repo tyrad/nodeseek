@@ -260,5 +260,26 @@
       "daily"
     ],
     "setup": "须用空闲的未登录阅读模式模拟器（SIMULATOR_ID 指定），运行后保留登录，重跑前在 App 设置里退出登录（只清本机会话）。默认帖 917518，E2E_VOTE_POST 换帖，E2E_VOTE_SUBMIT=1 时公开投第一个选项"
+  },
+  "deeplink-post": {
+    "title": "系统打开帖子深链，首次请求 893437 的第一页",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，member 专用设备；只读"
+  },
+  "deeplink-floor": {
+    "title": "冷启动从网页链接、热启动从帖子深链定位第 18 楼",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，member 专用设备；只读"
+  },
+  "deeplink-safari-probe": {
+    "title": "第三方网页在 Safari 浏览控制器打开，探针深链仍进原生列表",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "阅读模式，member 专用设备；只读"
   }
 }

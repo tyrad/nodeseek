@@ -1,6 +1,6 @@
 ---
 name: nodeseek-e2e
-description: 为 NodeSeek iOS 客户端编写和无人值守运行 Midscene 发布前回归，验证读帖、最近浏览、分类评论、游客登录入口、退出后会话清理、系统推送与站内通知跳转、收藏、引用、看图、翻页筛选、已登录搜索、发帖草稿恢复及指定帖真实回帖与编辑，定位失败并报告发布风险。
+description: 为 NodeSeek iOS 客户端编写和无人值守运行 Midscene 发布前回归，验证读帖、最近浏览、分类评论、游客登录入口、退出后会话清理、系统推送与站内通知跳转、外部深链、收藏、引用、看图、翻页筛选、已登录搜索、发帖草稿恢复及指定帖真实回帖与编辑，定位失败并报告发布风险。
 ---
 
 # NodeSeek iOS 发布前回归
@@ -113,6 +113,18 @@ make e2e-case CASE=push-cold
 [系统推送脚本](scripts/push.test.mjs) 使用 `xcrun simctl push` 投递含唯一标题的回复通知，由本机 `axe` 点按 SpringBoard 上实际显示的通知。后台用例连续投递两条到同一楼层的新通知；冷启动用例先退出 App 进程。每次只点一次，核对帖子 1016685 的第 18 楼和正文标记，再只点一次返回，必须看见首页。报告目录中的 `*-notification.png`、`*-detail.png`、`*-returned.png` 分别记录这三步。若返回后仍显示同一楼，检查 SceneDelegate 和通知中心代理是否处理了同一次系统响应。模拟投递覆盖设备端展示、点按和 App 路由；生产 APNs 服务的投递需另行验证。
 
 [常用功能脚本](scripts/daily.test.mjs) 中，`home-paging` 核对首页刷新、排序和第二页加载；`quote-cancel` 在固定评论取消引用并逐字读回自己的输入；`photo-return` 用帖子 703863 的配图验证长按出现分享和保存选项，收起菜单后可返回原帖；`last-page-filter` 检查只看楼主、恢复全部和末页导航；`inbox-reply` 从通知记录取得帖子及楼层，重开核对已读；`favorite-sync` 临时收藏帖子 1016685，从「我的收藏」重开并恢复初始状态。有站内通知时优先使用未读样本；全部已读时单独注明。无通知或固定帖已被用户收藏时，报告中的跳过项不计入通过数。
+
+## 外部深链
+
+用 `make e2e-case CASE=<编号>` 单跑。三条都通过系统的 `simctl openurl` 投递到已安装的 App。
+
+| 编号 | 验收 |
+| --- | --- |
+| `deeplink-post` | 热启动打开 `nsconnect://post/893437`，首个详情请求为 893437 第 1 页，点一次返回首页 |
+| `deeplink-floor` | 冷启动传入编码的 NodeSeek 网页链接，热启动传入带页码和楼层的直接深链；两次都看到帖子 1016685 第 18 楼的评论 14299736，一次返回首页 |
+| `deeplink-safari-probe` | 打开站外链接能在 Safari 浏览控制器看到目标域名，关闭后回到首页；随后打开 `nsconnect://probe` 进入探针列表 |
+
+域名匹配、地址规范化、非 HTTP(S) 协议和畸形帖子路径由 `make spm-test` 中的 `NodeSeekWebDeepLinkTests` 覆盖。
 
 ## TextKit 详情页分页
 
