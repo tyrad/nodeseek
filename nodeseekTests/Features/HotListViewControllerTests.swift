@@ -38,54 +38,72 @@ struct HotListViewControllerTests {
         HotListSourceSettings(userDefaults: UserDefaults(suiteName: "HotListViewControllerTests.\(UUID().uuidString)")!)
     }
 
-    private func makeViewController(_ loader: HotListFakeLoader) -> (HotListViewController, UITableView) {
+    /// 页面在显示时才请求，需挂到窗口上触发生命周期。
+    private func makeViewController(_ loader: HotListFakeLoader) -> (HotListViewController, UIWindow) {
         let repository = HotListRepository(settings: makeSettings(), loader: { try loader.load($0) })
         let viewController = HotListViewController(repository: repository)
-        viewController.loadViewIfNeeded()
-        let tableView = viewController.view.hotListFirstView(accessibilityIdentifier: "hot-list-table") as! UITableView
-        return (viewController, tableView)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = UINavigationController(rootViewController: viewController)
+        window.makeKeyAndVisible()
+        viewController.view.layoutIfNeeded()
+        return (viewController, window)
     }
 
-    @Test func loadsRealtimeListAndOpensSelectedPost() async throws {
+    private func table(_ viewController: HotListViewController, _ kind: HotListKind) -> UITableView? {
+        viewController.page(for: kind)?.viewIfLoaded == nil ? nil : viewController.page(for: kind)?.tableView
+    }
+
+    @Test func tabsLiveInNavigationBarAndRealtimeLoadsFirst() async throws {
         let loader = HotListFakeLoader()
-        let (viewController, tableView) = makeViewController(loader)
+        let (viewController, window) = makeViewController(loader)
         var selected: PostSummary?
         viewController.onSelectPost = { selected = $0 }
 
-        try await waitUntil { tableView.numberOfRows(inSection: 0) == 2 }
-        #expect(loader.requests == [HotListKind.realtime.defaultURL])
+        let titleView = try #require(viewController.navigationItem.titleView)
+        #expect(titleView.hotListFirstView(accessibilityIdentifier: "hot-list-tab-realtime") != nil)
+        #expect(titleView.hotListFirstView(accessibilityIdentifier: "hot-list-tab-weekly") != nil)
         #expect(viewController.navigationItem.rightBarButtonItem?.accessibilityIdentifier == "hot-list-settings-button")
 
-        viewController.tableView(tableView, didSelectRowAt: IndexPath(row: 1, section: 0))
+        try await waitUntil { table(viewController, .realtime)?.numberOfRows(inSection: 0) == 2 }
+        // 其他榜单还没显示，不应提前请求
+        #expect(loader.requests == [HotListKind.realtime.defaultURL])
+
+        let page = try #require(viewController.page(for: .realtime))
+        page.tableView(page.tableView, didSelectRowAt: IndexPath(row: 1, section: 0))
         #expect(selected?.id == "12")
         #expect(selected?.url.absoluteString == "https://www.nodeseek.com/post-12-1")
+        withExtendedLifetime(window) {}
     }
 
-    @Test func switchingTabLoadsThatList() async throws {
+    @Test func tappingTabShowsSeparateListForThatKind() async throws {
         let loader = HotListFakeLoader()
-        let (viewController, tableView) = makeViewController(loader)
-        try await waitUntil { tableView.numberOfRows(inSection: 0) == 2 }
+        let (viewController, window) = makeViewController(loader)
+        try await waitUntil { table(viewController, .realtime)?.numberOfRows(inSection: 0) == 2 }
 
-        let weeklyTab = try #require(viewController.view.hotListFirstView(accessibilityIdentifier: "hot-list-tab-weekly") as? UIButton)
+        let weeklyTab = try #require(viewController.navigationItem.titleView?.hotListFirstView(accessibilityIdentifier: "hot-list-tab-weekly") as? UIButton)
         weeklyTab.sendActions(for: .touchUpInside)
 
-        try await waitUntil { loader.requests.count == 2 }
+        try await waitUntil { table(viewController, .weekly)?.numberOfRows(inSection: 0) == 2 }
+        #expect(viewController.selectedKind == .weekly)
         #expect(loader.requests.last == HotListKind.weekly.defaultURL)
+        #expect(table(viewController, .weekly) !== table(viewController, .realtime))
+        withExtendedLifetime(window) {}
     }
 
     @Test func failureWithoutCacheShowsRetryAndRecovers() async throws {
         let loader = HotListFakeLoader()
         loader.setFails(true)
-        let (viewController, tableView) = makeViewController(loader)
+        let (viewController, window) = makeViewController(loader)
 
-        try await waitUntil { tableView.backgroundView?.accessibilityIdentifier == "hot-list-error" }
+        try await waitUntil { table(viewController, .realtime)?.backgroundView?.accessibilityIdentifier == "hot-list-error" }
+        let tableView = try #require(table(viewController, .realtime))
         let retry = try #require(tableView.backgroundView?.hotListFirstView(accessibilityIdentifier: "hot-list-retry-button") as? UIButton)
 
         loader.setFails(false)
         retry.sendActions(for: .primaryActionTriggered)
         try await waitUntil { tableView.numberOfRows(inSection: 0) == 2 }
         #expect(tableView.backgroundView == nil)
-        withExtendedLifetime(viewController) {}
+        withExtendedLifetime(window) {}
     }
 
     @Test func settingsScreenListsSourceAndThreeEditableURLs() {

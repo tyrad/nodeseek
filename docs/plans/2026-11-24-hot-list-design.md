@@ -57,7 +57,7 @@
 
 ### 页面（Features/HotList）
 
-- `HotListViewController`：顶部轻量 tab 切换三种榜单；tab 下灰色说明条显示统计范围、条数和更新时间；列表每行为「排名｜标题（两行）＋信息行（16pt 头像、作者、分类、发帖时间、浏览、回复、热度）」。前三名排名放大加粗，只用黑白灰。右上角为设置按钮，刷新靠下拉。
+- `HotListViewController`：导航栏 titleView 放实时 / 日榜 / 周榜三个 tab，下方 `UIPageViewController` 承载三个独立列表（`HotListPageViewController`），左右滑动切换，与首页分类一致；某个榜单第一次显示时才请求。每页顶部灰色说明条显示统计范围和更新时间；每行为「排名｜标题（两行）＋信息行（16pt 头像、作者、分类、发帖时间、浏览、回复、热度）」。前三名排名放大加粗，只用黑白灰。右上角为设置按钮，刷新靠下拉。
 - `HotListSettingsViewController`：数据来源（提供方、上次更新、查看插件主页）、三个接口地址可编辑、恢复默认地址。保存前先请求一次校验格式，失败不保存并提示。
 - 文案放 `HotList.strings`，补齐 zh-Hans / zh-Hant / en。支持暗黑模式与动态字号。
 
