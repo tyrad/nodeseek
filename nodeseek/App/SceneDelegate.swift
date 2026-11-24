@@ -58,10 +58,19 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         handle(urlContexts: URLContexts)
     }
 
-    /// 目前只有小组件会用 nsconnect:// 打开 App。
+    /// 小组件用 `nsconnect://probe/...`；外部（Loon、快捷指令、其它 App）用
+    /// `nsconnect://post/<id>[-<page>]` 或 `nsconnect://open?url=<NodeSeek 链接>` 直达帖子。
     private func handle(urlContexts: Set<UIOpenURLContext>) {
-        guard let link = urlContexts.lazy.compactMap({ ProbeWidgetLink(url: $0.url) }).first else { return }
-        PushNotificationDeepLink.handle(.probe(link))
+        for url in urlContexts.map(\.url) {
+            if let link = ProbeWidgetLink(url: url) {
+                PushNotificationDeepLink.handle(.probe(link))
+                return
+            }
+            if let route = NodeSeekWebDeepLink.route(for: url) {
+                PushNotificationDeepLink.handle(route)
+                return
+            }
+        }
     }
 
     private func presentOnboarding(from root: UIViewController, in window: UIWindow) {
