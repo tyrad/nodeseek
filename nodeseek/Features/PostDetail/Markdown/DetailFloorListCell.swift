@@ -32,7 +32,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     private let timestamp = UILabel()
     private let posterBadge = UILabel()
     private let badgeRow = UIStackView()
-    /// 作者标签放不下时折到下一行，与旧版标签换行一致。
+    /// 作者标签放不下时折到下一行。
     private let overflowRows = UIStackView()
     private var badgeLabels: [AuthorBadgeLabel] = []
     private let hotBadge = UIImageView()
@@ -66,7 +66,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
             }
         }
     }
-    /// 主楼计数过万按「万 / 亿」缩写，与旧版主楼一致；回复楼层显示原数字。
+    /// 主楼计数过万按「万 / 亿」缩写；回复楼层显示原数字。
     var compactCounts = false
     private(set) var body = DetailBlockStack()
     private(set) var request: DetailFloorRequest?
@@ -130,12 +130,12 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         avatar.layer.cornerRadius = PostDetailContentLayout.avatarCornerRadius
         avatar.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(showAuthor)))
         avatar.addInteraction(UIContextMenuInteraction(delegate: self))
-        // 与旧版标识一致，E2E 按它们定位作者。
+        // E2E 按这些标识定位作者，不要改名。
         avatar.accessibilityIdentifier = "comment-author-avatar"
         metadata.accessibilityIdentifier = "comment-author-name"
         metadata.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(showAuthor)))
         metadata.addInteraction(UIContextMenuInteraction(delegate: self))
-        // 与 Texture 楼层一致：作者名、楼主、状态标签各自独立，作者名过长时先换行，标签保持完整。
+        // 作者名、楼主、状态标签各自独立，作者名过长时先换行，标签保持完整。
         metadata.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         posterBadge.accessibilityIdentifier = "detail-poster-badge"
         posterBadge.text = DetailListStrings.text("poster")
@@ -285,7 +285,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         metadata.isUserInteractionEnabled = profileURL != nil
         authorURL = profileURL
         openAuthor = open
-        // 与旧版一致：名字可点开主页，读屏说明用途。
+        // 名字可点开主页，读屏说明用途。
         if profileURL != nil, let display = AuthorDisplayPolicy.displayName(from: name) {
             metadata.accessibilityLabel = String(format: DetailListStrings.text("view-profile"), display)
             metadata.accessibilityTraits = .button
@@ -486,7 +486,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         let config = UIImage.SymbolConfiguration(pointSize: PostDetailContentLayout.reactionSymbolPointSize, weight: .regular)
         let icon = key == "chicken" ? UIImage(named: "ChickenLeg") : UIImage(systemName: symbol)
         button.setImage(icon?.applyingSymbolConfiguration(config)?.withRenderingMode(.alwaysTemplate), for: .normal)
-        // 系统按钮默认会把符号按自身样式再放大一档，固定为 14pt 才与旧版图标一样大。
+        // 系统按钮默认会把符号按自身样式再放大一档，固定为 14pt 才与正文配套。
         button.setPreferredSymbolConfiguration(config, forImageIn: .normal)
         button.isEnabled = enabled
         footer.isHidden = false
@@ -588,7 +588,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
             signature.spacing = 4
             signature.onLink = self.body.onLink
             signature.onSignatureLinks = self.body.onSignatureLinks
-            // 与旧版签名一致：每个链接至少 72×48 的点击区。
+            // 签名里每个链接至少 72×48 的点击区。
             signature.linkTargetSize = CGSize(width: 72, height: 48)
             signature.onPhotos = self.body.onPhotos
             signature.onStickerSizeChange = self.body.onStickerSizeChange

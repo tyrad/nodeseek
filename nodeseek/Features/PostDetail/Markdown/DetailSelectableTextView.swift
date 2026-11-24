@@ -204,7 +204,7 @@ final class DetailSelectableTextView: UIView, UITextInput, UITextInteractionDele
         for segment in linkSegments {
             let rect = segment.rect
             var target = rect.insetBy(dx: min(0, (rect.width - size.width) / 2), dy: min(0, (rect.height - size.height) / 2))
-            // 与旧版一致，向上不越过本段文字顶部，免得盖住上方正文的最后一行。
+            // 向上不越过本段文字顶部，免得盖住上方正文的最后一行。
             let top = min(rect.minY, max(0, target.minY))
             target = CGRect(x: target.minX, y: top, width: target.width, height: target.maxY - top)
             guard target.contains(point) else { continue }

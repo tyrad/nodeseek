@@ -112,7 +112,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         queuedRows.removeAll()
         refreshQueuedBanner = false
         switch page.displayMode {
-        // 首次加载：与 Texture 相同，一个主楼骨架加若干回复骨架；-1 表示主楼。
+        // 首次加载：一个主楼骨架加若干回复骨架；-1 表示主楼。
         case .skeleton: rows = (-1..<page.skeletonCommentRowCount).map(PostDetailViewController.DetailRow.skeletonComment)
         case .content, .pageSkeleton: rows = page.detailRows
         }
@@ -300,7 +300,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
                           onLike: { [weak page] in page?.handleCommentLikeTap(comment) },
                           onChicken: { [weak page] in page?.handleCommentChickenLegTap(comment) },
                           onOppose: { [weak page] in page?.handleCommentOpposeTap(comment) })
-            // 与旧版一致：回复、引用常驻底栏，本人楼层另有编辑。
+            // 回复、引用常驻底栏，本人楼层另有编辑。
             let floor = comment.anchorID
             cell.addAction("reply", symbol: "arrowshape.turn.up.left", label: "reply-comment") { [weak page] in page?.handleReply(to: comment) }
             cell.addAction("quote", symbol: "quote.bubble", label: "quote-comment",
@@ -497,7 +497,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
 
 extension PostDetailCollectionList {
     /// 首次从骨架切到内容前调用：用骨架快照盖住列表，等首屏楼层装好正文、签名且高度稳定后再揭开，
-    /// 最长等待 timeout，与 Texture 首屏揭示一致，避免露出空楼层和预估高度后再跳动。
+    /// 最长等待 timeout，避免露出空楼层和预估高度后再跳动。
     func coverUntilSettled(timeout: TimeInterval) {
         guard revealCover == nil, let superview = view.superview, view.window != nil,
               let cover = view.snapshotView(afterScreenUpdates: false) ?? view.snapshotView(afterScreenUpdates: true) else {
@@ -549,7 +549,7 @@ private extension PostDetailCollectionList {
         let filterIcon = UIImage(systemName: "person.crop.circle")
         let editIcon = UIImage(systemName: "square.and.pencil")
         add("copy", UIImage(systemName: "doc.on.doc")) { [weak cell] page in
-            // 正文排好前用网页内容兜底，与旧版一样复制后提示，没有内容时直接说明。
+            // 正文排好前用网页内容兜底，复制后提示，没有内容时直接说明。
             func fallback() -> String? {
                 comment.map { CommentCopyTextFormatter.plainText(for: $0, baseURL: page.baseURL) }
                     ?? page.currentHeaderContent.map { CommentCopyTextFormatter.plainText(for: $0, baseURL: page.baseURL) }
@@ -563,7 +563,7 @@ private extension PostDetailCollectionList {
                 page?.showToast(message: DetailListStrings.text("copied"))
             }), animated: true)
         }
-        // 与旧版菜单一致：复制、投放鸡腿（非本人）、只看 TA（作者可展示时）、编辑。引用在底栏。
+        // 菜单：复制、投放鸡腿（非本人）、只看 TA（作者可展示时）、编辑。引用在底栏。
         if let comment {
             if !comment.isOwnComment { add("chicken", UIImage(named: "ChickenLeg")) { $0.handleCommentChickenLegTap(comment) } }
             if AuthorDisplayPolicy.isDisplayable(comment.authorName) {
@@ -613,7 +613,7 @@ extension PostDetailCollectionList {
     }
 }
 
-/// 楼层底栏按钮是 UIControl，系统默认不让列表接管已交给按钮的触摸。旧版按钮不是 UIControl，按住按钮再拖动仍会滚动，这里保持一致。
+/// 楼层底栏按钮是 UIControl，系统默认不让列表接管已交给按钮的触摸。这里让按住按钮再拖动仍能滚动列表。
 private final class DetailCollectionView: UICollectionView {
     var onAppearanceChange: (() -> Void)?
 

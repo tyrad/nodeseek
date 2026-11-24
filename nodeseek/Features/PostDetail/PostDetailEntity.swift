@@ -136,13 +136,6 @@ struct PostDetailHeaderContent: Equatable {
         return updated
     }
 
-    func updatingFavoriteReaction(count: Int?, isCollected: Bool) -> PostDetailHeaderContent {
-        var updated = self
-        updated.favoriteCount = count
-        updated.isFavoriteCollected = isCollected
-        return updated
-    }
-
     func updatingLikeReaction(count: Int?, isClicked: Bool) -> PostDetailHeaderContent {
         var updated = self
         updated.likeCount = count

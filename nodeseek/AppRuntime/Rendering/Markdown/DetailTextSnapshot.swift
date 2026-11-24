@@ -81,10 +81,10 @@ nonisolated struct DetailTextSegment: Sendable {
     var inQuote = false
     /// 列表嵌套层级，1 为顶层；每深一层整体右移一个悬挂缩进。
     var listLevel = 1
-    /// 签名沿用旧版样式：统一常规字重、次要文字色和签名链接色，段落紧凑。
+    /// 签名样式：统一常规字重、次要文字色和签名链接色，段落紧凑。
     var isSignature = false
 
-    // 与旧版网页样式表一致：段落后 12，标题前 18、后 8，列表项之间 6。
+    // 沿用站点网页样式表：段落后 12，标题前 18、后 8，列表项之间 6。
     var spacingBefore: CGFloat { isHeading ? 18 : 0 }
     var spacingAfter: CGFloat { isSignature ? 2 : isHeading ? 8 : (isListItem && !endsList ? 6 : 12) }
 }
@@ -164,12 +164,12 @@ nonisolated enum DetailTextTypesetter {
                 }
             }
             let style = paragraph.mutableCopy() as! NSMutableParagraphStyle
-            // 旧版按 CSS line-height 排版：行高为字号乘倍数后取整，额外行距不再叠加。
+            // 按 CSS line-height 排版：行高为字号乘倍数后取整，额外行距不再叠加。
             style.lineSpacing = 0
-            // 旧版签名行距为 2，约为字号的 1.2 倍再加 2。
+            // 签名行距为 2，约为字号的 1.2 倍再加 2。
             style.minimumLineHeight = segment.isSignature ? ceil(pointSize * 1.2 + 2) : ceil(pointSize * (segment.isHeading ? 1.28 : 1.42))
             if segment.isListItem {
-                // 旧版列表符号顶格，换行悬挂缩进 22；引用内不缩进。
+                // 列表符号顶格，换行悬挂缩进 22；引用内不缩进。
                 let nested = CGFloat(max(0, segment.listLevel - 1)) * 22
                 style.firstLineHeadIndent = nested
                 style.headIndent = nested + (segment.inQuote ? 0 : 22)

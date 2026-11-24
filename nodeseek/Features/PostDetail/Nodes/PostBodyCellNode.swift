@@ -575,14 +575,6 @@ final class PostBodyCellNode: ASCellNode, ThemeRefreshableNode {
         setNeedsLayout()
     }
 
-    func updateFavoriteReaction(count: Int?, isCollected: Bool) {
-        let nextContent = content.updatingFavoriteReaction(count: count, isCollected: isCollected)
-        guard nextContent != content else { return }
-        content = nextContent
-        configureFavoriteActionButton(count: content.favoriteCount, isCollected: content.isFavoriteCollected)
-        setNeedsLayout()
-    }
-
     @objc private func authorTapped() {
         guard let authorProfileURL = content.authorProfileURL else { return }
         onAuthorTapped(authorProfileURL)

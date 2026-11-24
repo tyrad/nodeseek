@@ -15,7 +15,7 @@ final class DetailBlockStack: UIStackView {
     /// 图片尺寸由页面统一缓存：已知尺寸按最终高度占位，加载后回写。
     var imageSize: ((URL) -> CGSize?)?
     var onImageSize: ((URL, CGSize) -> Void)?
-    /// 按楼层内第几个标签组读写选中栏，楼层复用重建后恢复，与旧版保持选中一致。
+    /// 按楼层内第几个标签组读写选中栏，楼层复用重建后恢复原来的选中栏。
     var savedTab: ((Int) -> Int)?
     var onTabSelected: ((Int, Int) -> Void)?
     private var nextTabOrdinal = 0
@@ -140,7 +140,7 @@ final class DetailBlockStack: UIStackView {
     private final class TabPage: UIStackView {
         var layoutTask: Task<Void, Never>?
         var sectionIndex = 0
-        /// 生成跨标签图集（含终端报告截图），与 Texture 版 `DetailMagicTabGallery` 一致。
+        /// 生成跨标签图集（含终端报告截图），规则同预览使用的 `DetailMagicTabGallery`。
         var gallery: ((UIView) async throws -> [DetailMagicTabGallery.Image])?
         var galleryTask: Task<Void, Never>?
         deinit { layoutTask?.cancel(); galleryTask?.cancel() }
@@ -155,7 +155,7 @@ final class DetailBlockStack: UIStackView {
         return nil
     }
 
-    /// 文字标签条，样式同 Texture 版 `DetailMagicTabsNode`：选中项加粗、加下划线，其余用次级文字色。
+    /// 文字标签条，样式同预览使用的 `DetailMagicTabsNode`：选中项加粗、加下划线，其余用次级文字色。
     private final class TabStrip: UIScrollView {
         private let row = UIStackView()
         private(set) var buttons: [UIButton] = []
@@ -182,7 +182,7 @@ final class DetailBlockStack: UIStackView {
                 button.accessibilityIdentifier = "detail-magic-tab-\(index)"
                 button.accessibilityLabel = title
                 button.addAction(UIAction { [weak self] _ in self?.onSelect?(index) }, for: .touchUpInside)
-                // 按文字自身宽度排列，不被栈视图拉伸，间距与 Texture 版一致。
+                // 按文字自身宽度排列，不被栈视图拉伸。
                 button.setContentHuggingPriority(.required, for: .horizontal)
                 button.setContentCompressionResistancePriority(.required, for: .horizontal)
                 button.titleLabel?.numberOfLines = 1
@@ -208,7 +208,7 @@ final class DetailBlockStack: UIStackView {
         }
     }
 
-    /// 标签页与 Texture 版一致：内容区高度以第一栏为准，较长的栏在区内滚动，切换时楼层高度不变；
+    /// 标签页内容区高度以第一栏为准，较长的栏在区内滚动，切换时楼层高度不变；
     /// 新栏排好后才替换旧栏，避免切换瞬间出现空白。只保留当前栏，未选中的栏不占用正文位图。
     private func tabs(_ titles: [String], in parent: UIStackView, width: CGFloat,
                       gallery: ((UIView) async throws -> [DetailMagicTabGallery.Image])? = nil, initial: ((TabPage) -> Void)? = nil,
@@ -304,7 +304,7 @@ final class DetailBlockStack: UIStackView {
         onPhotos?(urls, index)
     }
 
-    /// 与旧版一致：整楼图片（含引用内，不含标签页）组成图集。
+    /// 整楼图片（含引用内，不含标签页）组成图集。
     private func floorImageURLs() -> [URL] {
         var urls: [URL] = []
         func visit(_ view: UIView) {
@@ -405,7 +405,7 @@ final class DetailBlockStack: UIStackView {
                 height = attach(view, to: stack, height: DetailImageLayout.reportPlaceholderSize(maxWidth: width).height)
             case .image(let image):
                 weak var height: NSLayoutConstraint?
-                // 与旧版一致：标签内的图按报告图展示，点开后图集跨所有标签。
+                // 标签内的图按报告图展示，点开后图集跨所有标签。
                 let inTab = Self.tabPage(containing: stack) != nil
                 let kind: DetailImageKind = inTab ? .report : DetailImageKind.resolved(isSticker: false, imageURL: image.url)
                 let view = DetailImageBlockView(imageBlock: image, imageKind: kind, onImageLoaded: { [weak self] original, resolved in
@@ -416,7 +416,7 @@ final class DetailBlockStack: UIStackView {
                     guard let self else { return }
                     self.openPhoto(image.url, in: stack, gallery: self.floorImageURLs)
                 })
-                // 与旧版一致：同一进程内加载过的图按已知尺寸占位，复用或重新进入时不再先缩后撑。
+                // 同一进程内加载过的图按已知尺寸占位，复用或重新进入时不再先缩后撑。
                 let placeholder = imageSize?(image.url).map { DetailImageLayout.presentation(for: $0, maxWidth: width, kind: kind).size }
                     ?? (kind == .report ? DetailImageLayout.reportPlaceholderSize(maxWidth: width) : DetailImageLayout.normalPlaceholderSize(maxWidth: width))
                 // 正文图片可被读屏点按，E2E 按地址定位。
@@ -427,7 +427,7 @@ final class DetailBlockStack: UIStackView {
                 view.accessibilityIdentifier = "detail-content-image"
                 height = attach(view, to: stack, height: placeholder.height)
             case .iframeLink(let link):
-                // 与旧版一致：嵌入内容显示为带标题和来源的卡片。
+                // 嵌入内容显示为带标题和来源的卡片。
                 attach(DetailIFrameLinkView(iframeBlock: link) { open(link.openURL) }, to: stack,
                        height: DetailIFrameLinkLayout.measure(iframeBlock: link, constrainedSize: size).height)
             case .imagePlaceholder(let url): appendLegacy([.text(NSAttributedString(string: url?.absoluteString ?? "🖼"))], to: stack, width: width)
