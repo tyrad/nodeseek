@@ -516,6 +516,11 @@ extension PostDetailCollectionList {
     private func checkReveal() {
         guard let cover = revealCover else { return }
         view.layoutIfNeeded()
+        // 正文和签名异步撑高前面的楼层；首屏揭开前按实际高度校准深链的目标位置。
+        if let key = pendingAnchorKey, let path = data.indexPath(for: key) {
+            scroll(to: path.item, position: .centeredVertically)
+            view.layoutIfNeeded()
+        }
         let floors = view.visibleCells.compactMap { $0 as? DetailFloorListCell }
         // 高度回写在装入后的下一轮主队列执行，连续两次检查都稳定才算排好。
         settledChecks = !floors.isEmpty && floors.allSatisfy(\.isSettled) ? settledChecks + 1 : 0
