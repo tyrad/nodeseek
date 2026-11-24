@@ -4,7 +4,7 @@
 //
 //  外部链接跳转 App 的深链解析，供 Loon / 快捷指令 / 其它 App 使用：
 //    nsconnect://post/<postID>[-<page>][?floor=<anchor>]
-//    nsconnect://open?url=<NodeSeek 完整链接>
+//    nsconnect://open?url=<网页链接>
 //  `nsconnect://probe/...` 仍归小组件（ProbeWidgetLink）。
 //
 
@@ -27,11 +27,10 @@ nonisolated enum NodeSeekWebDeepLink {
 
     /// `nsconnect://post/139218-3?floor=482913`
     private static func postRoute(for url: URL) -> PushNotificationRoute? {
-        let components = url.pathComponents.filter { $0.isEmpty == false && $0 != "/" }
-        guard let raw = components.first else { return nil }
-        let parts = raw.split(separator: "-", omittingEmptySubsequences: true)
-        guard let idPart = parts.first, idPart.allSatisfy(\.isNumber) else { return nil }
-        let page = parts.count > 1 ? max(Int(parts[1]) ?? 1, 1) : 1
+        let path = url.path
+        guard path.hasPrefix("/") else { return nil }
+        let postURL = NodeSeekSite.baseURL.appendingPathComponent("post-" + path.dropFirst())
+        guard let route = NodeSeekPostRouteResolver.route(for: postURL, baseURL: NodeSeekSite.baseURL) else { return nil }
 
         var floor: String?
         if let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?
@@ -41,13 +40,7 @@ nonisolated enum NodeSeekWebDeepLink {
             floor = value
         }
 
-        let postID = String(idPart)
-        return .reply(
-            postID: postID,
-            page: page,
-            floor: floor,
-            url: NodeSeekSite.postURL(id: postID, page: page)
-        )
+        return .reply(postID: route.postID, page: route.page, floor: floor, url: NodeSeekSite.postURL(id: route.postID, page: route.page))
     }
 
     /// `nsconnect://open?url=https%3A%2F%2Fwww.nodeseek.com%2Fpost-139218-2`
@@ -57,14 +50,19 @@ nonisolated enum NodeSeekWebDeepLink {
             .first(where: { $0.name == "url" })?
             .value,
               let target = URL(string: rawValue),
-              let route = NodeSeekPostRouteResolver.route(for: target, baseURL: target) else {
+              let scheme = target.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              let host = target.host?.lowercased(), !host.isEmpty else {
             return nil
         }
+        guard host == NodeSeekSite.rootHost || host == NodeSeekSite.baseURL.host else {
+            return .externalWebPage(target)
+        }
+        guard let route = NodeSeekPostRouteResolver.route(for: target, baseURL: NodeSeekSite.baseURL) else { return nil }
         return .reply(
             postID: route.postID,
             page: route.page,
             floor: route.anchorID,
-            url: route.url
+            url: NodeSeekSite.postURL(id: route.postID, page: route.page)
         )
     }
 }

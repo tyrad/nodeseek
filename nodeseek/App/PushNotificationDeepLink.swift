@@ -1,3 +1,4 @@
+import SafariServices
 import UIKit
 import UserNotifications
 
@@ -70,6 +71,12 @@ extension AppRouter: PushNotificationNavigating {
             push(detail)
         case .checkin:
             push(UserInfoWebViewController(profileURL: NodeSeekSite.boardURL, title: "签到"))
+        case let .externalWebPage(url):
+            guard var presenter = window?.rootViewController else { return }
+            while let presented = presenter.presentedViewController {
+                presenter = presented
+            }
+            presenter.present(SFSafariViewController(url: url), animated: true)
         case let .webPage(url, title):
             push(UserProfileRouter.makeViewController(profileURL: url, title: title))
         case .inbox, .atMeList:

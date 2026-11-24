@@ -59,7 +59,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     /// 小组件用 `nsconnect://probe/...`；外部（Loon、快捷指令、其它 App）用
-    /// `nsconnect://post/<id>[-<page>]` 或 `nsconnect://open?url=<NodeSeek 链接>` 直达帖子。
+    /// `nsconnect://post/<id>[-<page>]` 直达帖子，或用 `nsconnect://open?url=<网页链接>` 打开网页。
     private func handle(urlContexts: Set<UIOpenURLContext>) {
         for url in urlContexts.map(\.url) {
             if let link = ProbeWidgetLink(url: url) {
@@ -67,7 +67,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 return
             }
             if let route = NodeSeekWebDeepLink.route(for: url) {
-                PushNotificationDeepLink.handle(route)
+                appRouter.open(route)
                 return
             }
         }

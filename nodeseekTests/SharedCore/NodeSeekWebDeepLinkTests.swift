@@ -9,63 +9,49 @@ import Testing
 
 struct NodeSeekWebDeepLinkTests {
     private func parse(_ string: String) throws -> PushNotificationRoute? {
-        let url = try #require(URL(string: string))
-        return NodeSeekWebDeepLink.route(for: url)
+        NodeSeekWebDeepLink.route(for: try #require(URL(string: string)))
     }
 
-    @Test func parsesPostLinkWithoutPage() throws {
-        let route = try #require(try parse("nsconnect://post/139218"))
-        guard case let .reply(postID, page, floor, url) = route else {
-            Issue.record("nsconnect://post 应解析为帖子")
-            return
-        }
-        #expect(postID == "139218")
-        #expect(page == 1)
-        #expect(floor == nil)
-        #expect(url.absoluteString == "https://www.nodeseek.com/post-139218-1")
+    private func open(_ target: String) throws -> PushNotificationRoute? {
+        let encoded = try #require(target.addingPercentEncoding(withAllowedCharacters: .alphanumerics))
+        return try parse("nsconnect://open?url=\(encoded)")
     }
 
-    @Test func parsesPostLinkWithPageAndFloor() throws {
-        let route = try #require(try parse("nsconnect://post/139218-3?floor=482913"))
-        guard case let .reply(postID, page, floor, _) = route else {
-            Issue.record("带页码与楼层的深链应解析为帖子")
-            return
-        }
-        #expect(postID == "139218")
-        #expect(page == 3)
-        #expect(floor == "482913")
+    @Test func firstPageLinksAreEquivalent() throws {
+        let expected = PushNotificationRoute.reply(postID: "893437", page: 1, floor: nil,
+                                                    url: NodeSeekSite.postURL(id: "893437", page: 1))
+        #expect(try parse("nsconnect://post/893437") == expected)
+        #expect(try parse("nsconnect://post/893437-1") == expected)
+        #expect(try open("https://www.nodeseek.com/post-893437-1") == expected)
+        #expect(try open("http://NODESEEK.COM/post-893437?from=share") == expected)
     }
 
-    @Test func parsesOpenWithEncodedWebURL() throws {
-        let web = "https://www.nodeseek.com/post-139218-2#482913"
-        let encoded = try #require(web.addingPercentEncoding(withAllowedCharacters: .alphanumerics))
-
-        let route = try #require(try parse("nsconnect://open?url=\(encoded)"))
-        guard case let .reply(postID, page, floor, _) = route else {
-            Issue.record("open?url= 应解析为帖子")
-            return
-        }
-        #expect(postID == "139218")
-        #expect(page == 2)
-        #expect(floor == "482913")
+    @Test func bothFormsPreserveTheTargetFloor() throws {
+        let expected = PushNotificationRoute.reply(postID: "1016685", page: 2, floor: "18",
+                                                    url: NodeSeekSite.postURL(id: "1016685", page: 2))
+        #expect(try parse("nsconnect://post/1016685-2?floor=18") == expected)
+        #expect(try open("https://nodeseek.com/post-1016685-2#18") == expected)
     }
 
-    @Test func ignoresInvalidRoutes() throws {
-        for link in [
-            "nsconnect://post/not-a-number",
-            "nsconnect://unknown/1",
-            "nsconnect://open?url=https%3A%2F%2Fexample.com%2Fpost-139218",
-            "https://www.nodeseek.com/post-139218",
-        ] {
-            let route = try parse(link)
-            #expect(route == nil, "\(link) 不应解析成帖子")
-        }
+    @Test(arguments: ["https://example.com/path?q=1&b=2#part", "http://other.nodeseek.com/post-893437",
+                      "https://nodeseek.com.example.org/post-893437", "https://nodeseek.com@example.org/post-893437"])
+    func externalWebAddressesGoToSafari(_ address: String) throws {
+        let target = try #require(URL(string: address))
+        #expect(try open(address) == .externalWebPage(target))
     }
 
-    @Test func leavesProbeWidgetLinkAlone() throws {
-        for link in ["nsconnect://probe", "nsconnect://probe?node=1"] {
-            let route = try parse(link)
-            #expect(route == nil, "\(link) 应留给小组件")
-        }
+    @Test(arguments: ["ftp://nodeseek.com/post-893437", "ftp://example.com/file", "file:///tmp/example",
+                      "javascript:void(0)", "//example.org/post-893437", "/post-893437", "https:///missing-host",
+                      "https://www.nodeseek.com/board", "https://nodeseek.com/post-893437/extra"])
+    func ignoresUnsupportedTargets(_ address: String) throws {
+        #expect(try open(address) == nil)
+    }
+
+    @Test(arguments: ["nsconnect://post/abc", "nsconnect://post/893437-bad", "nsconnect://post/893437/extra",
+                      "nsconnect://post/893437--2", "nsconnect://post/893437-2-3", "nsconnect://unknown/1",
+                      "nsconnect://open", "nsconnect://open?url=", "https://www.nodeseek.com/post-893437",
+                      "nsconnect://probe", "nsconnect://probe?node=1"])
+    func ignoresInvalidOrUnownedRoutes(_ link: String) throws {
+        #expect(try parse(link) == nil)
     }
 }
