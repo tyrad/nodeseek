@@ -1177,6 +1177,21 @@ struct PostDetailViewControllerTests {
         #expect(viewController.testDetailRowKinds() == ["header", "entryHint", "postRepliesDivider", "comment"])
     }
 
+    /// 跳页请求取消（没有渲染新页）后，原页面不能一直挂着待跳页标记，否则滑到底也不续页。
+    @Test func cancelledPageJumpLetsListContinuePaging() async throws {
+        let presenter = SpyPostDetailPresenter()
+        let viewController = PostDetailViewController(presenter: presenter, currentPage: 1)
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: makePageJumpDetail(page: 1))
+        await waitForDetailContent(in: viewController)
+
+        viewController.jumpToCommentPage(5)
+        viewController.showLoading()
+        viewController.hideLoading()
+
+        #expect(viewController.pendingPageJumpScroll == false)
+    }
+
     @Test func jumpingToLaterPageShowsStartPageHintThatJumpsBackInPlace() async throws {
         let presenter = SpyPostDetailPresenter()
         let viewController = PostDetailViewController(presenter: presenter, currentPage: 1)

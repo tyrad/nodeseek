@@ -112,6 +112,30 @@ struct PostDetailPresenterTests {
         #expect(view.renderedDetails.map(\.page) == [1, 5])
     }
 
+    /// 跳页请求失败或被取消后，已显示的页面要能继续续页、再次跳页和刷新原页。
+    @Test(arguments: [false, true])
+    func failedPageJumpKeepsPreviousPagination(cancelled: Bool) {
+        let interactor = SpyPostDetailInteractor()
+        let view = SpyPostDetailView()
+        let presenter = PostDetailPresenter(interactor: interactor, router: SpyPostDetailRouter(), initialPage: 1)
+        presenter.setView(view)
+        presenter.didLoadPostDetail(PostDetailResponse(detail: makePagedDetail(page: 1, commentID: "1")))
+
+        presenter.didSelectCommentPage(5)
+        if cancelled {
+            presenter.didCancelLoadPostDetail()
+        } else {
+            presenter.didFailLoadPostDetail(error: "网络错误")
+        }
+
+        #expect(presenter.didApproachCommentEnd())
+        presenter.didLoadPostDetail(PostDetailResponse(detail: makePagedDetail(page: 2, commentID: "11")))
+        #expect(view.appendedCommentPageDetails.map(\.page) == [2])
+        // 右上角刷新回到跳页前所在的第 1 页。
+        presenter.refreshInitialPage()
+        #expect(interactor.loadedPages == [5, 2, 1])
+    }
+
     @Test func selectingCommentPageIsIgnoredBeforeFirstLoad() {
         let interactor = SpyPostDetailInteractor()
         let presenter = PostDetailPresenter(interactor: interactor, router: SpyPostDetailRouter(), initialPage: 1)

@@ -51,6 +51,8 @@ extension PostDetailViewController: PostDetailViewProtocol {
     }
 
     func hideLoading() {
+        // 跳页请求结束却没渲染（失败或取消）时清掉待跳标记，否则续页一直被拦住。
+        pendingPageJumpScroll = false
         loadingIndicator.stopAnimating()
         collectionList.scheduleBatchFetchCheck()
         updateReplyButtonVisibility()
