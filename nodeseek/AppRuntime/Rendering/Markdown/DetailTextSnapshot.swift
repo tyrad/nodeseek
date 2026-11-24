@@ -226,9 +226,16 @@ nonisolated enum DetailTextTypesetter {
 
         // 行内代码按行合并字符框，画圆角底色；只缩小字号不够醒目。
         var codeBoxes: [CGRect] = []
+        // 字符框和代码区间都按文字顺序排列，一起往后走一遍，不必每段都扫描全部字符。
+        var cursor = 0
         for range in codeRanges {
             var box: (line: Int, rect: CGRect)?
-            for character in characters where NSIntersectionRange(character.range, range).length > 0 {
+            while cursor < characters.count, NSMaxRange(characters[cursor].range) <= range.location { cursor += 1 }
+            var next = cursor
+            while next < characters.count, characters[next].range.location < NSMaxRange(range) {
+                let character = characters[next]
+                next += 1
+                guard NSIntersectionRange(character.range, range).length > 0 else { continue }
                 let glyph = CGRect(x: character.rect.minX, y: character.rect.minY,
                                    width: NSMaxRange(character.range) == NSMaxRange(range) ? character.rect.width - Self.codeGap : character.rect.width,
                                    height: character.rect.height)
