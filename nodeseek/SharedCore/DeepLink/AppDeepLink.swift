@@ -34,9 +34,9 @@ nonisolated enum AppDeepLink: Equatable, Sendable {
             guard title.count <= 200, body.count <= 20_000 else { return nil }
             return .compose(title: title, body: body)
         case "post":
-            return postRoute(for: url)
+            return postRoute(for: components)
         case "open":
-            return webRoute(for: url)
+            return webRoute(for: components)
         default:
             return nil
         }
@@ -44,7 +44,7 @@ nonisolated enum AppDeepLink: Equatable, Sendable {
 
     private static func userRoute(path: String) -> AppDeepLink? {
         guard path.first == "/" else { return nil }
-        let digits = path.dropFirst()
+        let digits = path.hasSuffix("/") ? path.dropFirst().dropLast() : path.dropFirst()
         guard !digits.isEmpty, digits.utf8.allSatisfy({ (48...57).contains($0) }),
               let uid = Int(digits), uid > 0 else { return nil }
         return .user(uid)
@@ -52,6 +52,10 @@ nonisolated enum AppDeepLink: Equatable, Sendable {
 
     private static func parameters(_ components: URLComponents, allowing names: Set<String>) -> [String: String]? {
         guard components.path.isEmpty, components.fragment == nil else { return nil }
+        return queryParameters(components, allowing: names)
+    }
+
+    private static func queryParameters(_ components: URLComponents, allowing names: Set<String>) -> [String: String]? {
         var values = [String: String]()
         for item in components.queryItems ?? [] {
             guard names.contains(item.name), values[item.name] == nil, let value = item.value else { return nil }
@@ -61,29 +65,22 @@ nonisolated enum AppDeepLink: Equatable, Sendable {
     }
 
     /// `nsconnect://post/139218-3?floor=482913`
-    private static func postRoute(for url: URL) -> AppDeepLink? {
-        let path = url.path
+    private static func postRoute(for components: URLComponents) -> AppDeepLink? {
+        guard components.fragment == nil,
+              let values = queryParameters(components, allowing: ["floor"]) else { return nil }
+        let path = components.percentEncodedPath
         guard path.hasPrefix("/") else { return nil }
         let postURL = NodeSeekSite.baseURL.appendingPathComponent("post-" + path.dropFirst())
         guard let route = NodeSeekPostRouteResolver.route(for: postURL, baseURL: NodeSeekSite.baseURL) else { return nil }
 
-        var floor: String?
-        if let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-            .queryItems?
-            .first(where: { $0.name == "floor" })?
-            .value, value.isEmpty == false {
-            floor = value
-        }
-
+        let floor = values["floor"].flatMap { $0.isEmpty ? nil : $0 }
         return .post(postID: route.postID, page: route.page, floor: floor, url: NodeSeekSite.postURL(id: route.postID, page: route.page))
     }
 
     /// `nsconnect://open?url=https%3A%2F%2Fwww.nodeseek.com%2Fpost-139218-2`
-    private static func webRoute(for url: URL) -> AppDeepLink? {
-        guard let rawValue = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-            .queryItems?
-            .first(where: { $0.name == "url" })?
-            .value,
+    private static func webRoute(for components: URLComponents) -> AppDeepLink? {
+        guard let values = parameters(components, allowing: ["url"]),
+              let rawValue = values["url"],
               let target = URL(string: rawValue),
               let scheme = target.scheme?.lowercased(), ["http", "https"].contains(scheme),
               let host = target.host?.lowercased(), !host.isEmpty else {

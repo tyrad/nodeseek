@@ -48,9 +48,15 @@ struct AppDeepLinkTests {
     }
 
     @Test(arguments: ["nsconnect://post/abc", "nsconnect://post/893437-bad", "nsconnect://post/893437/extra",
-                      "nsconnect://post/893437--2", "nsconnect://post/893437-2-3", "nsconnect://unknown/1",
-                      "nsconnect://open", "nsconnect://open?url=", "https://www.nodeseek.com/post-893437",
-                      "nsconnect://category/tech", "nsconnect://user/0", "nsconnect://user/-1", "nsconnect://user/1/2",
+                      "nsconnect://post/893437--2", "nsconnect://post/893437-2-3", "nsconnect://post/893437#18",
+                      "nsconnect://post/893437?floor=18&extra=1", "nsconnect://post/893437?floor=18&floor=19",
+                      "nsconnect://unknown/1", "nsconnect://open", "nsconnect://open?url=",
+                      "nsconnect://open/extra?url=https%3A%2F%2Fexample.com",
+                      "nsconnect://open?url=https%3A%2F%2Fexample.com&extra=1",
+                      "nsconnect://open?url=https%3A%2F%2Fexample.com#frag",
+                      "https://www.nodeseek.com/post-893437",
+                      "nsconnect://category/tech", "nsconnect://user/0", "nsconnect://user/-1",
+                      "nsconnect://user/1/2", "nsconnect://user/12345//",
                       "nsconnect://search?q=%20", "nsconnect://search?q=x&q=y", "nsconnect://search/foo?q=x",
                       "nsconnect://compose?publish=1"])
     func ignoresInvalidOrUnownedRoutes(_ link: String) throws {
@@ -59,11 +65,15 @@ struct AppDeepLinkTests {
 
     @Test func sharesOfficialUserProfileURL() throws {
         #expect(try open("https://www.nodeseek.com/space/12345?from=share") == .user(12345))
+        #expect(try open("https://www.nodeseek.com/space/12345/") == .user(12345))
+        #expect(try open("https://www.nodeseek.com/space/12345#/general") == .user(12345))
+        #expect(try open("https://nodeseek.com/space/12345//") == nil)
         #expect(try open("https://nodeseek.com/space/12345/extra") == nil)
     }
 
     @Test func parsesWorkflowLinks() throws {
         #expect(try parse("nsconnect://user/12345") == .user(12345))
+        #expect(try parse("nsconnect://user/12345/") == .user(12345))
         #expect(try parse("nsconnect://search?q=Swift&scope=user") == .search(query: "Swift", scope: .user))
         #expect(try parse("nsconnect://search?q=a%26b") == .search(query: "a&b", scope: .post))
         #expect(try parse("nsconnect://search?q=x&scope=google") == .search(query: "x", scope: .post))

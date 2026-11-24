@@ -46,8 +46,18 @@ struct AppDeepLinkRouterTests {
 
         router.open(route, url: url, in: app)
         let target = try #require((hasSearchTab ? tabs.selectedViewController : nav.topViewController) as? SearchViewController)
+        #expect(target.isShowingDeepLinkSearch(query: "Swift", scope: .user))
         router.open(route, url: url, in: app)
         #expect(nav.viewControllers.count == (hasSearchTab ? 1 : 2))
         #expect((hasSearchTab ? tabs.selectedViewController : nav.topViewController) === target)
+
+        // 用户在搜索页改搜其他关键词后，再次打开同一深链应重新提交，不能被防重吞掉。
+        target.submitDeepLinkSearch(query: "Rust", scope: .post)
+        #expect(target.isShowingDeepLinkSearch(query: "Rust", scope: .post))
+        #expect(!target.isShowingDeepLinkSearch(query: "Swift", scope: .user))
+        router.open(route, url: url, in: app)
+        #expect(nav.viewControllers.count == (hasSearchTab ? 1 : 2))
+        #expect((hasSearchTab ? tabs.selectedViewController : nav.topViewController) === target)
+        #expect(target.isShowingDeepLinkSearch(query: "Swift", scope: .user))
     }
 }

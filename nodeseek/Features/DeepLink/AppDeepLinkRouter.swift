@@ -23,7 +23,11 @@ final class AppDeepLinkRouter {
         }
         guard nav.presentedViewController == nil, !(top is LoginWebViewController) else { return }
         let visible = (top as? UITabBarController)?.selectedViewController ?? top
-        if visible === lastPage, lastURL == url.absoluteString { return }
+        if case .search = route {
+            // 搜索页常驻 Tab 或允许页内改词，按当前搜索状态去重而不是按实例永久锁死同一地址。
+        } else if visible === lastPage, lastURL == url.absoluteString {
+            return
+        }
         composeTask?.cancel()
         switch route {
         case let .post(id, page, floor, target):
@@ -47,9 +51,12 @@ final class AppDeepLinkRouter {
                 search = SearchViewController()
                 app.push(search)
             }
-            search.submitDeepLinkSearch(query: query, scope: scope == .user ? .user : .post)
-            lastPage = search
-            lastURL = url.absoluteString
+            let targetScope: SearchScope = scope == .user ? .user : .post
+            if !search.isShowingDeepLinkSearch(query: query, scope: targetScope) {
+                search.submitDeepLinkSearch(query: query, scope: targetScope)
+            }
+            lastPage = nil
+            lastURL = nil
             return
         case let .compose(title, body):
             composeTask = Task { [weak app, weak nav, weak top] in

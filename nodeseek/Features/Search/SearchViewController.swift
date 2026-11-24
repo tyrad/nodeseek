@@ -713,6 +713,21 @@ final class SearchViewController: UIViewController {
         submitSearch(record: SearchHistoryRecord(query: query, category: .all, scope: scope))
     }
 
+    /// 供深链路由去重：只有当前展示的正是相同关键词和范围时才跳过重搜。
+    func isShowingDeepLinkSearch(query: String, scope: SearchScope) -> Bool {
+        guard isViewLoaded, selectedScope == scope else { return false }
+        let displayedQuery = keywordTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard displayedQuery == query else { return false }
+        switch scope {
+        case .post:
+            return activeRequest == SearchRequest(query: query, category: .all)
+        case .user:
+            return activeUserQuery == query
+        case .google:
+            return false
+        }
+    }
+
     private func submitSearch(record: SearchHistoryRecord) {
         keywordTextField.text = record.query
         if record.scope == .post {
