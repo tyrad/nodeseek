@@ -253,5 +253,12 @@
       "daily"
     ],
     "setup": "阅读模式，已登录设备，公开投票帖 917518；只读，不提交投票"
+  },
+  "vote-login-return": {
+    "title": "游客在投票帖内登录，返回同一张卡片后可投票",
+    "profiles": [
+      "daily"
+    ],
+    "setup": "须用空闲的未登录阅读模式模拟器（SIMULATOR_ID 指定），运行后保留登录；重跑前卸载 App 并删除设备级 Library/Cookies/Cookies.binarycookies 恢复游客，不要走站内退出。默认帖 917518，E2E_VOTE_POST 换帖，E2E_VOTE_SUBMIT=1 时公开投第一个选项"
   }
 }

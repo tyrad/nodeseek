@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { caseTest } from './cases.mjs';
 import { agentFromWebDriverAgent } from './ios-agent.mjs';
 import { assertSidebarAccount, nativeControls, request, simctl, waitFor } from './simulator.mjs';
+import { prepareLogin } from './login-form.mjs';
+import { parseEnv } from 'node:util';
 
 const { SIMULATOR_ID: device, MIDSCENE_RUN_DIR: out, E2E_WDA_PORT: port } = process.env;
 const bundle = 'com.mistj.nodeseek';
@@ -644,44 +646,103 @@ daily('textkit-guest-hidden-post', async ({ ui, ids, click, log, start, t }) => 
 const votePost = '917518';
 const voteHint = '请先登录后再投票。';
 
-async function openVoteCard({ fixture, ids, attr, scroll }, publicPost) {
-  await fixture(votePost, 1, undefined, { publicPost });
+async function openVoteCard({ fixture, ids, attr, scroll }, publicPost, post = votePost) {
+  await fixture(post, 1, undefined, { publicPost });
+  return readVoteCard({ ids, attr, scroll });
+}
+
+async function readVoteCard({ ids, attr, scroll }) {
   let status;
   for (let i = 0; i < 8 && !(status = (await ids('name == "vote-status" AND visible == 1'))[0]); i++) {
     if ((await ids('name BEGINSWITH "vote-option-" AND visible == 1')).length) break;
     await scroll(.75, .45);
   }
-  // 等投票读完，「正在加载投票…」只是中间态。
-  await waitFor(async () => {
-    const el = (await ids('name == "vote-status"'))[0];
-    const text = el && await attr(el, 'label');
-    return text !== '正在加载投票…' && ((await ids('name BEGINSWITH "vote-option-"')).length || text);
+  // 卡片每次状态变化都会重建控件，读到一半元素失效就整体重读；「正在加载投票…」只是中间态。
+  return waitFor(async () => {
+    try {
+      const el = (await ids('name == "vote-status"'))[0];
+      const status = el ? await attr(el, 'label') : null;
+      if (status === '正在加载投票…') return;
+      const options = [];
+      for (const option of await ids('name BEGINSWITH "vote-option-"')) {
+        options.push({ name: await attr(option, 'name'), label: await attr(option, 'label'), enabled: await attr(option, 'enabled') });
+      }
+      if (options.length || status) return { status, options };
+    } catch {}
   }, '投票卡片没有加载完成');
-  const el = (await ids('name == "vote-status"'))[0];
-  return { status: el ? await attr(el, 'label') : null, options: await ids('name BEGINSWITH "vote-option-"') };
 }
 
 daily('vote-guest-hint', async ctx => {
-  const { ids, attr, t } = ctx;
+  const { ids, t } = ctx;
   const { status, options } = await openVoteCard(ctx, true);
   assert.equal(status, voteHint, '游客投票卡片没有显示登录提示');
   assert.ok(options.length, '游客应仍能看到投票选项');
-  for (const el of options) assert.equal(await attr(el, 'enabled'), false, '游客的投票选项仍可点击');
+  for (const option of options) assert.equal(option.enabled, false, '游客的投票选项仍可点击');
   assert.equal((await ids('name == "vote-submit"')).length, 0, '游客不应看到提交投票按钮');
   t.diagnostic('游客打开 ' + votePost + '：' + options.length + ' 个选项只读，提示「' + status + '」');
 });
 
 daily('vote-member-open', async ctx => {
-  const { ids, attr, t } = ctx;
+  const { ids, t } = ctx;
   const { status, options } = await openVoteCard(ctx, false);
   assert.notEqual(status, voteHint, '已登录账号仍显示登录提示');
   assert.ok(options.length, '已登录账号没有读到投票选项');
   const voted = status === '已投票';
   if (!voted) {
-    for (const el of options) assert.equal(await attr(el, 'enabled'), true, '已登录且未投票时选项应可点击');
+    for (const option of options) assert.equal(option.enabled, true, '已登录且未投票时选项应可点击');
     assert.equal((await ids('name == "vote-submit"')).length, 1, '已登录且未投票时应显示提交按钮');
   }
   t.diagnostic('已登录打开 ' + votePost + '：' + options.length + ' 个选项，' + (voted ? '账号已投过票' : '可选择并提交') + '，状态「' + (status ?? '无') + '」');
+});
+
+// 在详情页内登录，回到同一张卡片后不能再提示登录。登录会保留在设备上，须用空闲的游客模拟器。
+// E2E_VOTE_POST 指定开放中且测试账号未投过的投票帖，E2E_VOTE_SUBMIT=1 时真实提交第一个选项。
+daily('vote-login-return', async ctx => {
+  const { ui, ids, attr, click, wda, t } = ctx;
+  const post = process.env.E2E_VOTE_POST || votePost;
+  const config = JSON.parse(readFileSync(join(process.env.HOME, '.config/nodeseek/e2e.json'), 'utf8'));
+  const { E2E_MEMBER_USERNAME: username, E2E_MEMBER_PASSWORD: password } =
+    parseEnv(readFileSync(process.env.E2E_MEMBER_ENV_FILE || config.memberEnvFile, 'utf8'));
+  assert.ok(username?.trim() && password, 'memberEnvFile 需要提供测试用户名和密码');
+  const guest = await openVoteCard(ctx, true, post);
+  assert.equal(guest.status, voteHint, '前置条件不满足：请用未登录的模拟器运行');
+  const logPath = join(simctl('get_app_container', device, bundle, 'data'), 'Library/Caches/Logs/nodeseek.log');
+  const entry = await ui.get('post-detail-reply-button');
+  const submit = await prepareLogin({ session: ui.session, log: logPath, entry, username, password });
+  await click(submit);
+  await waitFor(async () => !(await ids('name == "login-hint-container"')).length, '提交一次后登录页未自动关闭，请检查凭据或站点验证');
+  // 登录后会恢复原操作打开回复框，只收起，不发送。
+  await waitFor(async () => (await ids('name == "post-detail-reply-editor" AND visible == 1')).length, '登录后没有恢复打开回复框');
+  // 背景中心被回复框和键盘盖住，点屏幕上方露出的部分收起。
+  const { width, height } = await wda('/window/size');
+  await wda('/wda/tap', { x: width / 2, y: height * .2 });
+  await waitFor(async () => !(await ids('name == "post-detail-reply-editor" AND visible == 1')).length, '回复框没有收起');
+  const member = await readVoteCard(ctx);
+  assert.notEqual(member.status, voteHint, '登录返回后投票卡片仍提示先登录');
+  assert.ok(member.options.length, '登录返回后没有投票选项');
+  if (member.status === '已投票') {
+    t.diagnostic('登录返回 ' + post + '：登录提示已消失，账号已投过票，未提交');
+    return;
+  }
+  for (const option of member.options) assert.equal(option.enabled, true, '登录返回后选项仍不可点');
+  await ui.get('vote-submit');
+  if (process.env.E2E_VOTE_SUBMIT !== '1') {
+    t.diagnostic('登录返回 ' + post + '：选项可点、有提交按钮；未设 E2E_VOTE_SUBMIT=1，不提交');
+    return;
+  }
+  const [{ label: choice }] = member.options;
+  await ui.tap(member.options[0].name);
+  // 选中后卡片重建，按标识重新取提交按钮。
+  await waitFor(async () => {
+    try { return await ui.element('vote-submit', '/attribute/enabled'); } catch {}
+  }, '选择后提交按钮仍不可用');
+  await ui.tap('vote-submit');
+  await click(await waitFor(async () => (await ids('type == "XCUIElementTypeButton" AND label == "提交"'))[0], '没有弹出提交确认'));
+  await waitFor(async () => {
+    const el = (await ids('name == "vote-status"'))[0];
+    return el && await attr(el, 'label') === '已投票';
+  }, '提交后没有显示已投票');
+  t.diagnostic('登录返回 ' + post + ' 后投「' + choice + '」，状态变为已投票');
 });
 
 // 签名改用 TextKit 后链接是无障碍链接元素。站点只给登录用户输出签名，需 member 设备。
