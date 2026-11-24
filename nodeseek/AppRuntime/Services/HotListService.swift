@@ -14,6 +14,8 @@ enum HotListService {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 8
         configuration.httpShouldSetCookies = false
+        // 也不接收第三方的 Set-Cookie，避免写进 App 共享的 Cookie 存储
+        configuration.httpCookieStorage = nil
         return URLSession(configuration: configuration)
     }()
 

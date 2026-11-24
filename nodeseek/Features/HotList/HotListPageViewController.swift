@@ -141,6 +141,10 @@ final class HotListPageViewController: UIViewController, UITableViewDataSource, 
     private func load(userInitiated: Bool) {
         let kind = kind
         loadTask?.cancel()
+        // 无数据时重新请求要回到骨架屏，不能停在上次的失败页；有旧数据时失败提示保留到新结果出来
+        if snapshot == nil {
+            lastLoadFailed = false
+        }
         loadTask = Task { [weak self] in
             guard let self else { return }
             // 先显示缓存，避免切回本页时闪一下加载状态
@@ -153,18 +157,27 @@ final class HotListPageViewController: UIViewController, UITableViewDataSource, 
                 self.lastLoadFailed = false
                 if result != self.snapshot { self.apply(result) }
             } catch {
-                guard !Task.isCancelled, !UserFacingError.isCancellation(error) else { return }
+                // 被新请求替换时由新任务收尾，不能清掉它的 loadTask
+                guard !Task.isCancelled else { return }
+                guard !UserFacingError.isCancellation(error) else {
+                    self.finishLoad()
+                    return
+                }
                 self.lastLoadFailed = true
                 self.failureError = error
                 if self.snapshot != nil, self.view.window != nil {
                     BottomToast.show(HotListL10n.text("更新失败，显示的是上次的数据"), style: .failure, in: self.view)
                 }
             }
-            self.loadTask = nil
-            self.tableView.refreshControl?.endRefreshing()
-            self.renderStrip()
-            self.renderBackground()
+            self.finishLoad()
         }
+        renderStrip()
+        renderBackground()
+    }
+
+    private func finishLoad() {
+        loadTask = nil
+        tableView.refreshControl?.endRefreshing()
         renderStrip()
         renderBackground()
     }
@@ -204,7 +217,6 @@ final class HotListPageViewController: UIViewController, UITableViewDataSource, 
                 body: message,
                 retryTitle: HotListL10n.text("重试")
             ) { [weak self] in
-                self?.lastLoadFailed = false
                 self?.load(userInitiated: false)
             }
         } else if snapshot == nil {

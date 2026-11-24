@@ -30,6 +30,8 @@ final class HotListSettingsViewController: UITableViewController, UITextFieldDel
     private var isSaving = false {
         didSet { navigationItem.rightBarButtonItem?.isEnabled = !isSaving }
     }
+    private var saveTask: Task<Void, Never>?
+    private var keyboardDismissCoordinator: KeyboardDismissCoordinator?
 
     private let relativeFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
@@ -60,6 +62,7 @@ final class HotListSettingsViewController: UITableViewController, UITextFieldDel
             action: #selector(saveTapped)
         )
         navigationItem.rightBarButtonItem?.accessibilityIdentifier = "hot-list-settings-save"
+        keyboardDismissCoordinator = KeyboardDismissCoordinator(rootView: view, backgrounds: [view])
         tableView.keyboardDismissMode = .interactive
         // 常驻编辑状态只为显示顺序区的拖动手柄，其他行照常点按和输入
         tableView.isEditing = true
@@ -189,6 +192,8 @@ final class HotListSettingsViewController: UITableViewController, UITextFieldDel
         case .scriptPage:
             content.text = HotListL10n.text("查看插件主页")
             cell.accessoryType = .disclosureIndicator
+            // 表格常驻编辑状态，编辑态下只显示 editingAccessoryType
+            cell.editingAccessoryType = .disclosureIndicator
         }
         cell.contentConfiguration = content
         return cell
@@ -268,7 +273,17 @@ final class HotListSettingsViewController: UITableViewController, UITextFieldDel
 
     // MARK: - Actions
 
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        // 离开页面就放弃这次保存，避免校验完成后在后台悄悄改掉地址
+        if isMovingFromParent {
+            saveTask?.cancel()
+        }
+    }
+
     private func resetToDefaults() {
+        // 校验中恢复默认会被校验结果覆盖回去
+        guard !isSaving else { return }
         view.endEditing(true)
         settings.resetToDefaults()
         loadDrafts()
@@ -305,14 +320,15 @@ final class HotListSettingsViewController: UITableViewController, UITextFieldDel
         }
 
         isSaving = true
-        BottomToast.show(HotListL10n.text("正在校验…"), style: .progress, in: view)
-        Task { [weak self] in
-            guard let self else { return }
+        let progressToast = BottomToast.show(HotListL10n.text("正在校验…"), style: .progress, in: view)
+        saveTask = Task { [weak self] in
             for kind in HotListKind.allCases {
                 guard let url = changed[kind] else { continue }
                 do {
-                    _ = try await self.repository.validate(url)
+                    _ = try await self?.repository.validate(url)
                 } catch {
+                    BottomToast.dismiss(progressToast)
+                    guard let self, !Task.isCancelled else { return }
                     self.isSaving = false
                     let message = error is HotListDecodingError
                         ? HotListL10n.text("热榜数据格式不正确")
@@ -321,6 +337,8 @@ final class HotListSettingsViewController: UITableViewController, UITextFieldDel
                     return
                 }
             }
+            BottomToast.dismiss(progressToast)
+            guard let self, !Task.isCancelled else { return }
             self.settings.setURLs(urls)
             self.isSaving = false
             BottomToast.show(HotListL10n.text("已保存"), in: self.view)
@@ -329,9 +347,6 @@ final class HotListSettingsViewController: UITableViewController, UITextFieldDel
     }
 
     private func showAlert(title: String, message: String) {
-        view.window?.subviews
-            .filter { $0.accessibilityIdentifier == BottomToast.accessibilityIdentifier }
-            .forEach { $0.removeFromSuperview() }
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: HotListL10n.text("好"), style: .default))
         present(alert, animated: true)

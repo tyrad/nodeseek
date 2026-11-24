@@ -181,6 +181,20 @@ struct HotListViewControllerTests {
         withExtendedLifetime(window) {}
     }
 
+    @Test func reloadAfterFailureWithoutCacheShowsSkeletonInsteadOfError() async throws {
+        let loader = HotListFakeLoader()
+        loader.setFails(true)
+        let (viewController, window) = makeViewController(loader)
+
+        try await waitUntil { table(viewController, .realtime)?.backgroundView?.accessibilityIdentifier == "hot-list-error" }
+        let page = try #require(viewController.page(for: .realtime))
+
+        // 切走再切回来时会自动重新请求，请求期间应回到骨架屏
+        page.viewWillAppear(false)
+        #expect(page.tableView.backgroundView is HotListSkeletonView)
+        withExtendedLifetime(window) {}
+    }
+
     @Test func settingsScreenListsSourceAndThreeEditableURLs() {
         let repository = HotListRepository(settings: makeSettings(), loader: { _ in Data() })
         let viewController = HotListSettingsViewController(repository: repository, settings: makeSettings())
@@ -194,6 +208,9 @@ struct HotListViewControllerTests {
         let field = (cell as? HotListURLFieldCell)?.textField
         #expect(field?.text == HotListKind.weekly.defaultURL.absoluteString)
         #expect(field?.keyboardType == .URL)
+        // 表格常驻编辑状态，插件主页行仍要显示右箭头
+        let scriptCell = viewController.tableView(viewController.tableView, cellForRowAt: IndexPath(row: 2, section: 1))
+        #expect(scriptCell.editingAccessoryType == .disclosureIndicator)
     }
 
     @Test func movingOrderRowSavesNewOrder() {

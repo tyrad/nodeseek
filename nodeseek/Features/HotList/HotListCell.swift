@@ -148,8 +148,8 @@ final class HotListCell: UITableViewCell {
             metaLabel.text,
             HotListL10n.format("浏览 %ld", entry.viewCount),
             HotListL10n.format("回复 %ld", entry.commentCount),
-            HotListL10n.format("热度 %ld", Int(entry.score))
-        ].compactMap { $0 }.joined(separator: "，")
+            HotListL10n.format("热度 %ld", Self.scoreValue(entry.score))
+        ].compactMap { $0 }.joined(separator: ", ")
         ImageLoad.url(entry.avatarURL)
             .toAvatar(requestID: String(entry.postID))
             .into(avatarImageView)
@@ -169,6 +169,11 @@ final class HotListCell: UITableViewCell {
         metaRow.alignment = isAccessibilitySize ? .leading : .center
     }
 
+    /// 自定义接口的热度可能超出整数范围，直接转换会崩溃。
+    private static func scoreValue(_ score: Double) -> Int {
+        Int(exactly: score.rounded(.towardZero)) ?? 0
+    }
+
     /// 一万以上用当前语言的紧凑写法（如「2.3万」「23K」），避免统计数字挤掉作者和时间。
     private static func compact(_ value: Int) -> String {
         guard value >= 10_000 else { return value.formatted(.number.grouping(.never)) }
@@ -180,7 +185,7 @@ final class HotListCell: UITableViewCell {
         let items: [(String, String, Bool)] = [
             ("eye", compact(entry.viewCount), false),
             ("bubble.left", compact(entry.commentCount), false),
-            ("flame", compact(Int(entry.score)), true)
+            ("flame", compact(Self.scoreValue(entry.score)), true)
         ]
         let configuration = UIImage.SymbolConfiguration(font: font, scale: .small)
         for (index, item) in items.enumerated() {

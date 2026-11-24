@@ -118,17 +118,25 @@ nonisolated enum HotListDecoder {
 
     private static func int(_ value: Any?) -> Int? {
         switch value {
-        case let number as NSNumber: return number.intValue
+        case let number as NSNumber where !isBool(number): return number.intValue
         case let string as String: return Int(string)
         default: return nil
         }
     }
 
     private static func double(_ value: Any?) -> Double? {
+        let result: Double?
         switch value {
-        case let number as NSNumber: return number.doubleValue
-        case let string as String: return Double(string)
-        default: return nil
+        case let number as NSNumber where !isBool(number): result = number.doubleValue
+        case let string as String: result = Double(string)
+        default: result = nil
         }
+        // 字符串 "nan"、"inf" 也能解析成 Double，后续转整数会崩溃
+        return result?.isFinite == true ? result : nil
+    }
+
+    /// JSON 里的 true/false 也会解成 NSNumber，不能当成数字。
+    private static func isBool(_ number: NSNumber) -> Bool {
+        CFGetTypeID(number) == CFBooleanGetTypeID()
     }
 }

@@ -75,6 +75,23 @@ struct HotListDecoderTests {
         #expect(entry.score == 0)
     }
 
+    @Test func ignoresNonFiniteAndBooleanNumbers() throws {
+        let json = """
+        {"updated_at": true, "posts": [
+          {"post": {"id": 1, "title": "非有限热度", "views": true, "comments": false}, "score": "nan"},
+          {"post": {"id": 2, "title": "无穷热度"}, "score": "inf"},
+          {"post": {"id": 3, "title": "布尔热度"}, "score": true}
+        ]}
+        """
+        let response = try HotListDecoder.decode(Data(json.utf8))
+
+        #expect(response.updatedAt == nil)
+        #expect(response.entries.map(\.score) == [0, 0, 0])
+        let first = try #require(response.entries.first)
+        #expect(first.viewCount == 0)
+        #expect(first.commentCount == 0)
+    }
+
     @Test func rejectsPayloadWithoutPostsArray() {
         #expect(throws: HotListDecodingError.invalidFormat) {
             try HotListDecoder.decode(Data("<html>challenge</html>".utf8))
