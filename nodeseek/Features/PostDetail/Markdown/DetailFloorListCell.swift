@@ -551,6 +551,16 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         accessibilityIdentifier = request.id
     }
 
+    func installPageSummary(_ request: DetailFloorRequest, hasAvatar: Bool) {
+        body.isHidden = true
+        if !hasAvatar {
+            avatar.isHidden = true
+            header.directionalLayoutMargins.leading = 0
+            headerHeight.constant = 0
+        }
+        install(request, .native([]))
+    }
+
     private func install(_ delivered: DetailFloorRequest, _ layout: consuming DetailFloorLayout) {
         guard request == delivered else { return }
         contentInstalled = true

@@ -311,6 +311,11 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             }
         } else if let header = page.currentHeaderContent {
             cell.configureAuthor(name: header.authorName, avatarURL: header.avatarURL, profileURL: header.authorProfileURL) { [weak page] in page?.openUserInfo(profileURL: $0) }
+            if page.entryHintPage > 1, source.html.isEmpty, source.visibleMarkdown == nil, signature == nil {
+                cell.floorActions = floorActions(page: page, cell: cell, comment: nil)
+                cell.installPageSummary(request, hasAvatar: header.avatarURL != nil)
+                return cell
+            }
             if headerHasReactions(header) {
                 cell.addVotes(like: header.likeCount, chicken: header.chickenLegCount, oppose: header.opposeCount,
                               liked: header.isLikeClicked, rewarded: header.isChickenLegClicked, opposed: header.isOpposeClicked,

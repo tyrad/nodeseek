@@ -29,6 +29,30 @@ enum FixtureLoader {
 }
 
 struct KannaNodeSeekParserTests {
+    @Test func laterPageReadsOwnerFromPostConfigAndKeepsFirstReplySeparate() throws {
+        let html = """
+        <script id="nodeseek-captured-config" type="application/json">
+          {"postData":{"op":{"uid":9,"name":"酒神"}}}
+        </script>
+        <div class="nsk-post">
+          <div class="post-title"><a class="post-title-link">对邀请码发放机制的调整总结</a></div>
+          <ul class="comments"><li class="content-item" data-comment-id="12147134">
+            <a class="author-name" href="/space/32">又是熟悉的旋律</a>
+            <a class="floor-link">#11</a><article class="post-content">回复</article>
+          </li></ul>
+        </div>
+        """
+        let parser = KannaNodeSeekParser(baseURL: NodeSeekSite.baseURL)
+        let detail = try parser.parsePostDetail(html: html, url: NodeSeekSite.postURL(id: "893437", page: 2))
+
+        #expect(detail.title == "对邀请码发放机制的调整总结")
+        #expect(detail.authorName == "酒神")
+        #expect(detail.authorProfileURL?.path == "/space/9")
+        #expect(detail.contentHTML.isEmpty)
+        #expect(detail.comments.first?.authorName == "又是熟悉的旋律")
+        #expect(detail.comments.first?.floorText == "#11")
+    }
+
     @Test func parsesAuthorStatusBadgesForPostAndComments() throws {
         let html = """
         <div class="nsk-post-wrapper"><div class="nsk-post">

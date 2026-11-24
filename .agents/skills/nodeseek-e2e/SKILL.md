@@ -121,6 +121,7 @@ make e2e-case CASE=push-cold
 | 编号 | 验收 |
 | --- | --- |
 | `deeplink-post` | 连续三次打开 `nsconnect://post/893437`，仅加载一次第一页，点一次返回首页后同一链接可再次打开 |
+| `deeplink-page-header` | 直接打开 893437 第二页，在首屏核对帖子标题、楼主酒神和第 11 楼，同时检查没有补请求第一页 |
 | `deeplink-floor` | 冷启动传入编码的 NodeSeek 网页链接，热启动传入带页码和楼层的直接深链；两次都看到帖子 1016685 第 18 楼的评论 14299736，一次返回首页 |
 | `deeplink-safari-probe` | 打开站外链接能在 Safari 浏览控制器看到目标域名，关闭后回到首页；随后打开 `nsconnect://probe` 进入探针列表 |
 | `deeplink-search-tabs` | 多 Tab 分别配置有、无搜索标签，连点相同链接后核对关键词和用户范围，切回或返回一次即见首页 |

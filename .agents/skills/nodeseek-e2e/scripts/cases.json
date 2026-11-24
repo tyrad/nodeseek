@@ -268,6 +268,11 @@
     ],
     "setup": "阅读模式，member 专用设备；只读"
   },
+  "deeplink-page-header": {
+    "title": "直达帖子第二页显示标题、楼主及第 11 楼",
+    "profiles": ["daily"],
+    "setup": "阅读模式，公开帖 893437；只读"
+  },
   "deeplink-floor": {
     "title": "冷启动从网页链接、热启动从帖子深链定位第 18 楼",
     "profiles": [

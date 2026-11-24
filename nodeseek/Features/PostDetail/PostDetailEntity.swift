@@ -105,15 +105,15 @@ struct PostDetailHeaderContent: Equatable {
         )
     }
 
-    nonisolated init(detail: PostDetail) {
+    nonisolated init(detail: PostDetail, fallback: PostDetailHeaderContent? = nil) {
         self.init(
             postID: detail.id,
             title: detail.title,
-            authorName: detail.authorName,
+            authorName: detail.authorName.isEmpty ? (fallback?.authorName ?? "") : detail.authorName,
             authorBadgeTexts: detail.authorBadgeTexts,
-            avatarURL: detail.avatarURL,
-            authorProfileURL: detail.authorProfileURL,
-            metadataText: detail.metadataText,
+            avatarURL: detail.avatarURL ?? fallback?.avatarURL,
+            authorProfileURL: detail.authorProfileURL ?? fallback?.authorProfileURL,
+            metadataText: detail.metadataText ?? fallback?.metadataText,
             contentHTML: detail.contentHTML,
             signatureHTML: detail.signatureHTML,
             requiredReadingLevel: detail.requiredReadingLevel,

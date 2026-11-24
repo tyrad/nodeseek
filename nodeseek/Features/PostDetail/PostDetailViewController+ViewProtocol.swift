@@ -131,11 +131,11 @@ extension PostDetailViewController: PostDetailViewProtocol {
         if currentHeaderContent?.postID != detail.id || detail.isRestricted { authorFilter = nil }
         resetAuthorFilterAutoLoad()
         // 后续页解析出的正文可能是该页第一楼，已有主楼时沿用，避免把回复当成主楼。
-        let keepHeader = !detail.isRestricted && detail.page > 1 && currentHeaderContent?.postID == detail.id
-            && (detail.contentHTML.isEmpty || currentHeaderContent?.contentHTML.isEmpty == false)
-        if !keepHeader {
+        let previousHeader = detail.page > 1 && !detail.isRestricted && currentHeaderContent?.postID == detail.id
+            ? currentHeaderContent : nil
+        if (previousHeader?.contentHTML ?? "").isEmpty {
             collectionList.headerSource = .init(post: detail)
-            configureHeader(.init(detail: detail))
+            configureHeader(.init(detail: detail, fallback: previousHeader))
         }
         if displayMode == .skeleton { collectionList.coverUntilSettled(timeout: initialContentRevealTimeout) }
         displayMode = .content

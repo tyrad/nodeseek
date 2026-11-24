@@ -349,8 +349,11 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             throw NodeSeekParserError.postDetailNotFound
         }
 
+        let page = Self.postPage(from: url) ?? 1
         let bodyItem = document.at_xpath(XPathRules.postDetailBodyItem)
-        let authorName = bodyItem.flatMap { firstText(in: $0, xpaths: [XPathRules.contentAuthor]) } ?? ""
+        let owner = page > 1 && bodyItem == nil && restrictedNotice == nil
+            ? paginationOwner(in: document) : nil
+        let authorName = bodyItem.flatMap { firstText(in: $0, xpaths: [XPathRules.contentAuthor]) } ?? owner?.name ?? ""
         let avatarURL = bodyItem.flatMap {
             firstAttribute(
                 in: $0,
@@ -358,7 +361,7 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
                 attribute: "src"
             )
         }.flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
-        let authorProfileURL = bodyItem.flatMap { parseUserProfileURL(in: $0) }
+        let authorProfileURL = bodyItem.flatMap { parseUserProfileURL(in: $0) } ?? owner?.profileURL
         let createdAtText = bodyItem.flatMap { firstText(in: $0, xpaths: [XPathRules.contentCreatedAt]) }
         let categoryText = bodyItem.flatMap { firstText(in: $0, xpaths: [XPathRules.contentCategory]) }
         let metadataText = [createdAtText, categoryText].compactMap(\.self).joined(separator: " · ").trimmedNonEmpty
@@ -382,7 +385,6 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
                 restrictedNotice: restrictedNotice
             )
         }
-        let page = Self.postPage(from: url) ?? 1
         let pagination = parsePostDetailPagination(in: document, pageURL: url)
         let bodyReactionConfiguration = bodyItem.flatMap {
             reactionConfiguration?.commentConfiguration(for: $0)
@@ -431,6 +433,18 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             pagination: pagination,
             isLastPage: pagination?.nextPage == nil && document.at_xpath(XPathRules.postDetailNextPage) == nil
         )
+    }
+
+    /// 后续页只有评论，楼主身份仍随帖子配置返回。
+    private func paginationOwner(in document: HTMLDocument) -> (name: String, profileURL: URL?)? {
+        for root in configRoots(in: document) {
+            guard let post = root["postData"] as? [String: Any], let op = post["op"] as? [String: Any],
+                  let name = stringValue(in: op, keys: ["name"]) else { continue }
+            let uid = intValue(in: op, keys: ["uid"])
+            let profileURL = uid.flatMap { $0 > 0 ? normalizeUserProfileURL("/space/\($0)") : nil }
+            return (name, profileURL)
+        }
+        return nil
     }
 
     /// 和网页“编辑”按钮同一判断：楼主 uid 等于当前登录用户；任意分页都有这两项。

@@ -795,7 +795,16 @@ const openWebLink = url => 'nsconnect://open?url=' + encodeURIComponent(url);
 function openSystemLink(link) {
   simctl('openurl', device, link);
   for (let attempt = 0; attempt < 4; attempt++) {
-    const screen = execFileSync('axe', ['describe-ui', '--udid', device], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+    let screen;
+    try {
+      screen = execFileSync('axe', ['describe-ui', '--udid', device], {
+        encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (error) {
+      // SpringBoard 切换到应用过程中可能暂时读不到无障碍树。
+      if (error.stderr?.includes('No translation object returned for simulator')) continue;
+      throw error;
+    }
     const prompt = screen.match(/在.{0,3}NS Connect.{0,3}中打开|Open.{0,8}NS Connect/i);
     if (prompt) {
       const label = prompt[0].startsWith('在') ? '打开' : 'Open';
@@ -821,6 +830,18 @@ daily('deeplink-post', async ({ ui, start, log }) => {
   await waitFor(() => log().slice(reopened).includes('帖子详情加载成功，postID=893437,'), '返回后再次点同一链接没有重新打开帖子');
   await ui.tap('BackButton');
   await ui.get(home);
+});
+
+daily('deeplink-page-header', async ({ ui, start, ids, log }) => {
+  await start();
+  const offset = log().length;
+  openSystemLink('nsconnect://post/893437-2');
+  await ui.get('对邀请码发放机制的调整总结');
+  await waitFor(async () => (await ids('name == "comment-author-name" AND label CONTAINS "酒神" AND visible == 1')).length, '页头没有显示楼主');
+  await ui.get('查看完整帖子');
+  await ui.get('#11');
+  assert.doesNotMatch(log().slice(offset), /开始加载帖子详情，postID=893437, page=1\b/);
+  simctl('io', device, 'screenshot', join(out, 'deeplink-page-header.png'));
 });
 
 daily('deeplink-floor', async ({ ui, start }) => {
