@@ -110,8 +110,12 @@ final class DetailFloorAnchorTests: XCTestCase {
                                       metadataText: nil, contentHTML: "主帖", visibleMarkdown: "主帖", comments: comments))
         window.layoutIfNeeded()
         let list = try XCTUnwrap(page.collectionList.view)
-        page.handleContentLinkTap(try XCTUnwrap(URL(string: "https://www.nodeseek.com/post-10-1#2")))
         let path = try XCTUnwrap(page.indexPathForCurrentPageAnchor("2"))
+        // 这个场景验证点按当前可见的楼层；主楼高度与窗口尺寸会影响第 2 楼是否在首屏。
+        page.collectionList.scroll(to: path.item, position: .centeredVertically)
+        list.layoutIfNeeded()
+        XCTAssertTrue(list.indexPathsForVisibleItems.contains(path))
+        page.handleContentLinkTap(try XCTUnwrap(URL(string: "https://www.nodeseek.com/post-10-1#2")))
         let target = try XCTUnwrap(list.cellForItem(at: path) as? DetailFloorListCell)
         func overlay(_ cell: UICollectionViewCell) -> UIView? {
             cell.contentView.subviews.first { $0.accessibilityIdentifier == "detail-anchor-highlight" }
