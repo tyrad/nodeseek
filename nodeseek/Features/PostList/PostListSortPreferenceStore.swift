@@ -8,6 +8,7 @@ import Foundation
 /// 帖子列表排序偏好：所有分类共用一个排序方式，重启后沿用上次选择。
 protocol PostListSortPreferenceStoring: AnyObject {
     var sortMode: PostListSortMode { get set }
+    var showsHomeControl: Bool { get set }
 }
 
 final class PostListSortPreferenceStore: PostListSortPreferenceStoring {
@@ -15,13 +16,21 @@ final class PostListSortPreferenceStore: PostListSortPreferenceStoring {
 
     private let userDefaults: UserDefaults
     private let storageKey: String
+    private let showsHomeControlStorageKey: String
 
     init(
         userDefaults: UserDefaults = .standard,
-        storageKey: String = "postList.sortMode"
+        storageKey: String = "postList.sortMode",
+        showsHomeControlStorageKey: String = "postList.showsSortControl"
     ) {
         self.userDefaults = userDefaults
         self.storageKey = storageKey
+        self.showsHomeControlStorageKey = showsHomeControlStorageKey
+    }
+
+    var showsHomeControl: Bool {
+        get { userDefaults.object(forKey: showsHomeControlStorageKey) as? Bool ?? true }
+        set { userDefaults.set(newValue, forKey: showsHomeControlStorageKey) }
     }
 
     var sortMode: PostListSortMode {

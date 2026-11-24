@@ -44,7 +44,7 @@ struct SettingsViewControllerTests {
             let tableView = try #require(viewController.tableView)
             #expect(viewController.title == "设置")
             #expect(tableView.numberOfSections == 7)
-            #expect(tableView.numberOfRows(inSection: 0) == 7)
+            #expect(tableView.numberOfRows(inSection: 0) == 8)
             #expect(tableView.numberOfRows(inSection: 1) == 3)
             #expect(tableView.numberOfRows(inSection: 2) == 1)
             #expect(tableView.numberOfRows(inSection: 3) == 1)
@@ -84,7 +84,7 @@ struct SettingsViewControllerTests {
             ))
             let textSizeCell = try #require(tableView.dataSource?.tableView(
                 tableView,
-                cellForRowAt: IndexPath(row: 3, section: 0)
+                cellForRowAt: IndexPath(row: 4, section: 0)
             ))
             let searchEntryCell = try #require(tableView.dataSource?.tableView(
                 tableView,
@@ -92,7 +92,7 @@ struct SettingsViewControllerTests {
             ))
             let signatureCell = try #require(tableView.dataSource?.tableView(
                 tableView,
-                cellForRowAt: IndexPath(row: 4, section: 0)
+                cellForRowAt: IndexPath(row: 5, section: 0)
             ))
             let debugCell = try #require(tableView.dataSource?.tableView(
                 tableView,
@@ -190,13 +190,13 @@ struct SettingsViewControllerTests {
         )
         controller.loadViewIfNeeded()
         let tableView = try #require(controller.tableView)
-        let cell = controller.tableView(tableView, cellForRowAt: IndexPath(row: 5, section: 0))
+        let cell = controller.tableView(tableView, cellForRowAt: IndexPath(row: 6, section: 0))
         let control = try #require(cell.accessoryView as? UISwitch)
         #expect(cell.textLabel?.text == "深色模式图片变暗")
         #expect(control.isOn)
-        #expect(tableView.numberOfRows(inSection: 0) == 7)
+        #expect(tableView.numberOfRows(inSection: 0) == 8)
 
-        let levelCell = controller.tableView(tableView, cellForRowAt: IndexPath(row: 6, section: 0))
+        let levelCell = controller.tableView(tableView, cellForRowAt: IndexPath(row: 7, section: 0))
         let levelControl = try #require(levelCell.accessoryView as? UISegmentedControl)
         #expect(levelCell.textLabel?.text == "变暗程度")
         #expect(levelControl.numberOfSegments == 3)
@@ -208,11 +208,11 @@ struct SettingsViewControllerTests {
         control.isOn = false
         control.sendActions(for: .valueChanged)
         #expect(!DetailImageDimmingSettings(userDefaults: defaults).isEnabled)
-        #expect(tableView.numberOfRows(inSection: 0) == 6)
+        #expect(tableView.numberOfRows(inSection: 0) == 7)
         control.isOn = true
         control.sendActions(for: .valueChanged)
         #expect(DetailImageDimmingSettings(userDefaults: defaults).isEnabled)
-        #expect(tableView.numberOfRows(inSection: 0) == 7)
+        #expect(tableView.numberOfRows(inSection: 0) == 8)
         #expect(DetailImageDimmingSettings(userDefaults: defaults).level == .strong)
     }
 
@@ -241,7 +241,7 @@ struct SettingsViewControllerTests {
 
         let cell = try #require(viewController.tableView.dataSource?.tableView(
             viewController.tableView,
-            cellForRowAt: IndexPath(row: 4, section: 0)
+            cellForRowAt: IndexPath(row: 5, section: 0)
         ))
         let signatureSwitch = try #require(cell.accessoryView as? UISwitch)
         #expect(signatureSwitch.isOn == true)
@@ -250,6 +250,72 @@ struct SettingsViewControllerTests {
         signatureSwitch.sendActions(for: .valueChanged)
 
         #expect(signatureSettings.showsSignatures == false)
+    }
+
+    @Test func homeSortPreferencesPersistIndependentlyAndReflectExternalChanges() throws {
+        let suite = "settings-sort-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = PostListSortPreferenceStore(userDefaults: defaults)
+        let controller = PostListSortSettingsViewController(store: store)
+        controller.loadViewIfNeeded()
+        let table = try #require(controller.tableView)
+        #expect(table.tintColor == .label)
+        #expect(table.accessibilityIdentifier == "settings-post-list-sort-table-view")
+        let switchRow = controller.tableView(table, cellForRowAt: IndexPath(row: 0, section: 0))
+        let toggle = try #require(switchRow.accessoryView as? UISwitch)
+        #expect(toggle.accessibilityIdentifier == "settings-post-list-sort-show-switch")
+        #expect(toggle.isOn)
+        toggle.isOn = false
+        toggle.sendActions(for: .valueChanged)
+        let postRow = IndexPath(row: 0, section: 1)
+        controller.tableView(table, didSelectRowAt: postRow)
+        let reopenedStore = PostListSortPreferenceStore(userDefaults: defaults)
+        #expect(!reopenedStore.showsHomeControl)
+        #expect(reopenedStore.sortMode == .postTime)
+        #expect(controller.tableView(table, cellForRowAt: postRow).accessoryType == .checkmark)
+        reopenedStore.sortMode = .replyTime
+        controller.beginAppearanceTransition(true, animated: false)
+        controller.endAppearanceTransition()
+        #expect(controller.tableView(table, cellForRowAt: postRow).accessoryType == .none)
+        #expect(controller.tableView(table, cellForRowAt: IndexPath(row: 1, section: 1)).accessoryType == .checkmark)
+    }
+
+    @Test func settingsPageShowsHomeSortSummaryAndPushesSortSettingsWithInjectedStore() throws {
+        let sortStore = InMemoryPostListSortPreferenceStore()
+        sortStore.sortMode = .postTime
+        let viewController = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager(),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
+            sortPreferenceStore: sortStore
+        )
+        let navigationController = UINavigationController(rootViewController: viewController)
+        viewController.loadViewIfNeeded()
+
+        let indexPath = IndexPath(row: 3, section: 0)
+        let cell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: indexPath
+        ))
+        #expect(cell.accessibilityIdentifier == "settings-post-list-sort-cell")
+        #expect(cell.textLabel?.textColor == ReadingColors.text)
+        #expect(cell.detailTextLabel?.text == PostListSortMode.postTime.accessibilityTitle)
+        #expect(cell.accessoryType == .disclosureIndicator)
+
+        viewController.tableView.delegate?.tableView?(viewController.tableView, didSelectRowAt: indexPath)
+        let pushed = try #require(navigationController.topViewController as? PostListSortSettingsViewController)
+        pushed.loadViewIfNeeded()
+        let pushedTable = try #require(pushed.tableView)
+        pushed.tableView(pushedTable, didSelectRowAt: IndexPath(row: 1, section: 1))
+        #expect(sortStore.sortMode == .replyTime)
+
+        viewController.viewWillAppear(false)
+        let refreshedCell = try #require(viewController.tableView.dataSource?.tableView(
+            viewController.tableView,
+            cellForRowAt: indexPath
+        ))
+        #expect(refreshedCell.detailTextLabel?.text == PostListSortMode.replyTime.accessibilityTitle)
     }
 
     @Test func postListSearchEntryDefaultsToDisabledWhenUnset() throws {
@@ -338,7 +404,7 @@ struct SettingsViewControllerTests {
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 3, section: 0)
+            didSelectRowAt: IndexPath(row: 4, section: 0)
         )
 
         #expect(navigationController.topViewController is SettingsTextSizeViewController)

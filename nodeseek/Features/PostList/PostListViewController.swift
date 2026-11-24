@@ -29,7 +29,7 @@ class PostListViewController: UIViewController {
     }
 
     private enum FloatingControlLayout {
-        static let sortToggleBottomInset: CGFloat = 204
+        static let sortToggleBottomInset: CGFloat = 80
         static let composeButtonTrailing: CGFloat = 20
         static let composeButtonBottom: CGFloat = 16
         /// 滚动超过这个距离才切换发帖按钮显隐，避免手指轻微抖动时闪烁。
@@ -42,6 +42,7 @@ class PostListViewController: UIViewController {
     let presenter: PostListPresenterProtocol
     let layout: AppNavigationLayout
     private let searchEntrySettings: PostListSearchEntrySettings
+    private let sortPreferenceStore: PostListSortPreferenceStoring
     let detailTestURLProvider: () -> String
     let autoCheckInRunner: @MainActor (UIViewController?, AutoCheckInTrigger) async -> Void
     private var hasAppeared = false
@@ -49,7 +50,7 @@ class PostListViewController: UIViewController {
     var selectedCategory: PostListCategoryItem = .all
     var currentSortMode: PostListSortMode = .replyTime
     var sortToggleWidthConstraint: NSLayoutConstraint?
-    private var sortToggleTrailingConstraint: NSLayoutConstraint?
+    var sortToggleHeightConstraint: NSLayoutConstraint?
     private var sortToggleCollapseWorkItem: DispatchWorkItem?
     private var searchEntryObserver: NSObjectProtocol?
     private var notificationReadStateObserver: NSObjectProtocol?
@@ -214,6 +215,7 @@ class PostListViewController: UIViewController {
         visitedStore: VisitedPostStoreProtocol = EmptyVisitedPostStore(),
         floatingPositionStore: FloatingControlPositionStoring = UserDefaultsFloatingControlPositionStore(),
         searchEntrySettings: PostListSearchEntrySettings = .shared,
+        sortPreferenceStore: PostListSortPreferenceStoring = PostListSortPreferenceStore.shared,
         autoCheckInRunner: @escaping @MainActor (UIViewController?, AutoCheckInTrigger) async -> Void = { presentationContext, trigger in
             await AutoCheckInModule.runIfNeeded(
                 presentationContext: presentationContext,
@@ -230,11 +232,13 @@ class PostListViewController: UIViewController {
         self.presenter = presenter
         self.layout = layout
         self.searchEntrySettings = searchEntrySettings
+        self.sortPreferenceStore = sortPreferenceStore
         self.detailTestURLProvider = detailTestURLProvider
         self.autoCheckInRunner = autoCheckInRunner
         self.sideMenuViewController = PostListSideMenuViewController()
         self.pageContainerViewController = PostPageContainerViewController(
-            visitedStore: visitedStore
+            visitedStore: visitedStore,
+            sortPreferenceStore: sortPreferenceStore
         )
         self.floatingSortToggleContainer = FloatingControlContainerView(
             accessibilityIdentifier: "post-list-floating-sort-toggle",
@@ -275,6 +279,7 @@ class PostListViewController: UIViewController {
         navigationController?.setNavigationBarHidden(true, animated: animated)
         refreshAppearanceForCurrentTraits()
         applySearchEntryVisibility(animated: false)
+        applySortToggleVisibility()
         presenter.viewWillAppear()
         if hasAppeared {
             Task { @MainActor [weak self] in
@@ -289,6 +294,9 @@ class PostListViewController: UIViewController {
         super.viewWillDisappear(animated)
         composeLoginCheckTask?.cancel()
         composeLoginCheckTask = nil
+        if isSortToggleExpanded || sortToggleCollapseWorkItem != nil {
+            setSortToggleExpanded(false, animated: false)
+        }
         navigationController?.setNavigationBarHidden(false, animated: animated)
     }
 
@@ -336,8 +344,7 @@ class PostListViewController: UIViewController {
         tabScrollView.addSubview(tabStackView)
 
         let sortToggleTrailingConstraint = sortToggleAnchorView.trailingAnchor.constraint(
-            equalTo: view.safeAreaLayoutGuide.trailingAnchor,
-            constant: PostListSortToggleButton.collapsedTrailing
+            equalTo: view.safeAreaLayoutGuide.trailingAnchor
         )
         let sortToggleWidthConstraint = sortToggleAnchorView.widthAnchor.constraint(
             equalToConstant: PostListSortToggleButton.collapsedWidth
@@ -349,7 +356,8 @@ class PostListViewController: UIViewController {
         let tabScrollTrailingToSearchButtonConstraint = tabScrollView.trailingAnchor.constraint(
             equalTo: topSearchButton.leadingAnchor
         )
-        self.sortToggleTrailingConstraint = sortToggleTrailingConstraint
+        let sortToggleHeightConstraint = sortToggleAnchorView.heightAnchor.constraint(equalToConstant: 44)
+        self.sortToggleHeightConstraint = sortToggleHeightConstraint
         self.sortToggleWidthConstraint = sortToggleWidthConstraint
         self.tabScrollTrailingToSafeAreaConstraint = tabScrollTrailingToSafeAreaConstraint
         self.tabScrollTrailingToSearchButtonConstraint = tabScrollTrailingToSearchButtonConstraint
@@ -380,7 +388,7 @@ class PostListViewController: UIViewController {
                 constant: -FloatingControlLayout.sortToggleBottomInset
             ),
             sortToggleWidthConstraint,
-            sortToggleAnchorView.heightAnchor.constraint(equalToConstant: PostListSortToggleButton.height),
+            sortToggleHeightConstraint,
 
             tabScrollTrailingToSafeAreaConstraint,
             tabScrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: TopBarLayout.topOffset),
@@ -419,7 +427,7 @@ class PostListViewController: UIViewController {
         observeNotificationUnreadCount()
         observeAppForeground()
         sortToggleButton.apply(sortMode: currentSortMode, expanded: false)
-        sortToggleButton.applyAlpha(expanded: false)
+        applySortToggleVisibility()
         applySearchEntryVisibility(animated: false)
     }
     
@@ -450,9 +458,9 @@ class PostListViewController: UIViewController {
     }
 
     @objc private func sortToggleButtonTapped() {
+        isSortToggleExpanded = true
+        currentSortMode = pageContainerViewController.toggleSortMode(for: selectedCategory)
         setSortToggleExpanded(true, animated: true)
-        let sortMode = pageContainerViewController.toggleSortMode(for: selectedCategory)
-        renderSortMode(sortMode)
         pageContainerViewController.scrollToTop(for: selectedCategory, animated: false)
         scheduleSortToggleCollapse()
     }
@@ -523,35 +531,52 @@ class PostListViewController: UIViewController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.35, execute: workItem)
     }
 
+    private func applySortToggleVisibility() {
+        let showsControl = sortPreferenceStore.showsHomeControl
+        floatingSortToggleContainer.isHidden = !showsControl
+        if !showsControl {
+            setSortToggleExpanded(false, animated: false)
+        }
+    }
+
     private func setSortToggleExpanded(_ expanded: Bool, animated: Bool) {
         sortToggleCollapseWorkItem?.cancel()
         sortToggleCollapseWorkItem = nil
         isSortToggleExpanded = expanded
-        sortToggleButton.apply(sortMode: currentSortMode, expanded: expanded)
-        sortToggleWidthConstraint?.constant = expanded
-            ? PostListSortToggleButton.expandedWidth(for: currentSortMode.accessibilityTitle)
-            : PostListSortToggleButton.collapsedWidth
-        sortToggleTrailingConstraint?.constant = expanded
-            ? PostListSortToggleButton.expandedTrailing
-            : PostListSortToggleButton.collapsedTrailing
 
-        let animations: () -> Void = { [weak self] in
-            self?.sortToggleButton.applyAlpha(expanded: expanded)
-            self?.view.layoutIfNeeded()
-        }
-        guard animated else {
-            animations()
+        guard animated, !UIAccessibility.isReduceMotionEnabled else {
+            renderSortMode(currentSortMode)
+            view.layoutIfNeeded()
             return
         }
-        sortToggleButton.applyJellyAnimation(expanded: expanded)
-        UIView.animate(
-            withDuration: PostListSortToggleButton.transitionDuration,
-            delay: 0,
-            usingSpringWithDamping: PostListSortToggleButton.transitionDamping,
-            initialSpringVelocity: PostListSortToggleButton.transitionVelocity,
-            options: [.allowUserInteraction, .beginFromCurrentState],
-            animations: animations
-        )
+
+        if expanded {
+            renderSortMode(currentSortMode)
+            UIView.animate(
+                withDuration: 0.18,
+                delay: 0,
+                options: [.allowUserInteraction, .beginFromCurrentState],
+                animations: { [weak self] in
+                    self?.view.layoutIfNeeded()
+                }
+            )
+        } else {
+            sortToggleWidthConstraint?.constant = PostListSortToggleButton.collapsedWidth
+            sortToggleHeightConstraint?.constant = PostListSortToggleButton.collapsedWidth
+            UIView.animate(
+                withDuration: 0.18,
+                delay: 0,
+                options: [.allowUserInteraction, .beginFromCurrentState],
+                animations: { [weak self] in
+                    self?.sortToggleButton.applyCollapsedVisuals()
+                    self?.view.layoutIfNeeded()
+                },
+                completion: { [weak self] _ in
+                    guard let self, !self.isSortToggleExpanded else { return }
+                    self.sortToggleButton.apply(sortMode: self.currentSortMode, expanded: false)
+                }
+            )
+        }
     }
 
     private func refreshAppearanceForCurrentTraits() {

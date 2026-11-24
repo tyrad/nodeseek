@@ -68,22 +68,13 @@ struct PostListViewControllerTests {
 
         let button = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-sort-toggle"))
         #expect(button.title(for: .normal) == nil)
-        #expect(button.image(for: .normal) != nil)
-        #expect(button.backgroundColor == .label)
-        #expect(button.layer.maskedCorners == [.layerMinXMinYCorner, .layerMinXMaxYCorner])
-        #expect(button.bounds.height >= 42)
-        #expect(button.bounds.width >= 56)
-        #expect(button.bounds.width <= 60)
-        #expect(button.alpha < 1)
-        #expect(button.alpha >= 0.2)
-        #expect(button.titleLabel?.font.pointSize ?? 0 >= 13)
-        #expect(button.titleLabel?.numberOfLines == 1)
-        #expect(button.titleLabel?.lineBreakMode == .byTruncatingTail)
-        #expect(button.configuration?.titleLineBreakMode == .byTruncatingTail)
+        #expect(button.backgroundColor == .clear)
+        #expect(button.bounds.size == CGSize(width: 44, height: 44))
         var buttonFrame = button.convert(button.bounds, to: viewController.view)
-
-        #expect(buttonFrame.maxX > viewController.view.bounds.maxX)
-        #expect(buttonFrame.maxY <= viewController.view.bounds.maxY - 200)
+        #expect(buttonFrame.maxX == viewController.view.bounds.maxX)
+        #expect(buttonFrame.maxY == viewController.view.bounds.maxY - 80)
+        let innerPoint = CGPoint(x: buttonFrame.minX + 2, y: buttonFrame.midY)
+        #expect(viewController.view.hitTest(innerPoint, with: nil) === button)
 
         let animationsWereEnabled = UIView.areAnimationsEnabled
         UIView.setAnimationsEnabled(false)
@@ -92,17 +83,57 @@ struct PostListViewControllerTests {
         UIView.setAnimationsEnabled(animationsWereEnabled)
         buttonFrame = button.convert(button.bounds, to: viewController.view)
 
-        #expect(button.title(for: .normal) == "回复时间优先")
+        #expect(button.configuration?.title == PostListSortMode.replyTime.accessibilityTitle)
+        #expect(button.configuration?.titleLineBreakMode == .byTruncatingTail)
+        #expect(button.layer.borderWidth > 0)
+        #expect(button.layer.shadowOpacity > 0)
         #expect(button.alpha == 1)
-        #expect(button.bounds.width >= 168)
+        #expect(button.bounds.width > 44)
         #expect(button.configuration?.titleTextAttributesTransformer != nil)
         #expect(button.intrinsicContentSize.width <= button.bounds.width)
         #expect(abs(buttonFrame.maxX - viewController.view.bounds.maxX) < 0.5)
 
         viewController.renderSortMode(.postTime)
-        #expect(button.title(for: .normal) == "发帖时间优先")
-        #expect(button.bounds.width >= 168)
+        #expect(button.configuration?.title == PostListSortMode.postTime.accessibilityTitle)
+        #expect(button.bounds.width > 44)
         #expect(button.intrinsicContentSize.width <= button.bounds.width)
+        #expect(viewController.sortToggleButton.expandedWidth(for: String(repeating: "超长排序文案", count: 20), maxWidth: 320) <= 320)
+    }
+
+    @Test func sortToggleButtonVisibilityFollowsPreferenceStoreAndRefreshesOnAppear() throws {
+        let sortStore = InMemoryPostListSortPreferenceStore()
+        sortStore.showsHomeControl = false
+        let viewController = makePostListViewController(
+            presenter: SpyPostListPresenter(),
+            sortPreferenceStore: sortStore
+        )
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.view.layoutIfNeeded()
+
+        let floatingContainer = try #require(
+            viewController.view.firstView(accessibilityIdentifier: "post-list-floating-sort-toggle")
+        )
+        let button = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-list-sort-toggle"))
+        #expect(floatingContainer.isHidden == true)
+
+        sortStore.showsHomeControl = true
+        viewController.beginAppearanceTransition(true, animated: false)
+        viewController.endAppearanceTransition()
+        #expect(floatingContainer.isHidden == false)
+
+        let animationsWereEnabled = UIView.areAnimationsEnabled
+        UIView.setAnimationsEnabled(false)
+        defer { UIView.setAnimationsEnabled(animationsWereEnabled) }
+        button.sendActions(for: .touchUpInside)
+        viewController.view.layoutIfNeeded()
+        #expect(viewController.isSortToggleExpanded == true)
+
+        sortStore.showsHomeControl = false
+        viewController.beginAppearanceTransition(true, animated: false)
+        viewController.endAppearanceTransition()
+        #expect(floatingContainer.isHidden == true)
+        #expect(viewController.isSortToggleExpanded == false)
     }
 
     @Test func topNavigationUsesDenseReadingTabStyle() throws {
@@ -288,13 +319,13 @@ struct PostListViewControllerTests {
                 return referencesFloatingContainer && !isAutoresizingMaskConstraint
             } == false
         )
-        #expect(sortToggleButton.bounds.height >= 42)
-        #expect(sortToggleButton.bounds.width >= 56)
+        #expect(sortToggleButton.bounds.height == 44)
+        #expect(sortToggleButton.bounds.width == 44)
         let sortToggleFrame = sortToggleButton.convert(sortToggleButton.bounds, to: viewController.view)
-        #expect(sortToggleFrame.maxX > viewController.view.bounds.maxX)
+        #expect(sortToggleFrame.maxX == viewController.view.bounds.maxX)
         #expect(abs(floatingContainer.floatingEdgeInsets.top - viewController.pageContainerViewController.view.frame.minY) < 1)
         #expect(floatingContainer.floatingEdgeInsets.bottom >= viewController.view.safeAreaInsets.bottom)
-        #expect(floatingContainer.floatingEdgeInsets.right < 0)
+        #expect(floatingContainer.floatingEdgeInsets.right == 0)
 
         floatingContainer.frame.origin.y = 0
         floatingContainer.updateFloatingEdgeInsets(
@@ -950,6 +981,7 @@ private func makePostListViewController(
     layout: AppNavigationLayout = .reading,
     floatingPositionStore: FloatingControlPositionStoring = InMemoryFloatingControlPositionStore(),
     searchEntrySettings: PostListSearchEntrySettings = makePostListSearchEntrySettings(),
+    sortPreferenceStore: PostListSortPreferenceStoring = InMemoryPostListSortPreferenceStore(),
     autoCheckInRunner: @escaping @MainActor (UIViewController?, AutoCheckInTrigger) async -> Void = { _, _ in },
     detailTestURLProvider: @escaping () -> String = {
         UIPasteboard.general.url?.absoluteString ?? UIPasteboard.general.string ?? ""
@@ -960,6 +992,7 @@ private func makePostListViewController(
         layout: layout,
         floatingPositionStore: floatingPositionStore,
         searchEntrySettings: searchEntrySettings,
+        sortPreferenceStore: sortPreferenceStore,
         autoCheckInRunner: autoCheckInRunner,
         detailTestURLProvider: detailTestURLProvider
     )

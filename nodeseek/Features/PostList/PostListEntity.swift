@@ -196,7 +196,7 @@ nonisolated struct PostListCategoryItem: Hashable, Codable, Sendable {
     }
 }
 
-nonisolated enum PostListSortMode: String, Sendable {
+nonisolated enum PostListSortMode: String, CaseIterable, Sendable {
     case postTime
     case replyTime
 
@@ -212,9 +212,9 @@ nonisolated enum PostListSortMode: String, Sendable {
     var accessibilityTitle: String {
         switch self {
         case .postTime:
-            return "发帖时间优先"
+            return NSLocalizedString("sort.postTime", tableName: "PostList", comment: "")
         case .replyTime:
-            return "回复时间优先"
+            return NSLocalizedString("sort.replyTime", tableName: "PostList", comment: "")
         }
     }
 

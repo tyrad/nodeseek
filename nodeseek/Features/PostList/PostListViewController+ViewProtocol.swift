@@ -37,9 +37,15 @@ extension PostListViewController: PostListViewProtocol {
     func renderSortMode(_ sortMode: PostListSortMode) {
         currentSortMode = sortMode
         sortToggleButton.apply(sortMode: sortMode, expanded: isSortToggleExpanded)
-        if isSortToggleExpanded {
-            sortToggleWidthConstraint?.constant = PostListSortToggleButton.expandedWidth(for: sortMode.accessibilityTitle)
-        }
+        let maxExpandedWidth = view.bounds.width > 0
+            ? max(PostListSortToggleButton.collapsedWidth, view.bounds.width - 32)
+            : nil
+        sortToggleWidthConstraint?.constant = isSortToggleExpanded
+            ? sortToggleButton.expandedWidth(for: sortMode.accessibilityTitle, maxWidth: maxExpandedWidth)
+            : PostListSortToggleButton.collapsedWidth
+        sortToggleHeightConstraint?.constant = isSortToggleExpanded
+            ? sortToggleButton.expandedHeight
+            : PostListSortToggleButton.collapsedWidth
     }
 
     func reloadSelectedCategory() {

@@ -115,6 +115,7 @@ class SettingsViewController: UITableViewController {
         case navigationLayout
         case categoryPreferences
         case homeSearchEntry
+        case sortPreferences
         case textSize
         case signatureDisplay
         case imageDimming
@@ -142,6 +143,7 @@ class SettingsViewController: UITableViewController {
     private let signatureDisplaySettings: PostSignatureDisplaySettings
     private let imageDimmingSettings: DetailImageDimmingSettings
     private let searchEntrySettings: PostListSearchEntrySettings
+    private let sortPreferenceStore: PostListSortPreferenceStoring
     private let categoryPreferenceStore: PostCategoryPreferenceStore
     private let specialFollowKeywordStore: SpecialFollowKeywordStore
     private let pushAuthorizationStatusProvider: @MainActor () async -> UNAuthorizationStatus
@@ -168,6 +170,7 @@ class SettingsViewController: UITableViewController {
         signatureDisplaySettings: PostSignatureDisplaySettings = .shared,
         imageDimmingSettings: DetailImageDimmingSettings = .shared,
         searchEntrySettings: PostListSearchEntrySettings = .shared,
+        sortPreferenceStore: PostListSortPreferenceStoring = PostListSortPreferenceStore.shared,
         categoryPreferenceStore: PostCategoryPreferenceStore = .shared,
         specialFollowKeywordStore: SpecialFollowKeywordStore = .shared,
         pushAuthorizationStatusProvider: @escaping @MainActor () async -> UNAuthorizationStatus = {
@@ -192,6 +195,7 @@ class SettingsViewController: UITableViewController {
         self.signatureDisplaySettings = signatureDisplaySettings
         self.imageDimmingSettings = imageDimmingSettings
         self.searchEntrySettings = searchEntrySettings
+        self.sortPreferenceStore = sortPreferenceStore
         self.categoryPreferenceStore = categoryPreferenceStore
         self.specialFollowKeywordStore = specialFollowKeywordStore
         self.pushAuthorizationStatusProvider = pushAuthorizationStatusProvider
@@ -363,6 +367,8 @@ class SettingsViewController: UITableViewController {
             return categoryPreferencesCell(for: indexPath)
         case .homeSearchEntry:
             return homeSearchEntryCell(for: indexPath)
+        case .sortPreferences:
+            return sortPreferencesCell()
         case .textSize:
             return textSizeCell(for: indexPath)
         case .signatureDisplay:
@@ -497,6 +503,18 @@ class SettingsViewController: UITableViewController {
         cell.selectionStyle = .none
         cell.accessibilityIdentifier = "settings-home-search-entry-cell"
 
+        return cell
+    }
+
+    private func sortPreferencesCell() -> UITableViewCell {
+        let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
+        cell.textLabel?.text = NSLocalizedString("sort.title", tableName: "PostList", comment: "")
+        cell.detailTextLabel?.text = sortPreferenceStore.sortMode.accessibilityTitle
+        cell.detailTextLabel?.textColor = .secondaryLabel
+        cell.imageView?.image = UIImage(systemName: "arrow.up.arrow.down")
+        cell.accessoryType = .disclosureIndicator
+        cell.accessibilityIdentifier = "settings-post-list-sort-cell"
         return cell
     }
 
@@ -701,6 +719,11 @@ class SettingsViewController: UITableViewController {
             navigationController?.pushViewController(LayoutChooserViewController(mode: .settings), animated: true)
         case .categoryPreferences:
             showPostCategoryPreferences()
+        case .sortPreferences:
+            navigationController?.pushViewController(
+                PostListSortSettingsViewController(store: sortPreferenceStore),
+                animated: true
+            )
         case .textSize:
             showTextSizeSettings()
         case .homeSearchEntry, .signatureDisplay, .imageDimming, .imageDimmingLevel, .none:
