@@ -16,7 +16,7 @@ module ReleaseNotesGenerator
   COMMIT_SUBJECT_PATTERN = /\A([a-zA-Z][a-zA-Z0-9_-]*)(?:\(([^)]*)\))?(!)?:\s*(.+)\z/.freeze
 
   DEFAULT_API_BASE = "https://api.deepseek.com/v1"
-  DEFAULT_MODEL = "deepseek-chat"
+  DEFAULT_MODEL = "deepseek-flash"
   DEFAULT_TIMEOUT_SECONDS = 45
   MAX_AI_INPUT_CHARS = 12_000
 
@@ -45,7 +45,7 @@ module ReleaseNotesGenerator
          ### 体验优化
          ### 问题修复
        - 每条使用 `- **模块名**：简洁说明`（模块名用自然中文，如「热榜」「详情页」「个人主页」「深链」「搜索」「首页」等），不要附带 commit hash。
-       - 同类细碎修复合并表达，整体保持克制精炼（通常 3～15 条）。
+       - 先写能直接使用的新功能，每条说明入口或使用效果，保留 Beta 等状态。相同功能只写一次；一个大版本通常 5～8 条，小版本按实际内容写。
   PROMPT
 
   Commit = Struct.new(:short_sha, :subject, keyword_init: true)
@@ -223,6 +223,7 @@ module ReleaseNotesGenerator
     # 去掉重复的顶层 Changes 标题
     text = text.sub(/\A##\s+Changes\s*\n+/i, "").strip
     return nil if text.empty?
+    text = text.gsub(/^[ \t]*[*•][ \t]+/, "- ")
     return nil unless text.match?(/^- /m)
 
     text
@@ -255,6 +256,18 @@ module ReleaseNotesGenerator
     requester = http_requester || method(:default_http_post)
     user_prompt = build_ai_user_prompt(version: version, previous_tag: previous_tag, commits: user_commits)
 
+    payload = {
+      model: model_name,
+      temperature: 0.2,
+      max_tokens: 2500,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: user_prompt }
+      ]
+    }
+    # DeepSeek 默认先生成推理内容，短摘要只需把输出预算留给正文。
+    payload[:thinking] = { type: "disabled" } if uri.host == "api.deepseek.com"
+
     begin
       status_code, body = requester.call(
         uri: uri,
@@ -263,15 +276,7 @@ module ReleaseNotesGenerator
           "Accept" => "application/json",
           "Authorization" => "Bearer #{ai_config.api_key.strip}"
         },
-        payload: {
-          model: model_name,
-          temperature: 0.2,
-          max_tokens: 1500,
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: user_prompt }
-          ]
-        },
+        payload: payload,
         timeout: timeout
       )
 
@@ -281,11 +286,14 @@ module ReleaseNotesGenerator
       end
 
       parsed = JSON.parse(body)
+      finish_reason = parsed.dig("choices", 0, "finish_reason")
+      raise "model #{model_name} stopped with #{finish_reason}" if finish_reason && finish_reason != "stop"
+
       content = parsed.dig("choices", 0, "message", "content")
       cleaned = sanitize_ai_summary(content)
       return cleaned if cleaned
 
-      raise "model #{model_name} returned empty or invalid markdown"
+      raise "model #{model_name} returned empty or invalid markdown (finish_reason=#{finish_reason.inspect}, content_chars=#{content.to_s.length})"
     rescue StandardError => e
       warn_io.puts("[release-notes] AI summarization unavailable (#{e.class}: #{e.message}), falling back to rule-based notes.") if warn_io
       nil
@@ -311,8 +319,17 @@ module ReleaseNotesGenerator
       else
         lines << "无新增提交。"
       end
-    elsif ai_summary && !ai_summary.strip.empty?
-      lines << ai_summary.strip
+    elsif ai_summary || user_facing_commits(commits).size > 15
+      if ai_summary
+        lines << ai_summary.strip
+      else
+        groups = group_commits(commits)
+        counts = USER_GROUPS.map do |group|
+          count = groups.fetch(group[:key]).size
+          "#{group[:title]} #{count} 条" if count.positive?
+        end
+        lines << "本次变更按提交统计：#{counts.compact.join('、')}。"
+      end
       lines << ""
       lines << "<details>"
       lines << "<summary>完整提交记录（#{commits.length} 条）</summary>"

@@ -234,7 +234,7 @@ jobs:
           RELEASE_BUILD_NUMBER: ${{ steps.release.outputs.build_number }}
           RELEASE_NOTES_AI_ENABLED: "true"
           RELEASE_NOTES_API_BASE: ${{ vars.RELEASE_NOTES_API_BASE || 'https://api.deepseek.com/v1' }}
-          RELEASE_NOTES_MODEL: ${{ vars.RELEASE_NOTES_MODEL || 'deepseek-chat' }}
+          RELEASE_NOTES_MODEL: ${{ vars.RELEASE_NOTES_MODEL || 'deepseek-flash' }}
           RELEASE_NOTES_API_KEY: ${{ secrets.RELEASE_NOTES_API_KEY }}
         run: |
           set -euo pipefail

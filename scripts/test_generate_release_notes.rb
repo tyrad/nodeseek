@@ -186,7 +186,8 @@ class ReleaseNotesGeneratorTest < Minitest::Test
       assert_equal "https://api.deepseek.com/v1/chat/completions", req[:uri]
       assert_equal "Bearer sk-deepseek-test", req[:headers]["Authorization"]
       assert_equal "application/json", req[:headers]["Accept"]
-      assert_equal "deepseek-chat", req[:payload][:model]
+      assert_equal "deepseek-flash", req[:payload][:model]
+      assert_equal({ type: "disabled" }, req[:payload][:thinking])
 
       # 验证发给模型的提交按时间从早到晚排列，且过滤掉了 docs 提交
       user_msg = req[:payload][:messages][1][:content]
@@ -284,6 +285,31 @@ class ReleaseNotesGeneratorTest < Minitest::Test
       assert_includes notes, "### 问题修复\n\n- **detail**：修复翻页问题"
       assert_includes notes, "<summary>工程与文档变更（1 条）</summary>"
     end
+  end
+
+  def test_accepts_alternative_bullets_and_rejects_truncated_output
+    assert_equal "- 相同内容", ReleaseNotesGenerator.sanitize_ai_summary("* 相同内容")
+    config = ReleaseNotesGenerator::AIConfig.new(enabled: true, api_base: "https://example.com", api_key: "test")
+    commits = %w[功能一 功能二].map { |s| ReleaseNotesGenerator::Commit.new(subject: s) }
+    requester = lambda do |payload:, **|
+      refute payload.key?(:thinking)
+      [200, JSON.generate(choices: [{ finish_reason: "length", message: { content: "- 半段文本" } }])]
+    end
+    log = StringIO.new
+    assert_nil ReleaseNotesGenerator.summarize_with_ai(version: "1.0", previous_tag: nil, user_commits: commits,
+      ai_config: config, http_requester: requester, warn_io: log)
+    assert_includes log.string, "stopped with length"
+  end
+
+  def test_large_fallback_collapses_commit_details
+    commits = (1..16).map { |i| ReleaseNotesGenerator::Commit.new(short_sha: i.to_s, subject: "fix(feed): 修复条目 #{i}") }
+    notes = ReleaseNotesGenerator.render(version: "2.0", build_number: "9", source_ref: "main",
+      release_tag: "ios/v2.0-build.9", commit: "abc", previous_tag: nil, commits: commits)
+    summary, details = notes.split("<details>")
+    assert_includes summary, "问题修复 16 条"
+    refute_includes summary, "修复条目"
+    assert_includes details, "完整提交记录（16 条）"
+    assert_includes details, "修复条目 16"
   end
 
   def test_single_user_commit_skips_ai_call
