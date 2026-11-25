@@ -12,6 +12,7 @@
 		7A1000012FA0000000000009 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000022FA0000000000009 /* Markdown */; };
 		7A1000042FA0000000000001 /* AsyncDisplayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000052FA0000000000001 /* AsyncDisplayKit */; };
 		7A1000092FA0000000000001 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000082FA0000000000001 /* Kingfisher */; };
+		7A1000262FA0000000000001 /* libwebp in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000272FA0000000000001 /* libwebp */; };
 		7A1000152FA0000000000001 /* JXPhotoBrowser in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000172FA0000000000001 /* JXPhotoBrowser */; };
 		7A1000182FA0000000000001 /* DTCoreText in Frameworks */ = {isa = PBXBuildFile; productRef = 7A1000192FA0000000000001 /* DTCoreText */; };
 		7A10001C2FA0000000000001 /* SVGKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7A10001D2FA0000000000001 /* SVGKit */; };
@@ -142,6 +143,7 @@
 				7A10001C2FA0000000000001 /* SVGKit in Frameworks */,
 				7A1000202FA0000000000001 /* FramePlay in Frameworks */,
 				7A1000232FA0000000000001 /* WhatsNewKit in Frameworks */,
+				7A1000262FA0000000000001 /* libwebp in Frameworks */,
 				FA1000010000000000000001 /* FirebaseCrashlytics in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -230,6 +232,7 @@
 				7A10001D2FA0000000000001 /* SVGKit */,
 				7A1000212FA0000000000001 /* FramePlay */,
 				7A1000242FA0000000000001 /* WhatsNewKit */,
+				7A1000272FA0000000000001 /* libwebp */,
 				FA1000020000000000000001 /* FirebaseCrashlytics */,
 			);
 			productName = nodeseek;
@@ -302,6 +305,7 @@
 				7A10001B2FA0000000000001 /* XCRemoteSwiftPackageReference "SVGKit" */,
 				7A1000222FA0000000000001 /* XCLocalSwiftPackageReference "Packages/FramePlay" */,
 				7A1000252FA0000000000001 /* XCRemoteSwiftPackageReference "WhatsNewKit" */,
+				7A1000282FA0000000000001 /* XCRemoteSwiftPackageReference "libwebp-Xcode" */,
 				FA1000030000000000000001 /* Firebase */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -817,9 +821,22 @@
 			traits = ();
 			requirement = {kind = upToNextMajorVersion; minimumVersion = 13.2.0; };
 		};
+		7A1000282FA0000000000001 /* XCRemoteSwiftPackageReference "libwebp-Xcode" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SDWebImage/libwebp-Xcode.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.6.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		7A1000272FA0000000000001 /* libwebp */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7A1000282FA0000000000001 /* XCRemoteSwiftPackageReference "libwebp-Xcode" */;
+			productName = libwebp;
+		};
 		7A1000242FA0000000000001 /* WhatsNewKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 7A1000252FA0000000000001 /* XCRemoteSwiftPackageReference "WhatsNewKit" */;
