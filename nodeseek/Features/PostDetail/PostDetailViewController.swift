@@ -672,13 +672,12 @@ class PostDetailViewController: UIViewController {
             configureNavigationAuthorTitle(with: currentHeaderContent)
         }
 
-        let browserButton = UIBarButtonItem(
-            image: UIImage(systemName: "safari"),
-            style: .plain,
-            target: self,
-            action: #selector(openInBrowserTapped)
-        )
-        browserButton.accessibilityLabel = "在浏览器打开"
+        let browserAction = UIAction(
+            title: DetailListStrings.text("open-in-browser"),
+            image: UIImage(systemName: "safari")
+        ) { [weak self] _ in
+            self?.openInBrowserTapped()
+        }
 
         var moreButton: UIBarButtonItem?
         let refreshAction = UIAction(
@@ -715,11 +714,11 @@ class PostDetailViewController: UIViewController {
 
         moreButton = UIBarButtonItem(
             image: UIImage(systemName: "ellipsis.circle"),
-            menu: UIMenu(children: [editAction, refreshAction, copyLinkAction, shareAction])
+            menu: UIMenu(children: [editAction, refreshAction, copyLinkAction, shareAction, browserAction])
         )
         moreButton?.accessibilityLabel = "更多"
 
-        navigationItem.rightBarButtonItems = [moreButton, browserButton].compactMap { $0 }
+        navigationItem.rightBarButtonItem = moreButton
         updateVerticalReplyBarItem(visible: false)
     }
 
