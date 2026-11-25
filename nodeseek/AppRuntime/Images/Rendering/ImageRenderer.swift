@@ -72,6 +72,11 @@ enum ImageRenderer {
     static func downsampledImage(data: Data, maxPixelSize: Int) -> UIImage? {
         guard maxPixelSize > 0 else { return nil }
 
+        // ImageIO 缩小大 WebP 时会先解出整张原图位图，改由 libwebp 在解码阶段缩放。
+        if let image = WebPScaledDecoder.downsampledImage(data: data, maxPixelSize: maxPixelSize) {
+            return image
+        }
+
         let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else {
             return nil

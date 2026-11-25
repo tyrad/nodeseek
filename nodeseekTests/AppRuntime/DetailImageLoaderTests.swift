@@ -6,6 +6,7 @@
 //
 
 import CryptoKit
+import Darwin
 import Foundation
 import ImageIO
 @testable import nodeseek
@@ -101,6 +102,53 @@ struct DetailImageLoaderTests {
         #expect(result.animationAsset != nil)
         #expect(result.originalSize == CGSize(width: 640, height: 640))
         #expect(loader.detailImageCacheByteSize() == 0)
+    }
+
+    /// 4 张 6000×4000 大 WebP 并发加载：覆盖首次下载与“原图已缓存、缩略图缺失”两条路径，后者在全局队列并发解码。
+    @Test func largeWebPsDecodeWithoutFullSizeMemoryPeak() async throws {
+        let directory = Self.makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        DetailImageURLProtocol.reset()
+        let data = try DetailWebPTestFixture.data(name: "webp-large-p3-6000x4000")
+        let urls = try (0 ..< 4).map { index in
+            let url = try #require(URL(string: "https://images.example.com/large/webp-\(index).webp"))
+            DetailImageURLProtocol.stub(data: data, mimeType: "image/webp", for: url)
+            return url
+        }
+        let session = URLSession(configuration: Self.urlSessionConfiguration(protocolType: DetailImageURLProtocol.self))
+
+        func loadAll(_ loader: DetailImageLoader) async -> (results: [DetailInlineImageResult], peak: Int) {
+            await Self.measurePeakFootprint {
+                await withTaskGroup(of: DetailInlineImageResult.self) { group in
+                    for url in urls {
+                        group.addTask {
+                            await withCheckedContinuation { continuation in
+                                loader.loadImageForInlineResult(url, maxPixelWidth: 1100, displayScale: 3) {
+                                    continuation.resume(returning: $0)
+                                }
+                            }
+                        }
+                    }
+                    return await group.reduce(into: []) { $0.append($1) }
+                }
+            }
+        }
+
+        let network = await loadAll(DetailImageLoader(session: session, cacheDirectory: directory))
+        let diskLoader = DetailImageLoader(session: session, cacheDirectory: directory)
+        try diskLoader.clearDetailImageCache()
+        let disk = await loadAll(diskLoader)
+
+        for result in network.results + disk.results {
+            #expect(!result.isFallback)
+            #expect(result.animationAsset == nil)
+            let image = try #require(result.image)
+            #expect(max(image.size.width, image.size.height) * image.scale <= 1100)
+        }
+        #expect(DetailImageURLProtocol.totalRequestCount() == urls.count, "原图缓存命中时不应重复下载")
+        // 旧 ImageIO 路径单张 6000×4000 位图即约 92MB，4 张并发会叠加至 300MB+。
+        #expect(network.peak < 80 * 1_048_576, "首次下载峰值 \(network.peak / 1_048_576)MB")
+        #expect(disk.peak < 80 * 1_048_576, "缓存命中并发解码峰值 \(disk.peak / 1_048_576)MB")
     }
 
     @Test func staticWebPRemainsStaticAndCanUseThumbnailCache() async throws {
@@ -588,6 +636,12 @@ struct DetailImageLoaderTests {
         return configuration
     }
 
+    private static func measurePeakFootprint<T>(_ body: () async -> T) async -> (T, Int) {
+        let sampler = FootprintSampler()
+        let value = await body()
+        return (value, sampler.stop())
+    }
+
     private static func makeTemporaryDirectory() -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("DetailImageLoaderTests-\(UUID().uuidString)", isDirectory: true)
@@ -858,4 +912,43 @@ private final class DetailImageURLProtocol: URLProtocol, @unchecked Sendable {
     }
 
     override func stopLoading() {}
+}
+
+/// 后台每 0.5ms 采样进程 phys_footprint，返回相对起点的峰值增量。
+private final class FootprintSampler: @unchecked Sendable {
+    private let lock = NSLock()
+    private let base: Int
+    private var peak: Int
+    private var running = true
+
+    init() {
+        base = Self.footprint()
+        peak = base
+        Thread.detachNewThread { [self] in
+            while lock.withLock({ running }) {
+                let value = Self.footprint()
+                lock.withLock { peak = max(peak, value) }
+                usleep(500)
+            }
+        }
+    }
+
+    func stop() -> Int {
+        let value = Self.footprint()
+        return lock.withLock {
+            running = false
+            return max(peak, value) - base
+        }
+    }
+
+    private static func footprint() -> Int {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        return result == KERN_SUCCESS ? Int(info.phys_footprint) : 0
+    }
 }
