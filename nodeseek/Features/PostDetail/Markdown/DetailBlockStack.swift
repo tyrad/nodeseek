@@ -93,21 +93,26 @@ final class DetailBlockStack: UIStackView {
         }
     }
 
-    private static func table(_ rows: [[[DetailDocument.Inline]]]) -> RenderedTableBlock {
+    private static func table(_ rows: [[DetailDocument.TableCell]]) -> RenderedTableBlock {
         .init(rows: rows.enumerated().map { row, cells in
-            .init(cells: cells.map { runs in
-                var string = ""
-                var links: [RenderedTableBlock.Cell.Link] = []
-                var image: URL?
-                for run in runs {
-                    switch run {
-                    case let .text(text, _, url):
-                        if let url { links.append(.init(location: string.utf16.count, length: text.utf16.count, url: url)) }
-                        string += text
-                    case .sticker(_, let url): image = url
+            .init(cells: cells.map { cell in
+                switch cell {
+                case .image(let url):
+                    return .init(text: "", imageURL: url, isHeader: row == 0)
+                case .inline(let runs):
+                    var string = ""
+                    var links: [RenderedTableBlock.Cell.Link] = []
+                    var image: URL?
+                    for run in runs {
+                        switch run {
+                        case let .text(text, _, url):
+                            if let url { links.append(.init(location: string.utf16.count, length: text.utf16.count, url: url)) }
+                            string += text
+                        case .sticker(_, let url): image = url
+                        }
                     }
+                    return .init(text: string, links: links, imageURL: image, isHeader: row == 0)
                 }
-                return .init(text: string, links: links, imageURL: image, isHeader: row == 0)
             }, isHeader: row == 0)
         })
     }
@@ -368,6 +373,20 @@ final class DetailBlockStack: UIStackView {
         constraint.isActive = true
         return constraint
     }
+
+    #if DEBUG
+    func appendMarkdownFallbackNotice(for source: DetailFloorSource) {
+        let hasSource = source.visibleMarkdown?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        let label = UILabel()
+        label.text = DetailListStrings.text(hasSource ? "debug-markdown-unsupported" : "debug-markdown-unavailable")
+        label.font = .preferredFont(forTextStyle: .caption1)
+        label.adjustsFontForContentSizeCategory = true
+        label.textColor = .systemRed
+        label.numberOfLines = 0
+        label.accessibilityIdentifier = "detail-markdown-fallback"
+        addArrangedSubview(label)
+    }
+    #endif
 
     func appendLegacy(_ blocks: [RenderedContentBlock], to stack: UIStackView, width: CGFloat) {
         let size = CGSize(width: max(1, width), height: .greatestFiniteMagnitude)

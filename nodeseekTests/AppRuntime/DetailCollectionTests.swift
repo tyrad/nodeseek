@@ -361,6 +361,28 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(try bottom(of: "结尾", in: snapshot) - bottom(of: "乙", in: snapshot), 12 + bodyLine, accuracy: 1)
     }
 
+    #if DEBUG
+    func testFallbackNoticeTracksFloorAndClearsOnReuse() throws {
+        let cell = DetailFloorListCell(frame: .zero)
+        let appearance = DetailTextAppearance(width: 328, pointSize: 17, scale: 2, dark: false)
+        for (markdown, key) in [(Optional("<iframe></iframe>"), "debug-markdown-unsupported"), (nil, "debug-markdown-unavailable")] {
+            let request = DetailFloorRequest(id: key, version: 1, source: .init(html: "<p>正文</p>", visibleMarkdown: markdown),
+                                             appearance: appearance, baseURL: NodeSeekSite.baseURL)
+            cell.bind(request)
+            cell.receiver.install(request, .webpage([.text(NSAttributedString(string: "正文"))]))
+            let notice = try XCTUnwrap(cell.body.arrangedSubviews.first as? UILabel)
+            XCTAssertEqual(notice.accessibilityIdentifier, "detail-markdown-fallback")
+            XCTAssertEqual(notice.text, DetailListStrings.text(key))
+            XCTAssertEqual(cell.copyText, markdown ?? "正文")
+            cell.prepareForReuse()
+            XCTAssertTrue(cell.body.arrangedSubviews.isEmpty)
+            cell.bind(request)
+            cell.receiver.install(request, .native([]))
+            XCTAssertTrue(cell.body.arrangedSubviews.isEmpty)
+        }
+    }
+    #endif
+
     func testReuseRejectsLateFloorAndPreviousAppearance() throws {
         let cell = DetailFloorListCell(frame: CGRect(x: 0, y: 0, width: 360, height: 200))
         let appearance = DetailTextAppearance(width: 328, pointSize: 17, scale: 2, dark: false)

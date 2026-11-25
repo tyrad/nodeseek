@@ -14,6 +14,11 @@ nonisolated struct DetailDocument: Equatable, Sendable {
         case sticker(token: String, url: URL)
     }
 
+    nonisolated enum TableCell: Equatable, Sendable {
+        case inline([Inline])
+        case image(URL)
+    }
+
     nonisolated struct Tab: Equatable, Sendable {
         let title: String
         let blocks: [Block]
@@ -24,7 +29,7 @@ nonisolated struct DetailDocument: Equatable, Sendable {
         case heading(Int, [Inline])
         case quote([Block])
         case list(start: Int?, items: [[Block]])
-        case table(rows: [[[Inline]]])
+        case table(rows: [[TableCell]])
         case code(language: String?, text: String)
         case terminal(String)
         case image(alt: String, url: URL)

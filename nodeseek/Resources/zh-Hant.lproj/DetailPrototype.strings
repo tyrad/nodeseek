@@ -33,3 +33,5 @@
 "image" = "圖片";
 
 "vote.loginRequired" = "請先登入後再投票。";
+"debug-markdown-unsupported" = "Markdown 未解析，已使用網頁內文";
+"debug-markdown-unavailable" = "無可用 Markdown，已使用網頁內文";

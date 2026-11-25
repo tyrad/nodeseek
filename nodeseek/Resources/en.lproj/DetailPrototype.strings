@@ -33,3 +33,5 @@
 "image" = "Image";
 
 "vote.loginRequired" = "Sign in to vote.";
+"debug-markdown-unsupported" = "Markdown parsing fell back to HTML";
+"debug-markdown-unavailable" = "No Markdown source available. Showing HTML.";

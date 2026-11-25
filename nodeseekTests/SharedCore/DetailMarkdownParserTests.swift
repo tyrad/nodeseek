@@ -57,7 +57,13 @@ struct DetailMarkdownParserTests {
                 case .paragraph(let runs), .heading(_, let runs): read(runs)
                 case .quote(let children): read(children)
                 case .list(_, let items): for item in items { read(item) }
-                case .table(let rows): for row in rows { for cell in row { read(cell) } }
+                case .table(let rows):
+                    for cell in rows.joined() {
+                        switch cell {
+                        case .inline(let runs): read(runs)
+                        case .image(let url): images.append(url)
+                        }
+                    }
                 case .tabs(let tabs): for tab in tabs { paragraphs.append(tab.title); read(tab.blocks) }
                 case .code(_, let text), .terminal(let text): paragraphs.append(text)
                 case .image(_, let url): images.append(url)
@@ -273,9 +279,128 @@ struct DetailMarkdownParserTests {
         #expect(try parse("README.md") == [.paragraph([.text("README.md", [], nil)])])
     }
 
+    @Test func imageComparisonTableKeepsFloorNative() throws {
+        // 584268 帖 86 楼的表格紧跟正文，每列各放一张对比图。
+        let left = try #require(URL(string: "https://setu.iw233.top/large/ec43126fgy1i9d793igevj20wf11hb29.jpg"))
+        let right = try #require(URL(string: "https://setu.iw233.top/large/ec43126fgy1i9d79434rnj20wf18zhdt.jpg"))
+        let markdown = """
+        现在这个脚本好像还有点问题？
+        核心太多了 CPU利用好像不全.
+        或者说跑出来的分差距有点大.
+        |9654 ES|7B12 X 2|
+        |---|---|
+        |![MRv9KcBgcRTln4nXcy4xVur6IdYqfKRk.webp](\(left))|![9Bb5PYPxIzvXZXfKevhQMIpYc6PM3hjK.webp](\(right))|
+        """
+        let blocks = try parse(markdown)
+        #expect(blocks.count == 2)
+        guard case .paragraph = blocks.first else {
+            Issue.record("表格前缺少原生正文")
+            return
+        }
+        #expect(blocks.last == .table(rows: [
+            [.inline([.text("9654 ES", [], nil)]), .inline([.text("7B12 X 2", [], nil)])],
+            [.image(left), .image(right)],
+        ]))
+    }
+
     @Test func invalidImageAddressStaysNativeAsBrokenImage() throws {
         // 取自 1074863 #1：图片地址只有 https://，网页显示加载失败。
         #expect(try parse("![image](https://)-10+1") == [.brokenImage(alt: "image"), .paragraph([.text("-10+1", [], nil)])])
+    }
+
+    @Test func unrecognizedContainerSyntaxMatchesWebpageLiteralParagraph() throws {
+        // 取自 810146 主楼：作者带入外部博客的 :::note 提示块，网页未将其解析为容器，按普通段落原样显示。
+        let body = "加密算法本身通常不改变底层 PMTU，真正改变安全载荷大小的是传输方式和封装层。比如 TCP、TLS/REALITY、WS/gRPC、QUIC、HY2、TUIC、WireGuard、overlay 隧道，它们的开销不一样。"
+        let markdown = """
+        ```bash frame="terminal" title="PMTU ladder"
+        tracepath -n <peer>
+        ```
+
+        :::note[关于协议]
+        \(body)
+        :::
+
+        ---
+        """
+        let html = """
+        <pre><code class="language-bash">tracepath -n &lt;peer&gt;
+        </code></pre>
+        <p>:::note[关于协议]<br>
+        \(body)<br>
+        :::</p>
+        <hr>
+        """
+        let expected: [DetailDocument.Block] = [
+            .code(language: #"bash frame="terminal" title="PMTU ladder""#, text: "tracepath -n <peer>\n"),
+            .paragraph([
+                .text(":::note[关于协议]", [], nil), .text("\n", [], nil),
+                .text(body, [], nil), .text("\n", [], nil),
+                .text(":::", [], nil),
+            ]),
+            .divider,
+        ]
+        #expect(parser.render(.init(html: html, visibleMarkdown: markdown)) == .native(.init(blocks: expected)))
+        #expect(try parse(markdown) == expected)
+
+        // 标记后半段含行内样式或实体转义时，网页仍保留开头的 :::note 前缀，继续走原生解析。
+        let styledMarkdown = ":::note[**关于协议** & 说明]\n正文\n:::"
+        let styledHTML = "<p>:::note[<strong>关于协议</strong> &amp; 说明]<br>正文<br>:::</p>"
+        #expect(parser.render(.init(html: styledHTML, visibleMarkdown: styledMarkdown)) == .native(.init(blocks: [
+            .paragraph([
+                .text(":::note[", [], nil), .text("关于协议", .bold, nil), .text(" & 说明]", [], nil),
+                .text("\n", [], nil), .text("正文", [], nil), .text("\n", [], nil), .text(":::", [], nil),
+            ]),
+        ])))
+    }
+
+    @Test func unknownContainerConsumedByWebpageStillFallsBack() throws {
+        // 网页实际把 ::: 行消费成容器（正文不再含字面 ::: 标记）时，即使同楼代码块里出现相同字样，仍整楼回退网页渲染。
+        let markdown = """
+        ```text
+        ::: spoiler
+        示例
+        :::
+        ```
+
+        ::: spoiler
+        隐藏内容
+        :::
+        """
+        let html = """
+        <pre><code>::: spoiler
+        示例
+        :::
+        </code></pre>
+        <div class="spoiler"><p>隐藏内容</p></div>
+        """
+        #expect(parser.render(.init(html: html, visibleMarkdown: markdown)) == .webpage(html: html))
+
+        // tabs 容器内部出现未识别的 ::: 仍回退网页，避免闭合行语义冲突；网页正文保留了字面标记也不例外。
+        let nested = ":::: tabs\n::: tab-item A\n:::note[标题]\n内容\n:::\n::::"
+        let nestedHTML = "<p>:::note[标题]<br>内容</p>"
+        #expect(parser.render(.init(html: nestedHTML, visibleMarkdown: nested)) == .webpage(html: nestedHTML))
+        #expect(throws: (any Error).self) { try parse(nested) }
+
+        // 容器外单独出现的 :::: 与 ::: tab-item 同样以网页是否保留字面标记为准。
+        for line in ["::::", "::: tab-item A"] {
+            let literalHTML = "<p>\(line)</p>"
+            #expect(parser.render(.init(html: literalHTML, visibleMarkdown: line)) == .native(.init(blocks: [.paragraph([.text(line, [], nil)])])))
+            let consumedHTML = #"<div class="tab-item"><p>内容</p></div>"#
+            #expect(parser.render(.init(html: consumedHTML, visibleMarkdown: line)) == .webpage(html: consumedHTML))
+        }
+    }
+
+    @Test func literalContainerLinesCoexistWithTabs() throws {
+        // 同楼既有站点 tabs 又有搬运来的 :::note 时，两者互不干扰，顺序前后都能原生解析。
+        let note = ":::note[提示]\n正文\n:::"
+        let tabs = ":::: tabs\n::: tab-item A\n内容\n:::\n::::"
+        let noteBlock: DetailDocument.Block = .paragraph([
+            .text(":::note[提示]", [], nil), .text("\n", [], nil), .text("正文", [], nil), .text("\n", [], nil), .text(":::", [], nil),
+        ])
+        let tabsBlock: DetailDocument.Block = .tabs([.init(title: "A", blocks: [.paragraph([.text("内容", [], nil)])])])
+        let html = #"<p>:::note[提示]<br>正文<br>:::</p><div class="tabs"><div class="tab-item"><p>内容</p></div></div>"#
+        #expect(parser.render(.init(html: html, visibleMarkdown: note + "\n\n" + tabs)) == .native(.init(blocks: [noteBlock, tabsBlock])))
+        #expect(parser.render(.init(html: html, visibleMarkdown: tabs + "\n\n" + note)) == .native(.init(blocks: [tabsBlock, noteBlock])))
     }
 
     @Test func lineBreaksAroundImagesDoNotBecomeBlankParagraphs() throws {
@@ -308,7 +433,7 @@ struct DetailMarkdownParserTests {
         let jump = try #require(URLComponents(string: href))
         let target = try #require(jump.queryItems?.first(where: { $0.name == "to" })?.value)
         #expect(try bareLinkTarget(url) == target)
-        #expect(try parse("| A |\n|---|\n| <br> |") == [.table(rows: [[[.text("A", [], nil)]], [[.text("<br>", [], nil)]]])])
+        #expect(try parse("| A |\n|---|\n| <br> |") == [.table(rows: [[.inline([.text("A", [], nil)])], [.inline([.text("<br>", [], nil)])]])])
         let sticker = try #require(NodeSeekStickerLibrary.urlsByToken["xhj003"])
         #expect(try parse("@男朋友 :xhj003:") == [.paragraph([.text("@男朋友", [], URL(string: "/member?t=%E7%94%B7%E6%9C%8B%E5%8F%8B", relativeTo: NodeSeekSite.baseURL)?.absoluteURL), .text(" ", [], nil), .sticker(token: ":xhj003:", url: sticker)])])
     }

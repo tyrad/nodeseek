@@ -112,6 +112,7 @@ final class DetailMarkdownPrototypeController: UIViewController, UIScrollViewDel
         case .native(let blocks):
             stack.append(blocks, to: stack, width: width)
         case .webpage(let blocks):
+            stack.appendMarkdownFallbackNotice(for: request.source)
             copyText = copyText ?? CommentCopyTextFormatter.plainText(from: blocks, includingStickerCodes: true)
             stack.appendLegacy(blocks, to: stack, width: width)
         }

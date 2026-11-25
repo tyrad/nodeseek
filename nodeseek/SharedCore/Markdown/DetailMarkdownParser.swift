@@ -1,4 +1,5 @@
 import Foundation
+import Kanna
 import Markdown
 
 nonisolated struct DetailMarkdownParser: Sendable {
@@ -14,7 +15,7 @@ nonisolated struct DetailMarkdownParser: Sendable {
 
     func render(_ source: DetailFloorSource) -> DetailDocumentResult {
         guard let markdown = source.visibleMarkdown, !markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              let blocks = try? withFuzzyLinks(from: source.html).parseContainers(markdown), !blocks.isEmpty else { return .webpage(html: source.html) }
+              let blocks = try? withFuzzyLinks(from: source.html).parseContainers(markdown, html: source.html), !blocks.isEmpty else { return .webpage(html: source.html) }
         return .native(DetailDocument(blocks: blocks))
     }
 
@@ -38,7 +39,8 @@ nonisolated struct DetailMarkdownParser: Sendable {
     }
 
     // 仅在独立行识别站点容器。围栏内的冒号（包括与结束符相同的整行）属于代码。
-    private func parseContainers(_ markdown: String) throws -> [Block] {
+    // 容器外出现站点未识别的 ::: 行（例如外部博客搬运的 :::note）时，以网页正文是否原样保留为依据决定按普通文字解析还是回退网页。
+    private func parseContainers(_ markdown: String, html: String) throws -> [Block] {
         guard markdown.contains(":::") else { return try ordinary(markdown) }
         let lines = markdown.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
         var result: [Block] = []
@@ -46,6 +48,7 @@ nonisolated struct DetailMarkdownParser: Sendable {
         var tabs: [DetailDocument.Tab]?
         var title: String?
         var fence: (Character, Int)?
+        var plainHTMLText: String?
         for line in lines {
             let marker = line.trimmingCharacters(in: .whitespaces)
             let indent = line.prefix(while: { $0 == " " }).count
@@ -67,22 +70,57 @@ nonisolated struct DetailMarkdownParser: Sendable {
             case _ where marker.hasPrefix("::: tab-item ") && tabs != nil && title == nil:
                 guard buffer.allSatisfy({ $0.trimmingCharacters(in: .whitespaces).isEmpty }) else { throw ParseError.unsupported }
                 title = String(marker.dropFirst("::: tab-item ".count))
-            case ":::":
+            case ":::" where title != nil:
                 guard let currentTitle = title else { throw ParseError.unsupported }
                 tabs?.append(.init(title: currentTitle, blocks: try ordinary(buffer.joined(separator: "\n"))))
                 title = nil
-            case "::::" where title == nil:
+            case "::::" where tabs != nil && title == nil:
                 guard let complete = tabs, !complete.isEmpty,
                       buffer.allSatisfy({ $0.trimmingCharacters(in: .whitespaces).isEmpty }) else { throw ParseError.unsupported }
                 result.append(.tabs(complete))
                 tabs = nil
             default:
-                throw ParseError.unsupported
+                guard tabs == nil, isLiteralContainerLine(marker, in: html, cachedPlainText: &plainHTMLText) else { throw ParseError.unsupported }
+                buffer.append(line)
+                continue
             }
             buffer.removeAll(keepingCapacity: true)
         }
         guard tabs == nil else { throw ParseError.unsupported }
         return result + (try ordinary(buffer.joined(separator: "\n")))
+    }
+
+    /// 网页未把该 `:::` 行当作容器消费时，其非代码正文里会保留开头的字面标记。
+    private func isLiteralContainerLine(_ marker: String, in html: String, cachedPlainText: inout String?) -> Bool {
+        if html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        let plainText: String
+        if let cached = cachedPlainText {
+            plainText = cached
+        } else {
+            let extracted = Self.nonCodeText(from: html)
+            cachedPlainText = extracted
+            plainText = extracted
+        }
+        return plainText.contains(Self.containerLiteralPrefix(of: marker))
+    }
+
+    private static func nonCodeText(from html: String) -> String {
+        guard let document = try? HTML(html: "<body>\(html)</body>", encoding: .utf8),
+              let body = document.body else { return "" }
+        for element in body.xpath(".//pre | .//code | .//script | .//style").reversed() {
+            element.parent?.removeChild(element)
+        }
+        return body.text ?? ""
+    }
+
+    /// 提取连续冒号及紧随其后的容器名（如 `:::note[关于协议]` → `:::note`），避免行内样式或实体转义影响比对。
+    private static func containerLiteralPrefix(of marker: String) -> String {
+        let colons = marker.prefix(while: { $0 == ":" })
+        let afterColons = marker.dropFirst(colons.count)
+        let spaces = afterColons.prefix(while: { $0 == " " || $0 == "\t" })
+        let rest = afterColons.dropFirst(spaces.count)
+        let name = rest.prefix(while: { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" })
+        return name.isEmpty ? String(colons) : String(colons) + String(spaces) + String(name)
     }
 
     private func ordinary(_ markdown: String) throws -> [Block] {
@@ -105,15 +143,7 @@ nonisolated struct DetailMarkdownParser: Sendable {
             return [.list(start: (node as? OrderedList).map { Int($0.startIndex) }, items: items)]
         case let table as Table:
             let rows = [table.head as Markup] + Array(table.body.children)
-            return [.table(rows: try rows.map { row in
-                try row.children.map { cell in
-                    let runs = try inlineOnly(cell)
-                    if runs.contains(where: { if case .sticker = $0 { true } else { false } }), runs.count > 1 {
-                        throw ParseError.unsupported
-                    }
-                    return runs
-                }
-            })]
+            return [.table(rows: try rows.map { try $0.children.map(tableCell) })]
         case let code as CodeBlock:
             return code.language?.lowercased() == "ansi" ? [.terminal(code.code)] : [.code(language: code.language, text: code.code)]
         case let html as HTMLBlock:
@@ -128,6 +158,19 @@ nonisolated struct DetailMarkdownParser: Sendable {
     nonisolated private enum Piece {
         case inline(Inline)
         case block(Block)
+    }
+
+    private func tableCell(_ cell: Markup) throws -> DetailDocument.TableCell {
+        let content = try inlineChildren(cell).flatMap { try pieces($0) }
+        if content.count == 1, case .block(.image(_, let url)) = content[0] {
+            return .image(url)
+        }
+        let runs = try content.map { piece in
+            guard case .inline(let run) = piece else { throw ParseError.unsupported }
+            if case .sticker = run, content.count > 1 { throw ParseError.unsupported }
+            return run
+        }
+        return .inline(runs)
     }
 
     private func inlineOnly(_ parent: Markup) throws -> [Inline] {

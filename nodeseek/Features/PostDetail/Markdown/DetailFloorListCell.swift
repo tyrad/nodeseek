@@ -570,6 +570,9 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
             onNative?(blocks)
             body.append(blocks, to: body, width: delivered.appearance.width)
         case .webpage(let blocks):
+            #if DEBUG
+            body.appendMarkdownFallbackNotice(for: delivered.source)
+            #endif
             body.appendLegacy(blocks, to: body, width: delivered.appearance.width)
             copyText = copyText ?? CommentCopyTextFormatter.plainText(from: blocks, includingStickerCodes: true)
         }

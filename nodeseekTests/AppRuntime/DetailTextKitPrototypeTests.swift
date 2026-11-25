@@ -73,6 +73,18 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         XCTAssertEqual(images.first?.accessibilityLabel, "甲")
     }
 
+    func testNativeTableInstallsBothImageCellsAlongsideTextKitBody() async throws {
+        let source = DetailFloorSource(html: "", visibleMarkdown: "正文\n|甲|乙|\n|---|---|\n|![a](/a.jpg)|![b](/b.jpg)|")
+        let page = DetailMarkdownPrototypeController(id: "86", source: source)
+        let window = try host(page)
+        defer { window.isHidden = true }
+        try await waitFor { page.installedRequest != nil }
+        XCTAssertEqual(descendants(page.view, DetailSelectableTextView.self).map { $0.snapshot.string }, ["正文"])
+        let table = try XCTUnwrap(descendants(page.view, DetailTableScrollView.self).first)
+        let images = descendants(table, UIImageView.self).compactMap { ($0 as? DetailPhotoThumbnailSource)?.detailPhotoThumbnailURL?.path }
+        XCTAssertEqual(images, ["/a.jpg", "/b.jpg"])
+    }
+
     func testRepeatedImageOpensAtTheTappedPosition() async throws {
         // 同楼重复使用同一张图（A、B、A），点第三张要从第三张打开，不能回到第一张。
         let a = URL(string: "https://example.invalid/a.png")!
