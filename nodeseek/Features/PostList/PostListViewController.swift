@@ -866,3 +866,5 @@ private final class PostListTopSearchGradientView: UIView {
         updateColors()
     }
 }
+
+extension PostListViewController: HidesOuterNavigationBar {}

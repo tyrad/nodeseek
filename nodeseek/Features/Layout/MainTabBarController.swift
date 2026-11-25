@@ -10,6 +10,9 @@ protocol TabReselectHandling: AnyObject {
     func handleTabReselect()
 }
 
+/// 自己绘制顶部栏、需要隐藏外层导航条的 Tab 根页面，例如首页和搜一搜。
+protocol HidesOuterNavigationBar: AnyObject {}
+
 /// 多 Tab 模式的根界面：默认首页 / 通知 / 我的，用户可在设置里增减中间的入口。
 /// 本身放在外层导航栈里：进入二级页面时连同底栏一起被推走，不用 hidesBottomBarWhenPushed 单独收起底栏。
 final class MainTabBarController: UITabBarController, UITabBarControllerDelegate {
@@ -89,6 +92,7 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         guard let index = tabItems.firstIndex(of: item) else { return }
         selectedIndex = index
         syncNavigationItemWithSelectedTab()
+        syncNavigationBarVisibility()
     }
 
     func applyNotificationUnreadCount(_ unreadCount: NodeSeekNotificationUnreadCount) {
@@ -135,6 +139,7 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
             selectedIndex = index
         }
         syncNavigationItemWithSelectedTab()
+        syncNavigationBarVisibility()
         if let latestUnreadCount {
             applyNotificationUnreadCount(latestUnreadCount)
         }
@@ -153,6 +158,16 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
 
     func tabBarController(_ tabBarController: UITabBarController, didSelect viewController: UIViewController) {
         syncNavigationItemWithSelectedTab()
+        syncNavigationBarVisibility()
+    }
+
+    /// 切 Tab 时新页面的 viewWillAppear 先于旧页面的 viewWillDisappear 执行，
+    /// 首页和搜一搜各自显隐导航条会被另一页覆盖，切换完成后按选中页统一设置一次。
+    private func syncNavigationBarVisibility() {
+        guard let navigationController, navigationController.topViewController === self else { return }
+        let hidden = selectedViewController is HidesOuterNavigationBar
+        guard navigationController.isNavigationBarHidden != hidden else { return }
+        navigationController.setNavigationBarHidden(hidden, animated: false)
     }
 
     // MARK: - Private

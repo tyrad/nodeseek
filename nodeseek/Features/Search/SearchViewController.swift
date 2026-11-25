@@ -1000,3 +1000,5 @@ private enum SearchLoadError: LocalizedError {
         }
     }
 }
+
+extension SearchViewController: HidesOuterNavigationBar {}
