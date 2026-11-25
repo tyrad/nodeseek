@@ -23,6 +23,32 @@ enum WhatsNewModule {
     /// ])
     /// ```
     static let catalog: [WhatsNew] = [
+        release("1.5.0", features: [
+            feature(
+                systemName: "person.2.fill",
+                tint: .systemBlue,
+                title: localized("accounts.title"),
+                subtitle: localized("accounts.subtitle")
+            ),
+            feature(
+                systemName: "flame.fill",
+                tint: .systemOrange,
+                title: localized("hotList.title"),
+                subtitle: localized("hotList.subtitle")
+            ),
+            feature(
+                systemName: "bubble.left.and.bubble.right.fill",
+                tint: .systemIndigo,
+                title: localized("conversation.title"),
+                subtitle: localized("conversation.subtitle")
+            ),
+            feature(
+                systemName: "person.crop.circle.fill",
+                tint: .systemPink,
+                title: localized("profile.title"),
+                subtitle: localized("profile.subtitle")
+            )
+        ]),
         release("1.4.0", features: [
             feature(
                 systemName: "envelope.fill",
@@ -137,6 +163,10 @@ enum WhatsNewModule {
         ])
     ]
 
+    private static func localized(_ key: String) -> String {
+        NSLocalizedString(key, tableName: "WhatsNew", comment: "")
+    }
+
     static var hasContent: Bool { !catalog.isEmpty }
 
     /// 取不高于当前版本的最新一条介绍，未展示过时返回，否则返回 nil。
@@ -179,10 +209,10 @@ enum WhatsNewModule {
     static func release(_ version: WhatsNew.Version, features: [WhatsNew.Feature]) -> WhatsNew {
         WhatsNew(
             version: version,
-            title: "NS Connect\n新功能",
+            title: .init(text: .init(localized("release.title"))),
             features: features,
             primaryAction: WhatsNew.PrimaryAction(
-                title: "继续",
+                title: .init(localized("release.continue")),
                 // 跟随 App 黑白主题，按钮用文字色反色
                 backgroundColor: .primary,
                 foregroundColor: Color(.systemBackground)
