@@ -36,6 +36,8 @@ jobs:
     name: Build and upload TestFlight
     runs-on: xcode-27
     environment: app-store
+    outputs:
+      version: ${{ steps.release.outputs.version }}
 
     steps:
       - name: Checkout
@@ -263,11 +265,9 @@ jobs:
           fi
 
           gh release create "${release_tag}" \
-              --target "${GITHUB_SHA}" \
-              --title "${release_title}" \
-              --notes-file "${release_notes}"
-
-          gh release upload "${release_tag}" \
+            --target "${GITHUB_SHA}" \
+            --title "${release_title}" \
+            --notes-file "${release_notes}" \
             build/nodeseek.ipa \
             build/*.dSYM.zip \
             build/build-provenance.json
@@ -298,3 +298,17 @@ jobs:
           name: dSYM
           path: build/*.dSYM.zip
           if-no-files-found: warn
+
+  supersede-old-builds:
+    needs: testflight
+    runs-on: ubuntu-latest
+    concurrency:
+      group: supersede-ios-builds-${{ needs.testflight.outputs.version }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      - name: Mark older builds of the same version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.testflight.outputs.version }}
+        run: ruby scripts/supersede-ios-releases.rb

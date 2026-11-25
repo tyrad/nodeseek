@@ -39,7 +39,7 @@ class ReleaseNotesGeneratorTest < Minitest::Test
     end
   end
 
-  def test_finds_nearest_build_or_release_tag_regardless_of_type
+  def test_rebuild_uses_highest_reachable_lower_version
     with_temp_repo do |dir|
       create_commit(dir, "a.txt", "1", "feat(init): 初始化")
       git(dir, "tag", "ios/v1.3.1")
@@ -50,10 +50,13 @@ class ReleaseNotesGeneratorTest < Minitest::Test
 
       head = create_commit(dir, "a.txt", "3", "feat(hot-list): 新增热榜页")
 
-      # 无论正式 tag 还是 workflow_dispatch，都统一对比最近的任意打包 tag
+      %w[ios/v1.5 ios/v1.5.0-build.1 ios/v1.6.0-build.2 ios/v1.3.9-build.3].each do |tag|
+        git(dir, "tag", tag)
+      end
       prev = ReleaseNotesGenerator.find_previous_tag(
         repo_dir: dir,
         commit: head,
+        version: "1.5.0",
         exclude_tags: ["ios/v1.5.0", "ios/v1.5.0-build.20261125050000"]
       )
       assert_equal "ios/v1.4.2-build.20261119064405", prev
@@ -70,6 +73,7 @@ class ReleaseNotesGeneratorTest < Minitest::Test
       prev = ReleaseNotesGenerator.find_previous_tag(
         repo_dir: dir,
         commit: head,
+        version: "1.3.2",
         exclude_tags: ["ios/v1.3.2-build.20261112000000"]
       )
       assert_equal "ios/v1.3.1-build.20261111185129", prev
@@ -79,13 +83,13 @@ class ReleaseNotesGeneratorTest < Minitest::Test
   def test_prefers_latest_build_when_multiple_builds_share_commit
     with_temp_repo do |dir|
       sha = create_commit(dir, "a.txt", "1", "feat(init): 初始化")
-      git(dir, "tag", "ios/v1.4.0-build.20261117233815")
+      git(dir, "tag", "ios/v1.4.1-build.20261117233815")
       git(dir, "tag", "ios/v1.4.1-build.20261117235621")
 
       prev = ReleaseNotesGenerator.find_previous_tag(
         repo_dir: dir,
         commit: sha,
-        exclude_tags: ["ios/v1.4.1-build.20261118000000"]
+        version: "1.4.2"
       )
       assert_equal "ios/v1.4.1-build.20261117235621", prev
     end
@@ -138,6 +142,7 @@ class ReleaseNotesGeneratorTest < Minitest::Test
       git(dir, "tag", "ios/v1.4.2-build.20261119064405")
 
       create_commit(dir, "b.txt", "1", "feat(hot-list): 新增热榜页")
+      git(dir, "tag", "ios/v1.5.0-build.100")
       create_commit(dir, "c.txt", "1", "fix(hot-list): 修复热榜设置页箭头缺失")
       head = create_commit(dir, "d.txt", "1", "docs(hot-list): 记录热榜方案")
 
@@ -346,7 +351,7 @@ class ReleaseNotesGeneratorTest < Minitest::Test
     assert_operator prompt.length, :<, ReleaseNotesGenerator::MAX_AI_INPUT_CHARS + 500
   end
 
-  def test_same_commit_rebuild_shows_no_new_commits_message
+  def test_first_version_rebuild_keeps_all_features
     with_temp_repo do |dir|
       sha = create_commit(dir, "a.txt", "1", "feat(init): 初始化")
       git(dir, "tag", "ios/v1.4.2-build.20261119064405")
@@ -361,7 +366,8 @@ class ReleaseNotesGeneratorTest < Minitest::Test
         repository: "tyrad/nodeseek"
       )
 
-      assert_includes notes, "与上一版本（`ios/v1.4.2-build.20261119064405`）代码一致，无新增提交。"
+      assert_includes notes, "- Previous tag: none"
+      assert_includes notes, "初始化"
       refute_includes notes, "<details>"
     end
   end

@@ -8,7 +8,7 @@ require "optparse"
 require "uri"
 
 # 根据 Git 历史生成 GitHub Release 说明：
-# - 统一以当前提交可达的最近一次打包/发布 tag 为对比基线，不区分预发布与正式版
+# - 以当前提交可达的上一版本最后一个构建为基线，同版本重复打包仍生成完整更新说明
 # - 配置 API Key 时（默认 DeepSeek OpenAI 兼容接口），自动合并未上线功能迭代与开发期修复，并剔除已撤回的中间过程
 # - 原始提交（含工程与文档类）统一折叠保留；未配置 Key 或调用失败时自动降级为规则分组，不阻塞打包
 module ReleaseNotesGenerator
@@ -62,71 +62,23 @@ module ReleaseNotesGenerator
     stdout
   end
 
-  def parse_tag_sort_key(tag_name)
-    match = RELEASE_TAG_PATTERN.match(tag_name)
-    return nil unless match
+  def find_previous_tag(repo_dir:, commit:, version:, exclude_tags: [])
+    current_version = Gem::Version.new(version)
+    tags = run_git(repo_dir, "tag", "--merged", commit, "--list", "ios/v*")
 
-    version_parts = match[1].split(".").map(&:to_i)
-    version_parts << 0 while version_parts.length < 3
-    build_str = match[2]
-    has_build = build_str ? 1 : 0
-    build_num = build_str ? build_str.to_i : 0
+    candidates = tags.lines.map do |line|
+      tag = line.chomp
+      match = RELEASE_TAG_PATTERN.match(tag)
+      next unless match && !exclude_tags.include?(tag)
 
-    [has_build, build_num, version_parts, tag_name]
-  end
+      tag_version = Gem::Version.new(match[1])
+      next unless tag_version < current_version
 
-  # 查找当前提交可达的最近一次打包/发布 tag（按拓扑提交距离最近优先）
-  def find_previous_tag(repo_dir:, commit:, exclude_tags: [])
-    excluded = exclude_tags.compact.reject(&:empty?)
-    output = run_git(
-      repo_dir,
-      "for-each-ref",
-      "--merged=#{commit}",
-      "--format=%(refname:short)%09%(if)%(*objectname)%(then)%(*objectname)%(else)%(objectname)%(end)",
-      "refs/tags/ios/v*"
-    )
-
-    candidates = []
-    output.each_line do |line|
-      tag_name, target_sha = line.strip.split("\t", 2)
-      next if tag_name.nil? || tag_name.empty? || target_sha.nil? || target_sha.empty?
-      next if excluded.include?(tag_name)
-
-      sort_key = parse_tag_sort_key(tag_name)
-      next unless sort_key
-
-      candidates << { name: tag_name, sha: target_sha, sort_key: sort_key }
+      # 同一版本优先取最大构建号；只有裸版本标签时也能作为基线。
+      [tag_version, match[2] ? match[2].to_i : -1, tag]
     end
 
-    return nil if candidates.empty?
-
-    distance_by_sha = {}
-    candidates.each do |candidate|
-      sha = candidate[:sha]
-      next if distance_by_sha.key?(sha)
-
-      count_str = run_git(repo_dir, "rev-list", "--count", "#{sha}..#{commit}").strip
-      distance_by_sha[sha] = count_str.to_i
-    end
-
-    best = candidates.min_by do |candidate|
-      has_build, build_num, version_parts, _tag_name = candidate[:sort_key]
-      [
-        distance_by_sha[candidate[:sha]],
-        -has_build,
-        -build_num,
-        -version_parts[0],
-        -version_parts[1],
-        -version_parts[2]
-      ]
-    end
-
-    # 当两个 tag 指向同一提交且版本号与构建号完全相同时，按字典序倒序保证稳定
-    same_tier = candidates.select do |candidate|
-      distance_by_sha[candidate[:sha]] == distance_by_sha[best[:sha]] &&
-        candidate[:sort_key][0..2] == best[:sort_key][0..2]
-    end
-    same_tier.max_by { |candidate| candidate[:name] }[:name]
+    candidates.compact.max&.last
   end
 
   def list_commits(repo_dir:, commit:, previous_tag:)
@@ -255,7 +207,7 @@ module ReleaseNotesGenerator
 
     header = []
     header << "当前发布版本：v#{version}"
-    header << "上一打包基线：#{previous_tag || '无（首次发布）'}"
+    header << "上一版本基线：#{previous_tag || '无（首次发布）'}"
     header << "提交记录（已过滤纯测试/文档/构建提交，按时间从早到晚排列#{omitted > 0 ? "，过早的 #{omitted} 条已截断" : ""}）："
     "#{header.join("\n")}\n\n#{joined}"
   end
@@ -425,6 +377,7 @@ module ReleaseNotesGenerator
     previous_tag = find_previous_tag(
       repo_dir: repo_dir,
       commit: commit,
+      version: version,
       exclude_tags: exclude_tags + [release_tag]
     )
     commits = list_commits(repo_dir: repo_dir, commit: commit, previous_tag: previous_tag)
