@@ -275,6 +275,17 @@ class PostDetailViewController: UIViewController {
 
     private(set) lazy var collectionList = PostDetailCollectionList(page: self)
     var detailScrollView: UIScrollView { collectionList.view }
+    /// 竖排栏时代替底部评论栏的入口，由系统排进侧栏。
+    private(set) lazy var verticalReplyBarItem: UIBarButtonItem = {
+        // 图标和标题都给：竖排用图标，溢出菜单用标题。
+        let item = UIBarButtonItem(
+            title: "写评论",
+            image: UIImage(systemName: "text.bubble"),
+            primaryAction: UIAction { [weak self] _ in self?.replyButtonTapped() }
+        )
+        item.accessibilityIdentifier = "post-detail-vertical-reply-item"
+        return item
+    }()
     var toastHideWorkItem: DispatchWorkItem?
     lazy var toastIconWidthConstraint = toastIconView.widthAnchor.constraint(equalToConstant: 18)
     lazy var toastLabelLeadingConstraint = toastLabel.leadingAnchor.constraint(equalTo: toastIconView.trailingAnchor, constant: 8)
@@ -611,6 +622,13 @@ class PostDetailViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         configureNavigationItems()
+        if #available(iOS 27.1, *) {
+            // iPhone Duo 开合或旋转时竖排状态会变，作者标题要跟着挂上或撤下。
+            registerForTraitChanges(UITraitCollection.systemTraitsAffectingVerticalBarEdge) { (self: Self, _) in
+                self.updateNavigationTitleViewPlacement()
+                self.updateReplyButtonVisibility()
+            }
+        }
         setupUI()
         presenter.viewDidLoad()
     }
@@ -632,9 +650,23 @@ class PostDetailViewController: UIViewController {
         updateTableContentInsets()
     }
 
+    /// 系统把导航栏、Tab 栏竖排在侧边（iPhone Duo 外屏等）。
+    var usesVerticalBar: Bool {
+        guard #available(iOS 27.1, *) else { return false }
+        return traitCollection.verticalBarEdge != .unspecified
+    }
+
+    /// 导航栏竖排时，自定义 titleView 会让系统在顶部额外保留一条横向导航栏，
+    /// 正文上方空出一大块；此时不挂作者标题。
+    func updateNavigationTitleViewPlacement() {
+        let titleView: UIView? = usesVerticalBar ? nil : navigationAuthorTitleView
+        guard navigationItem.titleView !== titleView else { return }
+        navigationItem.titleView = titleView
+    }
+
     func configureNavigationItems() {
         title = nil
-        navigationItem.titleView = navigationAuthorTitleView
+        updateNavigationTitleViewPlacement()
         navigationAuthorTitleView.setVisible(false, animated: false)
         if let currentHeaderContent {
             configureNavigationAuthorTitle(with: currentHeaderContent)
@@ -688,6 +720,7 @@ class PostDetailViewController: UIViewController {
         moreButton?.accessibilityLabel = "更多"
 
         navigationItem.rightBarButtonItems = [moreButton, browserButton].compactMap { $0 }
+        updateVerticalReplyBarItem(visible: false)
     }
 
     func updateTableContentInsets() {
@@ -738,8 +771,9 @@ class PostDetailViewController: UIViewController {
         self.replyContextBarHeightConstraint = replyContextBarHeightConstraint
         self.replyStickerPickerHeightConstraint = replyStickerPickerHeightConstraint
         NSLayoutConstraint.activate([
-            detailScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            detailScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            // 左右贴安全区：iPhone Duo 外屏导航栏竖排在侧边，横屏刘海同理，正文不能钻到下面。
+            detailScrollView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            detailScrollView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
             detailScrollView.topAnchor.constraint(equalTo: view.topAnchor),
             detailScrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 

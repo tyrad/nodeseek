@@ -28,6 +28,15 @@
 - 如果系统颜色无法满足设计需要，应优先在 Assets 中定义支持 Light/Dark variants 的自定义颜色，再在代码中引用。
 - 新版本功能介绍页的内容与样式约束见 `docs/project-overview.md` 的「8. 新功能介绍页」。
 
+### iPhone Duo 适配
+
+新增或修改页面时，至少做第 1、4 步。改到操作入口或手动计算宽度的布局时，再做对应步骤。
+
+1. **把内容放进可用区域。** 在页面根视图上，将列表或正文容器的 `leadingAnchor`、`trailingAnchor` 分别约束到 `view.safeAreaLayoutGuide` 的同名边缘。子视图沿容器排版即可。独立覆盖在页面上的空态、悬浮按钮和编辑器也要对齐安全区，背景可以铺满。侧栏在哪一边、占多宽都交给系统计算。
+2. **有底部主操作时，明确竖栏和横栏各从哪里进入。** 以「写评论」为例：竖栏时收起底部评论栏，把带图标和本地化标题的 `UIBarButtonItem` 放入 `navigationItem`，点击后打开原编辑器；恢复横栏时移除该按钮，恢复底部入口。iOS 27.1+ 用 `traitCollection.verticalBarEdge != .unspecified` 判断竖栏，旧系统走原布局。页面首次加载时更新一次，再用 `registerForTraitChanges(UITraitCollection.systemTraitsAffectingVerticalBarEdge)` 监听变化并调用同一更新方法。可参照首页的 [applyComposeEntryPlacement()](nodeseek/Features/PostList/PostListViewController.swift)。
+3. **手算宽度时，量实际显示内容的视图。** 例如楼层预览取列表布局后的 `bounds.width`。开合、旋转或分屏导致宽度变化时，用新宽度重新测量文本，并更新依赖旧宽度的缓存。宽屏长文可用 `readableContentGuide` 控制行长；半折叠时，自定义浮层还要避开系统保留区域。
+4. **在模拟器上走一遍改过的路径。** 先在普通 iPhone 打开页面，再在 Duo 外屏打开同一页，检查正文两端、空态和主要按钮是否完整可见，实际点一次主要操作。改了入口或阅读布局，就停在当前页展开再合上，确认入口每次只有一个、仍能点，帖子和阅读位置保留。改了编辑器，就从页面入口输入几个字，确认软件键盘弹出后仍看得到输入文字和提交按钮，开合后草稿仍在。未实测的状态在交付时列明。设备操作见 [Duo 模拟器说明](docs/plans/iphone-duo-adaptation.md)。
+
 ### 键盘与输入
 - 新增或修改输入页面时，明确键盘出现后的可见区域、输入框切换、提交与收起方式；必要时使用 keyboardLayoutGuide，避免键盘遮挡当前输入和主要操作。
 - 点击空白收起键盘应由页面主动接入 KeyboardDismissCoordinator，显式指定背景白名单；仅背景本身响应，不自动包含子视图。禁止向 Window 全局安装收起手势。

@@ -198,7 +198,7 @@ extension PostDetailViewController {
 
     /// 楼层预览按回复楼层的正文宽度排版。
     var availableCommentContentWidth: CGFloat {
-        let width = view.bounds.width
+        let width = detailScrollView.bounds.width > 0 ? detailScrollView.bounds.width : view.bounds.width
         let contentWidth = (width > 0 ? width : 320)
             - PostDetailContentLayout.horizontalInset * 2
             - PostDetailContentLayout.avatarSize

@@ -63,6 +63,11 @@ class PostListViewController: UIViewController {
     var isSortToggleExpanded = false
     private var composeLoginCheckTask: Task<Void, Never>?
     private var isComposeButtonHidden = false
+    /// iPhone Duo 外屏等竖排栏场景下，发帖入口改放进系统侧栏。
+    private var usesVerticalBar: Bool {
+        guard #available(iOS 27.1, *) else { return false }
+        return traitCollection.verticalBarEdge != .unspecified
+    }
     /// 本次拖动中上一次切换发帖按钮时的手指位置。
     private var composeDragAnchorY: CGFloat?
     let sideMenuViewController: PostListSideMenuViewController
@@ -278,7 +283,7 @@ class PostListViewController: UIViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        navigationController?.setNavigationBarHidden(true, animated: animated)
+        navigationController?.setNavigationBarHidden(!showsComposeInNavigationBar, animated: animated)
         refreshAppearanceForCurrentTraits()
         applySearchEntryVisibility(animated: false)
         applySortToggleVisibility()
@@ -430,6 +435,12 @@ class PostListViewController: UIViewController {
         case .tabs:
             tabScrollView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12).isActive = true
             installComposeButton()
+            if #available(iOS 27.1, *) {
+                registerForTraitChanges(UITraitCollection.systemTraitsAffectingVerticalBarEdge) { (self: Self, _) in
+                    self.applyComposeEntryPlacement()
+                }
+            }
+            applyComposeEntryPlacement()
         }
         observeSearchEntrySettings()
         observeNotificationReadState()
@@ -709,6 +720,33 @@ class PostListViewController: UIViewController {
         ])
         pageContainerViewController.onListScroll = { [weak self] scrollView in
             self?.handleListScroll(scrollView)
+        }
+    }
+
+    private var showsComposeInNavigationBar: Bool {
+        layout == .tabs && usesVerticalBar
+    }
+
+    /// 竖排栏时首页导航栏只承载发帖按钮，系统会把它排进侧栏，不占顶部空间；悬浮按钮随之隐藏。
+    private func applyComposeEntryPlacement() {
+        let inBar = showsComposeInNavigationBar
+        composeButton.isHidden = inBar
+        if inBar {
+            if navigationItem.rightBarButtonItem == nil {
+                // 图标和标题都给：竖排用图标，溢出菜单用标题。
+                let item = UIBarButtonItem(
+                    title: "发帖",
+                    image: UIImage(systemName: "square.and.pencil"),
+                    primaryAction: UIAction { [weak self] _ in self?.composeButtonTapped() }
+                )
+                item.accessibilityIdentifier = "post-list-compose-bar-item"
+                navigationItem.rightBarButtonItem = item
+            }
+        } else {
+            navigationItem.rightBarButtonItem = nil
+        }
+        if isHomeVisible || viewIfLoaded?.window != nil {
+            navigationController?.setNavigationBarHidden(!inBar, animated: false)
         }
     }
 

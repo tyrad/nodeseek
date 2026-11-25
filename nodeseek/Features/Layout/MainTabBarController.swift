@@ -59,6 +59,12 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         // 黑白主题：选中用文字色，未选中用次级文字色
         tabBar.tintColor = .label
         tabBar.unselectedItemTintColor = .secondaryLabel
+        applyVerticalTabBarTint()
+        if #available(iOS 27.1, *) {
+            registerForTraitChanges(UITraitCollection.systemTraitsAffectingVerticalBarEdge) { (self: Self, _) in
+                self.applyVerticalTabBarTint()
+            }
+        }
         observeNotificationUnreadCount()
         NotificationCenter.default.addObserver(
             self, selector: #selector(applyMailUnreadCount),
@@ -70,6 +76,16 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         )
         SeekMailUnreadMonitor.shared.start()
         applyMailUnreadCount()
+    }
+
+    /// 竖排 Tab 栏（iPhone Duo 外屏等）不认 tabBar.tintColor，选中项会变成默认蓝色，只能从根视图继承。
+    /// 根视图着色会传给各页面默认着色的控件，所以只在竖排时设置。
+    private func applyVerticalTabBarTint() {
+        var usesVerticalBar = false
+        if #available(iOS 27.1, *) {
+            usesVerticalBar = traitCollection.verticalBarEdge != .unspecified
+        }
+        view.tintColor = usesVerticalBar ? .label : nil
     }
 
     @objc private func mailBadgeSettingChanged() {

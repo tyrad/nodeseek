@@ -75,7 +75,10 @@ extension PostDetailViewController {
     }
 
     func updateReplyButtonVisibility() {
-        let isHidden = showsReplyEntry == false || displayMode != .content || replyEditorContainer.isHidden == false
+        let isEntryHidden = showsReplyEntry == false || displayMode != .content || replyEditorContainer.isHidden == false
+        // 竖排栏时（iPhone Duo 外屏等）评论入口改放进系统侧栏，底部评论栏不再占用本就不高的屏幕。
+        let isHidden = isEntryHidden || usesVerticalBar
+        updateVerticalReplyBarItem(visible: isEntryHidden == false && usesVerticalBar)
         replyButton.isHidden = isHidden
         replyBarView.isHidden = isHidden
         replyBarFadeView.isHidden = isHidden || replyBarFadeView.isEnabled == false
@@ -85,6 +88,21 @@ extension PostDetailViewController {
         }
         updateReplyBarDraftPreview()
         view.setNeedsLayout()
+    }
+
+    func updateVerticalReplyBarItem(visible: Bool) {
+        var items = navigationItem.rightBarButtonItems ?? []
+        let index = items.firstIndex { $0 === verticalReplyBarItem }
+        switch (visible, index) {
+        case (true, nil):
+            // rightBarButtonItems 首项竖排时在最下方，靠近拇指。
+            items.insert(verticalReplyBarItem, at: 0)
+        case (false, let index?):
+            items.remove(at: index)
+        default:
+            return
+        }
+        navigationItem.rightBarButtonItems = items
     }
 
     /// 收起编辑器后评论栏显示草稿首行，提醒还有未发送的内容。
