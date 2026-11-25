@@ -20,6 +20,8 @@ final class NewDiscussionViewController: UIViewController {
     private let bodyTextView = UITextView()
     private let bodyPlaceholder = UILabel()
     private let feeNoticeLabel = UILabel()
+    /// 提示当前发布账号，配合全局草稿防止切号后误发。
+    private let postingAccountLabel = UILabel()
     /// 保存和上传状态，放在标题分隔线右端，不占工具栏位置。
     private let statusLabel = UILabel()
 
@@ -190,7 +192,37 @@ final class NewDiscussionViewController: UIViewController {
 
         setupBody()
 
-        [feeNoticeLabel, draftBannerContainer, titleTextView, separatorContainer, bodyTextView].forEach(contentStack.addArrangedSubview)
+        postingAccountLabel.font = .preferredFont(forTextStyle: .footnote)
+        postingAccountLabel.adjustsFontForContentSizeCategory = true
+        postingAccountLabel.textColor = .secondaryLabel
+        postingAccountLabel.numberOfLines = 1
+        postingAccountLabel.lineBreakMode = .byTruncatingTail
+        postingAccountLabel.isHidden = true
+        postingAccountLabel.accessibilityIdentifier = "new-discussion-posting-account-label"
+        let postingAccountContainer = UIView()
+        postingAccountLabel.translatesAutoresizingMaskIntoConstraints = false
+        postingAccountContainer.addSubview(postingAccountLabel)
+        NSLayoutConstraint.activate([
+            postingAccountLabel.leadingAnchor.constraint(equalTo: postingAccountContainer.leadingAnchor, constant: 20),
+            postingAccountLabel.trailingAnchor.constraint(equalTo: postingAccountContainer.trailingAnchor, constant: -20),
+            postingAccountLabel.topAnchor.constraint(equalTo: postingAccountContainer.topAnchor),
+            postingAccountLabel.bottomAnchor.constraint(equalTo: postingAccountContainer.bottomAnchor)
+        ])
+        postingAccountContainer.isHidden = true
+        Task { @MainActor [weak self, weak postingAccountContainer] in
+            guard let self, let postingAccountContainer else { return }
+            guard self.titleTextView.isHidden == false else { return }
+            if let account = await CurrentAccountStore.shared.snapshot()?.account,
+               account.isLoggedIn,
+               account.displayName.isEmpty == false {
+                self.postingAccountLabel.text = AccountsL10n.format("将以 %@ 身份发布", account.displayName)
+                self.postingAccountLabel.isHidden = false
+                postingAccountContainer.isHidden = false
+            }
+        }
+
+        [postingAccountContainer, feeNoticeLabel, draftBannerContainer, titleTextView, separatorContainer, bodyTextView].forEach(contentStack.addArrangedSubview)
+        contentStack.setCustomSpacing(4, after: postingAccountContainer)
         contentStack.setCustomSpacing(8, after: feeNoticeLabel)
         contentStack.setCustomSpacing(8, after: draftBannerContainer)
 

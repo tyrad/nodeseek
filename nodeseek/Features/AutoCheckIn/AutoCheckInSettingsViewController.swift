@@ -39,6 +39,11 @@ final class AutoCheckInSettingsViewController: UITableViewController {
         tableView.accessibilityIdentifier = "auto-check-in-settings-table-view"
     }
 
+    private enum EnableRow: Int, CaseIterable {
+        case enabled
+        case allAccounts
+    }
+
     override func numberOfSections(in tableView: UITableView) -> Int {
         Section.allCases.count
     }
@@ -46,7 +51,7 @@ final class AutoCheckInSettingsViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         switch Section(rawValue: section) {
         case .enable:
-            return 1
+            return EnableRow.allCases.count
         case .mode:
             return AutoCheckInMode.allCases.count
         case .none:
@@ -68,7 +73,14 @@ final class AutoCheckInSettingsViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         switch Section(rawValue: indexPath.section) {
         case .enable:
-            return enableCell()
+            switch EnableRow(rawValue: indexPath.row) {
+            case .enabled:
+                return enableCell()
+            case .allAccounts:
+                return allAccountsCell()
+            case .none:
+                return UITableViewCell()
+            }
         case .mode:
             return modeCell(for: indexPath)
         case .none:
@@ -96,6 +108,23 @@ final class AutoCheckInSettingsViewController: UITableViewController {
         return cell
     }
 
+    private func allAccountsCell() -> UITableViewCell {
+        let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+        cell.textLabel?.text = AccountsL10n.text("为全部已保存账号依次签到")
+        cell.textLabel?.numberOfLines = 0
+        cell.detailTextLabel?.text = AccountsL10n.text("按顺序在独立会话中完成签到，不打断当前账号")
+        cell.detailTextLabel?.textColor = .secondaryLabel
+        cell.detailTextLabel?.numberOfLines = 0
+        let toggle = UISwitch()
+        toggle.isOn = settingsStore.settings.checkInAllAccounts
+        toggle.accessibilityIdentifier = "auto-check-in-all-accounts-switch"
+        toggle.addTarget(self, action: #selector(allAccountsSwitchChanged(_:)), for: .valueChanged)
+        cell.accessoryView = toggle
+        cell.selectionStyle = .none
+        cell.accessibilityIdentifier = "auto-check-in-all-accounts-cell"
+        return cell
+    }
+
     private func modeCell(for indexPath: IndexPath) -> UITableViewCell {
         let mode = AutoCheckInMode.allCases[indexPath.row]
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
@@ -111,5 +140,9 @@ final class AutoCheckInSettingsViewController: UITableViewController {
             guard let self else { return }
             await self.onEnabledChanged(sender.isOn, self)
         }
+    }
+
+    @objc private func allAccountsSwitchChanged(_ sender: UISwitch) {
+        settingsStore.setCheckInAllAccounts(sender.isOn)
     }
 }

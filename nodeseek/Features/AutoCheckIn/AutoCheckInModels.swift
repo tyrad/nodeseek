@@ -8,8 +8,26 @@ import Foundation
 struct AutoCheckInSettings: Codable, Equatable, Sendable {
     var isEnabled: Bool
     var mode: AutoCheckInMode
+    var checkInAllAccounts: Bool
 
-    static let `default` = AutoCheckInSettings(isEnabled: false, mode: .fixedChickenLeg)
+    init(
+        isEnabled: Bool,
+        mode: AutoCheckInMode,
+        checkInAllAccounts: Bool = true
+    ) {
+        self.isEnabled = isEnabled
+        self.mode = mode
+        self.checkInAllAccounts = checkInAllAccounts
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
+        mode = try container.decode(AutoCheckInMode.self, forKey: .mode)
+        checkInAllAccounts = try container.decodeIfPresent(Bool.self, forKey: .checkInAllAccounts) ?? true
+    }
+
+    static let `default` = AutoCheckInSettings(isEnabled: false, mode: .fixedChickenLeg, checkInAllAccounts: true)
 }
 
 enum AutoCheckInMode: String, Codable, CaseIterable, Sendable {

@@ -33,7 +33,7 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         applyTabItems(layoutSettings.tabItems)
         observeTabItems()
         NotificationCenter.default.addObserver(
-            self, selector: #selector(accountSessionChanged),
+            self, selector: #selector(accountSessionChanged(_:)),
             name: .nodeSeekAccountSessionDidChange, object: nil
         )
     }
@@ -106,7 +106,11 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         updateTabControllers(items)
     }
 
-    @objc private func accountSessionChanged() {
+    @objc private func accountSessionChanged(_ notification: Notification) {
+        // 整根重建回到首页时旧 Tab 栏即将释放，跳过无意义的二次重建。
+        if notification.userInfo?["replacesRoot"] as? Bool == true {
+            return
+        }
         // 这些页面持有上一会话的列表和在途请求，不能等下次切回时才刷新。
         for item in [MainTabItem.collections, .discussions, .comments, .notification] {
             rootViewControllersByItem.removeValue(forKey: item)

@@ -58,23 +58,6 @@ nonisolated struct UserCollectionRecord: Equatable, Sendable {
     let rank: Int
 }
 
-extension AccountResponse {
-    nonisolated var nodeSeekUID: Int? {
-        guard let profileURL else { return nil }
-        return NodeSeekUserIDResolver.uid(from: profileURL)
-    }
-}
-
-enum NodeSeekUserIDResolver {
-    nonisolated static func uid(from url: URL) -> Int? {
-        let components = url.pathComponents
-        guard let spaceIndex = components.firstIndex(of: "space") else { return nil }
-        let idIndex = components.index(after: spaceIndex)
-        guard idIndex < components.endIndex else { return nil }
-        return Int(components[idIndex])
-    }
-}
-
 enum UserContentPostSummaryFactory {
     nonisolated static func postSummary(id: Int, title: String) -> PostSummary {
         let stringID = "\(id)"

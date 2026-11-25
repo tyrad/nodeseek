@@ -66,6 +66,28 @@ actor CurrentAccountStore {
         sessionID = UUID()
     }
 
+    /// 切换账号时轮换会话标识，拦截切号前发出的在途旧请求回写。
+    @discardableResult
+    func rotateSessionID() -> UUID {
+        let next = UUID()
+        sessionID = next
+        return next
+    }
+
+    /// 切号完成后原子替换当前快照并生成新的会话标识。
+    @discardableResult
+    func replaceSnapshot(_ account: AccountResponse, updatedAt: Date = Date()) -> UUID {
+        let next = UUID()
+        sessionID = next
+        if account.isLoggedIn {
+            userDefaults.removeObject(forKey: Self.pendingLogoutCleanupKey)
+        }
+        let snapshot = Snapshot(account: account, updatedAt: updatedAt)
+        cachedSnapshot = snapshot
+        persist(snapshot)
+        return next
+    }
+
     func clear() {
         cachedSnapshot = nil
         userDefaults.removeObject(forKey: storageKey)

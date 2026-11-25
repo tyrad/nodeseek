@@ -194,6 +194,7 @@ final class LoginWebViewController: BaseWebViewController {
 
     private func saveLoggedInAccount(_ account: AccountResponse) async {
         await CurrentAccountStore.shared.save(account)
+        await AccountsModule.adoptAfterDirectLogin(account: account)
         NotificationCenter.default.post(name: .nodeSeekAccountSessionDidChange, object: nil)
     }
 

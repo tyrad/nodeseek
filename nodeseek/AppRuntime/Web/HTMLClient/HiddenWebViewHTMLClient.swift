@@ -332,6 +332,12 @@ private final class HiddenWebViewPreloadLoader: NSObject, WKNavigationDelegate {
         resumeAllPreloadWaiters()
     }
 
+    func cancelAndReset() {
+        webView?.stopLoading()
+        didPreload = false
+        finishPreload()
+    }
+
     private func isLoading(_ url: URL) -> Bool {
         navigation != nil && activeURL?.absoluteString == url.absoluteString
     }
@@ -368,7 +374,27 @@ final class HiddenWebViewLoader: NSObject, WKNavigationDelegate {
 
     static func releaseLoader(for channel: HiddenWebViewChannel) {
         guard case .isolated(let id) = channel else { return }
-        isolatedLoaders.removeValue(forKey: id)
+        if let loader = isolatedLoaders.removeValue(forKey: id) {
+            loader.invalidateLoadedSession()
+        }
+    }
+
+    /// 切换账号或退出登录时释放所有常驻隐藏 WebView 页面状态与首页预载，防止旧账号 DOM/CSRF 残留。
+    static func invalidateAllSessions() {
+        HiddenWebViewPreloadLoader.shared.cancelAndReset()
+        shared.invalidateLoadedSession()
+        let isolated = Array(isolatedLoaders.values)
+        isolatedLoaders.removeAll()
+        isolated.forEach { $0.invalidateLoadedSession() }
+    }
+
+    private func invalidateLoadedSession() {
+        if let pending = continuation {
+            continuation = nil
+            pending.resume(throwing: CancellationError())
+        }
+        resetForNextRequest()
+        webView.loadHTMLString("", baseURL: nil)
     }
 
     private var loadLogID = "none"

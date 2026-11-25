@@ -128,6 +128,15 @@ final class DefaultAutoCheckInToastPresenter: AutoCheckInToastPresenting {
 @MainActor
 protocol AutoCheckInAccountStatusProviding: AnyObject {
     func isLoggedIn() async -> Bool?
+    func activeUID() async -> Int?
+    func activeDisplayName() async -> String?
+    func sessionID() async -> UUID?
+}
+
+extension AutoCheckInAccountStatusProviding {
+    func activeUID() async -> Int? { nil }
+    func activeDisplayName() async -> String? { nil }
+    func sessionID() async -> UUID? { nil }
 }
 
 @MainActor
@@ -141,6 +150,50 @@ final class CurrentAccountAutoCheckInStatusProvider: AutoCheckInAccountStatusPro
     func isLoggedIn() async -> Bool? {
         await store.snapshot()?.account.isLoggedIn
     }
+
+    func activeUID() async -> Int? {
+        await store.snapshot()?.account.nodeSeekUID
+    }
+
+    func activeDisplayName() async -> String? {
+        await store.snapshot()?.account.displayName
+    }
+
+    func sessionID() async -> UUID? {
+        await store.sessionID
+    }
+}
+
+@MainActor
+protocol AutoCheckInMultiAccountProviding: AnyObject {
+    func otherValidAccounts(excluding activeUID: Int?) -> [SavedAccount]
+    func cookies(forUID uid: Int) -> [HTTPCookie]?
+    func cloudflareCookies() async -> [HTTPCookie]
+    func updateCookies(_ cookies: [HTTPCookie], forUID uid: Int)
+    func markExpired(uid: Int)
+}
+
+@MainActor
+final class DefaultAutoCheckInMultiAccountProvider: AutoCheckInMultiAccountProviding {
+    func otherValidAccounts(excluding activeUID: Int?) -> [SavedAccount] {
+        AccountsModule.otherValidAccountsForAutoCheckIn(excluding: activeUID)
+    }
+
+    func cookies(forUID uid: Int) -> [HTTPCookie]? {
+        AccountsModule.cookiesForAutoCheckIn(uid: uid)
+    }
+
+    func cloudflareCookies() async -> [HTTPCookie] {
+        await AccountsModule.exportCloudflareCookies()
+    }
+
+    func updateCookies(_ cookies: [HTTPCookie], forUID uid: Int) {
+        AccountsModule.updateCookiesAfterIsolatedCheckIn(cookies, forUID: uid)
+    }
+
+    func markExpired(uid: Int) {
+        AccountsModule.markAccountExpiredFromBackground(uid: uid)
+    }
 }
 
 @MainActor
@@ -149,6 +202,7 @@ final class AutoCheckInCoordinator {
     private let stateStore: AutoCheckInStateStore
     private let webAutomator: AutoCheckInWebAutomating
     private let accountStatus: AutoCheckInAccountStatusProviding
+    private let multiAccountProvider: AutoCheckInMultiAccountProviding?
     private let toastPresenter: AutoCheckInToastPresenting
     private let now: () -> Date
     private let dayIdentifierProvider: () -> String
@@ -156,6 +210,7 @@ final class AutoCheckInCoordinator {
     private let challengeCooldownInterval: TimeInterval
     private let failureCooldownInterval: TimeInterval
     private let triggerDelayInterval: TimeInterval
+    private let multiAccountDelayInterval: TimeInterval
     private let delay: @MainActor (TimeInterval) async -> Void
     private var inFlightTask: Task<AutoCheckInRunOutcome, Never>?
     private var activeRunID: String?
@@ -166,6 +221,7 @@ final class AutoCheckInCoordinator {
         stateStore: AutoCheckInStateStore? = nil,
         webAutomator: AutoCheckInWebAutomating? = nil,
         accountStatus: AutoCheckInAccountStatusProviding? = nil,
+        multiAccountProvider: AutoCheckInMultiAccountProviding? = nil,
         toastPresenter: AutoCheckInToastPresenting? = nil,
         now: @escaping () -> Date = Date.init,
         dayIdentifierProvider: (() -> String)? = nil,
@@ -173,6 +229,7 @@ final class AutoCheckInCoordinator {
         cooldownInterval: TimeInterval = 120,
         failureCooldownInterval: TimeInterval = 30,
         triggerDelayInterval: TimeInterval = 3,
+        multiAccountDelayInterval: TimeInterval = 1.8,
         delay: @escaping @MainActor (TimeInterval) async -> Void = { seconds in
             guard seconds > 0 else { return }
             try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
@@ -182,6 +239,7 @@ final class AutoCheckInCoordinator {
         self.stateStore = stateStore ?? .shared
         self.webAutomator = webAutomator ?? WebViewAutoCheckInAutomator()
         self.accountStatus = accountStatus ?? CurrentAccountAutoCheckInStatusProvider()
+        self.multiAccountProvider = multiAccountProvider ?? (accountStatus == nil ? DefaultAutoCheckInMultiAccountProvider() : nil)
         self.toastPresenter = toastPresenter ?? DefaultAutoCheckInToastPresenter()
         self.now = now
         self.dayIdentifierProvider = dayIdentifierProvider ?? { AutoCheckInDayIdentifier.current() }
@@ -189,6 +247,7 @@ final class AutoCheckInCoordinator {
         self.challengeCooldownInterval = cooldownInterval
         self.failureCooldownInterval = failureCooldownInterval
         self.triggerDelayInterval = triggerDelayInterval
+        self.multiAccountDelayInterval = multiAccountDelayInterval
         self.delay = delay
     }
 
@@ -227,9 +286,17 @@ final class AutoCheckInCoordinator {
         let dayIdentifier = dayIdentifierProvider()
         let settings = settingsStore.settings
         let loggedIn = await accountStatus.isLoggedIn()
+        let activeUID = await accountStatus.activeUID()
+        let activeDisplayName = await accountStatus.activeDisplayName()
+        let initialSessionID = await accountStatus.sessionID()
+        let pendingOtherAccounts = settings.checkInAllAccounts
+            ? (multiAccountProvider?.otherValidAccounts(excluding: activeUID)
+                .filter { stateStore.isCompleted(forUID: $0.uid, on: dayIdentifier) == false } ?? [])
+            : []
+
         AppLog.notice(
             .autoCheckIn,
-            "runID=\(runID) start trigger=\(trigger.rawValue) day=\(dayIdentifier) timezone=Asia/Shanghai enabled=\(settings.isEnabled) mode=\(settings.mode.rawValue) random=\(settings.mode.randomQueryValue) loggedIn=\(Self.describeLoggedIn(loggedIn)) hasPresentationContext=\(presentationContext != nil) presentation=\(presentationContext.map { String(describing: type(of: $0)) } ?? "nil") lastCompletedDay=\(stateStore.state.completedDayIdentifier ?? "nil")"
+            "runID=\(runID) start trigger=\(trigger.rawValue) day=\(dayIdentifier) timezone=Asia/Shanghai enabled=\(settings.isEnabled) mode=\(settings.mode.rawValue) random=\(settings.mode.randomQueryValue) loggedIn=\(Self.describeLoggedIn(loggedIn)) activeUID=\(activeUID.map(String.init) ?? "nil") extraAccounts=\(pendingOtherAccounts.count) hasPresentationContext=\(presentationContext != nil) presentation=\(presentationContext.map { String(describing: type(of: $0)) } ?? "nil") lastCompletedDay=\(stateStore.state(forUID: activeUID).completedDayIdentifier ?? "nil")"
         )
 
         guard settings.isEnabled else {
@@ -237,7 +304,8 @@ final class AutoCheckInCoordinator {
             return finish(.skipped("disabled"), runID: runID, startedAt: startedAt, detail: "reason=disabled")
         }
 
-        guard stateStore.isCompleted(on: dayIdentifier) == false else {
+        let activeAlreadyCompleted = stateStore.isCompleted(forUID: activeUID, on: dayIdentifier)
+        if activeAlreadyCompleted && pendingOtherAccounts.isEmpty {
             AppLog.notice(.autoCheckIn, "runID=\(runID) skip=completed_today day=\(dayIdentifier)")
             return finish(.skipped("completed_today"), runID: runID, startedAt: startedAt, detail: "reason=completed_today")
         }
@@ -248,7 +316,7 @@ final class AutoCheckInCoordinator {
             return finish(.skipped("cooldown"), runID: runID, startedAt: startedAt, detail: "reason=cooldown")
         }
 
-        if loggedIn == false {
+        if loggedIn == false && pendingOtherAccounts.isEmpty {
             AppLog.notice(.autoCheckIn, "runID=\(runID) skip=not_logged_in source=account_store")
             return finish(.skipped("not_logged_in"), runID: runID, startedAt: startedAt, detail: "reason=not_logged_in")
         }
@@ -262,6 +330,91 @@ final class AutoCheckInCoordinator {
             AppLog.notice(.autoCheckIn, "runID=\(runID) trigger_delay skipped trigger=\(trigger.rawValue)")
         }
 
+        var submittedResults: [(name: String?, message: String?)] = []
+        var primaryOutcome: AutoCheckInRunOutcome = .skipped("completed_today")
+        var hitChallenge = false
+
+        if loggedIn != false && activeAlreadyCompleted == false {
+            let outcome = await runActiveAccount(
+                runID: runID,
+                dayIdentifier: dayIdentifier,
+                settings: settings,
+                activeUID: activeUID,
+                initialSessionID: initialSessionID,
+                startedAt: startedAt
+            )
+            primaryOutcome = outcome
+            if case let .submitted(message) = outcome {
+                submittedResults.append((activeDisplayName, message))
+            } else if case let .failed(reason) = outcome, reason == "challenge" {
+                hitChallenge = true
+            }
+        }
+
+        if hitChallenge == false, pendingOtherAccounts.isEmpty == false, let multiAccountProvider {
+            let cloudflareCookies = await multiAccountProvider.cloudflareCookies()
+            for (index, account) in pendingOtherAccounts.enumerated() {
+                if index > 0 || (loggedIn != false && activeAlreadyCompleted == false) {
+                    await delay(multiAccountDelayInterval)
+                }
+                guard let accountCookies = multiAccountProvider.cookies(forUID: account.uid),
+                      accountCookies.isEmpty == false else {
+                    multiAccountProvider.markExpired(uid: account.uid)
+                    continue
+                }
+                let isolated = await webAutomator.runIsolatedCheckIn(
+                    accountCookies: accountCookies,
+                    cloudflareCookies: cloudflareCookies,
+                    mode: settings.mode,
+                    runID: "\(runID)-u\(account.uid)"
+                )
+                if isolated.updatedAccountCookies.isEmpty == false {
+                    multiAccountProvider.updateCookies(isolated.updatedAccountCookies, forUID: account.uid)
+                }
+                if isolated.hitChallenge {
+                    startCooldown(reason: "challenge", runID: runID)
+                    break
+                }
+                if isolated.isLoggedOut {
+                    multiAccountProvider.markExpired(uid: account.uid)
+                    continue
+                }
+                switch isolated.outcome {
+                case .alreadyCheckedIn:
+                    stateStore.markCompleted(forUID: account.uid, dayIdentifier: dayIdentifier, at: now())
+                case let .submitted(message):
+                    stateStore.markCompleted(forUID: account.uid, dayIdentifier: dayIdentifier, at: now())
+                    submittedResults.append((account.displayName, sanitize(message)))
+                case .failed, .skipped:
+                    break
+                }
+            }
+        }
+
+        presentSummaryToastIfNeeded(
+            submittedResults: submittedResults,
+            presentationContext: presentationContext,
+            runID: runID
+        )
+
+        if submittedResults.count > 1 {
+            let summary = AccountsL10n.format("已完成 %d 个账号的今日签到", submittedResults.count)
+            return finish(.submitted(message: summary), runID: runID, startedAt: startedAt, detail: "source=multi_account_success")
+        }
+        if let first = submittedResults.first {
+            return finish(.submitted(message: first.message), runID: runID, startedAt: startedAt, detail: "source=submit_success")
+        }
+        return finish(primaryOutcome, runID: runID, startedAt: startedAt, detail: "source=completed")
+    }
+
+    private func runActiveAccount(
+        runID: String,
+        dayIdentifier: String,
+        settings: AutoCheckInSettings,
+        activeUID: Int?,
+        initialSessionID: UUID?,
+        startedAt: Date
+    ) async -> AutoCheckInRunOutcome {
         do {
             let boardState = try await webAutomator.fetchBoardState(runID: runID)
             let sanitizedBoardMessage = sanitize(boardState.message)
@@ -269,53 +422,99 @@ final class AutoCheckInCoordinator {
             guard boardState.ok else {
                 startCooldown(reason: boardState.reason, runID: runID)
                 AppLog.warning(.autoCheckIn, "runID=\(runID) failure reason=\(boardState.reason) status=\(boardState.statusCode.map(String.init) ?? "nil") elapsedMs=\(elapsedMilliseconds(since: startedAt)) message=\(sanitizedBoardMessage ?? "nil")")
-                return finish(.failed(boardState.reason), runID: runID, startedAt: startedAt, detail: "reason=\(boardState.reason)")
+                return .failed(boardState.reason)
             }
 
             if boardState.isCheckedIn {
-                stateStore.markCompleted(dayIdentifier: dayIdentifier, at: now())
+                await markActiveCompletedIfSessionMatches(
+                    uid: activeUID,
+                    initialSessionID: initialSessionID,
+                    dayIdentifier: dayIdentifier
+                )
                 AppLog.notice(.autoCheckIn, "runID=\(runID) state_write day=\(dayIdentifier) source=board_state")
-                AppLog.notice(.autoCheckIn, "runID=\(runID) toast=skipped reason=already_checked_in")
-                return finish(.alreadyCheckedIn, runID: runID, startedAt: startedAt, detail: "source=board_state")
+                return .alreadyCheckedIn
             }
 
             let submit = try await webAutomator.submit(mode: settings.mode, runID: runID)
             let sanitizedMessage = sanitize(submit.message)
 
             if submit.ok == false, isAlreadyCheckedInSubmitMessage(sanitizedMessage) {
-                stateStore.markCompleted(dayIdentifier: dayIdentifier, at: now())
+                await markActiveCompletedIfSessionMatches(
+                    uid: activeUID,
+                    initialSessionID: initialSessionID,
+                    dayIdentifier: dayIdentifier
+                )
                 AppLog.notice(.autoCheckIn, "runID=\(runID) state_write day=\(dayIdentifier) source=submit_already_checked_in")
-                AppLog.notice(.autoCheckIn, "runID=\(runID) toast=skipped reason=already_checked_in")
-                return finish(.alreadyCheckedIn, runID: runID, startedAt: startedAt, detail: "source=submit_already_checked_in")
+                return .alreadyCheckedIn
             }
 
             guard submit.ok else {
                 startCooldown(reason: submit.reason, runID: runID)
                 AppLog.warning(.autoCheckIn, "runID=\(runID) failure reason=\(submit.reason) status=\(submit.statusCode.map(String.init) ?? "nil") elapsedMs=\(elapsedMilliseconds(since: startedAt)) message=\(sanitizedMessage ?? "nil")")
-                return finish(.failed(submit.reason), runID: runID, startedAt: startedAt, detail: "reason=\(submit.reason)")
+                return .failed(submit.reason)
             }
 
-            stateStore.markCompleted(dayIdentifier: dayIdentifier, at: now())
+            await markActiveCompletedIfSessionMatches(
+                uid: activeUID,
+                initialSessionID: initialSessionID,
+                dayIdentifier: dayIdentifier
+            )
             AppLog.notice(.autoCheckIn, "runID=\(runID) state_write day=\(dayIdentifier) source=submit_success")
-            let toastMessage = sanitizedMessage?.isEmpty == false ? sanitizedMessage! : "已完成今日签到。"
-            if let presentationContext {
-                let didShow = toastPresenter.show(
-                    AutoCheckInToast(title: "自动签到成功", message: toastMessage),
-                    from: presentationContext
-                )
-                if didShow {
-                    AppLog.notice(.autoCheckIn, "runID=\(runID) toast=shown title=自动签到成功")
-                } else {
-                    AppLog.notice(.autoCheckIn, "runID=\(runID) toast=skipped reason=presentation_unavailable")
-                }
-            } else {
-                AppLog.notice(.autoCheckIn, "runID=\(runID) toast=skipped reason=no_presentation_context")
-            }
-            return finish(.submitted(message: sanitizedMessage), runID: runID, startedAt: startedAt, detail: "source=submit_success")
+            return .submitted(message: sanitizedMessage)
         } catch {
             startCooldown(reason: "exception", runID: runID)
             AppLog.warning(.autoCheckIn, "runID=\(runID) failure reason=exception elapsedMs=\(elapsedMilliseconds(since: startedAt)) message=\(sanitize(error.localizedDescription) ?? "nil")")
-            return finish(.failed("exception"), runID: runID, startedAt: startedAt, detail: "reason=exception")
+            return .failed("exception")
+        }
+    }
+
+    private func markActiveCompletedIfSessionMatches(
+        uid: Int?,
+        initialSessionID: UUID?,
+        dayIdentifier: String
+    ) async {
+        if let initialSessionID {
+            let currentSessionID = await accountStatus.sessionID()
+            guard currentSessionID == initialSessionID else { return }
+        }
+        stateStore.markCompleted(forUID: uid, dayIdentifier: dayIdentifier, at: now())
+    }
+
+    private func presentSummaryToastIfNeeded(
+        submittedResults: [(name: String?, message: String?)],
+        presentationContext: UIViewController?,
+        runID: String
+    ) {
+        guard submittedResults.isEmpty == false else { return }
+        let toastMessage: String
+        if submittedResults.count == 1 {
+            let raw = submittedResults[0].message
+            toastMessage = (raw?.isEmpty == false) ? raw! : "已完成今日签到。"
+        } else {
+            let names = submittedResults.compactMap(\.name).filter { !$0.isEmpty }
+            if names.isEmpty {
+                toastMessage = AccountsL10n.format("已完成 %d 个账号的今日签到", submittedResults.count)
+            } else {
+                toastMessage = AccountsL10n.format(
+                    "已完成 %d 个账号签到（%@）",
+                    submittedResults.count,
+                    names.joined(separator: "、")
+                )
+            }
+        }
+
+        if let presentationContext {
+            let didShow = toastPresenter.show(
+                AutoCheckInToast(title: "自动签到成功", message: toastMessage),
+                from: presentationContext
+            )
+            if didShow {
+                AppLog.notice(.autoCheckIn, "runID=\(runID) toast=shown title=自动签到成功")
+            } else {
+                AppLog.notice(.autoCheckIn, "runID=\(runID) toast=skipped reason=presentation_unavailable")
+            }
+        } else {
+            AppLog.notice(.autoCheckIn, "runID=\(runID) toast=skipped reason=no_presentation_context")
         }
     }
 

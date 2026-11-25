@@ -79,6 +79,11 @@ enum HiddenWebViewPageActionScheduler {
     private static let requestLock = HiddenWebViewRequestLock()
     private static let channel = HiddenWebViewChannel.isolated(UUID())
 
+    @MainActor
+    static func invalidatePreparedPage() {
+        HiddenWebViewLoader.releaseLoader(for: channel)
+    }
+
     fileprivate static var lockAndChannel: (HiddenWebViewRequestLock, HiddenWebViewChannel) {
         (requestLock, channel)
     }

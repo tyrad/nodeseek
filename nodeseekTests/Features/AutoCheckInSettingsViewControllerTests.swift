@@ -16,7 +16,7 @@ struct AutoCheckInSettingsViewControllerTests {
 
         #expect(viewController.title == "自动签到")
         #expect(viewController.tableView.numberOfSections == 2)
-        #expect(viewController.tableView.numberOfRows(inSection: 0) == 1)
+        #expect(viewController.tableView.numberOfRows(inSection: 0) == 2)
         #expect(viewController.tableView.numberOfRows(inSection: 1) == 2)
         #expect(viewController.tableView.dataSource?.tableView?(
             viewController.tableView,

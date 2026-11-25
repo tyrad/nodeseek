@@ -12,11 +12,22 @@ protocol NodeSeekCookieSessionManaging: AnyObject {
     func prepareHTTPLoad() async
     func prepareMediaRequest() async
     func clearLoginSession() async
+    func exportAccountSessionCookies() async -> [HTTPCookie]
+    func exportCloudflareCookies() async -> [HTTPCookie]
+    func replaceAccountSessionCookies(with cookies: [HTTPCookie]) async
+    func clearAccountSessionCookies() async
 }
 
 extension NodeSeekCookieSessionManaging {
     func prepareWebViewLoad() async {
         await prepareWebViewLoad(userInterfaceStyle: nil)
+    }
+
+    func exportAccountSessionCookies() async -> [HTTPCookie] { [] }
+    func exportCloudflareCookies() async -> [HTTPCookie] { [] }
+    func replaceAccountSessionCookies(with cookies: [HTTPCookie]) async {}
+    func clearAccountSessionCookies() async {
+        await clearLoginSession()
     }
 }
 
@@ -60,5 +71,21 @@ final class NodeSeekCookieSession: NodeSeekCookieSessionManaging {
 
     func clearLoginSession() async {
         await bridge.clearSession()
+    }
+
+    func exportAccountSessionCookies() async -> [HTTPCookie] {
+        await bridge.exportAccountSessionCookies()
+    }
+
+    func exportCloudflareCookies() async -> [HTTPCookie] {
+        await bridge.exportCloudflareCookies()
+    }
+
+    func replaceAccountSessionCookies(with cookies: [HTTPCookie]) async {
+        await bridge.replaceAccountSessionCookies(with: cookies)
+    }
+
+    func clearAccountSessionCookies() async {
+        await bridge.clearAccountSessionCookies()
     }
 }

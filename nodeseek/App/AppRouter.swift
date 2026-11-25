@@ -46,12 +46,55 @@ final class AppRouter {
         }
         rootViewController = root
         PushNotificationDeepLink.attach(self)
+        AccountsModule.registerRootResetHandler { [weak self] completion in
+            self?.resetToHomeForAccountChange(completion: completion)
+        }
         return root
     }
 
     @MainActor
     func push(_ viewController: UIViewController) {
         navigationController?.pushViewController(viewController, animated: true)
+    }
+
+    /// 切换账号或退出登录后，先关闭弹出界面，再跨淡重建根界面回到首页顶部。
+    @MainActor
+    func resetToHomeForAccountChange(completion: (@MainActor (UIViewController?) -> Void)? = nil) {
+        guard let window, let current = window.rootViewController, current === rootViewController else {
+            completion?(rootViewController)
+            return
+        }
+        let replaceRoot: @MainActor () -> Void = { [weak self, weak window] in
+            guard let self, let window else {
+                completion?(nil)
+                return
+            }
+            let newRoot = self.makeRootViewController()
+            UIView.transition(
+                with: window,
+                duration: 0.25,
+                options: [.transitionCrossDissolve, .allowAnimatedContent],
+                animations: {
+                    UIView.performWithoutAnimation {
+                        window.rootViewController = newRoot
+                    }
+                },
+                completion: { _ in
+                    Task { @MainActor in
+                        completion?(newRoot)
+                    }
+                }
+            )
+        }
+        if current.presentedViewController != nil {
+            current.dismiss(animated: true) {
+                Task { @MainActor in
+                    replaceRoot()
+                }
+            }
+        } else {
+            replaceRoot()
+        }
     }
 
     /// 布局设置变化后直接替换根界面；登录态存在 Cookie 中，不受影响。

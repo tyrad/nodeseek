@@ -47,6 +47,13 @@ final class AutoCheckInSettingsStore {
         persist(next)
     }
 
+    func setCheckInAllAccounts(_ enabled: Bool) {
+        var next = settings
+        guard next.checkInAllAccounts != enabled else { return }
+        next.checkInAllAccounts = enabled
+        persist(next)
+    }
+
     private func persist(_ settings: AutoCheckInSettings) {
         guard let data = try? encoder.encode(settings) else {
             AppLog.error(.autoCheckIn, "settings persist failed: encode")

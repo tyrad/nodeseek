@@ -133,9 +133,15 @@ class SettingsViewController: UITableViewController {
         case pushNotification
     }
 
+    private enum AccountRow: Int, CaseIterable {
+        case management
+        case logout
+    }
+
     private let cacheManager: SettingsCacheManaging
     private let sessionManager: SettingsSessionManaging
     private let currentAccountStore: CurrentAccountStore
+    private let accountVaultStore: AccountVaultStore
     private let buildInfo: SettingsBuildInfo
     private let nodeImageAPIKeyStore: NodeImageAPIKeyStoring
     private let nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting
@@ -163,6 +169,7 @@ class SettingsViewController: UITableViewController {
         cacheManager: SettingsCacheManaging? = nil,
         sessionManager: SettingsSessionManaging? = nil,
         currentAccountStore: CurrentAccountStore = .shared,
+        accountVaultStore: AccountVaultStore = .shared,
         buildInfo: SettingsBuildInfo = SettingsBuildInfo(),
         nodeImageAPIKeyStore: NodeImageAPIKeyStoring = KeychainNodeImageAPIKeyStore(),
         nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting? = nil,
@@ -188,6 +195,7 @@ class SettingsViewController: UITableViewController {
         self.cacheManager = cacheManager ?? DefaultSettingsCacheManager()
         self.sessionManager = sessionManager ?? DefaultSettingsSessionManager()
         self.currentAccountStore = currentAccountStore
+        self.accountVaultStore = accountVaultStore
         self.buildInfo = buildInfo
         self.nodeImageAPIKeyStore = nodeImageAPIKeyStore
         self.nodeImageAuthorizationPresenter = nodeImageAuthorizationPresenter ?? DefaultNodeImageAuthorizationPresenter()
@@ -275,7 +283,7 @@ class SettingsViewController: UITableViewController {
         case .about:
             return 1
         case .account:
-            return isLoggedIn ? 1 : 0
+            return visibleAccountRows.count
         case .none:
             return 0
         }
@@ -296,7 +304,7 @@ class SettingsViewController: UITableViewController {
         case .about:
             return nil
         case .account:
-            return isLoggedIn ? "账号" : nil
+            return visibleAccountRows.isEmpty ? nil : "账号"
         case .none:
             return nil
         }
@@ -317,7 +325,14 @@ class SettingsViewController: UITableViewController {
         case .about:
             return aboutCell(for: indexPath)
         case .account:
-            return logoutCell(for: indexPath)
+            let rows = visibleAccountRows
+            guard rows.indices.contains(indexPath.row) else { return UITableViewCell() }
+            switch rows[indexPath.row] {
+            case .management:
+                return accountManagementCell(for: indexPath)
+            case .logout:
+                return logoutCell(for: indexPath)
+            }
         case .none:
             return UITableViewCell()
         }
@@ -339,11 +354,29 @@ class SettingsViewController: UITableViewController {
         case .about:
             showAboutSettings()
         case .account:
-            guard isLoggedIn else { return }
-            confirmLogout()
+            let rows = visibleAccountRows
+            guard rows.indices.contains(indexPath.row) else { return }
+            switch rows[indexPath.row] {
+            case .management:
+                navigationController?.pushViewController(AccountManagementViewController(vaultStore: accountVaultStore), animated: true)
+            case .logout:
+                guard isLoggedIn else { return }
+                confirmLogout()
+            }
         case .none:
             break
         }
+    }
+
+    private var visibleAccountRows: [AccountRow] {
+        var rows: [AccountRow] = []
+        if isLoggedIn || accountVaultStore.accounts.isEmpty == false {
+            rows.append(.management)
+        }
+        if isLoggedIn {
+            rows.append(.logout)
+        }
+        return rows
     }
 
     private func cacheCell(for indexPath: IndexPath) -> UITableViewCell {
@@ -594,6 +627,22 @@ class SettingsViewController: UITableViewController {
         cell.imageView?.image = UIImage(systemName: "bell")
         cell.accessoryType = .disclosureIndicator
         cell.accessibilityIdentifier = "settings-push-notification-cell"
+
+        return cell
+    }
+
+    private func accountManagementCell(for indexPath: IndexPath) -> UITableViewCell {
+        let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
+        cell.textLabel?.text = AccountsL10n.text("账号管理")
+        let count = accountVaultStore.accounts.count
+        cell.detailTextLabel?.text = count > 0
+            ? AccountsL10n.format("%d 个账号", count)
+            : AccountsL10n.text("未保存")
+        cell.detailTextLabel?.textColor = .secondaryLabel
+        cell.imageView?.image = UIImage(systemName: "person.2")
+        cell.accessoryType = .disclosureIndicator
+        cell.accessibilityIdentifier = "settings-account-management-cell"
 
         return cell
     }
@@ -1097,6 +1146,7 @@ final class SettingsDebugViewController: UITableViewController {
         case detailTest
         #if DEBUG
         case debugLinks
+        case cloneAccountForTesting
         #endif
 
         static var visibleRows: [Row] {
@@ -1106,6 +1156,7 @@ final class SettingsDebugViewController: UITableViewController {
                 rows.append(.detailTest)
                 rows.append(.debugLinks)
             }
+            rows.append(.cloneAccountForTesting)
             #endif
             return rows
         }
@@ -1167,6 +1218,10 @@ final class SettingsDebugViewController: UITableViewController {
             cell.textLabel?.text = "调试链接"
             cell.imageView?.image = UIImage(systemName: "link")
             cell.accessibilityIdentifier = "settings-debug-links-cell"
+        case .cloneAccountForTesting:
+            cell.textLabel?.text = "克隆当前账号为测试分身"
+            cell.imageView?.image = UIImage(systemName: "person.2.badge.gearshape")
+            cell.accessibilityIdentifier = "settings-clone-account-cell"
         #endif
         }
         cell.accessoryType = .disclosureIndicator
@@ -1188,6 +1243,8 @@ final class SettingsDebugViewController: UITableViewController {
         case .debugLinks:
             guard NodeSeekDebugConfig.enablePostDetailTestEntry else { return }
             navigationController?.pushViewController(PostDetailDebugLinksViewController(), animated: true)
+        case .cloneAccountForTesting:
+            AccountsModule.cloneActiveAccountForTesting(in: self)
         #endif
         }
     }

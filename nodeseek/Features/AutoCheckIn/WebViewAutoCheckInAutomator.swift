@@ -4,11 +4,41 @@
 //
 
 import Foundation
+import WebKit
+
+struct IsolatedAutoCheckInResult {
+    let outcome: AutoCheckInRunOutcome
+    let isLoggedOut: Bool
+    let hitChallenge: Bool
+    let updatedAccountCookies: [HTTPCookie]
+}
 
 @MainActor
 protocol AutoCheckInWebAutomating: AnyObject {
     func fetchBoardState(runID: String) async throws -> AutoCheckInBoardState
     func submit(mode: AutoCheckInMode, runID: String) async throws -> AutoCheckInSubmitResult
+    func runIsolatedCheckIn(
+        accountCookies: [HTTPCookie],
+        cloudflareCookies: [HTTPCookie],
+        mode: AutoCheckInMode,
+        runID: String
+    ) async -> IsolatedAutoCheckInResult
+}
+
+extension AutoCheckInWebAutomating {
+    func runIsolatedCheckIn(
+        accountCookies: [HTTPCookie],
+        cloudflareCookies: [HTTPCookie],
+        mode: AutoCheckInMode,
+        runID: String
+    ) async -> IsolatedAutoCheckInResult {
+        IsolatedAutoCheckInResult(
+            outcome: .skipped("unsupported"),
+            isLoggedOut: false,
+            hitChallenge: false,
+            updatedAccountCookies: []
+        )
+    }
 }
 
 @MainActor
@@ -61,6 +91,21 @@ final class WebViewAutoCheckInAutomator: AutoCheckInWebAutomating {
             "runID=\(runID) automator_submit_finish ok=\(result.ok) success=\(result.success.map(String.init) ?? "nil") current=\(result.current.map(String.init) ?? "nil") reason=\(result.reason) message=\(result.message ?? "nil") \(Self.describeDiagnostics(object))"
         )
         return result
+    }
+
+    func runIsolatedCheckIn(
+        accountCookies: [HTTPCookie],
+        cloudflareCookies: [HTTPCookie],
+        mode: AutoCheckInMode,
+        runID: String
+    ) async -> IsolatedAutoCheckInResult {
+        let runner = IsolatedAutoCheckInRunner(timeoutInterval: timeoutInterval)
+        return await runner.run(
+            accountCookies: accountCookies,
+            cloudflareCookies: cloudflareCookies,
+            mode: mode,
+            runID: runID
+        )
     }
 
     static func parseBoardState(_ object: [String: Any]) -> AutoCheckInBoardState {
@@ -171,5 +216,209 @@ final class WebViewAutoCheckInAutomator: AutoCheckInWebAutomating {
         if let int = value as? Int { return int }
         if let number = value as? NSNumber { return number.intValue }
         return nil
+    }
+}
+
+/// 在独立 nonPersistent() WebView 中为非当前活跃账号执行一次签到，完成后回传续期后的账号 Cookie。
+@MainActor
+private final class IsolatedAutoCheckInRunner: NSObject, WKNavigationDelegate {
+    private let timeoutInterval: TimeInterval
+    private var webView: WKWebView?
+    private var navigationContinuation: CheckedContinuation<Bool, Never>?
+    private var navigationTimeoutTask: Task<Void, Never>?
+
+    init(timeoutInterval: TimeInterval) {
+        self.timeoutInterval = timeoutInterval
+    }
+
+    deinit {
+        navigationTimeoutTask?.cancel()
+    }
+
+    func run(
+        accountCookies: [HTTPCookie],
+        cloudflareCookies: [HTTPCookie],
+        mode: AutoCheckInMode,
+        runID: String
+    ) async -> IsolatedAutoCheckInResult {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let webView = NoBounceWebView(frame: .zero, configuration: configuration)
+        // 与主请求保持一致的 User-Agent，避免注入的 cf_clearance 因 UA 不匹配触发过盾。
+        webView.customUserAgent = WebRequestFingerprint.userAgent
+        webView.navigationDelegate = self
+        self.webView = webView
+
+        defer {
+            navigationTimeoutTask?.cancel()
+            navigationTimeoutTask = nil
+            webView.stopLoading()
+            webView.navigationDelegate = nil
+            self.webView = nil
+        }
+
+        let cookieStore = WKWebCookieStoreAdapter(store: configuration.websiteDataStore.httpCookieStore)
+        for cookie in cloudflareCookies + accountCookies {
+            await cookieStore.setCookie(cookie)
+        }
+
+        var request = URLRequest(url: NodeSeekSite.baseURL)
+        request.timeoutInterval = timeoutInterval
+        WebRequestFingerprint.applyHTMLHeaders(to: &request)
+
+        let loaded = await loadPage(request: request, in: webView)
+        guard loaded else {
+            return IsolatedAutoCheckInResult(
+                outcome: .failed("isolated_load_failed"),
+                isLoggedOut: false,
+                hitChallenge: false,
+                updatedAccountCookies: []
+            )
+        }
+
+        guard let boardObject = await runScript(
+            AutoCheckInAutomationScript.boardStateSource,
+            arguments: ["timeoutMs": Int(timeoutInterval * 1_000)],
+            in: webView
+        ) else {
+            return IsolatedAutoCheckInResult(
+                outcome: .failed("isolated_board_script_failed"),
+                isLoggedOut: false,
+                hitChallenge: false,
+                updatedAccountCookies: []
+            )
+        }
+
+        let boardState = WebViewAutoCheckInAutomator.parseBoardState(boardObject)
+        let hasConfigUser = (boardObject["diagnostics"] as? [String: Any])?["hasConfigUser"] as? Bool
+        let updatedCookies = NodeSeekCookieClassifier.accountSessionCookies(from: await cookieStore.allCookies())
+
+        if boardState.ok == false {
+            let isChallenge = boardState.reason == "challenge" || boardState.statusCode == 403 || boardState.statusCode == 503
+            let isLoggedOut = !isChallenge && (boardState.statusCode == 401 || hasConfigUser == false)
+            return IsolatedAutoCheckInResult(
+                outcome: .failed(boardState.reason),
+                isLoggedOut: isLoggedOut,
+                hitChallenge: isChallenge,
+                updatedAccountCookies: isLoggedOut ? [] : updatedCookies
+            )
+        }
+
+        if boardState.isCheckedIn {
+            return IsolatedAutoCheckInResult(
+                outcome: .alreadyCheckedIn,
+                isLoggedOut: false,
+                hitChallenge: false,
+                updatedAccountCookies: updatedCookies
+            )
+        }
+
+        guard let submitObject = await runScript(
+            AutoCheckInAutomationScript.submitSource,
+            arguments: [
+                "randomValue": mode.randomQueryValue,
+                "timeoutMs": Int(timeoutInterval * 1_000)
+            ],
+            in: webView
+        ) else {
+            return IsolatedAutoCheckInResult(
+                outcome: .failed("isolated_submit_script_failed"),
+                isLoggedOut: false,
+                hitChallenge: false,
+                updatedAccountCookies: updatedCookies
+            )
+        }
+
+        let submit = WebViewAutoCheckInAutomator.parseSubmitResult(submitObject)
+        let refreshedCookies = NodeSeekCookieClassifier.accountSessionCookies(from: await cookieStore.allCookies())
+        let message = submit.message?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if submit.ok == false, let message,
+           message.contains("已完成签到") || message.contains("请勿重复") || message.contains("已签到") || message.contains("已经签到") {
+            return IsolatedAutoCheckInResult(
+                outcome: .alreadyCheckedIn,
+                isLoggedOut: false,
+                hitChallenge: false,
+                updatedAccountCookies: refreshedCookies
+            )
+        }
+
+        guard submit.ok else {
+            let isChallenge = submit.reason == "challenge" || submit.statusCode == 403 || submit.statusCode == 503
+            let isLoggedOut = !isChallenge && (submit.statusCode == 401 || hasConfigUser == false)
+            return IsolatedAutoCheckInResult(
+                outcome: .failed(submit.reason),
+                isLoggedOut: isLoggedOut,
+                hitChallenge: isChallenge,
+                updatedAccountCookies: isLoggedOut ? [] : refreshedCookies
+            )
+        }
+
+        AppLog.notice(.autoCheckIn, "runID=\(runID) isolated_submit_success message=\(message ?? "nil")")
+        return IsolatedAutoCheckInResult(
+            outcome: .submitted(message: message),
+            isLoggedOut: false,
+            hitChallenge: false,
+            updatedAccountCookies: refreshedCookies
+        )
+    }
+
+    private func loadPage(request: URLRequest, in webView: WKWebView) async -> Bool {
+        await withCheckedContinuation { continuation in
+            navigationContinuation = continuation
+            navigationTimeoutTask?.cancel()
+            navigationTimeoutTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64(self?.timeoutInterval ?? 20) * 1_000_000_000)
+                guard !Task.isCancelled else { return }
+                self?.finishNavigation(false)
+            }
+            if webView.load(request) == nil {
+                finishNavigation(false)
+            }
+        }
+    }
+
+    private func finishNavigation(_ success: Bool) {
+        navigationTimeoutTask?.cancel()
+        navigationTimeoutTask = nil
+        guard let continuation = navigationContinuation else { return }
+        navigationContinuation = nil
+        continuation.resume(returning: success)
+    }
+
+    private func runScript(
+        _ source: String,
+        arguments: [String: Any],
+        in webView: WKWebView
+    ) async -> [String: Any]? {
+        await withCheckedContinuation { continuation in
+            webView.callAsyncJavaScript(
+                source,
+                arguments: arguments,
+                in: nil,
+                in: .page
+            ) { result in
+                MainActor.assumeIsolated {
+                    switch result {
+                    case .success(let value):
+                        continuation.resume(returning: value as? [String: Any])
+                    case .failure:
+                        continuation.resume(returning: nil)
+                    }
+                }
+            }
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        finishNavigation(true)
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        finishNavigation(false)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        finishNavigation(false)
     }
 }

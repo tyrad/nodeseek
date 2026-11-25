@@ -39,7 +39,7 @@ struct SettingsViewControllerTests {
             viewController.loadViewIfNeeded()
             viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
             viewController.view.layoutIfNeeded()
-            try await waitUntil { viewController.tableView.numberOfRows(inSection: 6) == 1 }
+            try await waitUntil { viewController.tableView.numberOfRows(inSection: 6) == 2 }
 
             let tableView = try #require(viewController.tableView)
             #expect(viewController.title == "设置")
@@ -50,7 +50,7 @@ struct SettingsViewControllerTests {
             #expect(tableView.numberOfRows(inSection: 3) == 1)
             #expect(tableView.numberOfRows(inSection: 4) == 1)
             #expect(tableView.numberOfRows(inSection: 5) == 1)
-            #expect(tableView.numberOfRows(inSection: 6) == 1)
+            #expect(tableView.numberOfRows(inSection: 6) == 2)
             #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 0) == "阅读")
             #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 1) == "功能")
             #expect(tableView.dataSource?.tableView?(tableView, titleForHeaderInSection: 2) == "通知")
@@ -102,9 +102,13 @@ struct SettingsViewControllerTests {
                 tableView,
                 cellForRowAt: IndexPath(row: 0, section: 5)
             ))
-            let logoutCell = try #require(tableView.dataSource?.tableView(
+            let accountManagementCell = try #require(tableView.dataSource?.tableView(
                 tableView,
                 cellForRowAt: IndexPath(row: 0, section: 6)
+            ))
+            let logoutCell = try #require(tableView.dataSource?.tableView(
+                tableView,
+                cellForRowAt: IndexPath(row: 1, section: 6)
             ))
 
             #expect(cacheCell.textLabel?.text == "清除缓存")
@@ -135,6 +139,8 @@ struct SettingsViewControllerTests {
             #expect(debugCell.accessoryType == .disclosureIndicator)
             #expect(aboutCell.textLabel?.text == "关于")
             #expect(aboutCell.accessoryType == .disclosureIndicator)
+            #expect(accountManagementCell.textLabel?.text == "账号管理")
+            #expect(accountManagementCell.accessoryType == .disclosureIndicator)
             #expect(logoutCell.textLabel?.text == "退出登录")
             #expect(logoutCell.textLabel?.textColor == .systemRed)
         }
@@ -164,10 +170,12 @@ struct SettingsViewControllerTests {
     @Test func settingsPageHidesLogoutWhenNotLoggedIn() async throws {
         let defaults = try #require(UserDefaults(suiteName: "settings-account-\(UUID().uuidString)"))
         let accountStore = CurrentAccountStore(userDefaults: defaults, storageKey: "account")
+        let vaultStore = AccountVaultStore(userDefaults: defaults)
         let viewController = SettingsViewController(
             cacheManager: FakeSettingsCacheManager(cacheByteSize: 4_096),
             sessionManager: FakeSettingsSessionManager(),
             currentAccountStore: accountStore,
+            accountVaultStore: vaultStore,
             nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore()
         )
 
@@ -766,6 +774,7 @@ struct SettingsViewControllerTests {
             cacheManager: cacheManager,
             sessionManager: sessionManager,
             currentAccountStore: accountStore,
+            accountVaultStore: AccountVaultStore(userDefaults: defaults),
             nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
             confirmsActionsImmediately: true,
             onLogout: {
@@ -773,11 +782,11 @@ struct SettingsViewControllerTests {
             }
         )
         viewController.loadViewIfNeeded()
-        try await waitUntil { viewController.tableView.numberOfRows(inSection: 6) == 1 }
+        try await waitUntil { viewController.tableView.numberOfRows(inSection: 6) == 2 }
 
         viewController.tableView.delegate?.tableView?(
             viewController.tableView,
-            didSelectRowAt: IndexPath(row: 0, section: 6)
+            didSelectRowAt: IndexPath(row: 1, section: 6)
         )
         try await Task.sleep(nanoseconds: 100_000_000)
 
@@ -1025,8 +1034,9 @@ struct SettingsViewControllerTests {
 
         #expect(manager.startPendingCleanup() == nil)
         await manager.logout()
-        #expect(nodeImageAPIKeyStore.clearCount == 1)
-        #expect(nodeImageAPIKeyStore.apiKey() == nil)
+        // 退出登录不清空全局共用的 NodeImage API Key。
+        #expect(nodeImageAPIKeyStore.clearCount == 0)
+        #expect(nodeImageAPIKeyStore.apiKey() == "nodeimage-key")
 
         let member = AccountResponse(displayName: "测试账号", isLoggedIn: true)
         await accountStore.save(AccountResponse(displayName: "游客", isLoggedIn: false))

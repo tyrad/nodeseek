@@ -72,6 +72,16 @@ enum PushNotificationRoute: Equatable, Sendable {
         }
     }
 
+    /// 预留解析推送载荷中的接收账号 UID，供后续 ns-apns 支持多账号推送时路由使用。
+    nonisolated static func targetAccountUID(from userInfo: [AnyHashable: Any]) -> Int? {
+        for key in ["account_uid", "uid", "member_id"] {
+            if let raw = stringValue(userInfo[key]), let value = Int(raw), value > 0 {
+                return value
+            }
+        }
+        return nil
+    }
+
     nonisolated static func parsePostURL(_ url: URL) -> (id: String, page: Int)? {
         let path = url.path
         guard let regex = try? NSRegularExpression(pattern: #"post-(\d+)(?:-(\d+))?"#) else {

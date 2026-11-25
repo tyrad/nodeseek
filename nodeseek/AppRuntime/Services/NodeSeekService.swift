@@ -100,8 +100,26 @@ struct NodeSeekService: Sendable {
         }
 
         let account = try parser.parseAccount(html: response.html)
-        if let currentAccountStore, await !currentAccountStore.save(account, for: sessionID) {
-            throw CancellationError()
+        if let currentAccountStore {
+            if await !currentAccountStore.save(account, for: sessionID) {
+                throw CancellationError()
+            }
+            if currentAccountStore === CurrentAccountStore.shared {
+                if account.isLoggedIn {
+                    await MainActor.run {
+                        Task { @MainActor in
+                            await AccountsModule.adoptCurrentSessionIfNeeded(account: account, requestSessionID: sessionID)
+                        }
+                    }
+                } else if response.statusCode == 200,
+                          Self.htmlIndicatesConfirmedGuestPage(response.html) {
+                    await MainActor.run {
+                        Task { @MainActor in
+                            await AccountsModule.handleConfirmedLoggedOut(requestSessionID: sessionID)
+                        }
+                    }
+                }
+            }
         }
         AppLog.info(.service, "账号信息解析完成，loggedIn=\(account.isLoggedIn), displayName=\(account.displayName)")
         AppLog.debug(.account, "service: parsed loggedIn=\(account.isLoggedIn) name=\(account.displayName) avatar=\(account.avatarURL?.path ?? "nil") profile=\(account.profileURL?.path ?? "nil") stats=\(account.stats.joined(separator: "|"))")
@@ -174,6 +192,20 @@ struct NodeSeekService: Sendable {
         guard let currentAccountStore, let account,
               await currentAccountStore.save(account, for: sessionID) else { return }
         AppLog.debug(.account, "service: opportunistic account save -> loggedIn=\(account.isLoggedIn) name=\(account.displayName)")
+        if currentAccountStore === CurrentAccountStore.shared, account.isLoggedIn {
+            await MainActor.run {
+                Task { @MainActor in
+                    await AccountsModule.adoptCurrentSessionIfNeeded(account: account, requestSessionID: sessionID)
+                }
+            }
+        }
+    }
+
+    private nonisolated static func htmlIndicatesConfirmedGuestPage(_ html: String) -> Bool {
+        // 仅当正常站点框架包含明确登录入口且无用户卡片时才判定为游客态，避免把维护页/异常页误判为过期。
+        let hasLoginEntry = html.contains("signIn.html") || html.contains("signIn")
+        let hasUserCard = html.contains("usercard-me")
+        return hasLoginEntry && !hasUserCard
     }
 
     /// 整页 HTML 解析要十几到几十毫秒，留在主线程会让滑动中的分页加载掉帧，

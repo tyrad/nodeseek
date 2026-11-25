@@ -35,6 +35,21 @@ nonisolated struct AccountResponse: Equatable, Sendable {
         self.stats = stats
         self.notification = notification
     }
+
+    nonisolated var nodeSeekUID: Int? {
+        guard let profileURL else { return nil }
+        return NodeSeekUserIDResolver.uid(from: profileURL)
+    }
+}
+
+enum NodeSeekUserIDResolver {
+    nonisolated static func uid(from url: URL) -> Int? {
+        let components = url.pathComponents
+        guard let spaceIndex = components.firstIndex(of: "space") else { return nil }
+        let idIndex = components.index(after: spaceIndex)
+        guard idIndex < components.endIndex else { return nil }
+        return Int(components[idIndex])
+    }
 }
 
 nonisolated struct PostSummary: Equatable, Sendable {

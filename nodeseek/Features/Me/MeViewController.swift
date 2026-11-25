@@ -181,6 +181,10 @@ final class MeViewController: UIViewController {
         profileCard.onProgressTap = { [weak self] in self?.toggleTodayProgress() }
         profileCard.onProgressRetry = { [weak self] in self?.loadProfile() }
         profileCard.onLoginTap = { [weak self] in self?.showLogin() }
+        profileCard.onSwitchAccountTap = { [weak self] in
+            guard let self else { return }
+            AccountsModule.presentAccountSwitcher(from: self)
+        }
         discussionsRow.addTarget(self, action: #selector(discussionsTapped), for: .touchUpInside)
         commentsRow.addTarget(self, action: #selector(commentsTapped), for: .touchUpInside)
         collectionsRow.addTarget(self, action: #selector(collectionsTapped), for: .touchUpInside)
@@ -296,7 +300,7 @@ final class MeViewController: UIViewController {
         if account.isLoggedIn {
             profileCard.renderLoggedIn(account: account, profile: profile)
         } else {
-            profileCard.renderGuest()
+            profileCard.renderGuest(showsSwitchAccount: AccountsModule.hasSavedAccounts)
         }
 
         updateProgressDetails()
@@ -508,6 +512,7 @@ private final class MeProfileCardView: UIControl {
     var onProgressRetry: (() -> Void)?
     var onProgressTap: (() -> Void)?
     var onLoginTap: (() -> Void)?
+    var onSwitchAccountTap: (() -> Void)?
 
     private static let defaultAvatarImage = UIImage(
         systemName: "person",
@@ -518,7 +523,9 @@ private final class MeProfileCardView: UIControl {
     private let avatarImageView = UIImageView()
     private let nameLabel = UILabel()
     private let metaLabel = UILabel()
-    private let chevronView = UIImageView(image: UIImage(systemName: "chevron.right"))
+    /// 切换按钮放在卡片层而不是头部里，避免触发头部高亮，也让读屏能单独聚焦；头部只保留一个等宽占位。
+    private let switchAccountPlaceholder = UIView()
+    private let switchAccountButton = AccountSwitchIconButton(accessibilityIdentifier: "me-profile-switch-account-button")
     private let loginButton = UIButton(type: .system)
 
     private let statsSeparator = MeSeparatorView()
@@ -561,11 +568,16 @@ private final class MeProfileCardView: UIControl {
         stack.axis = .vertical
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
+        addSubview(switchAccountButton)
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
             stack.topAnchor.constraint(equalTo: topAnchor),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor)
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+            switchAccountPlaceholder.widthAnchor.constraint(equalTo: switchAccountButton.widthAnchor),
+            switchAccountPlaceholder.heightAnchor.constraint(equalTo: switchAccountButton.heightAnchor),
+            switchAccountButton.centerXAnchor.constraint(equalTo: switchAccountPlaceholder.centerXAnchor),
+            switchAccountButton.centerYAnchor.constraint(equalTo: switchAccountPlaceholder.centerYAnchor)
         ])
     }
 
@@ -585,6 +597,9 @@ private final class MeProfileCardView: UIControl {
     /// 游客可点整卡登录；登录后各统计项独立接收点按。
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         guard let hitView = super.hitTest(point, with: event) else { return nil }
+        if hitView === switchAccountButton || hitView.isDescendant(of: switchAccountButton) {
+            return switchAccountButton
+        }
         if !loginButton.isHidden {
             return hitView.isDescendant(of: loginButton) ? hitView : self
         }
@@ -605,7 +620,7 @@ private final class MeProfileCardView: UIControl {
         } else {
             metaLabel.text = account.stats.prefix(2).joined(separator: " · ")
         }
-        chevronView.isHidden = false
+        setSwitchAccountVisible(true)
         loginButton.isHidden = true
 
         ImageLoad.url(account.avatarURL)
@@ -634,10 +649,10 @@ private final class MeProfileCardView: UIControl {
         }
     }
 
-    func renderGuest() {
+    func renderGuest(showsSwitchAccount: Bool) {
         nameLabel.text = "未登录"
         metaLabel.text = "登录后查看等级、鸡腿和今日进度"
-        chevronView.isHidden = true
+        setSwitchAccountVisible(showsSwitchAccount)
         loginButton.isHidden = false
         updateAccessibility(loggedIn: false)
         AvatarImageLoader.shared.cancel(on: avatarImageView)
@@ -670,9 +685,11 @@ private final class MeProfileCardView: UIControl {
         metaLabel.textColor = .secondaryLabel
         metaLabel.numberOfLines = 2
 
-        chevronView.tintColor = .tertiaryLabel
-        chevronView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
-        chevronView.setContentHuggingPriority(.required, for: .horizontal)
+        switchAccountPlaceholder.isUserInteractionEnabled = false
+        switchAccountPlaceholder.translatesAutoresizingMaskIntoConstraints = false
+        switchAccountPlaceholder.setContentHuggingPriority(.required, for: .horizontal)
+        switchAccountPlaceholder.setContentCompressionResistancePriority(.required, for: .horizontal)
+        switchAccountButton.addTarget(self, action: #selector(switchAccountTapped), for: .touchUpInside)
 
         var configuration = UIButton.Configuration.filled()
         configuration.baseBackgroundColor = .label
@@ -696,13 +713,12 @@ private final class MeProfileCardView: UIControl {
         textStack.spacing = 4
         textStack.isUserInteractionEnabled = false
 
-        let row = UIStackView(arrangedSubviews: [avatarImageView, textStack, chevronView, loginButton])
+        let row = UIStackView(arrangedSubviews: [avatarImageView, textStack, switchAccountPlaceholder, loginButton])
         row.axis = .horizontal
         row.alignment = .center
         row.spacing = 14
         row.translatesAutoresizingMaskIntoConstraints = false
         avatarImageView.isUserInteractionEnabled = false
-        chevronView.isUserInteractionEnabled = false
         headerView.addSubview(row)
 
         NSLayoutConstraint.activate([
@@ -807,8 +823,16 @@ private final class MeProfileCardView: UIControl {
         guard loggedIn else {
             accessibilityLabel = "未登录，登录后查看等级、鸡腿和今日进度"
             accessibilityHint = "点按登录"
+            // 游客态整卡是一个读屏元素，切换入口改用自定义操作提供。
+            accessibilityCustomActions = switchAccountButton.isHidden ? nil : [
+                UIAccessibilityCustomAction(name: AccountsL10n.text("切换账号")) { [weak self] _ in
+                    self?.onSwitchAccountTap?()
+                    return true
+                }
+            ]
             return
         }
+        accessibilityCustomActions = nil
         accessibilityLabel = nil
         accessibilityHint = nil
         headerView.accessibilityLabel = [nameLabel.text, metaLabel.text].compactMap { $0 }.joined(separator: "，")
@@ -821,6 +845,15 @@ private final class MeProfileCardView: UIControl {
 
     @objc private func loginTapped() {
         onLoginTap?()
+    }
+
+    @objc private func switchAccountTapped() {
+        onSwitchAccountTap?()
+    }
+
+    private func setSwitchAccountVisible(_ visible: Bool) {
+        switchAccountPlaceholder.isHidden = !visible
+        switchAccountButton.isHidden = !visible
     }
 }
 

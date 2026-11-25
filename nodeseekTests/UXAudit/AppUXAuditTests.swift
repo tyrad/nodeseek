@@ -224,6 +224,31 @@ final class AppUXAuditTests: XCTestCase {
         XCTAssertTrue(context.navigationController.topViewController is ProfileEditViewController)
     }
 
+    /// 期望：切换账号入口在资料卡右侧，点它弹出切换面板，不进资料页；导航栏只剩设置。
+    func testMeProfileCardSwitchButtonPresentsAccountSwitcher() async throws {
+        let context = try await makeLoggedInMePage()
+        defer { context.window.isHidden = true }
+        let me = context.viewController
+        XCTAssertEqual(me.navigationItem.rightBarButtonItems?.count ?? 0, 1)
+        let views = uxDescendants(of: me.view)
+        let card = try XCTUnwrap(views.first { $0.accessibilityIdentifier == "me-profile-card" })
+        let button = try XCTUnwrap(
+            views.first { $0.accessibilityIdentifier == "me-profile-switch-account-button" } as? UIButton
+        )
+        XCTAssertFalse(button.isHidden)
+        // 视觉 32pt 之外的边缘也应命中按钮（44pt 热区）
+        let edgePoint = button.convert(CGPoint(x: button.bounds.maxX + 5, y: button.bounds.midY), to: card)
+        XCTAssertTrue(card.hitTest(edgePoint, with: nil) === button)
+
+        button.sendActions(for: .touchUpInside)
+        _ = await uxWaitUntil(timeout: 1) { me.presentedViewController != nil }
+
+        let presented = try XCTUnwrap(me.presentedViewController as? UINavigationController)
+        XCTAssertTrue(presented.viewControllers.first is AccountSwitcherViewController)
+        XCTAssertTrue(context.navigationController.topViewController === me)
+        presented.dismiss(animated: false)
+    }
+
     func testMeLevelProgressRowExpandsAndCollapsesInPlace() async throws {
         let context = try await makeLoggedInMePage()
         defer { context.window.isHidden = true }

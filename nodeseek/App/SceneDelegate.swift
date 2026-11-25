@@ -16,9 +16,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
-        if let cleanup = (UIApplication.shared.delegate as? AppDelegate)?.logoutCleanup {
+        let appDelegate = UIApplication.shared.delegate as? AppDelegate
+        if let preparation = appDelegate?.accountLaunchPreparation ?? appDelegate?.logoutCleanup {
             Task { @MainActor [weak self] in
-                await cleanup.value
+                await preparation.value
                 self?.connectWindow(to: windowScene, options: connectionOptions)
             }
         } else {

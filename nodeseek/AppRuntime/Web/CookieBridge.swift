@@ -105,6 +105,69 @@ final class CookieBridge {
         logCleanupCookies("清理后", urlCookies: urlCookieStorage.cookies ?? [], webCookies: remaining)
     }
 
+    /// 导出当前活跃存储中的账号会话 Cookie（合并 WebKit 与 URLSession，WebKit 优先）。
+    func exportAccountSessionCookies() async -> [HTTPCookie] {
+        let merged = await mergedAllowedCookies()
+        return NodeSeekCookieClassifier.accountSessionCookies(from: merged, allowedDomains: allowedDomains)
+    }
+
+    /// 导出当前活跃存储中的 Cloudflare 过盾 Cookie，供独立登录页与独立自动签到复用。
+    func exportCloudflareCookies() async -> [HTTPCookie] {
+        let merged = await mergedAllowedCookies()
+        return NodeSeekCookieClassifier.cloudflareCookies(from: merged, allowedDomains: allowedDomains)
+    }
+
+    /// 双边先删后写替换账号会话 Cookie，保留 Cloudflare 与站点偏好 Cookie。
+    func replaceAccountSessionCookies(with targetCookies: [HTTPCookie]) async {
+        let webCookieStore = resolvedWebCookieStore()
+        let urlCookies = urlCookieStorage.cookies ?? []
+        let webCookies = await webCookieStore.allCookies()
+        logCleanupCookies("切换账号清理前", urlCookies: urlCookies, webCookies: webCookies)
+
+        for cookie in urlCookies where NodeSeekCookieClassifier.isAccountSession(cookie, allowedDomains: allowedDomains) {
+            urlCookieStorage.deleteCookie(cookie)
+        }
+        for cookie in webCookies where NodeSeekCookieClassifier.isAccountSession(cookie, allowedDomains: allowedDomains) {
+            await webCookieStore.deleteCookie(cookie)
+        }
+
+        let validTargetCookies = NodeSeekCookieClassifier.accountSessionCookies(
+            from: targetCookies,
+            allowedDomains: allowedDomains
+        )
+        for cookie in validTargetCookies {
+            urlCookieStorage.setCookie(cookie)
+            await webCookieStore.setCookie(cookie)
+        }
+
+        let remaining = await webCookieStore.allCookies()
+        logCleanupCookies("切换账号写入后", urlCookies: urlCookieStorage.cookies ?? [], webCookies: remaining)
+    }
+
+    /// 仅清空双边账号会话 Cookie，保留 Cloudflare 过盾与站点偏好 Cookie。
+    func clearAccountSessionCookies() async {
+        await replaceAccountSessionCookies(with: [])
+    }
+
+    private func mergedAllowedCookies() async -> [HTTPCookie] {
+        let webCookieStore = resolvedWebCookieStore()
+        let webCookies = await webCookieStore.allCookies().filter(isAllowed)
+        let urlCookies = (urlCookieStorage.cookies ?? []).filter(isAllowed)
+        var byIdentity: [String: HTTPCookie] = [:]
+        // URLSession 先入表，WebKit 覆盖，确保最新 WebView 续期 Cookie 优先。
+        for cookie in urlCookies {
+            byIdentity[Self.cookieIdentity(cookie)] = cookie
+        }
+        for cookie in webCookies {
+            byIdentity[Self.cookieIdentity(cookie)] = cookie
+        }
+        return Array(byIdentity.values)
+    }
+
+    private static func cookieIdentity(_ cookie: HTTPCookie) -> String {
+        "\(cookie.name.lowercased())|\(cookie.domain.lowercased())|\(cookie.path)"
+    }
+
     private func logCleanupCookies(_ stage: String, urlCookies: [HTTPCookie], webCookies: [HTTPCookie]) {
         func names(_ cookies: [HTTPCookie]) -> String {
             Set(cookies.filter(isAllowed).map(\.name)).sorted().joined(separator: ",")

@@ -108,6 +108,10 @@ final class PostListSideMenuViewController: UIViewController {
         return button
     }()
 
+    private let switchAccountButton = AccountSwitchIconButton(
+        accessibilityIdentifier: "post-list-side-menu-switch-account-button"
+    )
+
     private let extensionEntryStackView: UIStackView = {
         let stackView = UIStackView()
         stackView.axis = .horizontal
@@ -316,6 +320,10 @@ final class PostListSideMenuViewController: UIViewController {
             : "登录后同步账号信息"
         accountHeaderButton.accessibilityLabel = account.isLoggedIn ? "账号信息" : "登录账号"
         accountHeaderButton.isEnabled = !account.isLoggedIn || account.profileURL != nil
+        switchAccountButton.isHidden = !AccountSwitchIconButton.shouldShow(
+            isLoggedIn: account.isLoggedIn,
+            hasSavedAccounts: AccountsModule.hasSavedAccounts
+        )
         setExtensionEntriesVisible(account.isLoggedIn)
         notificationURL = account.notification?.url ?? NodeSeekSite.baseURL.appendingPathComponent("notification")
         if account.isLoggedIn == false {
@@ -388,6 +396,7 @@ final class PostListSideMenuViewController: UIViewController {
         view.isHidden = true
         backdropView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(backdropTapped)))
         accountHeaderButton.addTarget(self, action: #selector(accountHeaderTapped), for: .touchUpInside)
+        switchAccountButton.addTarget(self, action: #selector(switchAccountButtonTapped), for: .touchUpInside)
         settingsButton.addTarget(self, action: #selector(settingsButtonTapped), for: .touchUpInside)
         newDiscussionButton.addTarget(self, action: #selector(newDiscussionButtonTapped), for: .touchUpInside)
         checkInButton.addTarget(self, action: #selector(checkInButtonTapped), for: .touchUpInside)
@@ -407,6 +416,7 @@ final class PostListSideMenuViewController: UIViewController {
         sideMenuView.addSubview(nameLabel)
         sideMenuView.addSubview(statsLabel)
         sideMenuView.addSubview(accountHeaderButton)
+        sideMenuView.addSubview(switchAccountButton)
         sideMenuView.addSubview(extensionEntryStackView)
         extensionEntryStackView.addArrangedSubview(postsEntryButton)
         extensionEntryStackView.addArrangedSubview(commentsEntryButton)
@@ -444,11 +454,14 @@ final class PostListSideMenuViewController: UIViewController {
             avatarImageView.heightAnchor.constraint(equalToConstant: SideMenuLayout.avatarSize),
 
             nameLabel.leadingAnchor.constraint(equalTo: avatarImageView.trailingAnchor, constant: 14),
-            nameLabel.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
+            nameLabel.trailingAnchor.constraint(equalTo: switchAccountButton.leadingAnchor, constant: -12),
             nameLabel.topAnchor.constraint(equalTo: avatarImageView.topAnchor, constant: 8),
 
+            switchAccountButton.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
+            switchAccountButton.centerYAnchor.constraint(equalTo: nameLabel.centerYAnchor),
+
             statsLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
-            statsLabel.trailingAnchor.constraint(equalTo: nameLabel.trailingAnchor),
+            statsLabel.trailingAnchor.constraint(equalTo: sideMenuView.trailingAnchor, constant: -SideMenuLayout.horizontalInset),
             statsLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 6),
 
             accountHeaderButton.leadingAnchor.constraint(equalTo: avatarImageView.leadingAnchor),
@@ -622,6 +635,12 @@ final class PostListSideMenuViewController: UIViewController {
     @objc private func favoritesEntryButtonTapped() {
         hide(animated: true)
         onUserCollectionsTapped?()
+    }
+
+    @objc private func switchAccountButtonTapped() {
+        hide(animated: true)
+        let presenter = parent ?? self
+        AccountsModule.presentAccountSwitcher(from: presenter)
     }
 
     private func setVisible(_ visible: Bool, animated: Bool) {
