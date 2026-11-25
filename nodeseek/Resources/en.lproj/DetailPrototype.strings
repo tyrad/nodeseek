@@ -53,3 +53,5 @@
 "thread-login" = "Sign in";
 "thread-load-failed" = "Load failed, tap to retry";
 "thread-restricted" = "This page is restricted";
+"reply-bar-placeholder" = "Add a comment…";
+"reply-bar-accessibility" = "Comment";

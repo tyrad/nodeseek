@@ -30,6 +30,8 @@ extension PostDetailViewController: PostDetailViewProtocol {
     func showLoading() {
         loginButton.isHidden = true
         replyButton.isHidden = true
+        replyBarView.isHidden = true
+        replyBarFadeView.isHidden = true
         hideLoadingMoreComments()
         if hasRenderedDetailContent {
             loadingIndicator.startAnimating()

@@ -77,7 +77,24 @@ extension PostDetailViewController {
     func updateReplyButtonVisibility() {
         let isHidden = showsReplyEntry == false || displayMode != .content || replyEditorContainer.isHidden == false
         replyButton.isHidden = isHidden
-        floatingReplyButtonContainer.isHidden = isHidden
+        replyBarView.isHidden = isHidden
+        replyBarFadeView.isHidden = isHidden || replyBarFadeView.isEnabled == false
+        if isHidden {
+            // 编辑器打开或页面不可评论时复位，下次出现总是完整评论栏。
+            setReplyBarCollapsed(false, animated: false)
+        }
+        updateReplyBarDraftPreview()
+        view.setNeedsLayout()
+    }
+
+    /// 收起编辑器后评论栏显示草稿首行，提醒还有未发送的内容。
+    func updateReplyBarDraftPreview() {
+        let draft = replyTextView.text?
+            .split(whereSeparator: \.isNewline)
+            .lazy
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { $0.isEmpty == false }
+        replyBarView.setDraft(draft.map { String($0) })
     }
 
     func presentReplyEditor(mode: CommentComposerMode) {

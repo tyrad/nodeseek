@@ -3905,13 +3905,9 @@ struct PostDetailLoginViewControllerTests {
         #expect(button.isHidden)
     }
 
-    @Test func detailUsesOnlyFloatingReplyEntry() async throws {
+    @Test func detailUsesBottomReplyBar() async throws {
         let presenter = SpyPostDetailPresenter()
-        // 不读模拟器里保存过的拖动位置，只验证默认位置
-        let viewController = PostDetailViewController(
-            presenter: presenter,
-            floatingPositionStore: InMemoryFloatingControlPositionStore()
-        )
+        let viewController = PostDetailViewController(presenter: presenter)
 
         viewController.loadViewIfNeeded()
         viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
@@ -3928,85 +3924,111 @@ struct PostDetailLoginViewControllerTests {
         viewController.view.layoutIfNeeded()
 
         #expect(viewController.view.firstTextView(accessibilityIdentifier: "post-detail-comment-input") == nil)
-        #expect(viewController.view.firstButton(accessibilityIdentifier: "post-detail-comment-send-button") == nil)
-        #expect(viewController.view.firstLabel(accessibilityIdentifier: "post-detail-comment-placeholder-label") == nil)
+        #expect(viewController.view.firstView(accessibilityIdentifier: "post-detail-floating-reply-button") == nil)
 
-        let floatingReplyButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-button"))
-        #expect(floatingReplyButton.isHidden == false)
-        let floatingContainer = try #require(
-            viewController.view.firstView(accessibilityIdentifier: "post-detail-floating-reply-button") as? FloatingControlContainerView
-        )
-        let panGesture = try #require(floatingReplyButton.gestureRecognizers?.first { $0 is UIPanGestureRecognizer })
-        let replyButtonFrame = floatingReplyButton.convert(floatingReplyButton.bounds, to: viewController.view)
+        let replyBar = try #require(viewController.view.firstView(accessibilityIdentifier: "post-detail-reply-bar"))
+        let replyButton = try #require(viewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-button"))
+        #expect(replyBar.isHidden == false)
+        #expect(replyButton.isHidden == false)
+        #expect(replyButton.isDescendant(of: replyBar))
+        #expect(replyButton.gestureRecognizers?.contains { $0 is UIPanGestureRecognizer } != true)
 
-        #expect(panGesture.view === floatingReplyButton)
-        #expect(panGesture.cancelsTouchesInView)
-        #expect(floatingReplyButton.superview === floatingContainer)
-        #expect(floatingReplyButton.configuration?.baseForegroundColor == .systemBackground)
-        #expect(floatingReplyButton.backgroundColor == .label)
-        #expect(abs(floatingReplyButton.alpha - 0.48) < 0.0001)
-        #expect(floatingReplyButton.layer.borderWidth == 0.5)
-        #expect(abs(replyButtonFrame.maxY - (viewController.view.safeAreaLayoutGuide.layoutFrame.maxY - PostDetailViewController.Layout.replyButtonBottomInset)) < 1)
-
-        floatingContainer.frame.origin.x = 0
-        floatingContainer.floatingViewDidEndDragging(panGestureRecognizer: UIPanGestureRecognizer())
-        #expect(floatingReplyButton.layer.maskedCorners == [.layerMaxXMinYCorner, .layerMaxXMaxYCorner])
+        // 评论栏贴底，横向铺满安全区留白，列表底部让出评论栏高度。
+        let safeFrame = viewController.view.safeAreaLayoutGuide.layoutFrame
+        let barFrame = replyBar.convert(replyBar.bounds, to: viewController.view)
+        #expect(abs(barFrame.maxY - (safeFrame.maxY - PostDetailViewController.Layout.replyBarBottomInset)) < 1)
+        #expect(abs(barFrame.minX - (safeFrame.minX + PostDetailViewController.Layout.replyBarHorizontalInset)) < 1)
+        #expect(barFrame.height >= PostDetailViewController.Layout.replyBarMinimumHeight)
+        #expect(viewController.collectionList.view.contentInset.bottom >= viewController.view.bounds.maxY - barFrame.minY)
     }
 
-    @Test func detailReplyButtonRestoresLastDraggedPosition() async throws {
-        let positionStore = InMemoryFloatingControlPositionStore()
-
-        let firstViewController = PostDetailViewController(
+    @Test func replyBarCollapsesToTrailingCircleAndResetsAfterEditor() async throws {
+        let viewController = PostDetailViewController(
             presenter: SpyPostDetailPresenter(),
-            floatingPositionStore: positionStore
+            accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true)
         )
-        firstViewController.loadViewIfNeeded()
-        firstViewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
-        firstViewController.render(detail: PostDetail(
-            id: "703863",
-            title: "详情标题",
-            authorName: "ipv4",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            comments: []
-        ))
-        await waitForDetailContent(in: firstViewController, expectedRowCount: 1)
-        firstViewController.view.layoutIfNeeded()
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.render(detail: authorFilterDetail(comments: [], page: 1, nextPage: nil))
+        await waitForDetailContent(in: viewController)
+        viewController.view.layoutIfNeeded()
+        let bar = viewController.replyBarView
+        let expandedFrame = bar.capsuleView.frame
+        let restingInset = viewController.collectionList.view.contentInset.bottom
 
-        let firstContainer = try #require(
-            firstViewController.view.firstView(accessibilityIdentifier: "post-detail-floating-reply-button") as? FloatingControlContainerView
-        )
-        firstContainer.frame.origin.x = 0
-        firstContainer.frame.origin.y = 128
-        firstContainer.floatingViewDidEndDragging(panGestureRecognizer: UIPanGestureRecognizer())
+        viewController.setReplyBarCollapsed(true, animated: false)
+        viewController.view.layoutIfNeeded()
+        let collapsedFrame = bar.capsuleView.frame
+        #expect(bar.isCollapsed)
+        #expect(abs(collapsedFrame.width - collapsedFrame.height) < 0.5)
+        #expect(abs(collapsedFrame.maxX - expandedFrame.maxX) < 0.5)
+        #expect(bar.titleLabel.alpha == 0)
+        // 收起后胶囊左侧的空白不再拦截点按，列表底部留白不变。
+        #expect(bar.point(inside: CGPoint(x: expandedFrame.minX + 10, y: expandedFrame.midY), with: nil) == false)
+        #expect(bar.point(inside: CGPoint(x: collapsedFrame.midX, y: collapsedFrame.midY), with: nil))
+        #expect(viewController.collectionList.view.contentInset.bottom == restingInset)
 
-        let secondViewController = PostDetailViewController(
+        viewController.presentCommentEditor()
+        viewController.dismissReplyEditor()
+        viewController.view.layoutIfNeeded()
+        #expect(bar.isCollapsed == false)
+        #expect(bar.titleLabel.alpha == 1)
+        #expect(abs(bar.capsuleView.frame.width - expandedFrame.width) < 0.5)
+    }
+
+    @Test func replyBarStaysCollapsedWhileBouncingAtBottom() async throws {
+        let viewController = PostDetailViewController(presenter: SpyPostDetailPresenter())
+        viewController.loadViewIfNeeded()
+        viewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        viewController.render(detail: authorFilterDetail(comments: [], page: 1, nextPage: nil))
+        await waitForDetailContent(in: viewController)
+        viewController.view.layoutIfNeeded()
+
+        let scrollView = UIScrollView(frame: CGRect(x: 0, y: 0, width: 390, height: 800))
+        scrollView.contentSize = CGSize(width: 390, height: 3000)
+        let bottomY: CGFloat = 2200
+        func scroll(to y: CGFloat) {
+            scrollView.contentOffset.y = y
+            viewController.updateReplyBarForUserScroll(scrollView)
+        }
+
+        viewController.replyBarScrollAnchorY = 0
+        scroll(to: 300)
+        #expect(viewController.replyBarView.isCollapsed)
+
+        // 读到底部并越界回弹：越界部分按边界处理，评论栏不突然展开。
+        scroll(to: bottomY)
+        scroll(to: bottomY + 120)
+        scroll(to: bottomY + 40)
+        scroll(to: bottomY)
+        #expect(viewController.replyBarView.isCollapsed)
+
+        // 真正往回滚才展开。
+        scroll(to: bottomY - 60)
+        #expect(viewController.replyBarView.isCollapsed == false)
+    }
+
+    @Test func replyBarShowsDraftAfterDismissingEditor() async throws {
+        let viewController = PostDetailViewController(
             presenter: SpyPostDetailPresenter(),
-            floatingPositionStore: positionStore
+            accountRefresher: StubPostDetailAccountRefresher(isLoggedIn: true)
         )
-        secondViewController.loadViewIfNeeded()
-        secondViewController.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
-        secondViewController.render(detail: PostDetail(
-            id: "703863",
-            title: "详情标题",
-            authorName: "ipv4",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            comments: []
-        ))
-        await waitForDetailContent(in: secondViewController, expectedRowCount: 1)
-        secondViewController.view.layoutIfNeeded()
+        viewController.loadViewIfNeeded()
+        viewController.render(detail: authorFilterDetail(comments: [], page: 1, nextPage: nil))
+        await waitForDetailContent(in: viewController)
 
-        let restoredContainer = try #require(
-            secondViewController.view.firstView(accessibilityIdentifier: "post-detail-floating-reply-button") as? FloatingControlContainerView
-        )
-        let restoredButton = try #require(secondViewController.view.firstButton(accessibilityIdentifier: "post-detail-reply-button"))
+        let placeholder = viewController.replyBarView.titleLabel.text
+        viewController.presentCommentEditor()
+        viewController.replyTextView.text = "\n  第一行草稿\n第二行"
+        viewController.dismissReplyEditor()
 
-        #expect(abs(restoredContainer.frame.minX) < 0.5)
-        #expect(abs(restoredContainer.frame.minY - firstContainer.frame.minY) < 1)
-        #expect(restoredButton.layer.maskedCorners == [.layerMaxXMinYCorner, .layerMaxXMaxYCorner])
+        #expect(viewController.replyBarView.isHidden == false)
+        #expect(viewController.replyBarView.titleLabel.text == "第一行草稿")
+
+        viewController.presentCommentEditor()
+        viewController.replyTextView.text = ""
+        viewController.dismissReplyEditor()
+        #expect(viewController.replyBarView.titleLabel.text == placeholder)
     }
 
     @Test func restrictedDetailHidesReplyEntry() async throws {

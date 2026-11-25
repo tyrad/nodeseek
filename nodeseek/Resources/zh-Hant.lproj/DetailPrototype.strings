@@ -52,3 +52,5 @@
 "thread-login" = "前往登入";
 "thread-load-failed" = "載入失敗，請重試";
 "thread-restricted" = "目前頁面無權查看";
+"reply-bar-placeholder" = "寫評論…";
+"reply-bar-accessibility" = "評論";

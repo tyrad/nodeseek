@@ -52,3 +52,5 @@
 "thread-login" = "去登录";
 "thread-load-failed" = "加载失败，请重试";
 "thread-restricted" = "当前页面无权查看";
+"reply-bar-placeholder" = "写评论…";
+"reply-bar-accessibility" = "评论";

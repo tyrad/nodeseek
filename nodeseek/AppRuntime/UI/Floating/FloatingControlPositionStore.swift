@@ -10,7 +10,6 @@ import Foundation
 
 enum FloatingControlPositionKeys {
     static let postListSortToggle = "floating.postList.sortToggle.position"
-    static let postDetailReplyButton = "floating.postDetail.replyButton.position"
 }
 
 struct FloatingControlPosition: Codable, Equatable {

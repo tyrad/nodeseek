@@ -114,6 +114,9 @@ extension PostDetailViewController {
         // 只响应手指拖动和惯性滚动，代码触发的滚动不浮出页码。
         if scrollView.isDragging || scrollView.isDecelerating {
             showPageIndicatorWhileScrolling()
+            updateReplyBarForUserScroll(scrollView)
+        } else {
+            replyBarScrollAnchorY = scrollView.contentOffset.y
         }
     }
 

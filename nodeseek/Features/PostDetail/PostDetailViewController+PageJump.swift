@@ -8,23 +8,43 @@ import UIKit
 extension PostDetailViewController {
     private enum PageIndicatorLayout {
         static let trailingInset: CGFloat = 16
-        static let bottomInset: CGFloat = 16
+        static let bottomInset: CGFloat = 12
+        static let collapsedSpacing: CGFloat = 10
         static let hideDelay: TimeInterval = 1.5
     }
 
     func configurePageIndicator() {
         pageIndicatorButton.addTarget(self, action: #selector(pageIndicatorTapped), for: .touchUpInside)
         view.addSubview(pageIndicatorButton)
-        NSLayoutConstraint.activate([
+        pageIndicatorExpandedConstraints = [
             pageIndicatorButton.trailingAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.trailingAnchor,
                 constant: -PageIndicatorLayout.trailingInset
             ),
             pageIndicatorButton.bottomAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.bottomAnchor,
+                equalTo: replyBarView.topAnchor,
                 constant: -PageIndicatorLayout.bottomInset
             )
-        ])
+        ]
+        // 评论栏收成小圆钮时，页码贴到圆钮左侧，底部不再空出一块。
+        pageIndicatorCollapsedConstraints = [
+            pageIndicatorButton.trailingAnchor.constraint(
+                equalTo: replyBarView.capsuleView.leadingAnchor,
+                constant: -PageIndicatorLayout.collapsedSpacing
+            ),
+            pageIndicatorButton.centerYAnchor.constraint(equalTo: replyBarView.capsuleView.centerYAnchor)
+        ]
+        NSLayoutConstraint.activate(pageIndicatorExpandedConstraints)
+    }
+
+    func updatePageIndicatorPlacement(replyBarCollapsed: Bool) {
+        if replyBarCollapsed {
+            NSLayoutConstraint.deactivate(pageIndicatorExpandedConstraints)
+            NSLayoutConstraint.activate(pageIndicatorCollapsedConstraints)
+        } else {
+            NSLayoutConstraint.deactivate(pageIndicatorCollapsedConstraints)
+            NSLayoutConstraint.activate(pageIndicatorExpandedConstraints)
+        }
     }
 
     /// 总页数取分页条里最大的页码；站点分页条会省略中间页，但总会给出最后一页。
