@@ -36,6 +36,9 @@ extension PostListViewController: PostPageContainerViewControllerDelegate {
         _ containerView: PostPageContainerViewController,
         didLoadFirstPageFor category: PostListCategoryItem
     ) {
+        if category == selectedCategory {
+            selectedCategoryDidLoadFirstPage()
+        }
         AppLog.notice(
             .autoCheckIn,
             "trigger=post_list_first_page category=\(category.rawValue) title=\(category.title) isAll=\(category.isAll)"

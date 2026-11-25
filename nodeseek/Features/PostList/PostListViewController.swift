@@ -45,6 +45,8 @@ class PostListViewController: UIViewController {
     private let sortPreferenceStore: PostListSortPreferenceStoring
     let detailTestURLProvider: () -> String
     let autoCheckInRunner: @MainActor (UIViewController?, AutoCheckInTrigger) async -> Void
+    private var isHomeVisible = false
+    private var hasLoadedHomeContent = false
     private var hasAppeared = false
     var categories: [PostListCategoryItem] = []
     var selectedCategory: PostListCategoryItem = .all
@@ -290,8 +292,15 @@ class PostListViewController: UIViewController {
         hasAppeared = true
     }
     
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        isHomeVisible = true
+        showHomeSortHintIfNeeded()
+    }
+
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        isHomeVisible = false
         composeLoginCheckTask?.cancel()
         composeLoginCheckTask = nil
         if isSortToggleExpanded || sortToggleCollapseWorkItem != nil {
@@ -457,7 +466,21 @@ class PostListViewController: UIViewController {
         sideMenuViewController.show(animated: true)
     }
 
+    func selectedCategoryDidLoadFirstPage() {
+        hasLoadedHomeContent = true
+        showHomeSortHintIfNeeded()
+    }
+
+    private func showHomeSortHintIfNeeded() {
+        guard isHomeVisible, hasLoadedHomeContent, sortPreferenceStore.showsHomeControl,
+              !sortPreferenceStore.hasSeenHomeSortHint else { return }
+        sortPreferenceStore.hasSeenHomeSortHint = true
+        setSortToggleExpanded(true, animated: true)
+        scheduleSortToggleCollapse()
+    }
+
     @objc private func sortToggleButtonTapped() {
+        sortPreferenceStore.hasSeenHomeSortHint = true
         isSortToggleExpanded = true
         currentSortMode = pageContainerViewController.toggleSortMode(for: selectedCategory)
         setSortToggleExpanded(true, animated: true)
@@ -550,6 +573,8 @@ class PostListViewController: UIViewController {
             return
         }
 
+        // 先在动画外完成其他待定布局，避免列表刚加载的 cell 被一起动画导致错位。
+        view.layoutIfNeeded()
         if expanded {
             renderSortMode(currentSortMode)
             UIView.animate(

@@ -9,6 +9,7 @@ import Foundation
 protocol PostListSortPreferenceStoring: AnyObject {
     var sortMode: PostListSortMode { get set }
     var showsHomeControl: Bool { get set }
+    var hasSeenHomeSortHint: Bool { get set }
 }
 
 final class PostListSortPreferenceStore: PostListSortPreferenceStoring {
@@ -32,6 +33,9 @@ final class PostListSortPreferenceStore: PostListSortPreferenceStoring {
         get { userDefaults.object(forKey: showsHomeControlStorageKey) as? Bool ?? true }
         set { userDefaults.set(newValue, forKey: showsHomeControlStorageKey) }
     }
+
+    // 提示在本次启动内只展示一次。
+    var hasSeenHomeSortHint = false
 
     var sortMode: PostListSortMode {
         get {

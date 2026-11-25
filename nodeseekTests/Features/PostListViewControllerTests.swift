@@ -100,6 +100,43 @@ struct PostListViewControllerTests {
         #expect(viewController.sortToggleButton.expandedWidth(for: String(repeating: "超长排序文案", count: 20), maxWidth: 320) <= 320)
     }
 
+    @Test func homeSortHintResetsOnNextLaunch() throws {
+        let suite = "home-sort-hint-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let firstLaunch = PostListSortPreferenceStore(userDefaults: defaults)
+        firstLaunch.sortMode = .postTime
+        firstLaunch.hasSeenHomeSortHint = true
+
+        let nextLaunch = PostListSortPreferenceStore(userDefaults: defaults)
+        #expect(!nextLaunch.hasSeenHomeSortHint)
+        #expect(nextLaunch.sortMode == .postTime)
+    }
+
+    @Test func firstLoadedHomePreviewsCurrentSortOnceThenCollapses() async throws {
+        let store = InMemoryPostListSortPreferenceStore()
+        store.sortMode = .postTime
+        let page = makePostListViewController(presenter: SpyPostListPresenter(), sortPreferenceStore: store)
+        page.loadViewIfNeeded()
+        page.renderSortMode(.postTime)
+        let container = page.pageContainerViewController
+        page.postPageContainerViewController(container, didLoadFirstPageFor: .all)
+        #expect(!store.hasSeenHomeSortHint)
+
+        page.beginAppearanceTransition(true, animated: false)
+        page.endAppearanceTransition()
+        #expect(page.isSortToggleExpanded)
+        #expect(page.sortToggleButton.configuration?.title == PostListSortMode.postTime.accessibilityTitle)
+        #expect(store.sortMode == .postTime)
+        #expect(store.hasSeenHomeSortHint)
+
+        try await Task.sleep(nanoseconds: 1_650_000_000)
+        #expect(!page.isSortToggleExpanded)
+        page.postPageContainerViewController(container, didLoadFirstPageFor: .all)
+        #expect(!page.isSortToggleExpanded)
+    }
+
     @Test func sortToggleButtonVisibilityFollowsPreferenceStoreAndRefreshesOnAppear() throws {
         let sortStore = InMemoryPostListSortPreferenceStore()
         sortStore.showsHomeControl = false
