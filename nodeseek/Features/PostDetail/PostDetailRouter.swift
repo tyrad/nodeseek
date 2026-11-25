@@ -88,12 +88,22 @@ class PostDetailRouter: PostDetailRouterProtocol {
         )
         sheetVC.modalPresentationStyle = .pageSheet
         if let sheet = sheetVC.sheetPresentationController {
-            sheet.detents = [.large(), .medium()]
+            sheet.detents = Self.readingSheetDetents(for: detailVC.traitCollection)
             sheet.selectedDetentIdentifier = .large
             sheet.prefersGrabberVisible = true
             sheet.prefersScrollingExpandsWhenScrolledToEdge = true
             sheet.preferredCornerRadius = 18
         }
         detailVC.present(sheetVC, animated: true)
+    }
+
+    static func readingSheetDetents(for traits: UITraitCollection) -> [UISheetPresentationController.Detent] {
+        let detents: [UISheetPresentationController.Detent] = [.medium(), .large()]
+        if #available(iOS 26.1, *), traits.userInterfaceStyle == .dark {
+            for detent in detents {
+                detent.backgroundEffect = UIColorEffect(color: .systemBackground)
+            }
+        }
+        return detents
     }
 }

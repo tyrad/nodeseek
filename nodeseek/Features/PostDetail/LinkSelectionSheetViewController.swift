@@ -20,6 +20,7 @@ final class LinkSelectionSheetViewController: UITableViewController {
 
     init(
         candidates: [DetailLinkCandidate],
+        presentingTraits: UITraitCollection,
         onSelect: @escaping (URL) -> Void
     ) {
         self.candidates = candidates
@@ -27,7 +28,7 @@ final class LinkSelectionSheetViewController: UITableViewController {
         super.init(style: .plain)
         modalPresentationStyle = .pageSheet
         if let sheetPresentationController {
-            sheetPresentationController.detents = [.medium(), .large()]
+            sheetPresentationController.detents = PostDetailRouter.readingSheetDetents(for: presentingTraits)
             sheetPresentationController.prefersGrabberVisible = true
             sheetPresentationController.preferredCornerRadius = 18
         }

@@ -115,6 +115,7 @@ extension PostDetailViewController {
 
         let sheet = LinkSelectionSheetViewController(
             candidates: uniqueCandidates,
+            presentingTraits: traitCollection,
             onSelect: { [weak self] url in
                 self?.handleContentLinkTap(url)
             }
