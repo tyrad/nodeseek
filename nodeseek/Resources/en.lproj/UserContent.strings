@@ -1,0 +1,7 @@
+// User content list strings
+"还没有收藏" = "No Favorites Yet";
+"在帖子页点「收藏」，之后可以在这里找到。" = "Tap Favorite on a post to find it here later.";
+"取消收藏" = "Unfavorite";
+"操作未完成，请刷新后再试。" = "The action didn’t finish. Refresh and try again.";
+"正在取消收藏…" = "Removing from Favorites…";
+"已取消收藏" = "Removed from Favorites";

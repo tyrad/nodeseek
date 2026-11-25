@@ -7,6 +7,58 @@
 
 import UIKit
 
+nonisolated enum UserContentL10n {
+    static func text(_ key: String, bundle: Bundle = .main) -> String {
+        bundle.localizedString(forKey: key, value: key, table: "UserContent")
+    }
+}
+
+/// 列表为空时的说明：图标 + 标题 + 一句引导。
+final class UserContentEmptyView: UIStackView {
+    init(symbolName: String, title: String, message: String, accessibilityIdentifier: String) {
+        super.init(frame: .zero)
+        axis = .vertical
+        alignment = .center
+        spacing = 8
+        isHidden = true
+        self.accessibilityIdentifier = accessibilityIdentifier
+        translatesAutoresizingMaskIntoConstraints = false
+
+        let imageView = UIImageView(image: UIImage(
+            systemName: symbolName,
+            withConfiguration: UIImage.SymbolConfiguration(textStyle: .largeTitle, scale: .large)
+        ))
+        imageView.tintColor = .tertiaryLabel
+        imageView.adjustsImageSizeForAccessibilityContentSizeCategory = true
+        imageView.isAccessibilityElement = false
+
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.font = .preferredFont(forTextStyle: .headline)
+        titleLabel.textColor = .label
+        titleLabel.textAlignment = .center
+        titleLabel.numberOfLines = 0
+        titleLabel.adjustsFontForContentSizeCategory = true
+
+        let messageLabel = UILabel()
+        messageLabel.text = message
+        messageLabel.font = .preferredFont(forTextStyle: .subheadline)
+        messageLabel.textColor = .secondaryLabel
+        messageLabel.textAlignment = .center
+        messageLabel.numberOfLines = 0
+        messageLabel.adjustsFontForContentSizeCategory = true
+
+        addArrangedSubview(imageView)
+        setCustomSpacing(14, after: imageView)
+        addArrangedSubview(titleLabel)
+        addArrangedSubview(messageLabel)
+    }
+
+    required init(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
 enum UserContentDisplayMode {
     case content
     case skeleton

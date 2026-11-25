@@ -18,6 +18,8 @@ final class UserContentSkeletonCellNode: ASCellNode {
     private let titlePlaceholder = ASDisplayNode()
     private let metaPlaceholder = ASDisplayNode()
     private let extraPlaceholder = ASDisplayNode()
+    /// 收藏页的行是圆角卡片，骨架也画成同样的卡片，加载完成时不跳动。
+    private let cardNode: ASDisplayNode?
 
     private lazy var placeholderNodes = [
         titlePlaceholder,
@@ -25,16 +27,20 @@ final class UserContentSkeletonCellNode: ASCellNode {
         extraPlaceholder
     ]
 
-    override init() {
+    init(cardStyle: Bool = false) {
+        cardNode = cardStyle ? ASDisplayNode() : nil
         super.init()
         automaticallyManagesSubnodes = true
         selectionStyle = .none
         backgroundColor = .clear
+        cardNode?.backgroundColor = .secondarySystemGroupedBackground
+        cardNode?.cornerRadius = UserCollectionCellNode.Layout.cornerRadius
         configurePlaceholders()
     }
 
     override func didLoad() {
         super.didLoad()
+        cardNode?.layer.cornerCurve = .continuous
         startPulseAnimation()
     }
 
@@ -60,7 +66,10 @@ final class UserContentSkeletonCellNode: ASCellNode {
         let stack = ASStackLayoutSpec.vertical()
         stack.spacing = 9
         stack.children = [titlePlaceholder, bottomStack]
-        return ASInsetLayoutSpec(insets: Layout.contentInset, child: stack)
+        let content = ASInsetLayoutSpec(insets: Layout.contentInset, child: stack)
+        guard let cardNode else { return content }
+        let card = ASBackgroundLayoutSpec(child: content, background: cardNode)
+        return ASInsetLayoutSpec(insets: UserCollectionCellNode.Layout.cardInset, child: card)
     }
 
     private func configurePlaceholders() {
@@ -120,21 +129,70 @@ final class UserDiscussionCellNode: ASCellNode {
     }
 }
 
+/// 收藏一行：圆角卡片承载标题。
 final class UserCollectionCellNode: ASCellNode {
-    private let titleNode = ASTextNode()
+    enum Layout {
+        static let cardInset = UIEdgeInsets(top: 5, left: 16, bottom: 5, right: 16)
+        static let contentInset = UIEdgeInsets(top: 14, left: 16, bottom: 14, right: 14)
+        static let cornerRadius: CGFloat = 14
+    }
 
-    init(record: UserCollectionRecord) {
+    private let cardNode = ASDisplayNode()
+    private let titleNode = ASTextNode()
+    private let chevronNode = ASImageNode()
+
+    /// Texture 文本不随外观自动更新，颜色按建行时的外观解析，外观变化由页面整表重载。
+    init(record: UserCollectionRecord, traits: UITraitCollection = .current) {
         super.init()
         automaticallyManagesSubnodes = true
         backgroundColor = .clear
-        selectionStyle = .default
-        titleNode.maximumNumberOfLines = 2
+        selectionStyle = .none
+        cardNode.backgroundColor = .secondarySystemGroupedBackground
+        cardNode.cornerRadius = Layout.cornerRadius
+        titleNode.maximumNumberOfLines = 3
+        titleNode.truncationMode = .byTruncatingTail
         titleNode.accessibilityIdentifier = "user-collection-post-\(record.postID)"
-        titleNode.attributedText = UserContentText.title(record.title)
+        chevronNode.contentMode = .center
+        chevronNode.isAccessibilityElement = false
+        titleNode.attributedText = NSAttributedString(
+            string: record.title,
+            attributes: [
+                .font: PostListCellStyle.Typography.titleFont,
+                .foregroundColor: ReadingColors.text.resolvedColor(with: traits)
+            ]
+        )
+        let configuration = UIImage.SymbolConfiguration(
+            font: PostListCellStyle.Typography.metadataFont,
+            scale: .small
+        )
+        chevronNode.image = UIImage(systemName: "chevron.forward", withConfiguration: configuration)?
+            .withTintColor(.tertiaryLabel.resolvedColor(with: traits), renderingMode: .alwaysOriginal)
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+        accessibilityLabel = record.title
+    }
+
+    override func didLoad() {
+        super.didLoad()
+        cardNode.layer.cornerCurve = .continuous
+    }
+
+    override var isHighlighted: Bool {
+        didSet {
+            cardNode.backgroundColor = isHighlighted ? .tertiarySystemGroupedBackground : .secondarySystemGroupedBackground
+        }
     }
 
     override func layoutSpecThatFits(_ constrainedSize: ASSizeRange) -> ASLayoutSpec {
-        ASInsetLayoutSpec(insets: UIEdgeInsets(top: 13, left: 18, bottom: 13, right: 18), child: titleNode)
+        titleNode.style.flexGrow = 1
+        titleNode.style.flexShrink = 1
+        let row = ASStackLayoutSpec.horizontal()
+        row.spacing = 10
+        row.alignItems = .center
+        row.children = [titleNode, chevronNode]
+        let content = ASInsetLayoutSpec(insets: Layout.contentInset, child: row)
+        let card = ASBackgroundLayoutSpec(child: content, background: cardNode)
+        return ASInsetLayoutSpec(insets: Layout.cardInset, child: card)
     }
 }
 
