@@ -35,3 +35,20 @@
 "vote.loginRequired" = "請先登入後再投票。";
 "debug-markdown-unsupported" = "Markdown 未解析，已使用網頁內文";
 "debug-markdown-unavailable" = "無可用 Markdown，已使用網頁內文";
+
+"thread-replies" = "查看相關對話";
+"thread-replying-to" = "回覆 #%ld";
+"thread-no-markdown" = "暫無原文";
+"thread-empty" = "暫未找到對 #%ld 的直接回覆";
+"thread-scanning-with-total" = "已找到 %ld 則 · 正在查看第 %ld/%ld 頁";
+"thread-scanning-without-total" = "已找到 %ld 則 · 正在查看第 %ld 頁";
+"thread-paused-with-total" = "已找到 %ld 則 · 已查至第 %ld/%ld 頁";
+"thread-paused-without-total" = "已找到 %ld 則 · 已查至第 %ld 頁";
+"thread-completed-count" = "共找到 %ld 則回覆";
+"thread-completed-empty" = "已查完 · 暫無回覆";
+"thread-failed-partial" = "已找到 %ld 則 · %@";
+"thread-continue" = "繼續查找";
+"thread-retry" = "重試";
+"thread-login" = "前往登入";
+"thread-load-failed" = "載入失敗，請重試";
+"thread-restricted" = "目前頁面無權查看";

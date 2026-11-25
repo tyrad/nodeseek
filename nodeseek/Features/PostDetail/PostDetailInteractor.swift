@@ -24,6 +24,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
     
     // MARK: - Properties
     weak var presenter: PostDetailInteractorOutput?
+    let threadedReplyCoordinator: ThreadedReplyCoordinator?
     private let post: PostSummary?
     private let service: NodeSeekService
     private let initialPage: Int
@@ -58,10 +59,12 @@ class PostDetailInteractor: PostDetailInteractorInput {
         actionPagePreparer: PostDetailActionPagePreparing = NoopPostDetailActionPagePreparer(),
         authorRankLoader: PostAuthorRankLoading? = nil,
         page: Int = 1,
-        sessionStore: NodeSeekSessionStore = .shared
+        sessionStore: NodeSeekSessionStore = .shared,
+        threadedReplyCoordinator: ThreadedReplyCoordinator? = nil
     ) {
         self.post = post
-        self.service = service ?? NodeSeekService(htmlClient: HTMLLoadingStrategyFactory.makeDefaultClient())
+        let resolvedService = service ?? NodeSeekService(htmlClient: HTMLLoadingStrategyFactory.makeDefaultClient())
+        self.service = resolvedService
         self.initialPage = max(1, page)
         self.commentSubmitter = commentSubmitter ?? NodeSeekCommentSubmitter()
         self.collectionSubmitter = collectionSubmitter ?? NodeSeekPostCollectionSubmitter()
@@ -74,6 +77,22 @@ class PostDetailInteractor: PostDetailInteractorInput {
         self.sessionStore = sessionStore
         self.actionPagePreparer = actionPagePreparer
         self.authorRankLoader = authorRankLoader ?? NodeSeekAuthorRankClient()
+        if let threadedReplyCoordinator {
+            self.threadedReplyCoordinator = threadedReplyCoordinator
+        } else if let post {
+            self.threadedReplyCoordinator = ThreadedReplyCoordinator(
+                postID: post.id,
+                baseURL: resolvedService.baseURL,
+                pageFetcher: resolvedService,
+                sessionStore: sessionStore
+            )
+        } else {
+            self.threadedReplyCoordinator = nil
+        }
+    }
+
+    func invalidateThreadedReplySession() {
+        threadedReplyCoordinator?.invalidateSession()
     }
 
     deinit {
@@ -185,6 +204,7 @@ class PostDetailInteractor: PostDetailInteractorInput {
                 )
                 AppLog.info(.postDetail, "Interactor commentSubmitter 成功返回: postID=\(post.id), message=\(response.message ?? "nil"), elapsedMs=\(AppLog.elapsedMilliseconds(since: taskStartedAt))")
                 await sessionStore.recordSuccess()
+                threadedReplyCoordinator?.markLastPageStaleForGrowth()
                 AppLog.info(.postDetail, "Interactor 已记录会话成功，准备回调 Presenter: postID=\(post.id), elapsedMs=\(AppLog.elapsedMilliseconds(since: taskStartedAt))")
                 await MainActor.run {
                     presenter?.didSubmitReply(PostDetailSubmitReplyResponse(message: response.message))
@@ -414,7 +434,12 @@ class PostDetailInteractor: PostDetailInteractorInput {
 
     private func loadDetail(postID: String, page: Int) async throws -> PostDetail? {
         AppLog.info(.postDetail, "详情请求开始，postID=\(postID), page=\(page)")
-        let result = try await service.loadPostDetail(postID: postID, page: page)
+        let result: NodeSeekResult<PostDetail>
+        if let coordinator = threadedReplyCoordinator, coordinator.postID == postID {
+            result = try await coordinator.loadPageForMainDetail(page: page)
+        } else {
+            result = try await service.loadPostDetail(postID: postID, page: page)
+        }
         switch result {
         case .value(let detail):
             await sessionStore.recordSuccess()

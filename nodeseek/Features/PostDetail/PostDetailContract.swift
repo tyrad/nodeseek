@@ -61,12 +61,20 @@ protocol PostDetailPresenterProtocol: AnyObject {
     func didTapEditPost()
     /// 编辑自己的评论：先在评论所在页读原文再打开编辑页。
     func didTapEditComment(_ comment: Comment)
+    /// 打开楼层「吃瓜」回复面板。
+    func didTapThreadedReplies(for comment: Comment)
+}
+
+extension PostDetailPresenterProtocol {
+    func didTapThreadedReplies(for comment: Comment) {}
 }
 
 // MARK: - Interactor Input (Presenter -> Interactor)
 protocol PostDetailInteractorInput: AnyObject {
+    var threadedReplyCoordinator: ThreadedReplyCoordinator? { get }
     func loadPostDetail()
     func loadPostDetail(page: Int)
+    func invalidateThreadedReplySession()
     func submitReply(content: String)
     func addFavorite()
     func removeFavorite()
@@ -76,6 +84,11 @@ protocol PostDetailInteractorInput: AnyObject {
     func addCommentChickenLeg(commentID: String)
     func addPostOppose()
     func addCommentOppose(commentID: String)
+}
+
+extension PostDetailInteractorInput {
+    var threadedReplyCoordinator: ThreadedReplyCoordinator? { nil }
+    func invalidateThreadedReplySession() {}
 }
 
 // MARK: - Interactor Output (Interactor -> Presenter)
@@ -110,4 +123,9 @@ protocol PostDetailRouterProtocol: AnyObject {
     func navigateToLogin(onClose: @escaping @MainActor () -> Void)
     func presentEditPost(_ editable: EditableDiscussion, onSaved: @escaping () -> Void)
     func presentEditComment(_ editable: EditableComment, onSaved: @escaping () -> Void)
+    func presentThreadedReplies(rootComment: Comment, coordinator: ThreadedReplyCoordinator)
+}
+
+extension PostDetailRouterProtocol {
+    func presentThreadedReplies(rootComment: Comment, coordinator: ThreadedReplyCoordinator) {}
 }

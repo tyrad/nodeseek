@@ -15,7 +15,7 @@ final class DetailCollectionTests: XCTestCase {
         var calls: [String] = []
         bind("a")
         cell.addAction("like", symbol: "hand.thumbsup.fill", count: 19, selected: true) { calls.append("a") }
-        let first = try XCTUnwrap(allButtons(cell.contentView).first)
+        let first = try XCTUnwrap(allButtons(cell.contentView).first { !$0.isHidden })
         cell.prepareForReuse()
         bind("b")
         cell.addAction("like", symbol: "hand.thumbsup", count: 0) { calls.append("b") }
@@ -84,7 +84,9 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertTrue(previews().allSatisfy { $0?.view === cell.contentView }, "展开、收起都应使用有正文的完整楼层")
         let floor = try XCTUnwrap(cell.contentView.subviews.flatMap(allLabels).first { $0.text == "#1" })
         let floorPoint = floor.convert(CGPoint(x: floor.bounds.midX, y: floor.bounds.midY), to: cell)
-        XCTAssertTrue(cell.hitTest(floorPoint, with: nil) === blank)
+        // 楼号与左侧转折图标合成一个点击区，点楼号直接打开相关对话，不再落到长按菜单面。
+        let threadButton = try XCTUnwrap(cell.contentView.subviews.flatMap(allButtons).first { $0.accessibilityIdentifier == "detail-floor-thread-button-1" })
+        XCTAssertTrue(cell.hitTest(floorPoint, with: nil) === threadButton)
         let copy = try XCTUnwrap(floor.accessibilityCustomActions?.first { $0.name == DetailListStrings.text("copy") })
         let reply = try XCTUnwrap(cell.contentView.subviews.flatMap(allButtons).first { $0.accessibilityLabel == DetailListStrings.text("reply-comment") })
         let replyPoint = reply.convert(CGPoint(x: reply.bounds.midX, y: reply.bounds.midY), to: cell)
@@ -128,9 +130,9 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertFalse(labels(otherCell).contains(DetailListStrings.text("edit-comment")))
         XCTAssertTrue(labels(ownCell).contains(DetailListStrings.text("edit-comment")))
         XCTAssertNotNil(otherCell.contentView.subviews.flatMap(allButtons).first { $0.accessibilityIdentifier == "post-detail-quote-comment-1-2" })
-        // 长按菜单：复制、投放鸡腿（非本人）、只看 TA，本人可编辑；均带图标。
-        XCTAssertEqual(otherCell.floorActions.map(\.title), ["copy", "chicken", "author-them"].map(DetailListStrings.text))
-        XCTAssertEqual(ownCell.floorActions.map(\.title), ["copy", "author-them", "edit"].map(DetailListStrings.text))
+        // 长按菜单：复制、查看相关对话、投放鸡腿（非本人）、只看 TA，本人可编辑；均带图标。
+        XCTAssertEqual(otherCell.floorActions.map(\.title), ["copy", "thread-replies", "chicken", "author-them"].map(DetailListStrings.text))
+        XCTAssertEqual(ownCell.floorActions.map(\.title), ["copy", "thread-replies", "author-them", "edit"].map(DetailListStrings.text))
         XCTAssertTrue((otherCell.floorActions + ownCell.floorActions).allSatisfy { $0.image != nil })
         let header = try cell("0")
         XCTAssertEqual(header.floorActions.last?.title, DetailListStrings.text("author-poster"))

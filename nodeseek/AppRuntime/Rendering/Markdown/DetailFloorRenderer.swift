@@ -47,6 +47,25 @@ nonisolated struct DetailFloorRenderer: Sendable {
         }
     }
 
+    /// 纯 Markdown 渲染路径（不做 HTML 兜底），供「吃瓜」面板直接排版正文。
+    @MainActor
+    func startPureMarkdown(_ request: DetailFloorRequest, deliver: @escaping Delivery) -> Task<Void, Never> {
+        Task.detached(priority: .userInitiated) {
+            onStep?(.parse, request)
+            let markdown = request.source.visibleMarkdown ?? ""
+            let document = CommentReplyRelationParser.pureMarkdownDocument(
+                from: markdown,
+                baseURL: request.baseURL,
+                mediaURLs: mediaURLs
+            )
+            guard !Task.isCancelled else { return }
+            onStep?(.layout, request)
+            guard let blocks = try? layout(document.blocks, appearance: request.appearance, width: request.appearance.width) else { return }
+            guard !Task.isCancelled else { return }
+            await deliver(request, .native(blocks))
+        }
+    }
+
     /// 签名只有 HTML：能转成原生块就用 TextKit 排版（appearance.pointSize 为签名字号），否则退回网页渲染。
     @MainActor
     func startSignature(_ request: DetailFloorRequest, deliver: @escaping Delivery) -> Task<Void, Never> {

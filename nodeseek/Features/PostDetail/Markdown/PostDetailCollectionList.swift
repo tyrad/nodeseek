@@ -268,6 +268,14 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         cell.body.isLayoutMarginsRelativeArrangement = true
         cell.textIndent = indent
         cell.body.directionalLayoutMargins = .init(top: 0, leading: indent, bottom: 0, trailing: 0)
+        // 先配置分支入口按钮，确保 configureHeader 里的 wrapBadges 准确留出按钮宽度，且不在滚屏时同步解析 Markdown。
+        if let comment, let floorNum = CommentReplyRelationParser.floorNumber(for: comment), floorNum > 0 {
+            cell.configureThreadEntry(floor: floorNum) { [weak page] in
+                page?.presenter.didTapThreadedReplies(for: comment)
+            }
+        } else {
+            cell.configureThreadEntry(floor: nil, perform: nil)
+        }
         cell.configureHeader(title: title, requiredLevel: requiredLevel, name: author, isPoster: isPoster, badges: badges, time: time,
                              floor: floor, isHot: isHot, showsRiskWarning: showsRiskWarning)
         cell.body.onLink = { [weak page] in page?.handleContentLinkTap($0) }
@@ -573,8 +581,13 @@ private extension PostDetailCollectionList {
                 page?.showToast(message: DetailListStrings.text("copied"))
             }), animated: true)
         }
-        // 菜单：复制、投放鸡腿（非本人）、只看 TA（作者可展示时）、编辑。引用在底栏。
+        // 菜单：复制、查看相关对话（有明确正整数楼层的评论）、投放鸡腿（非本人）、只看 TA（作者可展示时）、编辑。引用在底栏。
         if let comment {
+            if let floor = CommentReplyRelationParser.floorNumber(for: comment), floor > 0 {
+                add("thread-replies", UIImage(systemName: "arrow.turn.down.right")) {
+                    $0.presenter.didTapThreadedReplies(for: comment)
+                }
+            }
             if !comment.isOwnComment { add("chicken", UIImage(named: "ChickenLeg")) { $0.handleCommentChickenLegTap(comment) } }
             if AuthorDisplayPolicy.isDisplayable(comment.authorName) {
                 add(page.authorFilter == nil ? "author-them" : "all", filterIcon) { $0.toggleAuthorFilter(.author(of: comment), focusingCommentID: comment.id) }

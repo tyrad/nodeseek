@@ -431,8 +431,19 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
             comments: comments,
             page: page,
             pagination: pagination,
-            isLastPage: pagination?.nextPage == nil && document.at_xpath(XPathRules.postDetailNextPage) == nil
+            isLastPage: pagination?.nextPage == nil && document.at_xpath(XPathRules.postDetailNextPage) == nil,
+            totalPages: postPageCount(in: document) ?? pagination?.items.map(\.page).max()
         )
+    }
+
+    private func postPageCount(in document: HTMLDocument) -> Int? {
+        for root in configRoots(in: document) {
+            guard let postData = root["postData"] as? [String: Any],
+                  let count = intValue(in: postData, keys: ["postPageCount"]),
+                  count > 0 else { continue }
+            return count
+        }
+        return nil
     }
 
     /// 后续页只有评论，楼主身份仍随帖子配置返回。

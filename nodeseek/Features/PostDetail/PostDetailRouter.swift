@@ -61,4 +61,39 @@ class PostDetailRouter: PostDetailRouterProtocol {
     func navigateToLogin(onClose: @escaping @MainActor () -> Void) {
         LoginWebViewController.open(from: viewController, onClose: onClose)
     }
+
+    func presentThreadedReplies(rootComment: Comment, coordinator: ThreadedReplyCoordinator) {
+        guard let detailVC = viewController as? PostDetailViewController else { return }
+        let sheetVC = ThreadedRepliesSheetViewController(
+            rootComment: rootComment,
+            coordinator: coordinator,
+            renderer: detailVC.collectionList.renderer,
+            onLink: { [weak detailVC] url in
+                detailVC?.dismiss(animated: true) {
+                    detailVC?.handleContentLinkTap(url)
+                }
+            },
+            onAuthorTapped: { [weak detailVC] profileURL in
+                detailVC?.dismiss(animated: true) {
+                    detailVC?.openUserInfo(profileURL: profileURL)
+                }
+            },
+            onRequireLogin: { [weak detailVC] in
+                detailVC?.dismiss(animated: true) {
+                    detailVC?.presenter.didTapLogin()
+                }
+            },
+            imageSize: { [weak detailVC] url in detailVC?.cachedDetailImageSize(for: url) },
+            onImageSize: { [weak detailVC] url, size in detailVC?.cacheDetailImageSize(size, for: url) }
+        )
+        sheetVC.modalPresentationStyle = .pageSheet
+        if let sheet = sheetVC.sheetPresentationController {
+            sheet.detents = [.large(), .medium()]
+            sheet.selectedDetentIdentifier = .large
+            sheet.prefersGrabberVisible = true
+            sheet.prefersScrollingExpandsWhenScrolledToEdge = true
+            sheet.preferredCornerRadius = 18
+        }
+        detailVC.present(sheetVC, animated: true)
+    }
 }

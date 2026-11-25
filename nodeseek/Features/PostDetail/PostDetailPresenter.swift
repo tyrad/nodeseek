@@ -263,8 +263,14 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         router.navigateToLogin { [weak self] in
             self?.view?.showLoading()
             guard let self else { return }
+            self.interactor.invalidateThreadedReplySession()
             self.interactor.loadPostDetail(page: self.currentPage)
         }
+    }
+
+    func didTapThreadedReplies(for comment: Comment) {
+        guard let coordinator = interactor.threadedReplyCoordinator else { return }
+        router.presentThreadedReplies(rootComment: comment, coordinator: coordinator)
     }
 
     @discardableResult
@@ -814,6 +820,7 @@ extension PostDetailPresenter: PostDetailInteractorOutput {
         activeCommentPageRequest = nil
         nextCommentPage = nil
         commentPageTracker.reset()
+        interactor.invalidateThreadedReplySession()
         view?.hideLoadingMoreComments()
         view?.hideLoading()
         view?.renderLoginRequired(message: message)

@@ -28,6 +28,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     }
     private let identity = UIStackView()
     private let header = UIStackView()
+    private let threadButton = UIButton(type: .system)
     private let floorNumber = UILabel()
     private let timestamp = UILabel()
     private let posterBadge = UILabel()
@@ -42,6 +43,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     private var bottomInset: CGFloat = 0
     private var authorURL: URL?
     private var openAuthor: ((URL) -> Void)?
+    private var openThread: (() -> Void)?
     var textIndent: CGFloat = 0
     let stack = UIStackView()
     let heading = UILabel()
@@ -149,7 +151,12 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         hotBadge.contentMode = .scaleAspectFit
         hotBadge.image = UIImage(systemName: "flame.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold))
         hotBadge.tintColor = .systemOrange
-        for view in [posterBadge, badgeRow, hotBadge] as [UIView] {
+        threadButton.setImage(UIImage(systemName: "arrow.turn.down.right"), for: .normal)
+        threadButton.tintColor = .tertiaryLabel
+        threadButton.isHidden = true
+        threadButton.accessibilityLabel = DetailListStrings.text("thread-replies")
+        threadButton.addTarget(self, action: #selector(threadButtonTapped), for: .touchUpInside)
+        for view in [posterBadge, badgeRow, hotBadge, threadButton] as [UIView] {
             view.setContentHuggingPriority(.required, for: .horizontal)
             view.setContentCompressionResistancePriority(.required, for: .horizontal)
         }
@@ -160,7 +167,9 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         identity.addArrangedSubview(badgeRow)
         identity.addArrangedSubview(UIView())
         identity.addArrangedSubview(hotBadge)
-        identity.setCustomSpacing(4, after: hotBadge)
+        identity.setCustomSpacing(6, after: hotBadge)
+        identity.addArrangedSubview(threadButton)
+        identity.setCustomSpacing(2, after: threadButton)
         identity.addArrangedSubview(floorNumber)
         header.axis = .vertical
         header.distribution = .equalCentering
@@ -295,6 +304,28 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         if !avatar.isHidden { ImageLoad.url(avatarURL).toAvatar(requestID: request?.id ?? name).into(avatar) }
     }
 
+    func configureThreadEntry(floor: Int?, perform: (() -> Void)?) {
+        openThread = perform
+        let isEnabled = floor != nil && perform != nil
+        threadButton.isHidden = !isEnabled
+        guard let floor, isEnabled else {
+            threadButton.accessibilityIdentifier = nil
+            return
+        }
+        let metrics = UIFontMetrics(forTextStyle: .subheadline)
+        let small = metrics.scaledFont(for: AppTypography.commentMetadataFont(), compatibleWith: traitCollection)
+        // 跟随楼号字体缩放，.small + light 让图标比楼号更轻，只作提示不抢阅读注意力。
+        let config = UIImage.SymbolConfiguration(font: small, scale: .small)
+            .applying(UIImage.SymbolConfiguration(weight: .light))
+        threadButton.setPreferredSymbolConfiguration(config, forImageIn: .normal)
+        threadButton.accessibilityIdentifier = "detail-floor-thread-button-\(floor)"
+        threadButton.accessibilityLabel = "\(DetailListStrings.text("thread-replies")) #\(floor)"
+    }
+
+    @objc private func threadButtonTapped() {
+        openThread?()
+    }
+
     /// 作者标签按作者栏实际宽度折行：第一行跟在作者名、楼主之后，右侧留出热评和楼层号。
     private func wrapBadges(_ labels: [AuthorBadgeLabel]) {
         // 作者栏与正文同在楼层内容区，左侧再让出头像；主楼正文不缩进，不能直接用正文宽度。
@@ -302,7 +333,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         let width = contentWidth - header.directionalLayoutMargins.leading
         let spacing = identity.spacing
         func size(_ view: UIView) -> CGFloat { view.isHidden ? 0 : ceil(view.intrinsicContentSize.width) + spacing }
-        var used = size(metadata) + size(posterBadge) + size(hotBadge) + size(floorNumber)
+        var used = size(metadata) + size(posterBadge) + size(hotBadge) + size(threadButton) + size(floorNumber)
         var lineHasContent = !metadata.isHidden || !posterBadge.isHidden
         var lines: [[AuthorBadgeLabel]] = [[]]
         for label in labels {
@@ -388,8 +419,20 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     }
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        // 细线分支图标与右侧楼号合体为宽松单手热区，点击直达「吃瓜」面板且不干扰列表滚动。
+        if !threadButton.isHidden, threadButton.isUserInteractionEnabled, openThread != nil {
+            let iconRect = threadButton.convert(threadButton.bounds, to: self)
+            let combinedRect = floorNumber.isHidden
+                ? iconRect
+                : iconRect.union(floorNumber.convert(floorNumber.bounds, to: self))
+            let expandedRect = combinedRect.insetBy(dx: -8, dy: -10)
+            if expandedRect.contains(point) {
+                return threadButton
+            }
+        }
         guard let hit = super.hitTest(point, with: event) else { return nil }
         guard !floorActions.isEmpty else { return hit }
+        if hit === threadButton { return hit }
         if let text = hit as? DetailSelectableTextView {
             return text.handlesTouch(at: convert(point, to: text)) ? text : menuSurface
         }
@@ -521,6 +564,9 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         avatar.image = nil
         authorURL = nil
         openAuthor = nil
+        openThread = nil
+        threadButton.isHidden = true
+        threadButton.accessibilityIdentifier = nil
         for button in actionButtons.prefix(usedButtonCount) {
             button.perform = nil
             button.minimumWidth.constant = 0

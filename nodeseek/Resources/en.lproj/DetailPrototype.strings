@@ -35,3 +35,21 @@
 "vote.loginRequired" = "Sign in to vote.";
 "debug-markdown-unsupported" = "Markdown parsing fell back to HTML";
 "debug-markdown-unavailable" = "No Markdown source available. Showing HTML.";
+
+"thread-replies" = "View Related Conversation";
+"thread-replying-to" = "Replying to #%ld";
+"thread-no-markdown" = "Source unavailable";
+"thread-empty" = "No direct replies to #%ld yet";
+"thread-scanning-with-total" = "%ld found · Checking page %ld/%ld";
+"thread-scanning-without-total" = "%ld found · Checking page %ld";
+"thread-paused-with-total" = "%ld found · Checked to page %ld/%ld";
+"thread-paused-without-total" = "%ld found · Checked to page %ld";
+"thread-completed-count-one" = "1 reply found";
+"thread-completed-count" = "%ld replies found";
+"thread-completed-empty" = "Done · No replies";
+"thread-failed-partial" = "%ld found · %@";
+"thread-continue" = "Continue";
+"thread-retry" = "Retry";
+"thread-login" = "Sign in";
+"thread-load-failed" = "Load failed, tap to retry";
+"thread-restricted" = "This page is restricted";

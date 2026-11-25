@@ -129,6 +129,7 @@ nonisolated struct PostDetail: Equatable, Sendable {
     private(set) var page: Int
     private(set) var pagination: PostDetailPagination?
     private(set) var isLastPage: Bool
+    private(set) var totalPages: Int?
 
     init(
         id: String,
@@ -156,7 +157,8 @@ nonisolated struct PostDetail: Equatable, Sendable {
         comments: [Comment],
         page: Int = 1,
         pagination: PostDetailPagination? = nil,
-        isLastPage: Bool? = nil
+        isLastPage: Bool? = nil,
+        totalPages: Int? = nil
     ) {
         self.id = id
         self.title = title
@@ -184,6 +186,8 @@ nonisolated struct PostDetail: Equatable, Sendable {
         self.page = max(1, page)
         self.pagination = pagination
         self.isLastPage = isLastPage ?? (pagination?.nextPage == nil)
+        let normalizedTotal = totalPages.flatMap { $0 > 0 ? $0 : nil }
+        self.totalPages = normalizedTotal ?? pagination?.items.map(\.page).max()
     }
 
     func updatingFavoriteState(count: Int?, isCollected: Bool) -> PostDetail {
@@ -247,13 +251,16 @@ nonisolated struct PostDetail: Equatable, Sendable {
     func replacingComments(
         _ nextComments: [Comment],
         page: Int,
-        pagination: PostDetailPagination?
+        pagination: PostDetailPagination?,
+        totalPages: Int? = nil
     ) -> PostDetail {
         var updated = self
         updated.comments = nextComments
         updated.page = max(1, page)
         updated.pagination = pagination
         updated.isLastPage = pagination?.nextPage == nil
+        let normalizedTotal = totalPages.flatMap { $0 > 0 ? $0 : nil }
+        updated.totalPages = normalizedTotal ?? updated.totalPages ?? pagination?.items.map(\.page).max()
         return updated
     }
 }
