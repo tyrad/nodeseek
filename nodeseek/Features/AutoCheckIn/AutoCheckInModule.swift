@@ -20,6 +20,12 @@ enum AutoCheckInModule {
         )
     }
 
+    static func checkInFromSiri() async -> AutoCheckInRunOutcome {
+        await (UIApplication.shared.delegate as? AppDelegate)?.accountLaunchPreparation?.value
+        _ = await CurrentAccountRefresher.shared.refreshIfNeeded(maxAge: 60)
+        return await coordinator.runIfNeeded(presentationContext: nil, trigger: .siri)
+    }
+
     static func makeSettingsViewController() -> UIViewController {
         AutoCheckInSettingsViewController(settingsStore: settingsStore)
     }

@@ -1,0 +1,3 @@
+"Check in with ${applicationName}" = "${applicationName}签到";
+"Check probe status in ${applicationName}" = "查一下${applicationName}探针状态";
+"Take a note with ${applicationName}" = "用${applicationName}记个草稿";

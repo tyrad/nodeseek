@@ -8,6 +8,19 @@
 	<true/>
 	<key>CFBundleDisplayName</key>
 	<string>NS Connect</string>
+	<key>LSHasLocalizedDisplayName</key>
+	<true/>
+	<key>INAlternativeAppNames</key>
+	<array>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>NS</string>
+		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>NodeSeek</string>
+		</dict>
+	</array>
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>en</string>

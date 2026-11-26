@@ -56,6 +56,7 @@ enum AutoCheckInMode: String, Codable, CaseIterable, Sendable {
 enum AutoCheckInTrigger: String, Sendable {
     case postListAllFirstPage
     case postListAppear
+    case siri
     case settingsEnabled
     case sceneBecomeActive
 }

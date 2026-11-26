@@ -213,6 +213,7 @@ final class AutoCheckInCoordinator {
     private let multiAccountDelayInterval: TimeInterval
     private let delay: @MainActor (TimeInterval) async -> Void
     private var inFlightTask: Task<AutoCheckInRunOutcome, Never>?
+    private var activeTrigger: AutoCheckInTrigger?
     private var activeRunID: String?
     private var cooldownUntil: Date?
 
@@ -255,7 +256,12 @@ final class AutoCheckInCoordinator {
         presentationContext: UIViewController?,
         trigger: AutoCheckInTrigger = .postListAllFirstPage
     ) async -> AutoCheckInRunOutcome {
-        if let inFlightTask {
+        while let inFlightTask {
+            // 语音只签当前账号，自动任务可能还要处理其他账号。两者串行后各自复核当日状态。
+            if (activeTrigger == .siri) != (trigger == .siri) {
+                _ = await inFlightTask.value
+                continue
+            }
             AppLog.notice(.autoCheckIn, "runID=\(activeRunID ?? "unknown") skip=in_flight")
             return await inFlightTask.value
         }
@@ -263,6 +269,11 @@ final class AutoCheckInCoordinator {
         let runID = runIDProvider()
         let task: Task<AutoCheckInRunOutcome, Never> = Task { @MainActor [weak self] in
             guard let self else { return .failed("coordinator_released") }
+            defer {
+                self.inFlightTask = nil
+                self.activeTrigger = nil
+                self.activeRunID = nil
+            }
             return await self.performRun(
                 runID: runID,
                 trigger: trigger,
@@ -270,11 +281,9 @@ final class AutoCheckInCoordinator {
             )
         }
         activeRunID = runID
+        activeTrigger = trigger
         inFlightTask = task
-        let outcome = await task.value
-        inFlightTask = nil
-        activeRunID = nil
-        return outcome
+        return await task.value
     }
 
     private func performRun(
@@ -289,7 +298,8 @@ final class AutoCheckInCoordinator {
         let activeUID = await accountStatus.activeUID()
         let activeDisplayName = await accountStatus.activeDisplayName()
         let initialSessionID = await accountStatus.sessionID()
-        let pendingOtherAccounts = settings.checkInAllAccounts
+        if trigger == .siri, loggedIn != true { return .skipped("not_logged_in") }
+        let pendingOtherAccounts = trigger != .siri && settings.checkInAllAccounts
             ? (multiAccountProvider?.otherValidAccounts(excluding: activeUID)
                 .filter { stateStore.isCompleted(forUID: $0.uid, on: dayIdentifier) == false } ?? [])
             : []
@@ -299,7 +309,7 @@ final class AutoCheckInCoordinator {
             "runID=\(runID) start trigger=\(trigger.rawValue) day=\(dayIdentifier) timezone=Asia/Shanghai enabled=\(settings.isEnabled) mode=\(settings.mode.rawValue) random=\(settings.mode.randomQueryValue) loggedIn=\(Self.describeLoggedIn(loggedIn)) activeUID=\(activeUID.map(String.init) ?? "nil") extraAccounts=\(pendingOtherAccounts.count) hasPresentationContext=\(presentationContext != nil) presentation=\(presentationContext.map { String(describing: type(of: $0)) } ?? "nil") lastCompletedDay=\(stateStore.state(forUID: activeUID).completedDayIdentifier ?? "nil")"
         )
 
-        guard settings.isEnabled else {
+        guard settings.isEnabled || trigger == .siri else {
             AppLog.notice(.autoCheckIn, "runID=\(runID) skip=disabled")
             return finish(.skipped("disabled"), runID: runID, startedAt: startedAt, detail: "reason=disabled")
         }
@@ -435,6 +445,7 @@ final class AutoCheckInCoordinator {
                 return .alreadyCheckedIn
             }
 
+            if let initialSessionID, await accountStatus.sessionID() != initialSessionID { return .failed("session_changed") }
             let submit = try await webAutomator.submit(mode: settings.mode, runID: runID)
             let sanitizedMessage = sanitize(submit.message)
 
@@ -538,7 +549,7 @@ final class AutoCheckInCoordinator {
         switch trigger {
         case .postListAllFirstPage:
             return configured
-        case .postListAppear, .settingsEnabled, .sceneBecomeActive:
+        case .postListAppear, .settingsEnabled, .sceneBecomeActive, .siri:
             return 0
         }
     }

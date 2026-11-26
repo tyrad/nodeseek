@@ -21,6 +21,25 @@ struct AutoCheckInCoordinatorTests {
         #expect(harness.web.submitModes.isEmpty)
     }
 
+    @Test func siriChecksInWhenAutomaticCheckInIsOffAndReusesTodaysResult() async throws {
+        let harness = try Harness(settings: .default)
+        let first = await harness.coordinator.runIfNeeded(presentationContext: nil, trigger: .siri)
+        let second = await harness.coordinator.runIfNeeded(presentationContext: nil, trigger: .siri)
+        #expect(first == .submitted(message: "ok"))
+        #expect(second == .skipped("completed_today"))
+        #expect(harness.web.submitModes == [.fixedChickenLeg])
+        #expect(!harness.settingsStore.settings.isEnabled)
+    }
+
+    @Test func siriRequiresLoginEvenWithACompletedDay() async throws {
+        let harness = try Harness(settings: .default)
+        harness.stateStore.markCompleted(dayIdentifier: harness.dayIdentifier, at: harness.now)
+        harness.accountStatus.isLoggedInValue = false
+        let outcome = await harness.coordinator.runIfNeeded(presentationContext: nil, trigger: .siri)
+        #expect(outcome == .skipped("not_logged_in"))
+        #expect(harness.web.boardCalls == 0)
+    }
+
     @Test func waitsConfiguredTriggerDelayBeforeRequestingBoardState() async throws {
         var delays: [TimeInterval] = []
         let harness = try Harness(
@@ -220,6 +239,19 @@ struct AutoCheckInCoordinatorTests {
         #expect(first == .submitted(message: "ok"))
         #expect(second == first)
         #expect(harness.web.boardCalls == 1)
+        #expect(harness.web.submitModes == [.fixedChickenLeg])
+    }
+
+    @Test func siriWaitsForAutomaticCheckInBeforeCheckingTodaysState() async throws {
+        let harness = try Harness(settings: AutoCheckInSettings(isEnabled: true, mode: .fixedChickenLeg))
+        harness.web.suspendBoardState = true
+        let automatic = Task { await harness.coordinator.runIfNeeded(presentationContext: nil) }
+        while harness.web.boardContinuation == nil { await Task.yield() }
+        let spoken = Task { await harness.coordinator.runIfNeeded(presentationContext: nil, trigger: .siri) }
+        harness.web.resumeBoardState()
+
+        #expect(await automatic.value == .submitted(message: "ok"))
+        #expect(await spoken.value == .skipped("completed_today"))
         #expect(harness.web.submitModes == [.fixedChickenLeg])
     }
 
