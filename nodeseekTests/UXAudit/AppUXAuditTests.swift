@@ -249,6 +249,25 @@ final class AppUXAuditTests: XCTestCase {
         presented.dismiss(animated: false)
     }
 
+    func testMeContentRowsKeepTheirFramesWhenProfileLoads() async throws {
+        func rowFrames(in page: MeViewController) -> [CGRect] {
+            page.view.layoutIfNeeded()
+            return uxDescendants(of: page.view)
+                .filter { $0.accessibilityIdentifier?.hasSuffix("-row") == true }
+                .map { $0.convert($0.bounds, to: page.view) }
+        }
+
+        var initialFrames: [CGRect]?
+        let context = try await makeLoggedInMePage { page in
+            if initialFrames == nil { initialFrames = rowFrames(in: page) }
+        }
+        defer { context.window.isHidden = true }
+        XCTAssertNotNil(context.todayLabelText)
+        let initial = try XCTUnwrap(initialFrames)
+        XCTAssertEqual(initial.count, 8)
+        XCTAssertEqual(rowFrames(in: context.viewController), initial)
+    }
+
     func testMeLevelProgressRowExpandsAndCollapsesInPlace() async throws {
         let context = try await makeLoggedInMePage()
         defer { context.window.isHidden = true }
@@ -432,7 +451,9 @@ final class AppUXAuditTests: XCTestCase {
     }
 
     /// 用独立账号存储和模拟接口搭一个已登录、资料与今日进度都已加载的「我的」页。
-    private func makeLoggedInMePage() async throws -> MePageContext {
+    private func makeLoggedInMePage(
+        onAccountRendered: ((MeViewController) -> Void)? = nil
+    ) async throws -> MePageContext {
         UXAuditMockURLProtocol.responsesByPath = [
             "/api/account/getInfo/31037": #"{"success":true,"detail":{"member_id":31037,"member_name":"缭雾","rank":4,"coin":2000,"stardust":21,"bio":"","created_at":"2024-11-23T17:11:12.000Z","nPost":26,"nComment":607,"follows":3,"fans":5,"readme":"","followed":false}}"#,
             "/api/progress/today": #"{"success":true,"postBonusCount":0,"maxPostBonusCount":4,"commentBonusCount":7,"maxCommentBonusCount":20,"maxFreeLike":3,"freeLikeUsed":0}"#,
@@ -446,17 +467,25 @@ final class AppUXAuditTests: XCTestCase {
             profileURL: URL(string: "https://www.nodeseek.com/space/31037")
         ))
         let client = NodeSeekUserContentClient(session: uxMockSession())
+        let accountController = PostListSideMenuAccountController(
+            currentAccountStore: store, accountRefresher: UXAuditAccountRefresher()
+        )
         let me = MeViewController(
-            accountController: PostListSideMenuAccountController(
-                currentAccountStore: store,
-                accountRefresher: UXAuditAccountRefresher()
-            ),
+            accountController: accountController,
             client: client,
             notificationClient: UXAuditNotificationClient(),
             visitedStore: EmptyVisitedPostStore()
         )
         let navigation = UINavigationController(rootViewController: me)
         let window = uxMakeWindow(root: navigation)
+
+        if let onAccountRendered {
+            let render = accountController.onAccountChanged
+            accountController.onAccountChanged = { [weak me] account in
+                render?(account)
+                if account.isLoggedIn, let me { onAccountRendered(me) }
+            }
+        }
 
         var todayText: String?
         _ = await uxWaitUntil(timeout: 3) {

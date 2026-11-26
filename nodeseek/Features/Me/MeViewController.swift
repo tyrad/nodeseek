@@ -92,7 +92,8 @@ final class MeViewController: UIViewController {
         )
         SeekMailUnreadMonitor.shared.start()
         mailUnreadDidChange()
-        render()
+        // 等本地账号快照确定卡片类型，避免先闪现可点击的游客布局。
+        contentStack.isHidden = true
 
         // 刷新只由本页出现和登录关闭触发；不能用 view.window 判断，
         // 出现回调和登录关闭时本页都还不在 window 上，会把刷新丢掉
@@ -209,6 +210,7 @@ final class MeViewController: UIViewController {
     private func accountDidChange(_ account: AccountResponse) {
         let uidChanged = account.nodeSeekUID != self.account.nodeSeekUID
         self.account = account
+        contentStack.isHidden = false
         if uidChanged || account.isLoggedIn == false {
             isProgressExpanded = false
             profile = nil
@@ -249,7 +251,7 @@ final class MeViewController: UIViewController {
                 self.render()
                 let progress = await progressResult
                 guard !Task.isCancelled else { return }
-                self.progress = progress
+                if let progress { self.progress = progress }
                 self.render()
             } catch {
                 guard !Task.isCancelled else { return }
@@ -337,7 +339,10 @@ final class MeViewController: UIViewController {
     }
 
     private func toggleTodayProgress() {
-        guard profile != nil else { return }
+        guard profile != nil else {
+            loadProfile()
+            return
+        }
         isProgressExpanded.toggle()
         if isProgressExpanded && progress == nil { loadProfile() }
         updateProgressDetails()
@@ -524,6 +529,7 @@ private final class MeProfileCardView: UIControl {
     private let avatarImageView = UIImageView()
     private let nameLabel = UILabel()
     private let metaLabel = UILabel()
+    private lazy var memberHeaderHeight = headerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 0)
     /// 切换按钮放在卡片层而不是头部里，避免触发头部高亮，也让读屏能单独聚焦；头部只保留一个等宽占位。
     private let switchAccountPlaceholder = UIView()
     private let switchAccountButton = AccountSwitchIconButton(accessibilityIdentifier: "me-profile-switch-account-button")
@@ -536,10 +542,11 @@ private final class MeProfileCardView: UIControl {
     private let levelSeparator = MeSeparatorView()
     private let levelContainer = UIControl()
     private let progressChevron = UIImageView()
-    private let detailsStack = UIStackView()
+    private let detailsView = UIView()
     private let progressRows = UserTodayProgressRowsView()
     private let progressSpinner = UIActivityIndicatorView(style: .medium)
     private let retryButton = UIButton(type: .system)
+    private let levelPlaceholder = UIView()
     private let levelTitleLabel = UILabel()
     private let todayLabel = UILabel()
     private let levelBar = MeProgressBar()
@@ -565,7 +572,7 @@ private final class MeProfileCardView: UIControl {
         setupStats()
         setupLevel()
 
-        let stack = UIStackView(arrangedSubviews: [headerView, statsSeparator, statsStack, levelSeparator, levelContainer, detailsStack])
+        let stack = UIStackView(arrangedSubviews: [headerView, statsSeparator, statsStack, levelSeparator, levelContainer, detailsView])
         stack.axis = .vertical
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
@@ -604,7 +611,7 @@ private final class MeProfileCardView: UIControl {
         if !loginButton.isHidden {
             return hitView.isDescendant(of: loginButton) ? hitView : self
         }
-        if hitView.isDescendant(of: detailsStack) {
+        if hitView.isDescendant(of: detailsView) {
             return hitView.isDescendant(of: retryButton) ? retryButton : nil
         }
         if hitView.isDescendant(of: levelContainer) { return levelContainer }
@@ -619,8 +626,9 @@ private final class MeProfileCardView: UIControl {
             if let days = profile.joinedDays() { parts.append("加入 \(days) 天") }
             metaLabel.text = parts.joined(separator: " · ")
         } else {
-            metaLabel.text = account.stats.prefix(2).joined(separator: " · ")
+            metaLabel.text = account.nodeSeekUID.map { "UID \($0)" } ?? account.stats.prefix(2).joined(separator: " · ")
         }
+        memberHeaderHeight.isActive = true
         setSwitchAccountVisible(true)
         loginButton.isHidden = true
 
@@ -636,21 +644,22 @@ private final class MeProfileCardView: UIControl {
         statsSeparator.isHidden = false
         statsStack.isHidden = false
 
+        let canLoadProfile = account.nodeSeekUID != nil
+        levelContainer.isHidden = !canLoadProfile
+        levelSeparator.isHidden = !canLoadProfile
         if let profile {
             let level = profile.levelProgress
             levelTitleLabel.text = level.isMaxRank
                 ? "Lv \(level.rank) 已满级"
                 : "距 Lv \(level.nextRank) 还差 \(level.remaining) 鸡腿"
             levelBar.fraction = level.fraction
-            levelSeparator.isHidden = false
-            levelContainer.isHidden = false
         } else {
-            levelSeparator.isHidden = true
-            levelContainer.isHidden = true
+            levelBar.fraction = 0
         }
     }
 
     func renderGuest(showsSwitchAccount: Bool) {
+        memberHeaderHeight.isActive = false
         nameLabel.text = "未登录"
         metaLabel.text = "登录后查看等级、鸡腿和今日进度"
         setSwitchAccountVisible(showsSwitchAccount)
@@ -669,6 +678,7 @@ private final class MeProfileCardView: UIControl {
     func updateTextSize() {
         nameLabel.font = AppTypography.font(basePointSize: 22, weight: .bold)
         metaLabel.font = AppTypography.font(basePointSize: 13)
+        memberHeaderHeight.constant = 16 + ceil(nameLabel.font.lineHeight) + 4 + 2 * ceil(metaLabel.font.lineHeight) + 14
     }
 
     private func setupHeader() {
@@ -745,8 +755,28 @@ private final class MeProfileCardView: UIControl {
     }
 
     private func setupLevel() {
-        detailsStack.axis = .vertical
-        detailsStack.accessibilityIdentifier = "me-progress-details"
+        // 明细始终由真实的四行决定高度，等待和重试控件叠放在同一位置。
+        for child in [progressRows, progressSpinner, retryButton] as [UIView] {
+            child.translatesAutoresizingMaskIntoConstraints = false
+            detailsView.addSubview(child)
+        }
+        let rowsBottom = progressRows.bottomAnchor.constraint(equalTo: detailsView.bottomAnchor)
+        rowsBottom.priority = .defaultHigh
+        NSLayoutConstraint.activate([
+            progressRows.leadingAnchor.constraint(equalTo: detailsView.leadingAnchor),
+            progressRows.trailingAnchor.constraint(equalTo: detailsView.trailingAnchor),
+            progressRows.topAnchor.constraint(equalTo: detailsView.topAnchor),
+            rowsBottom,
+            progressSpinner.centerXAnchor.constraint(equalTo: detailsView.centerXAnchor),
+            progressSpinner.centerYAnchor.constraint(equalTo: detailsView.centerYAnchor),
+            retryButton.centerXAnchor.constraint(equalTo: detailsView.centerXAnchor),
+            retryButton.centerYAnchor.constraint(equalTo: detailsView.centerYAnchor)
+        ])
+        levelPlaceholder.backgroundColor = .tertiarySystemFill
+        levelPlaceholder.layer.cornerRadius = 4
+        levelPlaceholder.translatesAutoresizingMaskIntoConstraints = false
+        levelContainer.addSubview(levelPlaceholder)
+        detailsView.accessibilityIdentifier = "me-progress-details"
         retryButton.setTitle(NSLocalizedString("重试", tableName: "Me", comment: ""), for: .normal)
         retryButton.tintColor = .label
         retryButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
@@ -781,6 +811,10 @@ private final class MeProfileCardView: UIControl {
         stack.translatesAutoresizingMaskIntoConstraints = false
         levelContainer.addSubview(stack)
         NSLayoutConstraint.activate([
+            levelPlaceholder.leadingAnchor.constraint(equalTo: levelTitleLabel.leadingAnchor),
+            levelPlaceholder.centerYAnchor.constraint(equalTo: levelTitleLabel.centerYAnchor),
+            levelPlaceholder.widthAnchor.constraint(equalToConstant: 100),
+            levelPlaceholder.heightAnchor.constraint(equalToConstant: 10),
             stack.leadingAnchor.constraint(equalTo: levelContainer.leadingAnchor, constant: 16),
             stack.trailingAnchor.constraint(equalTo: levelContainer.trailingAnchor, constant: -16),
             stack.topAnchor.constraint(equalTo: levelContainer.topAnchor, constant: 12),
@@ -789,27 +823,33 @@ private final class MeProfileCardView: UIControl {
     }
 
     func showProgressDetails(expanded: Bool, level: UserLevelProgress?, today: UserTodayProgressRecord?, isLoading: Bool) {
-        let content: UIView?
+        levelPlaceholder.isHidden = level != nil || !isLoading
+        levelTitleLabel.alpha = levelPlaceholder.isHidden ? 1 : 0
+        levelContainer.isEnabled = levelPlaceholder.isHidden
+        levelContainer.isAccessibilityElement = levelContainer.isEnabled
+        progressChevron.isHidden = level == nil
+        if level == nil {
+            levelTitleLabel.text = isLoading ? NSLocalizedString("今日进度", tableName: "Me", comment: "")
+                : NSLocalizedString("重试", tableName: "Me", comment: "")
+        }
         if expanded, let level {
             todayLabel.text = level.isMaxRank ? "\(level.coin) 鸡腿" : "\(level.coin) / \(level.upperBound)"
             if let today {
                 progressRows.configure(today: today)
-                content = progressRows
-            } else {
-                content = isLoading ? progressSpinner : retryButton
             }
         } else {
             todayLabel.text = today.map {
                 "今日 评论 \($0.commentBonusCount)/\($0.maxCommentBonusCount) · 发帖 \($0.postBonusCount)/\($0.maxPostBonusCount)"
             }
-            content = nil
         }
-        if detailsStack.arrangedSubviews.first !== content {
-            detailsStack.arrangedSubviews.first?.removeFromSuperview()
-            if let content { detailsStack.addArrangedSubview(content) }
+        detailsView.isHidden = !expanded
+        progressRows.isHidden = today == nil
+        retryButton.isHidden = !expanded || today != nil || isLoading
+        if expanded && today == nil && isLoading {
+            progressSpinner.startAnimating()
+        } else {
+            progressSpinner.stopAnimating()
         }
-        detailsStack.isHidden = content == nil
-        if content === progressSpinner { progressSpinner.startAnimating() } else { progressSpinner.stopAnimating() }
         progressChevron.transform = expanded ? CGAffineTransform(rotationAngle: .pi) : .identity
         let state = expanded ? NSLocalizedString("已展开", tableName: "Me", comment: "")
             : NSLocalizedString("已折叠", tableName: "Me", comment: "")
