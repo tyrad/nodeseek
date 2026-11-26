@@ -10,7 +10,7 @@ extension PostPageContainerViewController: UIPageViewControllerDataSource {
         _ pageViewController: UIPageViewController,
         viewControllerBefore viewController: UIViewController
     ) -> UIViewController? {
-        guard let host = viewController as? PostTextureListHostViewController,
+        guard let host = viewController as? PostListHostViewController,
               let index = categories.firstIndex(of: host.category),
               index > 0 else {
             return nil
@@ -22,7 +22,7 @@ extension PostPageContainerViewController: UIPageViewControllerDataSource {
         _ pageViewController: UIPageViewController,
         viewControllerAfter viewController: UIViewController
     ) -> UIViewController? {
-        guard let host = viewController as? PostTextureListHostViewController,
+        guard let host = viewController as? PostListHostViewController,
               let index = categories.firstIndex(of: host.category),
               index < categories.count - 1 else {
             return nil
@@ -39,7 +39,7 @@ extension PostPageContainerViewController: UIPageViewControllerDelegate {
         transitionCompleted completed: Bool
     ) {
         guard finished, completed,
-              let current = pageViewController.viewControllers?.first as? PostTextureListHostViewController else {
+              let current = pageViewController.viewControllers?.first as? PostListHostViewController else {
             return
         }
         updateCurrentCategoryAfterPaging(current.category)

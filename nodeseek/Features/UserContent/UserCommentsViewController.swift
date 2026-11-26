@@ -5,12 +5,11 @@
 //  Created by Codex on 2026/5/11.
 //
 
-import AsyncDisplayKit
 import UIKit
 
 @MainActor
 final class UserCommentsViewController: UIViewController {
-    private let tableNode = ASTableNode(style: .plain)
+    private let tableView = UITableView(frame: .zero, style: .plain)
     private let refreshControl = UIRefreshControl()
     private let footerView = UserContentFooterView()
     private let errorView = UserContentErrorView(accessibilityIdentifier: "user-comments-error-view")
@@ -62,7 +61,7 @@ final class UserCommentsViewController: UIViewController {
         super.traitCollectionDidChange(previousTraitCollection)
         if traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection),
            isViewLoaded, displayMode == .content {
-            tableNode.reloadData()
+            tableView.reloadData()
         }
     }
 
@@ -72,31 +71,34 @@ final class UserCommentsViewController: UIViewController {
 
     private func setupUI() {
         view.backgroundColor = UIColor.systemBackground
-        tableNode.dataSource = self
-        tableNode.delegate = self
-        tableNode.leadingScreensForBatching = 2
-        tableNode.view.separatorStyle = .singleLine
-        tableNode.view.tableFooterView = footerView
-        tableNode.view.backgroundColor = UIColor.systemBackground
+        tableView.dataSource = self
+        tableView.delegate = self
+        tableView.rowHeight = UITableView.automaticDimension
+        tableView.estimatedRowHeight = 72
+        tableView.register(UserCommentGroupCell.self, forCellReuseIdentifier: "content")
+        tableView.register(UserContentSkeletonCell.self, forCellReuseIdentifier: "skeleton")
+        tableView.separatorStyle = .singleLine
+        tableView.tableFooterView = footerView
+        tableView.backgroundColor = UIColor.systemBackground
         refreshControl.addTarget(self, action: #selector(refreshTriggered), for: .valueChanged)
-        tableNode.view.refreshControl = refreshControl
-        tableNode.view.translatesAutoresizingMaskIntoConstraints = false
+        tableView.refreshControl = refreshControl
+        tableView.translatesAutoresizingMaskIntoConstraints = false
         errorView.onRetry = { [weak self] in
             self?.loadFirstPage()
         }
 
-        view.addSubview(tableNode.view)
+        view.addSubview(tableView)
         view.addSubview(errorView)
         NSLayoutConstraint.activate([
-            tableNode.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableNode.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableNode.view.topAnchor.constraint(equalTo: view.topAnchor),
-            tableNode.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            tableView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            tableView.topAnchor.constraint(equalTo: view.topAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            errorView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            errorView.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
             errorView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            errorView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
-            errorView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32)
+            errorView.leadingAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 32),
+            errorView.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -32)
         ])
     }
 
@@ -143,6 +145,7 @@ final class UserCommentsViewController: UIViewController {
             } catch {
                 guard generation == requestGeneration else { return }
                 isLoadingMore = false
+                lastBatchFetchRequestedCount = nil
                 footerView.stopAnimating()
             }
         }
@@ -166,7 +169,7 @@ final class UserCommentsViewController: UIViewController {
         errorView.isHidden = true
         refreshControl.endRefreshing()
         footerView.stopAnimating()
-        tableNode.reloadData()
+        tableView.reloadData()
     }
 
     private func finishLoadMore(records loaded: [UserCommentRecord], page: Int) {
@@ -179,19 +182,26 @@ final class UserCommentsViewController: UIViewController {
         nextPage = page + 1
         let oldGroups = groups
         let oldCount = records.count
-        records.append(contentsOf: loaded.filter { item in
-            records.contains { $0.postID == item.postID && $0.floorID == item.floorID } == false
-        })
+        var known = Dictionary(grouping: records, by: \.postID).mapValues { Set($0.map(\.floorID)) }
+        records.append(contentsOf: loaded.filter { known[$0.postID, default: []].insert($0.floorID).inserted })
         let newCount = records.count
-        guard newCount > oldCount else { return }
+        guard newCount > oldCount else {
+            lastBatchFetchRequestedCount = nil
+            return
+        }
+        // 离屏时 UITableView 可能尚未读取上一次 reload 的行数，直接同步当前数据。
+        guard tableView.window != nil else {
+            tableView.reloadData()
+            return
+        }
         // 保留未变化的节点，避免分页时重建整张列表导致可见内容跳动。
         let changed = oldGroups.indices.compactMap { index -> IndexPath? in
             oldGroups[index] != groups[index] ? IndexPath(row: index, section: 0) : nil
         }
         let inserted = (oldGroups.count..<groups.count).map { IndexPath(row: $0, section: 0) }
-        tableNode.performBatch(animated: false) { [weak self] in
-            self?.tableNode.reloadRows(at: changed, with: .none)
-            self?.tableNode.insertRows(at: inserted, with: .none)
+        tableView.performBatchUpdates {
+            tableView.reloadRows(at: changed, with: .none)
+            tableView.insertRows(at: inserted, with: .none)
         }
     }
 
@@ -200,7 +210,7 @@ final class UserCommentsViewController: UIViewController {
         records = []
         errorView.isHidden = true
         footerView.stopAnimating()
-        tableNode.reloadData()
+        tableView.reloadData()
     }
 
     private func showFirstPageError(_ message: String) {
@@ -212,7 +222,7 @@ final class UserCommentsViewController: UIViewController {
         footerView.stopAnimating()
         errorView.messageLabel.text = message
         errorView.isHidden = false
-        tableNode.reloadData()
+        tableView.reloadData()
     }
 
     @objc private func refreshTriggered() {
@@ -231,7 +241,7 @@ final class UserCommentsViewController: UIViewController {
 
     @objc private func appTextSizeDidChange(_ notification: Notification) {
         guard displayMode == .content else { return }
-        tableNode.reloadData()
+        tableView.reloadData()
     }
 
     private func openPost(_ record: UserCommentRecord) {
@@ -245,8 +255,8 @@ final class UserCommentsViewController: UIViewController {
     }
 }
 
-extension UserCommentsViewController: ASTableDataSource {
-    func tableNode(_ tableNode: ASTableNode, numberOfRowsInSection section: Int) -> Int {
+extension UserCommentsViewController: UITableViewDataSource {
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         switch displayMode {
         case .content:
             return groups.count
@@ -257,34 +267,23 @@ extension UserCommentsViewController: ASTableDataSource {
         }
     }
 
-    func tableNode(_ tableNode: ASTableNode, nodeBlockForRowAt indexPath: IndexPath) -> ASCellNodeBlock {
-        switch displayMode {
-        case .content:
-            let group = groups[indexPath.row]
-            let traits = traitCollection
-            return { [weak self] in
-                UserCommentGroupCellNode(
-                    group: group,
-                    traits: traits,
-                    onOpenComment: { [weak self] record in self?.openComment(record) }
-                )
-            }
-        case .skeleton:
-            return {
-                UserContentSkeletonCellNode()
-            }
-        case .firstPageError:
-            return {
-                ASCellNode()
-            }
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        guard displayMode == .content else {
+            return tableView.dequeueReusableCell(withIdentifier: "skeleton", for: indexPath)
         }
+        let cell = tableView.dequeueReusableCell(withIdentifier: "content", for: indexPath) as! UserCommentGroupCell
+        let group = groups[indexPath.row]
+        cell.configure(group, onOpenPost: { [weak self] in
+            if let first = group.comments.first { self?.openPost(first) }
+        }) { [weak self] in self?.openComment($0) }
+        return cell
     }
 }
 
-extension UserCommentsViewController: ASTableDelegate {
-    func tableNode(_ tableNode: ASTableNode, didSelectRowAt indexPath: IndexPath) {
+extension UserCommentsViewController: UITableViewDelegate {
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         guard displayMode == .content, groups.indices.contains(indexPath.row) else { return }
-        tableNode.deselectRow(at: indexPath, animated: true)
+        tableView.deselectRow(at: indexPath, animated: true)
         if let record = groups[indexPath.row].comments.first {
             openPost(record)
         }
@@ -294,25 +293,11 @@ extension UserCommentsViewController: ASTableDelegate {
         hasUserStartedScrolling = true
     }
 
-    func shouldBatchFetch(for tableNode: ASTableNode) -> Bool {
-        displayMode == .content
-            && hasUserStartedScrolling
-            && hasMorePages
-            && !isLoadingFirstPage
-            && !isLoadingMore
-            && !records.isEmpty
-            && lastBatchFetchRequestedCount != records.count
-    }
-
-    func tableNode(_ tableNode: ASTableNode, willBeginBatchFetchWith context: ASBatchContext) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else {
-                context.completeBatchFetching(true)
-                return
-            }
-            self.lastBatchFetchRequestedCount = self.records.count
-            self.loadMoreIfNeeded()
-            context.completeBatchFetching(true)
-        }
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        guard hasUserStartedScrolling, displayMode == .content, !isLoadingMore, !isLoadingFirstPage, hasMorePages,
+              scrollView.contentOffset.y + scrollView.bounds.height * 2 >= scrollView.contentSize.height,
+              lastBatchFetchRequestedCount != records.count else { return }
+        lastBatchFetchRequestedCount = records.count
+        loadMoreIfNeeded()
     }
 }

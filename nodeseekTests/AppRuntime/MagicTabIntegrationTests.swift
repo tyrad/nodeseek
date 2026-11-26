@@ -1,4 +1,3 @@
-import AsyncDisplayKit
 import ImageIO
 import JXPhotoBrowser
 import UIKit
@@ -194,22 +193,21 @@ final class MagicTabIntegrationTests: XCTestCase {
             .init(title: "IP 质量", blocks: [])
         ])
         var didOpenGallery = false
-        let node = DetailMagicTabsNode(tabs: tabs, makeContent: { _, _, _ in [] }, onImageTapped: { _, _ in
-            didOpenGallery = true
-        }, onLayoutInvalidated: {})
-        node.view.frame = CGRect(x: 0, y: 100, width: 300, height: 300)
-        controller.view.addSubview(node.view)
-        defer { node.view.removeFromSuperview() }
-        node.openGallery(sectionIndex: 0, imageURLs: [url], imageIndex: 0)
-        let loading = try XCTUnwrap(node.galleryLoadingView)
-        XCTAssertNotNil(loading.superview)
+        let stack = DetailBlockStack()
+        stack.frame = CGRect(x: 0, y: 100, width: 300, height: 300)
+        stack.axis = .vertical
+        controller.view.addSubview(stack)
+        stack.onPhotos = { _, _ in didOpenGallery = true }
+        stack.appendLegacy([.tabs(tabs)], to: stack, width: 300)
+        let image = try XCTUnwrap(findView(DetailImageBlockView.self, in: stack))
+        image.handleTap()
+        let loading = try XCTUnwrap(findView(DetailGalleryLoadingView.self, in: stack))
         XCTAssertTrue(try XCTUnwrap(findView(UIActivityIndicatorView.self, in: loading)).isAnimating)
         XCTAssertFalse(loading.isUserInteractionEnabled)
-        XCTAssertNil(controller.presentedViewController, "准备图片时不应弹出 alert")
-        node.selectTab(1)
-        XCTAssertNil(node.galleryLoadingView)
-        XCTAssertNil(loading.superview)
-        XCTAssertNil(node.galleryTask)
+        XCTAssertNil(controller.presentedViewController)
+        let next = try XCTUnwrap(tabButton(1, in: stack))
+        next.sendActions(for: .touchUpInside)
+        XCTAssertNil(findView(DetailGalleryLoadingView.self, in: stack))
         await Task.yield()
         XCTAssertFalse(didOpenGallery, "切换分栏后不应再打开上一次请求的图库")
     }
@@ -230,21 +228,17 @@ final class MagicTabIntegrationTests: XCTestCase {
         XCTAssertEqual(images.map(\.sectionIndex), [0, 1, 2, 3, 4])
         XCTAssertEqual(images.map { URLComponents(url: $0.url, resolvingAgainstBaseURL: false)?.queryItems?.first?.value }, ["ipv4", "large4", "ipv6", "intl", "speedtest"])
         XCTAssertEqual(Set(images.map(\.url)).count, 5, "section 参数不同的图片不能被合并")
-        let nodes = DetailContentBlockNodeFactory.makeNodes(from: tabs.sections[0].blocks,
-            onImageTapped: { _, _ in }, onLinkTapped: { _ in }, onTextLayoutInvalidated: {})
-        let imageNode = try XCTUnwrap(nodes.first as? DetailImageBlockNode)
-        imageNode.updateLoadedImageSize(CGSize(width: 1840, height: 2125))
-        let size = imageNode.calculateSizeThatFits(CGSize(width: 368, height: CGFloat.greatestFiniteMagnitude))
-        XCTAssertEqual(size.height, 425, "TQ 报告应完整等比展示，不能裁成普通图片缩略图")
-        let imageView = try XCTUnwrap(imageNode.view.subviews.compactMap { $0 as? UIImageView }.first)
+        let stack = DetailBlockStack()
+        stack.appendLegacy([.tabs(tabs)], to: stack, width: 368)
+        let block = try XCTUnwrap(findView(DetailImageBlockView.self, in: stack))
+        let imageView = try XCTUnwrap(block.subviews.compactMap { $0 as? UIImageView }.first)
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         let preview = UIGraphicsImageRenderer(size: CGSize(width: 368, height: 425), format: format).image { _ in }
         let thumbnail = UIImage(cgImage: try XCTUnwrap(preview.cgImage), scale: 2, orientation: .up)
-        let block = try XCTUnwrap(imageNode.view as? DetailImageBlockView)
         block.applyLoadedImage(.init(image: thumbnail, resolvedKind: nil, originalSize: CGSize(width: 1840, height: 2125)))
-        imageNode.view.frame = CGRect(x: 0, y: 0, width: 368, height: 425)
-        imageNode.view.layoutSubviews()
+        block.frame = CGRect(x: 0, y: 0, width: 368, height: 425)
+        block.layoutSubviews()
         XCTAssertEqual(imageView.contentMode, .scaleAspectFit, "内部 UIImageView 也应沿用报告类型")
         XCTAssertEqual(imageView.frame.height, 425)
     }
@@ -260,41 +254,37 @@ final class MagicTabIntegrationTests: XCTestCase {
         ] + sources.enumerated().map { index, source in
             .init(title: index == 0 ? "网络质量" : "回程路由", blocks: [.image(.init(url: source.0, altText: nil))])
         })
-        let nodes = DetailContentBlockNodeFactory.makeNodes(from: [.tabs(tabs)],
-            onImageTapped: { _, _ in }, onLinkTapped: { _ in }, onTextLayoutInvalidated: {},
-            imageSizeProvider: { url in sources.first { $0.0 == url }?.1 })
-        let tabNode = try XCTUnwrap(nodes.first as? DetailMagicTabsNode)
-        let range = ASSizeRange(min: CGSize(width: 368, height: 0), max: CGSize(width: 368, height: CGFloat.greatestFiniteMagnitude))
-        let baselineHeight = tabNode.layoutThatFits(range).size.height
+        let stack = DetailBlockStack()
+        stack.axis = .vertical
+        stack.frame = CGRect(x: 0, y: 0, width: 368, height: 400)
+        stack.imageSize = { url in sources.first { $0.0 == url }?.1 }
+        stack.appendLegacy([.tabs(tabs)], to: stack, width: 368)
+        stack.layoutIfNeeded()
         for index in [2, 3, 2] {
-            tabNode.selectTab(index)
-            let layout = tabNode.layoutThatFits(range)
-            XCTAssertEqual(layout.size.height, baselineHeight, "各栏统一使用基本信息的高度")
-            tabNode.view.frame = CGRect(origin: .zero, size: layout.size)
-            tabNode.layoutIfNeeded()
-            let node = try XCTUnwrap(findNode(DetailImageBlockNode.self, in: tabNode))
+            let button = try XCTUnwrap(tabButton(index, in: stack))
+            button.sendActions(for: .touchUpInside)
+            stack.layoutIfNeeded()
+            let block = try XCTUnwrap(findView(DetailImageBlockView.self, in: stack))
             let original = sources[index - 2].1
+            XCTAssertEqual(block.url, sources[index - 2].0)
             let expectedHeight = ceil(368 * original.height / original.width)
-            XCTAssertEqual(node.calculateSizeThatFits(range.max).height, expectedHeight, "分栏原图不能按普通图片裁切")
-            node.updateLoadedImageSize(CGSize(width: original.width / 16, height: original.height / 16))
-            XCTAssertEqual(node.calculateSizeThatFits(range.max).height, expectedHeight, "缩略图加载与切栏返回都不能压缩报告高度")
-            let imageView = try XCTUnwrap(node.view.subviews.compactMap { $0 as? UIImageView }.first)
+            XCTAssertEqual(block.constraints.first { $0.firstAttribute == .height }?.constant, expectedHeight)
+            let imageView = try XCTUnwrap(block.subviews.compactMap { $0 as? UIImageView }.first)
             let format = UIGraphicsImageRendererFormat()
             format.scale = 1
             let preview = UIGraphicsImageRenderer(size: original, format: format).image { _ in }
             let thumbnail = UIImage(cgImage: try XCTUnwrap(preview.cgImage), scale: 16, orientation: .up)
-            let block = try XCTUnwrap(node.view as? DetailImageBlockView)
             block.applyLoadedImage(.init(image: thumbnail, resolvedKind: nil, originalSize: original))
-            node.view.frame = CGRect(x: 0, y: 0, width: 368, height: expectedHeight)
-            node.view.layoutSubviews()
+            block.frame = CGRect(x: 0, y: 0, width: 368, height: expectedHeight)
+            block.layoutSubviews()
             XCTAssertEqual(imageView.contentMode, .scaleAspectFit)
             XCTAssertEqual(imageView.frame.width, 368)
             XCTAssertEqual(imageView.frame.height, 368 * original.height / original.width, accuracy: 0.01)
         }
-        let ordinary = DetailContentBlockNodeFactory.makeNodes(from: [.image(.init(url: sources[0].0, altText: nil))],
-            onImageTapped: { _, _ in }, onLinkTapped: { _ in }, onTextLayoutInvalidated: {},
-            imageSizeProvider: { _ in sources[0].1 })
-        XCTAssertEqual(ordinary[0].calculateSizeThatFits(range.max).height, 368, "分栏之外的普通竖图高度受栏宽限制")
+        stack.removeAllBlocks()
+        stack.appendLegacy([.image(.init(url: sources[0].0, altText: nil))], to: stack, width: 368)
+        let image = try XCTUnwrap(stack.arrangedSubviews.first)
+        XCTAssertEqual(image.constraints.first { $0.firstAttribute == .height }?.constant, 368)
     }
 
     private func waitForPhotoBrowser(in controller: UIViewController) async throws -> JXPhotoBrowserViewController {
@@ -329,9 +319,9 @@ final class MagicTabIntegrationTests: XCTestCase {
         return view.subviews.compactMap { findView(type, in: $0) }.first
     }
 
-    private func findNode<T: ASDisplayNode>(_ type: T.Type, in node: ASDisplayNode) -> T? {
-        if let result = node as? T { return result }
-        return (node.subnodes ?? []).compactMap { findNode(type, in: $0) }.first
+    private func tabButton(_ index: Int, in view: UIView) -> UIButton? {
+        if let button = view as? UIButton, button.accessibilityIdentifier == "detail-magic-tab-\(index)" { return button }
+        return view.subviews.compactMap { tabButton(index, in: $0) }.first
     }
 
     private func saveScreenshot(_ window: UIWindow, name: String) throws {

@@ -1,5 +1,4 @@
 import CryptoKit
-import AsyncDisplayKit
 import Darwin
 import FramePlay
 import UIKit
@@ -45,7 +44,7 @@ final class DetailAnimatedImageIntegrationTests: XCTestCase {
         XCTAssertTrue(second.isPlaying)
         NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
         XCTAssertFalse(second.isPlaying)
-        // Texture 在即将进入前台时恢复可见范围，模拟完整的系统通知顺序。
+        // 进入前台时恢复可见范围，模拟完整的系统通知顺序。
         NotificationCenter.default.post(name: UIApplication.willEnterForegroundNotification, object: nil)
         NotificationCenter.default.post(name: UIApplication.didBecomeActiveNotification, object: nil)
         XCTAssertFalse(first.isPlaying)
@@ -121,14 +120,14 @@ final class DetailAnimatedImageIntegrationTests: XCTestCase {
         XCTAssertFalse(block.isPlayingWebP)
     }
 
-    func testTextureVisibilityPausesBlockAndRichTextAttachments() async throws {
+    func testScrollViewVisibilityPausesBlockAndRichTextAttachments() async throws {
         let window = try makeWindow()
         let controller = try DetailWebPTableFixtureController(includesRichText: true)
         window.rootViewController = controller
         controller.loadViewIfNeeded()
         defer { window.isHidden = true; window.rootViewController = nil }
         defer {
-            let nodes = controller.animatedNodes.map { "\($0.isVisible):\($0.frame)" }.joined(separator: ", ")
+            let nodes = controller.animatedViews.map { "\($0.frame)" }.joined(separator: ", ")
             let diagnostics = XCTAttachment(string: controller.inlineViews.map { image in
                 "playing=\(image.isPlayingWebP), imageFrame=\(image.frame), parentBounds=\(String(describing: image.superview?.bounds)), rectInRoot=\(image.convert(image.bounds, to: controller.view)), window=\(image.window != nil), nodes=\(nodes)"
             }.joined(separator: "\n"))
@@ -138,7 +137,7 @@ final class DetailAnimatedImageIntegrationTests: XCTestCase {
             let snapshot = XCTAttachment(image: UIGraphicsImageRenderer(bounds: controller.view.bounds).image { _ in
                 controller.view.drawHierarchy(in: controller.view.bounds, afterScreenUpdates: true)
             })
-            snapshot.name = "FramePlay-Texture-final-state"
+            snapshot.name = "FramePlay-UIKit-final-state"
             snapshot.lifetime = .keepAlways
             add(snapshot)
         }
@@ -150,11 +149,11 @@ final class DetailAnimatedImageIntegrationTests: XCTestCase {
         try await waitFor { controller.inlineViews.map { self.digest($0.image) } != initial }
         let blocks = controller.blockViews
         let inlines = controller.inlineViews
-        controller.table.view.setContentOffset(CGPoint(x: 0, y: 1_200), animated: false)
-        try await waitFor { controller.animatedNodes.allSatisfy { !$0.isVisible } }
+        controller.table.setContentOffset(CGPoint(x: 0, y: 1_200), animated: false)
+        try await waitFor { controller.animatedViews.allSatisfy { !controller.table.bounds.intersects($0.convert($0.bounds, to: controller.table)) } }
         XCTAssertTrue(blocks.allSatisfy { !$0.isPlayingWebP })
         XCTAssertTrue(inlines.allSatisfy { !$0.isPlayingWebP })
-        controller.table.view.setContentOffset(.zero, animated: false)
+        controller.table.setContentOffset(.zero, animated: false)
         try await waitFor { controller.blockViews.allSatisfy(\.isPlayingWebP) && controller.inlineViews.allSatisfy(\.isPlayingWebP) }
         // 富文本附件尺寸更新有 100ms 的布局节流，截图等这一轮布局完成。
         try await Task.sleep(nanoseconds: 200_000_000)
@@ -163,12 +162,12 @@ final class DetailAnimatedImageIntegrationTests: XCTestCase {
         let attachment = XCTAttachment(image: UIGraphicsImageRenderer(bounds: controller.view.bounds).image { _ in
             XCTAssertTrue(controller.view.drawHierarchy(in: controller.view.bounds, afterScreenUpdates: true))
         })
-        attachment.name = "FramePlay-Texture-block-and-inline"
+        attachment.name = "FramePlay-UIKit-block-and-inline"
         attachment.lifetime = .keepAlways
         add(attachment)
     }
 
-    func testTexturePlaybackMeasurements() async throws {
+    func testScrollViewPlaybackMeasurements() async throws {
         guard ProcessInfo.processInfo.environment["FRAMEPLAY_INTEGRATION_PERFORMANCE"] == "1" else {
             throw XCTSkip("设置 TEST_RUNNER_FRAMEPLAY_INTEGRATION_PERFORMANCE=1 启用主项目性能采样")
         }
@@ -181,7 +180,7 @@ final class DetailAnimatedImageIntegrationTests: XCTestCase {
         // 宿主启动和首轮布局单独完成后，采样稳定播放阶段。
         try await Task.sleep(nanoseconds: 2_000_000_000)
         let images = controller.blockViews.compactMap { $0.subviews.compactMap { $0 as? UIImageView }.first }
-        let sampler = DetailWebPIntegrationSampler(images: images, scroll: controller.table.view)
+        let sampler = DetailWebPIntegrationSampler(images: images, scroll: controller.table)
         sampler.start()
         let cpu = Self.cpuSeconds()
         let start = ProcessInfo.processInfo.systemUptime
@@ -210,8 +209,8 @@ final class DetailAnimatedImageIntegrationTests: XCTestCase {
         screenshot.name = "FramePlay-main-project-four-images"
         screenshot.lifetime = .keepAlways
         add(screenshot)
-        controller.table.view.setContentOffset(CGPoint(x: 0, y: 1_200), animated: false)
-        try await waitFor { controller.animatedNodes.allSatisfy { !$0.isVisible } }
+        controller.table.setContentOffset(CGPoint(x: 0, y: 1_200), animated: false)
+        try await waitFor { controller.animatedViews.allSatisfy { !controller.table.bounds.intersects($0.convert($0.bounds, to: controller.table)) } }
         XCTAssertTrue(controller.blockViews.allSatisfy { !$0.isPlayingWebP })
     }
 
@@ -306,87 +305,60 @@ private final class DetailWebPIntegrationSampler: NSObject {
 }
 
 @MainActor
-private final class DetailWebPTableFixtureController: UIViewController, ASTableDataSource {
-    let table = ASTableNode(style: .plain)
-    private var rows: [ASCellNode] = []
-    private(set) var animatedNodes: [ASDisplayNode] = []
-    let includesRichText: Bool
-
-    var blockViews: [DetailImageBlockView] { animatedNodes.compactMap { $0.isNodeLoaded ? $0.view as? DetailImageBlockView : nil } }
+private final class DetailWebPTableFixtureController: UIViewController, UIScrollViewDelegate {
+    let table = UIScrollView()
+    let stack = DetailBlockStack()
+    private let includesRichText: Bool
+    private let url: URL
+    var animatedViews: [UIView] { stack.arrangedSubviews }
+    var blockViews: [DetailImageBlockView] { animatedViews.compactMap { $0 as? DetailImageBlockView } }
     var inlineViews: [DetailInlineImageView] {
-        animatedNodes.flatMap { node -> [DetailInlineImageView] in
-            guard node.isNodeLoaded, let rich = node.view as? DetailRichTextView else { return [] }
-            return descendants(of: rich)
+        func visit(_ view: UIView) -> [DetailInlineImageView] {
+            if let image = view as? DetailInlineImageView { return [image] }
+            return view.subviews.flatMap(visit)
         }
+        return visit(stack)
     }
 
     init(includesRichText: Bool) throws {
         self.includesRichText = includesRichText
+        url = try DetailWebPTestFixture.url()
         super.init(nibName: nil, bundle: nil)
-        let url = try DetailWebPTestFixture.url()
-        for index in 0 ..< (includesRichText ? 2 : 4) {
-            let node: ASDisplayNode
-            if includesRichText && index == 1 {
-                let text = NSMutableAttributedString(string: "")
-                let blocks = DTCoreTextHTMLContentRenderer().renderTextBlocks(
-                    fragment: "<p>内联 WebP <img src='\(url.absoluteString)' width='120' height='120'></p>",
-                    baseURL: NodeSeekSite.baseURL, maxImageWidth: 160
-                )
-                for case .text(let value) in blocks { text.append(value) }
-                node = DetailRichTextNode(attributedText: text, onImageTapped: { _, _ in }, onLayoutInvalidated: { [weak self] in
-                    self?.table.relayoutItems()
-                })
-                node.style.width = ASDimension(unit: .points, value: 160)
-                node.style.flexGrow = 0
-            } else {
-                node = DetailImageBlockNode(imageBlock: RenderedImageBlock(url: url, altText: "动态 WebP"),
-                                            imageURLs: [url], imageIndex: 0, initialImageSize: CGSize(width: 640, height: 640),
-                                            onImageTapped: { _, _ in }, onLayoutInvalidated: {})
-                node.style.preferredSize = CGSize(width: 160, height: 160)
-            }
-            animatedNodes.append(node)
-            let cell = ASCellNode()
-            cell.automaticallyManagesSubnodes = true
-            cell.layoutSpecBlock = { _, _ in
-                let row = ASStackLayoutSpec(direction: .horizontal, spacing: 0,
-                                            justifyContent: .start, alignItems: .start, children: [node])
-                return ASInsetLayoutSpec(insets: UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16), child: row)
-            }
-            rows.append(cell)
-        }
-        for index in 0 ..< 12 {
-            let cell = ASTextCellNode()
-            cell.text = "滚动验证 \(index)"
-            cell.style.preferredSize.height = 160
-            rows.append(cell)
-        }
     }
-
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        table.dataSource = self
-        view.addSubview(table.view)
+        view.addSubview(table)
+        table.delegate = self
+        table.addSubview(stack)
+        stack.axis = .vertical
+        stack.spacing = 20
+        stack.viewport = table
+        stack.imageSize = { _ in CGSize(width: 640, height: 640) }
+        var blocks: [RenderedContentBlock] = [.image(.init(url: url, altText: "动态 WebP"))]
+        if includesRichText {
+            blocks += DTCoreTextHTMLContentRenderer().renderTextBlocks(
+                fragment: "<p>内联 WebP <img src='\(url.absoluteString)' width='120' height='120'></p>",
+                baseURL: NodeSeekSite.baseURL, maxImageWidth: 160)
+        } else {
+            blocks = Array(repeating: blocks[0], count: 4)
+        }
+        stack.appendLegacy(blocks, to: stack, width: 160)
+        stack.onSizeChange = { [weak self] in self?.view.setNeedsLayout() }
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         table.frame = CGRect(x: 0, y: view.safeAreaInsets.top, width: view.bounds.width,
                              height: includesRichText ? 480 : view.bounds.height - view.safeAreaInsets.top)
+        let height = stack.systemLayoutSizeFitting(CGSize(width: 160, height: 0),
+            withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height
+        stack.frame = CGRect(x: 16, y: 10, width: 160, height: height)
+        table.contentSize = CGSize(width: table.bounds.width, height: height + 2000)
+        stack.layoutIfNeeded()
+        stack.refreshPlayback()
     }
-
-    func tableNode(_ tableNode: ASTableNode, numberOfRowsInSection section: Int) -> Int { rows.count }
-    func tableNode(_ tableNode: ASTableNode, nodeBlockForRowAt indexPath: IndexPath) -> ASCellNodeBlock {
-        let cell = rows[indexPath.row]
-        return { cell }
-    }
-
-    private func descendants(of root: UIView) -> [DetailInlineImageView] {
-        root.subviews.flatMap { view -> [DetailInlineImageView] in
-            if let image = view as? DetailInlineImageView { return [image] }
-            return descendants(of: view)
-        }
-    }
+    func scrollViewDidScroll(_ scrollView: UIScrollView) { stack.refreshPlayback() }
 }

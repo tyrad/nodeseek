@@ -1,42 +1,4 @@
-import AsyncDisplayKit
 import UIKit
-
-final class DetailVoteNode: ASDisplayNode {
-    private let sizeLock = NSLock()
-    private var contentHeight: CGFloat = 160
-
-    init(id: Int, service: NodeSeekVoteServing? = nil, onLayoutInvalidated: @escaping () -> Void) {
-        super.init()
-        setViewBlock { [weak self] in
-            DetailVoteView(id: id, service: service, onHeightChanged: { height in
-                guard let self else { return }
-                self.sizeLock.lock()
-                let changed = abs(self.contentHeight - height) > 0.5
-                self.contentHeight = height
-                self.sizeLock.unlock()
-                if changed {
-                    // 自定义 UIView 不会自动向 Texture 父节点传递尺寸变化。
-                    // 必须一路作废到单元格，否则列表重排仍会命中正文的旧高度。
-                    var ancestor: ASDisplayNode? = self
-                    while let node = ancestor {
-                        node.setNeedsLayout()
-                        if node is ASCellNode { break }
-                        ancestor = node.supernode
-                    }
-                    onLayoutInvalidated()
-                }
-            })
-        }
-        style.flexShrink = 1
-    }
-
-    override func calculateSizeThatFits(_ constrainedSize: CGSize) -> CGSize {
-        sizeLock.lock()
-        let height = contentHeight
-        sizeLock.unlock()
-        return CGSize(width: constrainedSize.width.isFinite ? constrainedSize.width : 320, height: height)
-    }
-}
 
 @MainActor
 final class DetailVoteView: UIView {

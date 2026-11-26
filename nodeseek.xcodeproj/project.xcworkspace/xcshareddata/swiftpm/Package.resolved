@@ -1,5 +1,5 @@
 {
-  "originHash" : "e74e0089b3de2deab43d163f36674ccb475c89ed65a397284bebcdafb159c6e9",
+  "originHash" : "c4a6acd65fcdfca5f3bb9113c0c2c28d9d036711f1f695cb9b114384483e3f52",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -215,15 +215,6 @@
       "state" : {
         "revision" : "7d9a5ce307528578dfa777d505496bd5f544ad94",
         "version" : "0.7.3"
-      }
-    },
-    {
-      "identity" : "texture",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/FluidGroup/Texture.git",
-      "state" : {
-        "revision" : "9620825e5f97dfbd1ce653443e5165d5eb405b9b",
-        "version" : "3.0.4"
       }
     },
     {

@@ -302,8 +302,8 @@ final class SearchViewController: UIViewController {
         return stack
     }()
 
-    private let listView: PostTextureListView = {
-        let view = PostTextureListView()
+    private let listView: PostListView = {
+        let view = PostListView()
         view.isHidden = true
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
@@ -958,8 +958,8 @@ extension SearchViewController: UITextFieldDelegate {
     }
 }
 
-extension SearchViewController: PostTextureListViewDelegate {
-    func postTextureListView(_ textureListView: PostTextureListView, didSelectPostAt index: Int) {
+extension SearchViewController: PostListViewDelegate {
+    func postListView(_ listView: PostListView, didSelectPostAt index: Int) {
         guard items.indices.contains(index) else { return }
         let item = items[index]
         visitedStore.markVisited(post: item.post, visitedAt: Date())
@@ -977,15 +977,15 @@ extension SearchViewController: PostTextureListViewDelegate {
         navigationController?.pushViewController(detailViewController, animated: true)
     }
 
-    func postTextureListViewDidRequestRefresh(_ textureListView: PostTextureListView) {
+    func postListViewDidRequestRefresh(_ listView: PostListView) {
         reloadFirstPageForActiveRequest(isRefresh: true)
     }
 
-    func postTextureListViewDidRequestFirstPageRetry(_ textureListView: PostTextureListView) {
+    func postListViewDidRequestFirstPageRetry(_ listView: PostListView) {
         reloadFirstPageForActiveRequest(isRefresh: false)
     }
 
-    func postTextureListView(_ textureListView: PostTextureListView, didApproachBottomAt index: Int, totalCount: Int) {
+    func postListView(_ listView: PostListView, didApproachBottomAt index: Int, totalCount: Int) {
         loadMoreIfNeeded(currentIndex: index, totalCount: totalCount)
     }
 }

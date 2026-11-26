@@ -5,12 +5,11 @@
 //  Created by Codex on 2026/5/11.
 //
 
-import AsyncDisplayKit
 import UIKit
 
 @MainActor
 final class UserCollectionsViewController: UIViewController {
-    private let tableNode = ASTableNode(style: .plain)
+    private let tableView = UITableView(frame: .zero, style: .plain)
     private let refreshControl = UIRefreshControl()
     private let footerView = UserContentFooterView()
     private let errorView = UserContentErrorView(accessibilityIdentifier: "user-collections-error-view")
@@ -32,11 +31,13 @@ final class UserCollectionsViewController: UIViewController {
     private var requestGeneration = 0
     private var isLoadingFirstPage = false
     private var isLoadingMore = false
-    private var lastBatchFetchRequestedCount: Int?
+    private let paginationButton = UIButton(type: .system)
     private let skeletonRowCount = 9
     /// 只有自己的收藏能取消；看别人的收藏时不提供滑动操作。
     private var canRemove = false
     private var removingPostIDs: Set<Int> = []
+    // 本轮刷新或分页返回的快照可能早于取消收藏成功的时间。
+    private var removedSinceRefresh: Set<Int> = []
     var onSelectPost: ((PostSummary, Int, String?) -> Void)?
 
     /// 不传 uid 时取当前账号，供侧边栏「我的」入口使用
@@ -70,7 +71,7 @@ final class UserCollectionsViewController: UIViewController {
         super.traitCollectionDidChange(previousTraitCollection)
         if traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection),
            isViewLoaded, displayMode == .content {
-            tableNode.reloadData()
+            tableView.reloadData()
         }
     }
 
@@ -80,34 +81,40 @@ final class UserCollectionsViewController: UIViewController {
 
     private func setupUI() {
         view.backgroundColor = .systemGroupedBackground
-        tableNode.dataSource = self
-        tableNode.delegate = self
-        tableNode.leadingScreensForBatching = 2
+        tableView.dataSource = self
+        tableView.delegate = self
+        tableView.estimatedRowHeight = 68
+        tableView.rowHeight = UITableView.automaticDimension
+        tableView.register(UserCollectionCell.self, forCellReuseIdentifier: "collection")
+        tableView.register(UserCollectionSkeletonCell.self, forCellReuseIdentifier: "skeleton")
+        paginationButton.configuration = .plain()
+        paginationButton.frame.size.height = 56
+        paginationButton.addAction(UIAction { [weak self] _ in self?.loadMoreIfNeeded() }, for: .touchUpInside)
         // 行是独立卡片，不用分隔线；顶部留白让第一张卡片不贴着导航栏
-        tableNode.view.separatorStyle = .none
-        tableNode.view.tableHeaderView = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 6))
-        tableNode.view.tableFooterView = footerView
-        tableNode.view.backgroundColor = .systemGroupedBackground
+        tableView.separatorStyle = .none
+        tableView.tableHeaderView = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 6))
+        tableView.tableFooterView = footerView
+        tableView.backgroundColor = .systemGroupedBackground
         refreshControl.addTarget(self, action: #selector(refreshTriggered), for: .valueChanged)
-        tableNode.view.refreshControl = refreshControl
-        tableNode.view.translatesAutoresizingMaskIntoConstraints = false
+        tableView.refreshControl = refreshControl
+        tableView.translatesAutoresizingMaskIntoConstraints = false
         errorView.onRetry = { [weak self] in
             self?.loadFirstPage()
         }
 
-        view.addSubview(tableNode.view)
+        view.addSubview(tableView)
         view.addSubview(errorView)
         view.addSubview(emptyView)
         NSLayoutConstraint.activate([
-            tableNode.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableNode.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableNode.view.topAnchor.constraint(equalTo: view.topAnchor),
-            tableNode.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            tableView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            tableView.topAnchor.constraint(equalTo: view.topAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            errorView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            errorView.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
             errorView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            errorView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
-            errorView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32),
+            errorView.leadingAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 32),
+            errorView.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -32),
 
             emptyView.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
             emptyView.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor, constant: -24),
@@ -118,13 +125,14 @@ final class UserCollectionsViewController: UIViewController {
 
     private func loadFirstPage() {
         guard !isLoadingFirstPage else { return }
+        removedSinceRefresh.removeAll()
         requestGeneration += 1
         let generation = requestGeneration
         isLoadingMore = false
         isLoadingFirstPage = true
         hasMorePages = true
         nextPage = 2
-        lastBatchFetchRequestedCount = nil
+        tableView.tableFooterView = footerView
         showSkeleton()
 
         Task { [weak self] in
@@ -134,6 +142,7 @@ final class UserCollectionsViewController: UIViewController {
                 let loaded = try await client.loadCollections(page: 1, uid: uid)
                 let currentUID = await currentAccountStore.snapshot()?.account.nodeSeekUID
                 guard generation == requestGeneration else { return }
+                if self.uid != uid { removedSinceRefresh.removeAll() }
                 self.uid = uid
                 canRemove = currentUID == uid
                 finishFirstPage(records: loaded)
@@ -148,6 +157,7 @@ final class UserCollectionsViewController: UIViewController {
         guard let uid else { return }
         guard !records.isEmpty, hasMorePages, !isLoadingMore, !isLoadingFirstPage else { return }
         isLoadingMore = true
+        tableView.tableFooterView = footerView
         footerView.startAnimating()
         let generation = requestGeneration
         let page = nextPage
@@ -161,6 +171,8 @@ final class UserCollectionsViewController: UIViewController {
                 guard generation == requestGeneration else { return }
                 isLoadingMore = false
                 footerView.stopAnimating()
+                paginationButton.configuration?.title = UserContentL10n.text("重试")
+                tableView.tableFooterView = paginationButton
             }
         }
     }
@@ -174,8 +186,9 @@ final class UserCollectionsViewController: UIViewController {
         return uid
     }
 
-    private func finishFirstPage(records: [UserCollectionRecord]) {
-        self.records = records
+    private func finishFirstPage(records loaded: [UserCollectionRecord]) {
+        var knownIDs = removedSinceRefresh
+        records = loaded.filter { knownIDs.insert($0.postID).inserted }
         displayMode = .content
         isLoadingFirstPage = false
         isLoadingMore = false
@@ -184,7 +197,8 @@ final class UserCollectionsViewController: UIViewController {
         emptyView.isHidden = !records.isEmpty
         refreshControl.endRefreshing()
         footerView.stopAnimating()
-        tableNode.reloadData()
+        tableView.reloadData()
+        if records.isEmpty, !loaded.isEmpty { loadFirstPage() }
     }
 
     private func finishLoadMore(records loaded: [UserCollectionRecord], page: Int) {
@@ -196,15 +210,21 @@ final class UserCollectionsViewController: UIViewController {
         }
         nextPage = page + 1
         let oldCount = records.count
-        records.append(contentsOf: loaded.filter { item in
-            records.contains { $0.postID == item.postID } == false
-        })
+        var knownIDs = removedSinceRefresh.union(records.map(\.postID))
+        records.append(contentsOf: loaded.filter { knownIDs.insert($0.postID).inserted })
         let newCount = records.count
-        guard newCount > oldCount else { return }
-        let indexPaths = (oldCount..<newCount).map { IndexPath(row: $0, section: 0) }
-        tableNode.performBatch(animated: false) { [weak self] in
-            self?.tableNode.insertRows(at: indexPaths, with: .none)
+        guard newCount > oldCount else {
+            paginationButton.configuration?.title = UserContentL10n.text("加载更多")
+            tableView.tableFooterView = paginationButton
+            return
         }
+        // 离屏时 UITableView 可能尚未读取上一次 reload 的行数，直接同步当前数据。
+        guard tableView.window != nil else {
+            tableView.reloadData()
+            return
+        }
+        let indexPaths = (oldCount..<newCount).map { IndexPath(row: $0, section: 0) }
+        tableView.insertRows(at: indexPaths, with: .none)
     }
 
     private func showSkeleton() {
@@ -213,7 +233,7 @@ final class UserCollectionsViewController: UIViewController {
         errorView.isHidden = true
         emptyView.isHidden = true
         footerView.stopAnimating()
-        tableNode.reloadData()
+        tableView.reloadData()
     }
 
     private func showFirstPageError(_ message: String) {
@@ -226,7 +246,7 @@ final class UserCollectionsViewController: UIViewController {
         errorView.messageLabel.text = message
         errorView.isHidden = false
         emptyView.isHidden = true
-        tableNode.reloadData()
+        tableView.reloadData()
     }
 
     @objc private func refreshTriggered() {
@@ -245,14 +265,13 @@ final class UserCollectionsViewController: UIViewController {
 
     @objc private func appTextSizeDidChange(_ notification: Notification) {
         guard displayMode == .content else { return }
-        tableNode.reloadData()
+        tableView.reloadData()
     }
 
     /// 接口较慢，提交期间显示加载提示；确认成功后再移除这一行，失败时卡片留在原处。
-    private func removeRecord(postID: Int) {
-        guard !removingPostIDs.contains(postID) else { return }
+    private func removeRecord(postID: Int, ownerUID: Int) {
+        guard uid == ownerUID, canRemove, !removingPostIDs.contains(postID) else { return }
         removingPostIDs.insert(postID)
-        let generation = requestGeneration
         let progressToast = BottomToast.show(
             UserContentL10n.text("正在取消收藏…"),
             style: .progress,
@@ -269,14 +288,16 @@ final class UserCollectionsViewController: UIViewController {
                 removingPostIDs.remove(postID)
                 BottomToast.dismiss(progressToast)
                 BottomToast.show(UserContentL10n.text("已取消收藏"), in: view)
-                // 期间刷新过列表时按帖子 ID 重新定位，找不到说明新列表里已经没有它
-                guard generation == requestGeneration,
-                      displayMode == .content,
+                guard uid == ownerUID else { return }
+                removedSinceRefresh.insert(postID)
+                guard displayMode == .content,
                       let row = records.firstIndex(where: { $0.postID == postID }) else { return }
                 records.remove(at: row)
-                tableNode.performBatch(animated: true, updates: { [weak self] in
-                    self?.tableNode.deleteRows(at: [IndexPath(row: row, section: 0)], with: .automatic)
-                }, completion: nil)
+                if tableView.window == nil {
+                    tableView.reloadData()
+                } else {
+                    tableView.deleteRows(at: [IndexPath(row: row, section: 0)], with: .automatic)
+                }
                 emptyView.isHidden = !records.isEmpty || hasMorePages
                 if records.isEmpty, hasMorePages { loadFirstPage() }
             } catch {
@@ -295,8 +316,8 @@ final class UserCollectionsViewController: UIViewController {
     }
 }
 
-extension UserCollectionsViewController: ASTableDataSource {
-    func tableNode(_ tableNode: ASTableNode, numberOfRowsInSection section: Int) -> Int {
+extension UserCollectionsViewController: UITableViewDataSource {
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         switch displayMode {
         case .content:
             return records.count
@@ -307,63 +328,37 @@ extension UserCollectionsViewController: ASTableDataSource {
         }
     }
 
-    func tableNode(_ tableNode: ASTableNode, nodeBlockForRowAt indexPath: IndexPath) -> ASCellNodeBlock {
-        switch displayMode {
-        case .content:
-            let record = records[indexPath.row]
-            let traits = traitCollection
-            return {
-                UserCollectionCellNode(record: record, traits: traits)
-            }
-        case .skeleton:
-            return {
-                UserContentSkeletonCellNode(cardStyle: true)
-            }
-        case .firstPageError:
-            return {
-                ASCellNode()
-            }
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        guard displayMode == .content else {
+            return tableView.dequeueReusableCell(withIdentifier: "skeleton", for: indexPath)
         }
+        let cell = tableView.dequeueReusableCell(withIdentifier: "collection", for: indexPath) as! UserCollectionCell
+        cell.configure(records[indexPath.row])
+        return cell
     }
 }
 
-extension UserCollectionsViewController: ASTableDelegate {
-    func tableNode(_ tableNode: ASTableNode, didSelectRowAt indexPath: IndexPath) {
+extension UserCollectionsViewController: UITableViewDelegate {
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         guard displayMode == .content, records.indices.contains(indexPath.row) else { return }
-        tableNode.deselectRow(at: indexPath, animated: true)
+        tableView.deselectRow(at: indexPath, animated: true)
         openRecord(records[indexPath.row])
     }
 
-    func shouldBatchFetch(for tableNode: ASTableNode) -> Bool {
-        displayMode == .content
-            && !records.isEmpty
-            && lastBatchFetchRequestedCount != records.count
+    func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        guard displayMode == .content, indexPath.row >= records.count - 4,
+              tableView.tableFooterView !== paginationButton else { return }
+        loadMoreIfNeeded()
     }
 
-    func tableNode(_ tableNode: ASTableNode, willBeginBatchFetchWith context: ASBatchContext) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else {
-                context.completeBatchFetching(true)
-                return
-            }
-            self.lastBatchFetchRequestedCount = self.records.count
-            self.loadMoreIfNeeded()
-            context.completeBatchFetching(true)
-        }
-    }
-}
-
-// ASTableNode 会把 UITableViewDelegate 的方法转给这里
-extension UserCollectionsViewController {
     /// 左滑取消收藏，接口确认后再移除这一行。
-    @objc(tableView:trailingSwipeActionsConfigurationForRowAtIndexPath:)
     func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-        guard canRemove, displayMode == .content, records.indices.contains(indexPath.row) else { return nil }
+        guard let uid, canRemove, displayMode == .content, records.indices.contains(indexPath.row) else { return nil }
         let postID = records[indexPath.row].postID
         let action = UIContextualAction(style: .destructive, title: UserContentL10n.text("取消收藏")) { [weak self] _, _, done in
             // 先收起滑动按钮，结果由加载提示反馈，不让按钮停在原处等接口
             done(false)
-            self?.removeRecord(postID: postID)
+            self?.removeRecord(postID: postID, ownerUID: uid)
         }
         action.image = UIImage(systemName: "star.slash")
         let configuration = UISwipeActionsConfiguration(actions: [action])

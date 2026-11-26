@@ -1,15 +1,15 @@
 //
-//  PostTextureListHostViewController.swift
+//  PostListHostViewController.swift
 //  nodeseek
 //
 
 import UIKit
 
-final class PostTextureListHostViewController: UIViewController {
+final class PostListHostViewController: UIViewController {
     let category: PostListCategoryItem
 
-    private let presenter: PostTextureListHostPresenterProtocol
-    private let listView = PostTextureListView()
+    private let presenter: PostListHostPresenterProtocol
+    private let listView = PostListView()
     /// 再次点按 Tab 刷新时弹出的加载提示，刷新结束时收起。
     private weak var tabRefreshToast: UIView?
 
@@ -20,7 +20,7 @@ final class PostTextureListHostViewController: UIViewController {
 
     init(
         category: PostListCategoryItem,
-        presenter: PostTextureListHostPresenterProtocol
+        presenter: PostListHostPresenterProtocol
     ) {
         self.category = category
         self.presenter = presenter
@@ -86,25 +86,25 @@ final class PostTextureListHostViewController: UIViewController {
     }
 }
 
-extension PostTextureListHostViewController: PostTextureListViewDelegate {
-    func postTextureListView(_ textureListView: PostTextureListView, didSelectPostAt index: Int) {
+extension PostListHostViewController: PostListViewDelegate {
+    func postListView(_ listView: PostListView, didSelectPostAt index: Int) {
         presenter.didSelectPost(at: index)
     }
 
-    func postTextureListViewDidRequestRefresh(_ textureListView: PostTextureListView) {
+    func postListViewDidRequestRefresh(_ listView: PostListView) {
         presenter.didRequestRefresh()
     }
 
-    func postTextureListViewDidRequestFirstPageRetry(_ textureListView: PostTextureListView) {
+    func postListViewDidRequestFirstPageRetry(_ listView: PostListView) {
         presenter.didRequestFirstPageRetry()
     }
 
-    func postTextureListView(_ textureListView: PostTextureListView, didApproachBottomAt index: Int, totalCount: Int) {
+    func postListView(_ listView: PostListView, didApproachBottomAt index: Int, totalCount: Int) {
         presenter.didApproachBottom(at: index, totalCount: totalCount)
     }
 }
 
-extension PostTextureListHostViewController: PostTextureListHostViewProtocol {
+extension PostListHostViewController: PostListHostViewProtocol {
     func setItems(_ items: [PostListItem]) {
         listView.setItems(items)
     }

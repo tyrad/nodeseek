@@ -1,5 +1,5 @@
 //
-//  PostTextureListInteractor.swift
+//  PostListInteractor.swift
 //  nodeseek
 //
 //  Created by Codex on 2026/4/27.
@@ -8,10 +8,10 @@
 import Foundation
 
 @MainActor
-final class PostTextureListInteractor: PostTextureListHostInteractorInput {
+final class PostListInteractor: PostListHostInteractorInput {
     
     // MARK: - Properties
-    weak var presenter: PostTextureListHostInteractorOutput?
+    weak var presenter: PostListHostInteractorOutput?
     private let service: NodeSeekService
     private let sessionStore: NodeSeekSessionStore
     
@@ -70,12 +70,12 @@ final class PostTextureListInteractor: PostTextureListHostInteractorInput {
         case .challenge(let challenge):
             AppLog.warning(.postList, "列表请求命中验证，category=\(category.rawValue), sort=\(sortMode.rawValue), page=\(page): \(challenge.logDescription)")
             let message = await sessionStore.recordChallenge(challenge)
-            throw PostTextureListLoadError.challengeRequired(message)
+            throw PostListLoadError.challengeRequired(message)
         }
     }
 }
 
-private enum PostTextureListLoadError: LocalizedError {
+private enum PostListLoadError: LocalizedError {
     case challengeRequired(String)
 
     var errorDescription: String? {

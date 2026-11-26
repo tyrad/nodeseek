@@ -3,6 +3,7 @@ import UIKit
 /// 原型与列表共用同一套内容块视图。排版任务只持有快照，媒体和选区属于当前视图。
 final class DetailBlockStack: UIStackView {
     var renderer = DetailFloorRenderer()
+    var scalesPreviewText = false
     var appearance: DetailTextAppearance?
     var voteService: NodeSeekVoteServing?
     var onLink: ((URL) -> Void)?
@@ -160,7 +161,7 @@ final class DetailBlockStack: UIStackView {
         return nil
     }
 
-    /// 文字标签条，样式同预览使用的 `DetailMagicTabsNode`：选中项加粗、加下划线，其余用次级文字色。
+    /// 文字标签条：选中项加粗、加下划线，其余用次级文字色。
     private final class TabStrip: UIScrollView {
         private let row = UIStackView()
         private(set) var buttons: [UIButton] = []
@@ -388,6 +389,16 @@ final class DetailBlockStack: UIStackView {
     }
     #endif
 
+    private func previewText(_ text: NSAttributedString) -> NSAttributedString {
+        let scaled = NSMutableAttributedString(attributedString: text)
+        let metrics = UIFontMetrics(forTextStyle: .body)
+        text.enumerateAttribute(.font, in: NSRange(location: 0, length: text.length)) { value, range, _ in
+            let font = value as? UIFont ?? AppTypography.commentBodyFont()
+            scaled.addAttribute(.font, value: metrics.scaledFont(for: font, compatibleWith: traitCollection), range: range)
+        }
+        return scaled
+    }
+
     func appendLegacy(_ blocks: [RenderedContentBlock], to stack: UIStackView, width: CGFloat) {
         let size = CGSize(width: max(1, width), height: .greatestFiniteMagnitude)
         let open: (URL) -> Void = { [weak self] in self?.onLink?($0) }
@@ -399,7 +410,7 @@ final class DetailBlockStack: UIStackView {
             switch block {
             case .text(let text):
                 let rich = DetailRichTextView(frame: CGRect(origin: .zero, size: CGSize(width: width, height: 1)))
-                rich.configure(text, onImageTapped: photos, onLinkTapped: open, onSignatureLinkCandidatesTapped: onSignatureLinks, onLayoutInvalidated: { [weak self, weak rich] in rich?.invalidateIntrinsicContentSize(); self?.onSizeChange?() })
+                rich.configure(scalesPreviewText ? previewText(text) : text, onImageTapped: photos, onLinkTapped: open, onSignatureLinkCandidatesTapped: onSignatureLinks, onLayoutInvalidated: { [weak self, weak rich] in rich?.invalidateIntrinsicContentSize(); self?.onSizeChange?() })
                 stack.addArrangedSubview(rich)
             case .quote(let children): appendLegacy(children.children, to: quote(in: stack), width: DetailQuoteLayout.contentWidth(width))
             case .tabs(let content):
@@ -432,6 +443,9 @@ final class DetailBlockStack: UIStackView {
                 let view = DetailImageBlockView(imageBlock: image, imageKind: kind, onImageLoaded: { [weak self] original, resolved in
                     self?.onImageSize?(image.url, original)
                     height?.constant = DetailImageLayout.presentation(for: original, maxWidth: width, kind: resolved ?? kind).size.height
+                    self?.onSizeChange?()
+                }, onImageFailed: { [weak self] in
+                    height?.constant = DetailImagePlaceholderView.failureSize(maxWidth: width).height
                     self?.onSizeChange?()
                 }, onImageTapped: { [weak self, weak stack] in
                     guard let self else { return }

@@ -27,7 +27,7 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(calls, ["b"])
     }
 
-    func testFloorActionIconsKeepTextureSymbolSize() throws {
+    func testFloorActionIconsKeepSymbolSize() throws {
         let cell = DetailFloorListCell(frame: CGRect(x: 0, y: 0, width: 390, height: 120))
         cell.bind(.init(id: "a", version: 1, source: .init(html: "", visibleMarkdown: "a"),
                         appearance: .init(width: 358, pointSize: 16, scale: 3, dark: false), baseURL: NodeSeekSite.baseURL))
@@ -101,7 +101,7 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(copy.actionHandler?(copy), false)
     }
 
-    func testFloorFooterAndMenuMatchTexture() async throws {
+    func testFloorFooterAndMenuExposeReplyAndReactionActions() async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
         let page = PostDetailViewController(presenter: SpyPostDetailPresenter())
@@ -187,7 +187,7 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertTrue(allViews(cell.contentView).contains { $0.accessibilityIdentifier == "comment-author-avatar" })
     }
 
-    func testPostCountsUseCompactUnitsLikeTexture() {
+    func testPostCountsUseCompactUnits() {
         let cell = DetailFloorListCell(frame: CGRect(x: 0, y: 0, width: 360, height: 200))
         // 与旧版一致：主楼计数过万显示「1.2万」，回复楼层保持原数字。
         cell.compactCounts = true
@@ -234,7 +234,7 @@ final class DetailCollectionTests: XCTestCase {
         }
     }
 
-    func testAuthorFilterBannerHasClearButtonLikeTexture() async throws {
+    func testAuthorFilterBannerHasClearButton() async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
         let page = PostDetailViewController(presenter: SpyPostDetailPresenter())
@@ -341,7 +341,7 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertLessThan(code, plain * 2 + 0.05)
     }
 
-    func testBlockSpacingMatchesTextureStyleSheet() throws {
+    func testParagraphAndHeadingSpacing() throws {
         let appearance = DetailTextAppearance(width: 320, pointSize: 17, scale: 2, dark: false)
         func bottom(of word: String, in snapshot: DetailTextSnapshot) throws -> CGFloat {
             let offset = (snapshot.string as NSString).range(of: word).location
@@ -953,25 +953,30 @@ final class DetailCollectionTests: XCTestCase {
         allViews(root).first { $0.accessibilityIdentifier == id }
     }
 
-    func testInitialLoadShowsTextureSkeletonLayout() throws {
+    func testInitialLoadShowsFloorSkeletonLayout() throws {
         let page = PostDetailViewController(presenter: SpyPostDetailPresenter())
         let window = try pagingWindow(for: page)
         defer { window.isHidden = true; window.rootViewController = nil }
         page.showLoading()
         window.layoutIfNeeded()
         let list = try XCTUnwrap(page.collectionList.view)
-        let skeletons = list.visibleCells.filter { $0.accessibilityIdentifier?.hasPrefix("post-detail-skeleton") == true }
-        // 与 Texture 一致：1 个主楼骨架 + 4 个回复骨架。
-        XCTAssertEqual(skeletons.map(\.accessibilityIdentifier), ["post-detail-skeleton-header"] + Array(repeating: "post-detail-skeleton-comment", count: 4))
-        XCTAssertEqual(skeletons.first?.bounds.height ?? 0, 354, accuracy: 0.5)
-        XCTAssertEqual(skeletons.last?.bounds.height ?? 0, 136, accuracy: 0.5)
+        let count = list.numberOfItems(inSection: 0)
+        XCTAssertEqual(count, 5)
+        for item in 0..<count {
+            let path = IndexPath(item: item, section: 0)
+            list.scrollToItem(at: path, at: .centeredVertically, animated: false)
+            list.layoutIfNeeded()
+            let cell = try XCTUnwrap(list.cellForItem(at: path))
+            XCTAssertEqual(cell.accessibilityIdentifier, item == 0 ? "post-detail-skeleton-header" : "post-detail-skeleton-comment")
+            XCTAssertEqual(cell.bounds.height, item == 0 ? 354 : 136, accuracy: 0.5)
+        }
 
         page.render(detail: makePagedDetail(1...3, pageNumber: 1, next: nil))
         window.layoutIfNeeded()
         XCTAssertFalse(list.visibleCells.contains { $0.accessibilityIdentifier?.hasPrefix("post-detail-skeleton") == true })
     }
 
-    func testReplyHeaderKeepsTexturePosterHotAndStatusBadges() async throws {
+    func testReplyHeaderKeepsPosterHotAndStatusBadges() async throws {
         let page = PostDetailViewController(presenter: SpyPostDetailPresenter())
         let window = try pagingWindow(for: page)
         defer { window.isHidden = true; window.rootViewController = nil }
@@ -1094,7 +1099,7 @@ final class DetailCollectionTests: XCTestCase {
         window.layoutIfNeeded()
         page.render(detail: makePagedDetail(1...12, pageNumber: 1, next: nil))
         window.layoutIfNeeded()
-        // 与 Texture 首屏一致：内容排好前继续盖着骨架，不露出空楼层和预估高度。
+        // 内容排好前继续盖着骨架，不露出空楼层和预估高度。
         XCTAssertNotNil(view("post-detail-reveal-cover", in: page.view))
         var waited = 0
         while view("post-detail-reveal-cover", in: page.view) != nil, waited < 100 {

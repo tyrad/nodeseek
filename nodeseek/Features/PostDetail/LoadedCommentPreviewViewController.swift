@@ -5,7 +5,6 @@
 //  Created by Codex on 2026/5/9.
 //
 
-import AsyncDisplayKit
 import UIKit
 
 final class LoadedCommentPreviewViewController: UIViewController {
@@ -19,15 +18,14 @@ final class LoadedCommentPreviewViewController: UIViewController {
         static let headerHeight: CGFloat = 56
         static let footerHeight: CGFloat = 86
         static let verticalChrome: CGFloat = 54
-        static let estimatedNonTextBlockHeight: CGFloat = 120
     }
 
     private let comment: Comment
-    private let renderedContent: [RenderedContentBlock]?
+    private let baseURL: URL
     private let showsFullPostButton: Bool
     private let onOpenFullPost: () -> Void
     private let onReveal: () -> Void
-    private let tableNode = ASTableNode(style: .plain)
+    private let preview = DetailFloorPreviewScrollView()
     private let headerView = UIView()
     private let headerSeparator = UIView()
     private let footerStack = UIStackView()
@@ -36,13 +34,13 @@ final class LoadedCommentPreviewViewController: UIViewController {
 
     init(
         comment: Comment,
-        renderedContent: [RenderedContentBlock]?,
+        baseURL: URL,
         showsFullPostButton: Bool,
         onOpenFullPost: @escaping () -> Void,
         onReveal: @escaping () -> Void
     ) {
         self.comment = comment
-        self.renderedContent = renderedContent
+        self.baseURL = baseURL
         self.showsFullPostButton = showsFullPostButton
         self.onOpenFullPost = onOpenFullPost
         self.onReveal = onReveal
@@ -51,12 +49,11 @@ final class LoadedCommentPreviewViewController: UIViewController {
 
     static func preferredSize(
         comment: Comment,
-        renderedContent: [RenderedContentBlock]?,
         containerSize: CGSize
     ) -> CGSize {
         let containerWidth = containerSize.width > 0 ? containerSize.width : Layout.fallbackContainerWidth
         let containerHeight = containerSize.height > 0 ? containerSize.height : Layout.fallbackContainerHeight
-        let width = min(max(containerWidth - 32, Layout.minimumWidth), Layout.maximumWidth)
+        let width = min(containerWidth, max(containerWidth - 32, Layout.minimumWidth), Layout.maximumWidth)
         let textWidth = max(
             width
                 - PostDetailContentLayout.horizontalInset * 2
@@ -64,42 +61,12 @@ final class LoadedCommentPreviewViewController: UIViewController {
                 - PostDetailContentLayout.avatarSpacing,
             1
         )
-        let bodyHeight = estimatedBodyHeight(
-            comment: comment,
-            renderedContent: renderedContent,
-            width: textWidth
-        )
+        let bodyHeight = estimatedTextHeight(comment.contentHTML, width: textWidth, font: UIFont.preferredFont(forTextStyle: .body))
         let rawHeight = Layout.headerHeight + Layout.footerHeight + Layout.verticalChrome + bodyHeight
         let maximumHeight = max(Layout.minimumHeight, floor(containerHeight * Layout.maximumHeightRatio))
         return CGSize(
             width: width,
             height: min(max(ceil(rawHeight), Layout.minimumHeight), maximumHeight)
-        )
-    }
-
-    private static func estimatedBodyHeight(
-        comment: Comment,
-        renderedContent: [RenderedContentBlock]?,
-        width: CGFloat
-    ) -> CGFloat {
-        let bodyFont = UIFont.preferredFont(forTextStyle: .body)
-        var textHeight: CGFloat = 0
-        var extraBlockHeight: CGFloat = 0
-        if let renderedContent, renderedContent.isEmpty == false {
-            for block in renderedContent {
-                switch block {
-                case .text(let attributedText):
-                    textHeight += estimatedTextHeight(attributedText.string, width: width, font: bodyFont)
-                case .vote, .image, .iframeLink, .imagePlaceholder, .table, .codeBlock, .terminal, .tabs, .unsupported, .quote:
-                    extraBlockHeight += Layout.estimatedNonTextBlockHeight
-                }
-            }
-        } else {
-            textHeight = estimatedTextHeight(comment.contentHTML, width: width, font: bodyFont)
-        }
-        return max(
-            PostDetailContentLayout.avatarSize,
-            textHeight + extraBlockHeight + 96
         )
     }
 
@@ -126,22 +93,58 @@ final class LoadedCommentPreviewViewController: UIViewController {
         view.layer.cornerRadius = 12
         view.layer.cornerCurve = .continuous
         view.clipsToBounds = true
-        tableNode.dataSource = self
-        tableNode.delegate = self
+        preview.configureHeader = { [comment] cell in
+            cell.configureHeader(title: nil, requiredLevel: nil, name: comment.authorName, isPoster: comment.isPoster,
+                                 badges: comment.authorBadgeTexts, time: comment.createdAtText, floor: comment.floorText, isHot: comment.isHot)
+            cell.configureAuthor(name: comment.authorName, avatarURL: comment.avatarURL, profileURL: nil) { _ in }
+        }
+        preview.floor.addVotes(like: comment.likeCount, chicken: comment.chickenLegCount, oppose: comment.opposeCount,
+                               liked: comment.isLikeClicked, rewarded: comment.isChickenLegClicked,
+                               opposed: comment.isOpposeClicked, isOwn: comment.isOwnComment)
+        if AuthorDisplayPolicy.isDisplayable(comment.authorName) {
+            let indent = PostDetailContentLayout.avatarSize + PostDetailContentLayout.avatarSpacing
+            preview.floor.textIndent = indent
+            preview.floor.body.isLayoutMarginsRelativeArrangement = true
+            preview.floor.body.directionalLayoutMargins = .init(top: 0, leading: indent, bottom: 0, trailing: 0)
+        }
+        let showsSignature = PostSignatureDisplaySettings.shared.showsSignatures
+        preview.loadContent = DetailFloorPreviewScrollView.background { [comment, baseURL] width in
+            PostDetailViewController.makeRenderedContent(html: comment.contentHTML, signatureHTML: comment.signatureHTML,
+                                                         baseURL: baseURL, maxImageWidth: width, showsSignature: showsSignature)
+        }
+        preview.onMeasuredHeight = { [weak self] _ in self?.view.setNeedsLayout() }
         configureContent()
         applyCurrentTheme()
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        guard let container = presentingViewController?.view, preview.contentSize.height > 0 else { return }
+        let chrome = view.safeAreaLayoutGuide.layoutFrame.height - preview.bounds.height
+        let desired = chrome + preview.contentSize.height + preview.contentInset.top + preview.contentInset.bottom
+        let maximum = max(Layout.minimumHeight, floor(container.safeAreaLayoutGuide.layoutFrame.height * Layout.maximumHeightRatio))
+        let height = min(max(Layout.minimumHeight, ceil(desired)), maximum)
+        guard preferredContentSize.height != height else { return }
+        preferredContentSize.height = height
+        if #available(iOS 16.0, *) { sheetPresentationController?.invalidateDetents() }
+    }
+
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
+        if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory {
+            footerStack.axis = traitCollection.preferredContentSizeCategory.isAccessibilityCategory ? .vertical : .horizontal
+        }
         guard previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle else { return }
         applyCurrentTheme()
     }
 
     private func applyCurrentTheme() {
-        view.backgroundColor = .systemBackground
-        headerView.backgroundColor = .systemBackground
-        tableNode.view.backgroundColor = .systemBackground
+        // 弹层使用一层实色阅读背景，避免系统材质与楼层背景叠加降低对比度。
+        let readingTraits = UITraitCollection(traitsFrom: [traitCollection, UITraitCollection(userInterfaceLevel: .base)])
+        view.backgroundColor = UIColor.systemBackground.resolvedColor(with: readingTraits)
+        headerView.backgroundColor = .clear
+        preview.backgroundColor = .clear
+        preview.floor.contentView.backgroundColor = .clear
         headerSeparator.backgroundColor = .separator
     }
 
@@ -151,7 +154,7 @@ final class LoadedCommentPreviewViewController: UIViewController {
         let closeButton = UIButton(type: .system)
         closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
         closeButton.tintColor = .secondaryLabel
-        closeButton.accessibilityLabel = "关闭"
+        closeButton.accessibilityLabel = DetailListStrings.text("close")
         closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
         closeButton.translatesAutoresizingMaskIntoConstraints = false
 
@@ -160,7 +163,7 @@ final class LoadedCommentPreviewViewController: UIViewController {
         headerView.addSubview(headerSeparator)
 
         var fullPostConfiguration = UIButton.Configuration.bordered()
-        fullPostConfiguration.title = "查看完整帖子"
+        fullPostConfiguration.title = DetailListStrings.text("entry-open-full-post")
         fullPostConfiguration.baseForegroundColor = .label
         fullPostConfiguration.cornerStyle = .medium
         fullPostConfiguration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 10, bottom: 8, trailing: 10)
@@ -170,7 +173,7 @@ final class LoadedCommentPreviewViewController: UIViewController {
         fullPostButton.titleLabel?.minimumScaleFactor = 0.85
 
         var revealConfiguration = UIButton.Configuration.filled()
-        revealConfiguration.title = "查看原楼"
+        revealConfiguration.title = DetailListStrings.text("preview-show-floor")
         revealConfiguration.baseBackgroundColor = .secondarySystemBackground
         revealConfiguration.baseForegroundColor = .label
         revealConfiguration.cornerStyle = .medium
@@ -180,7 +183,7 @@ final class LoadedCommentPreviewViewController: UIViewController {
         revealButton.titleLabel?.adjustsFontSizeToFitWidth = true
         revealButton.titleLabel?.minimumScaleFactor = 0.85
 
-        footerStack.axis = .horizontal
+        footerStack.axis = traitCollection.preferredContentSizeCategory.isAccessibilityCategory ? .vertical : .horizontal
         footerStack.alignment = .fill
         footerStack.distribution = .fillEqually
         footerStack.spacing = 10
@@ -190,18 +193,17 @@ final class LoadedCommentPreviewViewController: UIViewController {
         }
         footerStack.addArrangedSubview(revealButton)
 
-        tableNode.view.separatorStyle = .none
-        tableNode.view.alwaysBounceVertical = false
-        tableNode.contentInset = UIEdgeInsets(top: 12, left: 0, bottom: 14, right: 0)
-        tableNode.view.verticalScrollIndicatorInsets = tableNode.contentInset
-        tableNode.view.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(tableNode.view)
+        preview.alwaysBounceVertical = false
+        preview.contentInset = UIEdgeInsets(top: 12, left: 0, bottom: 14, right: 0)
+        preview.verticalScrollIndicatorInsets = preview.contentInset
+        preview.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(preview)
         view.addSubview(headerView)
         view.addSubview(footerStack)
 
         NSLayoutConstraint.activate([
-            headerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            headerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            headerView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            headerView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
             headerView.topAnchor.constraint(equalTo: view.topAnchor),
             headerView.heightAnchor.constraint(equalToConstant: Layout.headerHeight),
 
@@ -210,20 +212,20 @@ final class LoadedCommentPreviewViewController: UIViewController {
             headerSeparator.bottomAnchor.constraint(equalTo: headerView.bottomAnchor),
             headerSeparator.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
 
-            tableNode.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableNode.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableNode.view.topAnchor.constraint(equalTo: headerView.bottomAnchor),
-            tableNode.view.bottomAnchor.constraint(equalTo: footerStack.topAnchor, constant: -12),
+            preview.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            preview.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            preview.topAnchor.constraint(equalTo: headerView.bottomAnchor),
+            preview.bottomAnchor.constraint(equalTo: footerStack.topAnchor, constant: -12),
 
-            footerStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            footerStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            footerStack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),
+            footerStack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
             footerStack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
-            footerStack.heightAnchor.constraint(greaterThanOrEqualToConstant: 40),
+            revealButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
 
             closeButton.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
             closeButton.trailingAnchor.constraint(equalTo: headerView.trailingAnchor, constant: -8),
-            closeButton.widthAnchor.constraint(equalToConstant: 32),
-            closeButton.heightAnchor.constraint(equalToConstant: 32)
+            closeButton.widthAnchor.constraint(equalToConstant: 44),
+            closeButton.heightAnchor.constraint(equalToConstant: 44)
         ])
     }
 
@@ -240,33 +242,5 @@ final class LoadedCommentPreviewViewController: UIViewController {
     @objc
     private func revealTapped() {
         onReveal()
-    }
-}
-
-extension LoadedCommentPreviewViewController: ASTableDataSource, ASTableDelegate {
-    func tableNode(_ tableNode: ASTableNode, numberOfRowsInSection section: Int) -> Int {
-        1
-    }
-
-    func tableNode(_ tableNode: ASTableNode, nodeBlockForRowAt indexPath: IndexPath) -> ASCellNodeBlock {
-        let comment = comment
-        let renderedContent = renderedContent
-        return { [weak self] in
-            CommentCellNode(
-                comment: comment,
-                renderedBody: renderedContent,
-                onImageTapped: { _, _ in },
-                onLinkTapped: { _ in },
-                onAuthorTapped: { _ in },
-                onLikeTapped: { _ in },
-                onChickenLegTapped: { _ in },
-                onOpposeTapped: { _ in },
-                onReplyTapped: { _ in },
-                onQuoteTapped: { _ in },
-                onTextLayoutInvalidated: {
-                    self?.tableNode.relayoutItems()
-                }
-            )
-        }
     }
 }

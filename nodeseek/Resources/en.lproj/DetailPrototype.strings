@@ -5,6 +5,7 @@
 "entry-opened-on-page" = "Opened on page %ld";
 "entry-starts-at-page" = "Starting from page %ld";
 "entry-open-full-post" = "View full post";
+"preview-show-floor" = "Go to reply";
 "entry-return-first" = "Back to page 1";
 "reply" = "Reply";
 "quote" = "Quote";

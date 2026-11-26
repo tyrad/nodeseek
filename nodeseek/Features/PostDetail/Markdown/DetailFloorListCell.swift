@@ -500,20 +500,20 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     }
 
     func addVotes(like: Int?, chicken: Int?, oppose: Int?, liked: Bool, rewarded: Bool, opposed: Bool, isOwn: Bool,
-                  onLike: @escaping () -> Void, onChicken: @escaping () -> Void, onOppose: @escaping () -> Void) {
-        if !isOwn || (like ?? 0) > 0 {
-            addAction("like", symbol: liked ? "hand.thumbsup.fill" : "hand.thumbsup", count: like, selected: liked, enabled: !isOwn, perform: onLike)
+                  onLike: (() -> Void)? = nil, onChicken: (() -> Void)? = nil, onOppose: (() -> Void)? = nil) {
+        if (!isOwn && onLike != nil) || (like ?? 0) > 0 {
+            addAction("like", symbol: liked ? "hand.thumbsup.fill" : "hand.thumbsup", count: like, selected: liked, enabled: !isOwn && onLike != nil, perform: onLike)
         }
-        if !isOwn || (chicken ?? 0) > 0 {
-            addAction("chicken", symbol: "fork.knife", count: chicken, selected: rewarded, enabled: !isOwn, perform: onChicken)
+        if (!isOwn && onChicken != nil) || (chicken ?? 0) > 0 {
+            addAction("chicken", symbol: "fork.knife", count: chicken, selected: rewarded, enabled: !isOwn && onChicken != nil, perform: onChicken)
         }
-        if !isOwn || (oppose ?? 0) > 0 {
-            addAction("oppose", symbol: opposed ? "hand.thumbsdown.fill" : "hand.thumbsdown", count: oppose, selected: opposed, enabled: !isOwn, perform: onOppose)
+        if (!isOwn && onOppose != nil) || (oppose ?? 0) > 0 {
+            addAction("oppose", symbol: opposed ? "hand.thumbsdown.fill" : "hand.thumbsdown", count: oppose, selected: opposed, enabled: !isOwn && onOppose != nil, perform: onOppose)
         }
     }
 
     func addAction(_ key: String, symbol: String, count: Int? = nil, selected: Bool = false, enabled: Bool = true,
-                   label: String? = nil, identifier: String? = nil, perform: @escaping () -> Void) {
+                   label: String? = nil, identifier: String? = nil, perform: (() -> Void)?) {
         let button: FloorButton
         if usedButtonCount < actionButtons.count {
             button = actionButtons[usedButtonCount]
@@ -531,9 +531,11 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         button.setImage(icon?.applyingSymbolConfiguration(config)?.withRenderingMode(.alwaysTemplate), for: .normal)
         // 系统按钮默认会把符号按自身样式再放大一档，固定为 14pt 才与正文配套。
         button.setPreferredSymbolConfiguration(config, forImageIn: .normal)
-        button.isEnabled = enabled
+        button.isEnabled = enabled || perform == nil
+        button.isUserInteractionEnabled = perform != nil
+        button.accessibilityTraits = perform == nil ? .staticText : .button
         footer.isHidden = false
-        button.setTitle(count.flatMap { $0 > 0 ? " " + (compactCounts ? PostBodyCellNode.reactionCountText($0) : String($0)) : nil }, for: .normal)
+        button.setTitle(count.flatMap { $0 > 0 ? " " + (compactCounts ? PostDetailContentLayout.reactionCountText($0) : String($0)) : nil }, for: .normal)
         button.titleLabel?.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(for: AppTypography.commentActionFont(), compatibleWith: traitCollection)
         button.minimumWidth.constant = (count ?? 0) > 0 ? PostDetailContentLayout.reactionActionMinWidth : PostDetailContentLayout.reactionIconOnlyWidth
         button.accessibilityLabel = DetailListStrings.text(label ?? key)
@@ -678,7 +680,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     }
 }
 
-/// 作者状态标签，样式同 `AuthorStatusBadgeNode`：禁言、封禁标红，其余用分隔线色描边。
+/// 作者状态标签：禁言、封禁标红，其余用分隔线色描边。
 final class AuthorBadgeLabel: UILabel {
     private let insets = UIEdgeInsets(top: 2, left: 5, bottom: 2, right: 5)
     private var isMuted = false
@@ -719,8 +721,9 @@ final class AuthorBadgeLabel: UILabel {
     }
 }
 
-/// 楼主等级过低时的交易提醒卡片，样式同 `PostAuthorRiskWarningNode`。
+/// 楼主等级过低时的交易提醒卡片。
 final class DetailRiskWarningView: UIView {
+    static let message = "『温馨提醒』检测到楼主用户等级在lv1以下，交易需要通过中介，禁止发起拼车"
     private let label = UILabel()
 
     override init(frame: CGRect) {
@@ -733,7 +736,7 @@ final class DetailRiskWarningView: UIView {
         let icon = UIImageView(image: UIImage(systemName: "exclamationmark.shield.fill"))
         icon.tintColor = .systemOrange
         icon.isAccessibilityElement = false
-        label.text = PostAuthorRiskWarningNode.message
+        label.text = Self.message
         label.font = .preferredFont(forTextStyle: .subheadline)
         label.adjustsFontForContentSizeCategory = true
         label.textColor = .label

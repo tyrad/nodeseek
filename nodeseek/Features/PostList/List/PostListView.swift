@@ -1,5 +1,5 @@
 //
-//  PostTextureListView.swift
+//  PostListView.swift
 //  nodeseek
 //
 //  Created by Codex on 2026/4/27.
@@ -8,21 +8,21 @@
 import UIKit
 import Foundation
 
-protocol PostTextureListViewDelegate: AnyObject {
-    func postTextureListView(_ textureListView: PostTextureListView, didSelectPostAt index: Int)
-    func postTextureListViewDidRequestRefresh(_ textureListView: PostTextureListView)
-    func postTextureListViewDidRequestFirstPageRetry(_ textureListView: PostTextureListView)
-    func postTextureListView(_ textureListView: PostTextureListView, didApproachBottomAt index: Int, totalCount: Int)
+protocol PostListViewDelegate: AnyObject {
+    func postListView(_ listView: PostListView, didSelectPostAt index: Int)
+    func postListViewDidRequestRefresh(_ listView: PostListView)
+    func postListViewDidRequestFirstPageRetry(_ listView: PostListView)
+    func postListView(_ listView: PostListView, didApproachBottomAt index: Int, totalCount: Int)
 }
 
-final class PostTextureListView: UIView {
+final class PostListView: UIView {
     private enum DisplayMode {
         case content
         case skeleton
         case firstPageError
     }
 
-    weak var delegate: PostTextureListViewDelegate?
+    weak var delegate: PostListViewDelegate?
     var onOpenAuthorPreview: ((UIViewController) -> Void)?
     var onScroll: ((UIScrollView) -> Void)?
 
@@ -343,7 +343,7 @@ final class PostTextureListView: UIView {
     }
 
     @objc private func handlePullToRefresh() {
-        delegate?.postTextureListViewDidRequestRefresh(self)
+        delegate?.postListViewDidRequestRefresh(self)
     }
 
     @objc private func appTextSizeDidChange(_ notification: Notification) {
@@ -373,7 +373,7 @@ final class PostTextureListView: UIView {
     }
 
     @objc private func retryFirstPageTapped() {
-        delegate?.postTextureListViewDidRequestFirstPageRetry(self)
+        delegate?.postListViewDidRequestFirstPageRetry(self)
     }
 
     override func layoutSubviews() {
@@ -461,7 +461,7 @@ final class PostTextureListView: UIView {
     }
 }
 
-extension PostTextureListView: UITableViewDataSource {
+extension PostListView: UITableViewDataSource {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         switch displayMode {
         case .content:
@@ -495,7 +495,7 @@ extension PostTextureListView: UITableViewDataSource {
     }
 }
 
-extension PostTextureListView: UITableViewDelegate {
+extension PostListView: UITableViewDelegate {
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         guard displayMode == .content, items.indices.contains(indexPath.row),
               let layout = layout(for: items[indexPath.row]) else {
@@ -509,7 +509,7 @@ extension PostTextureListView: UITableViewDelegate {
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         guard displayMode == .content else { return }
         tableView.deselectRow(at: indexPath, animated: true)
-        delegate?.postTextureListView(self, didSelectPostAt: indexPath.row)
+        delegate?.postListView(self, didSelectPostAt: indexPath.row)
     }
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
@@ -543,7 +543,7 @@ extension PostTextureListView: UITableViewDelegate {
         let totalCount = items.count
         lastBatchFetchRequestedItemCount = totalCount
         AppLog.info(.postList, "提前触发帖子列表分页: itemCount=\(totalCount), leadingScreens=\(leadingScreensForBatching)")
-        delegate?.postTextureListView(
+        delegate?.postListView(
             self,
             didApproachBottomAt: max(totalCount - 1, 0),
             totalCount: totalCount

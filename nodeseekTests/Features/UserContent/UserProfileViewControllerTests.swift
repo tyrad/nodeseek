@@ -1,4 +1,3 @@
-import AsyncDisplayKit
 import JXPhotoBrowser
 import UIKit
 import XCTest
@@ -11,30 +10,22 @@ final class UserProfileViewControllerTests: XCTestCase {
             UserCommentRecord(postID: 1, title: "同一标题下的多条回复", rank: 0, floorID: $0, text: "回复 \($0)")
         }
         var opened: [UserCommentRecord] = []
-        let node = UserCommentGroupCellNode(group: try XCTUnwrap(UserCommentGroup.grouped(records).first), traits: UITraitCollection(userInterfaceStyle: .dark)) {
-            opened.append($0)
-        }
-        let layout = node.layoutThatFits(ASSizeRange(
-            min: CGSize(width: 320, height: 0),
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        ))
-        node.frame = CGRect(origin: .zero, size: layout.size)
-        _ = node.view
-        node.layoutIfNeeded()
-        func allNodes(_ root: ASDisplayNode) -> [ASDisplayNode] {
-            [root] + (root.subnodes ?? []).flatMap { allNodes($0) }
-        }
-        let texts = allNodes(node).compactMap { $0 as? ASTextNode }
-        let titleColor = try XCTUnwrap(texts.first?.attributedText?.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor)
-        XCTAssertEqual(titleColor, ReadingColors.text.resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark)))
-        let buttons = allNodes(node).compactMap { $0 as? ASButtonNode }
-        XCTAssertEqual(buttons.count, 3)
+        let cell = UserCommentGroupCell(style: .default, reuseIdentifier: nil)
+        cell.overrideUserInterfaceStyle = .dark
+        var titleTaps = 0
+        cell.configure(try XCTUnwrap(UserCommentGroup.grouped(records).first), onOpenPost: { titleTaps += 1 }) { opened.append($0) }
+        cell.frame = CGRect(x: 0, y: 0, width: 320, height: 220)
+        cell.layoutIfNeeded()
+        let title = try XCTUnwrap(descendants(cell).compactMap { $0 as? UILabel }.first { $0.text == records.first?.title })
+        XCTAssertEqual(title.textColor.resolvedColor(with: cell.traitCollection), ReadingColors.text.resolvedColor(with: cell.traitCollection))
+        let buttons = descendants(cell).compactMap { $0 as? UIButton }
+        XCTAssertEqual(buttons.count, 4)
         for button in buttons {
-            _ = button.view
-            button.sendActions(forControlEvents: .touchUpInside, with: nil)
-            XCTAssertGreaterThanOrEqual(button.calculatedSize.width, 44)
-            XCTAssertGreaterThanOrEqual(button.calculatedSize.height, 44)
+            button.sendActions(for: .touchUpInside)
+            XCTAssertGreaterThanOrEqual(button.bounds.width, 44)
+            XCTAssertGreaterThanOrEqual(button.bounds.height, 44)
         }
+        XCTAssertEqual(titleTaps, 1)
         XCTAssertEqual(opened, records)
         XCTAssertEqual(opened.map(\.commentPage), [3, 1, 1])
         XCTAssertEqual(opened.map(\.anchorID), ["30", "10", "1"])
@@ -69,10 +60,6 @@ final class UserProfileViewControllerTests: XCTestCase {
         XCTAssertEqual(table.numberOfRows(inSection: 0), 3)
         // 分组后首屏较短，也不应在用户阅读前连续分页刷新。
         XCTAssertEqual(MockProfileURLProtocol.requestedPages, ["1"])
-        let probeTable = ASTableNode()
-        XCTAssertFalse(controller.shouldBatchFetch(for: probeTable))
-        controller.scrollViewWillBeginDragging(table)
-        XCTAssertTrue(controller.shouldBatchFetch(for: probeTable))
         for (name, style) in [("comments-grouped-light", UIUserInterfaceStyle.light), ("comments-grouped-dark", .dark)] {
             window.overrideUserInterfaceStyle = style
             window.layoutIfNeeded()
@@ -92,12 +79,24 @@ final class UserProfileViewControllerTests: XCTestCase {
             ["post_id": 4, "title": "下一页主题", "rank": 0, "floor_id": 1, "text": "新主题回复"]
         ]
         MockProfileURLProtocol.responseData = try JSONSerialization.data(withJSONObject: ["success": true, "comments": nextRows])
-        controller.tableNode(probeTable, willBeginBatchFetchWith: ASBatchContext())
+        controller.scrollViewWillBeginDragging(table)
+        controller.scrollViewDidScroll(table)
         for _ in 0..<50 where table.numberOfRows(inSection: 0) != 4 {
             try await Task.sleep(nanoseconds: 50_000_000)
         }
         XCTAssertEqual(table.numberOfRows(inSection: 0), 4)
         XCTAssertTrue(MockProfileURLProtocol.requestedPages.contains("2"))
+
+        navigation.setOverrideTraitCollection(UITraitCollection(preferredContentSizeCategory: .accessibilityExtraExtraLarge), forChild: controller)
+        window.layoutIfNeeded()
+        let first = try XCTUnwrap(table.cellForRow(at: IndexPath(row: 0, section: 0)))
+        let titleText = try XCTUnwrap(rows.first?["title"] as? String)
+        let title = try XCTUnwrap(descendants(first).compactMap { $0 as? UILabel }.first { $0.text == titleText })
+        let reply = try XCTUnwrap(descendants(first).compactMap { $0 as? UIButton }.first { $0.accessibilityValue != nil })
+        let needed = title.sizeThatFits(CGSize(width: title.bounds.width, height: .greatestFiniteMagnitude)).height
+        XCTAssertGreaterThanOrEqual(title.bounds.height + 1, needed)
+        XCTAssertLessThanOrEqual(title.convert(title.bounds, to: first).maxY, reply.convert(reply.bounds, to: first).minY)
+
     }
 
     func testTappingAvatarPresentsFullImage() async throws {

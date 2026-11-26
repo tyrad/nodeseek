@@ -1,5 +1,5 @@
 //
-//  PostTextureListInteractorTests.swift
+//  PostListInteractorTests.swift
 //  nodeseekTests
 //
 //  Created by Codex on 2026/4/27.
@@ -10,7 +10,7 @@ import Testing
 @testable import nodeseek
 
 @MainActor
-struct PostTextureListInteractorTests {
+struct PostListInteractorTests {
     @Test func stopsAfterFirstChallengeAndUpdatesSharedSessionState() async throws {
         let html = try FixtureLoader.html(named: "cloudflare-challenge")
         let url = URL(string: "https://www.nodeseek.com/")!
@@ -26,8 +26,8 @@ struct PostTextureListInteractorTests {
             parser: KannaNodeSeekParser(baseURL: url)
         )
         let sessionStore = NodeSeekSessionStore()
-        let presenter = SpyPostTextureListHostInteractorOutput()
-        let interactor = PostTextureListInteractor(service: service, sessionStore: sessionStore)
+        let presenter = SpyPostListHostInteractorOutput()
+        let interactor = PostListInteractor(service: service, sessionStore: sessionStore)
         interactor.presenter = presenter
 
         interactor.loadPosts(category: .all, sortMode: .replyTime, generation: 42)
@@ -47,10 +47,10 @@ struct PostTextureListInteractorTests {
     }
 
     @Test func successfulFirstPageLoadNotifiesHostDelegate() {
-        let interactor = SpyPostTextureListHostInteractor()
-        let view = SpyPostTextureListHostView()
-        let delegate = SpyPostTextureListHostPresenterDelegate()
-        let presenter = PostTextureListHostPresenter(
+        let interactor = SpyPostListHostInteractor()
+        let view = SpyPostListHostView()
+        let delegate = SpyPostListHostPresenterDelegate()
+        let presenter = PostListHostPresenter(
             category: .all,
             interactor: interactor,
             visitedStore: EmptyVisitedPostStore(),
@@ -74,7 +74,7 @@ struct PostTextureListInteractorTests {
     }
 
     @Test func togglingSortWhileFirstPageLoadingStillRequestsNewSort() {
-        let interactor = SpyPostTextureListHostInteractor()
+        let interactor = SpyPostListHostInteractor()
         let presenter = makeHostPresenter(interactor: interactor)
         presenter.viewDidLoad()
 
@@ -86,8 +86,8 @@ struct PostTextureListInteractorTests {
     }
 
     @Test func staleResponseAfterSortToggleDoesNotBlockNewSortResult() {
-        let interactor = SpyPostTextureListHostInteractor()
-        let view = SpyPostTextureListHostView()
+        let interactor = SpyPostListHostInteractor()
+        let view = SpyPostListHostView()
         let presenter = makeHostPresenter(interactor: interactor, view: view)
         presenter.viewDidLoad()
         _ = presenter.toggleSortMode()
@@ -108,7 +108,7 @@ struct PostTextureListInteractorTests {
     }
 
     @Test func viewDidLoadUsesPreferenceChangedAfterCreation() {
-        let interactor = SpyPostTextureListHostInteractor()
+        let interactor = SpyPostListHostInteractor()
         let store = InMemoryPostListSortPreferenceStore()
         let presenter = makeHostPresenter(interactor: interactor, store: store)
 
@@ -120,8 +120,8 @@ struct PostTextureListInteractorTests {
     }
 
     @Test func returningToCategoryWithDifferentSortReloadsFromFirstPage() {
-        let interactor = SpyPostTextureListHostInteractor()
-        let view = SpyPostTextureListHostView()
+        let interactor = SpyPostListHostInteractor()
+        let view = SpyPostListHostView()
         let store = InMemoryPostListSortPreferenceStore()
         let presenter = makeHostPresenter(interactor: interactor, view: view, store: store)
         presenter.viewDidLoad()
@@ -138,8 +138,8 @@ struct PostTextureListInteractorTests {
     }
 
     @Test func returningToCategoryWithSameSortKeepsList() {
-        let interactor = SpyPostTextureListHostInteractor()
-        let view = SpyPostTextureListHostView()
+        let interactor = SpyPostListHostInteractor()
+        let view = SpyPostListHostView()
         let presenter = makeHostPresenter(interactor: interactor, view: view)
         presenter.viewDidLoad()
         presenter.didLoadPosts([makePost(id: "1")], category: .all, sortMode: .replyTime, generation: 0)
@@ -150,8 +150,8 @@ struct PostTextureListInteractorTests {
     }
 
     @Test func switchingBackRejectsOldFirstPageAfterCurrentResult() {
-        let interactor = SpyPostTextureListHostInteractor()
-        let view = SpyPostTextureListHostView()
+        let interactor = SpyPostListHostInteractor()
+        let view = SpyPostListHostView()
         let presenter = makeHostPresenter(interactor: interactor, view: view)
         presenter.viewDidLoad()
         let oldGeneration = interactor.loadedGenerations.last!
@@ -167,8 +167,8 @@ struct PostTextureListInteractorTests {
 
     @Test(arguments: [false, true])
     func switchingBackRejectsOldPagination(empty: Bool) {
-        let interactor = SpyPostTextureListHostInteractor()
-        let view = SpyPostTextureListHostView()
+        let interactor = SpyPostListHostInteractor()
+        let view = SpyPostListHostView()
         let presenter = makeHostPresenter(interactor: interactor, view: view)
         presenter.viewDidLoad()
         let oldGeneration = interactor.loadedGenerations.last!
@@ -190,8 +190,8 @@ struct PostTextureListInteractorTests {
     }
 
     @Test func switchingBackRejectsOldFailuresWithoutClearingLoadingState() {
-        let interactor = SpyPostTextureListHostInteractor()
-        let view = SpyPostTextureListHostView()
+        let interactor = SpyPostListHostInteractor()
+        let view = SpyPostListHostView()
         let presenter = makeHostPresenter(interactor: interactor, view: view)
         presenter.viewDidLoad()
         let oldGeneration = interactor.loadedGenerations.last!
@@ -234,17 +234,17 @@ struct PostTextureListInteractorTests {
 
 @MainActor
 private func makeHostPresenter(
-    interactor: SpyPostTextureListHostInteractor? = nil,
-    view: SpyPostTextureListHostView? = nil,
+    interactor: SpyPostListHostInteractor? = nil,
+    view: SpyPostListHostView? = nil,
     store: InMemoryPostListSortPreferenceStore? = nil
-) -> PostTextureListHostPresenter {
-    let presenter = PostTextureListHostPresenter(
+) -> PostListHostPresenter {
+    let presenter = PostListHostPresenter(
         category: .all,
-        interactor: interactor ?? SpyPostTextureListHostInteractor(),
+        interactor: interactor ?? SpyPostListHostInteractor(),
         visitedStore: EmptyVisitedPostStore(),
         sortPreferenceStore: store ?? InMemoryPostListSortPreferenceStore()
     )
-    presenter.setView(view ?? SpyPostTextureListHostView())
+    presenter.setView(view ?? SpyPostListHostView())
     return presenter
 }
 
@@ -261,7 +261,7 @@ private func makePost(id: String) -> PostSummary {
 }
 
 @MainActor
-private final class SpyPostTextureListHostInteractorOutput: PostTextureListHostInteractorOutput {
+private final class SpyPostListHostInteractorOutput: PostListHostInteractorOutput {
     var loadedPosts: [PostSummary]?
     var errorMessage: String?
     var lastGeneration: Int?
@@ -286,8 +286,8 @@ private final class SpyPostTextureListHostInteractorOutput: PostTextureListHostI
 }
 
 @MainActor
-private final class SpyPostTextureListHostInteractor: PostTextureListHostInteractorInput {
-    weak var presenter: PostTextureListHostInteractorOutput?
+private final class SpyPostListHostInteractor: PostListHostInteractorInput {
+    weak var presenter: PostListHostInteractorOutput?
     private(set) var loadedSortModes: [PostListSortMode] = []
     private(set) var loadedGenerations: [Int] = []
     private(set) var loadedPages: [Int] = []
@@ -305,20 +305,20 @@ private final class SpyPostTextureListHostInteractor: PostTextureListHostInterac
 }
 
 @MainActor
-private final class SpyPostTextureListHostPresenterDelegate: PostTextureListHostPresenterDelegate {
+private final class SpyPostListHostPresenterDelegate: PostListHostPresenterDelegate {
     private(set) var loadedFirstPageCategories: [PostListCategoryItem] = []
 
-    func postTextureListHostDidSelectPost(_ post: PostSummary, category: PostListCategoryItem) {}
+    func postListHostDidSelectPost(_ post: PostSummary, category: PostListCategoryItem) {}
 
-    func postTextureListHostDidChangeSortMode(_ sortMode: PostListSortMode, category: PostListCategoryItem) {}
+    func postListHostDidChangeSortMode(_ sortMode: PostListSortMode, category: PostListCategoryItem) {}
 
-    func postTextureListHostDidLoadFirstPage(category: PostListCategoryItem) {
+    func postListHostDidLoadFirstPage(category: PostListCategoryItem) {
         loadedFirstPageCategories.append(category)
     }
 }
 
 @MainActor
-private final class SpyPostTextureListHostView: PostTextureListHostViewProtocol {
+private final class SpyPostListHostView: PostListHostViewProtocol {
     private(set) var lastItems: [PostListItem]?
     private(set) var hiddenSkeletonCount = 0
     private(set) var hiddenMoreCount = 0

@@ -80,7 +80,7 @@ final class UserContentErrorView: UIStackView {
         translatesAutoresizingMaskIntoConstraints = false
 
         let titleLabel = UILabel()
-        titleLabel.text = "加载失败"
+        titleLabel.text = UserContentL10n.text("加载失败")
         titleLabel.font = .preferredFont(forTextStyle: .headline)
         titleLabel.textColor = ReadingColors.text
         titleLabel.adjustsFontForContentSizeCategory = true
@@ -92,7 +92,7 @@ final class UserContentErrorView: UIStackView {
         messageLabel.adjustsFontForContentSizeCategory = true
 
         var configuration = UIButton.Configuration.filled()
-        configuration.title = "重试"
+        configuration.title = UserContentL10n.text("重试")
         configuration.cornerStyle = .capsule
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 18, bottom: 8, trailing: 18)
         retryButton.configuration = configuration

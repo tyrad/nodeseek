@@ -7,7 +7,7 @@
 当前主要技术栈包括：
 
 - UIKit
-- AsyncDisplayKit / Texture
+- TextKit
 - DTCoreText
 - Kingfisher
 - Kanna
@@ -22,7 +22,7 @@
 
 文件放置规则：
 
-- `nodeseek/SharedCore/`：App 与 SwiftPM tests 共享的纯逻辑。允许 Foundation、CoreGraphics、Kanna 等 macOS SwiftPM 可运行依赖；不得依赖 UIKit、WebKit、Texture、DTCoreText、Kingfisher、SVGKit、App 生命周期或模拟器。
+- `nodeseek/SharedCore/`：App 与 SwiftPM tests 共享的纯逻辑。允许 Foundation、CoreGraphics、Kanna 等 macOS SwiftPM 可运行依赖；不得依赖 UIKit、WebKit、DTCoreText、Kingfisher、SVGKit、App 生命周期或模拟器。
 - `nodeseek/SharedCore/Domain/`：纯数据模型、结果类型、跨 feature 共享的业务实体。
 - `nodeseek/SharedCore/Parsing/`：HTML 解析协议、Kanna parser 和解析规则。解析规则优先放在 `XPathRules.swift` 或 parser 内，不要散落到 ViewController。
 - `nodeseek/SharedCore/HTTP/`：网络协议、表单编码、challenge 检测、请求指纹等不依赖 App host 的 HTTP 辅助逻辑。
@@ -30,15 +30,15 @@
 - `nodeseek/SharedCore/Layout/`：渲染输入/输出模型、尺寸计算和布局纯函数。
 - `nodeseek/AppRuntime/`：需要 iOS App runtime 或第三方 UI/runtime 框架的基础设施。只走 Xcode 构建和 App-hosted 测试。
 - `nodeseek/AppRuntime/Web/`：URLSession、WebKit、Cookie、网页登录、页面加载、发帖提交和 Web 宿主相关 runtime 网络实现。
-- `nodeseek/AppRuntime/Rendering/`：依赖 UIKit、Texture、DTCoreText 等 App runtime 的渲染实现。
+- `nodeseek/AppRuntime/Rendering/`：依赖 UIKit、DTCoreText 等 App runtime 的渲染实现。
 - `nodeseek/AppRuntime/Images/`：图片下载、预览、SVG/GIF、Kingfisher、SVGKit 等 runtime 相关图片能力。
-- `nodeseek/AppRuntime/UI/`：UIKit/Texture 共享控件和 UI 基础设施。
+- `nodeseek/AppRuntime/UI/`：UIKit 共享控件和 UI 基础设施。
 - `nodeseek/AppRuntime/Services/`：依赖 App runtime、WebKit 或 Xcode App target 的服务实现。
-- `nodeseek/Features/`：VIPER feature 层。Presenter/Interactor 可以用 Xcode 单测；ViewController、Router、Texture node 走 App-hosted tests。
+- `nodeseek/Features/`：VIPER feature 层。Presenter/Interactor 可以用 Xcode 单测；ViewController、Router 走 App-hosted tests。
 - `nodeseek/App/`：App 生命周期、根路由和模板 App 控制器。启动只用系统启动屏（Info.plist `UILaunchScreen` + `SplashLogo`/`SplashBackground` 资源），没有启动动画。
 - `nodeseek/Resources/`：Info.plist、Assets.xcassets 等 App 资源。注意 Info.plist 由 Xcode build setting 管理，不是 SwiftPM 资源。
 - `nodeseekTests/SharedCore/`：SharedCore 纯逻辑测试。能脱离 App host 的 Foundation/CoreGraphics/Kanna 测试优先纳入 SwiftPM。
-- `nodeseekTests/AppRuntime/`：AppRuntime 测试。UIKit、WebKit、DTCoreText、Texture、图片预览和 runtime 服务测试只走 Xcode App-hosted tests。
+- `nodeseekTests/AppRuntime/`：AppRuntime 测试。UIKit、WebKit、DTCoreText、图片预览和 runtime 服务测试只走 Xcode App-hosted tests。
 - `nodeseekTests/Features/`：feature 层测试。默认走 Xcode，除非明确拆出纯逻辑模块。
 - `nodeseekTests/App/`：App 生命周期、启动和根路由相关测试，只走 Xcode App-hosted tests。
 - `nodeseekTests/Fixtures/`：测试 fixture。读取逻辑要同时兼容 `Bundle.module` 和 Xcode test bundle。
@@ -52,7 +52,6 @@
 不能依赖模拟器
 不能依赖 UIKit 生命周期
 不能依赖 WebKit 页面加载
-不能依赖 Texture node/view 生命周期
 ```
 
 ## 2. 项目改动边界
@@ -74,7 +73,7 @@
 测试选择规则：
 
 - 改 `SharedCore` 下可独立运行的纯逻辑：先跑 `make spm-test`。
-- 改 `AppRuntime`、UIKit、WebKit、Texture、DTCoreText、图片预览、App 生命周期：跑对应 Xcode 窄范围测试。
+- 改 `AppRuntime`、UIKit、WebKit、DTCoreText、图片预览、App 生命周期：跑对应 Xcode 窄范围测试。
 - 改 `Features` presenter/interactor 或仍依赖 App target 的单测：跑 `make xcode-test-class TEST=测试类名`。
 - 提交前如果改动跨 SharedCore 和 UI/runtime，至少跑一次 `make xcode-build-tests`，必要时再跑 `make xcode-test-full`。
 
@@ -120,7 +119,7 @@ xcodebuild -showdestinations -project nodeseek.xcodeproj -scheme nodeseek
 `Package.swift` 是测试加速入口，不是 App 工程迁移入口。维护时遵守以下规则：
 
 - 新增到 `NodeSeekCore` target 的源码必须能脱离 App host 编译。
-- 如果某个文件 import 了 UIKit、WebKit、Texture、DTCoreText、Kingfisher、SVGKit，默认不要加入 `NodeSeekCore`。
+- 如果某个文件 import 了 UIKit、WebKit、DTCoreText、Kingfisher、SVGKit，默认不要加入 `NodeSeekCore`。
 - 如果测试因为缺少 UIKit/WebKit 类型失败，优先把该测试留在 Xcode 路径，不要为了让 `swift test` 通过而扩大 SwiftPM target。
 - fixture 放在 `nodeseekTests/Fixtures/`，测试读取要同时兼容 `Bundle.module` 和 Xcode test bundle。
 - SharedCore 测试文件如需同时支持 SwiftPM 和 Xcode，使用：
@@ -133,22 +132,22 @@ xcodebuild -showdestinations -project nodeseek.xcodeproj -scheme nodeseek
 #endif
 ```
 
-- SwiftPM 快速测试不替代最终 App 验证。涉及 UI、WebView、Texture node、DTCoreText 布局、图片加载和 App 导航时，仍需跑 Xcode 测试。
+- SwiftPM 快速测试不替代最终 App 验证。涉及 UI、WebView、DTCoreText 布局、图片加载和 App 导航时，仍需跑 Xcode 测试。
 
 ## 4. 详情页相关约定
 
 详情页核心文件：
 
 - `nodeseek/Features/PostDetail/PostDetailViewController.swift`
-- `nodeseek/Features/PostDetail/Nodes/PostBodyCellNode.swift`
-- `nodeseek/Features/PostDetail/Nodes/CommentCellNode.swift`
+- `nodeseek/Features/PostDetail/Markdown/PostDetailCollectionList.swift`
+- `nodeseek/Features/PostDetail/Markdown/DetailFloorListCell.swift`
 
 详情页包含富文本、图片附件、头像加载、评论列表和图片预览。修改时注意：
 
 - DTCoreText 的布局和图片附件尺寸变更会影响 cell 高度。
 - 图片加载完成后刷新布局要节流，避免频繁 `reloadData()` 造成抖动。
-- 富文本 view 与 Texture node 生命周期要分清：node 可后台构造，UIKit view 只能在 Texture 加载 view 时创建和配置。
-- 修详情页崩溃时，优先补覆盖 node 构造、布局、富文本配置的测试。
+- 正文解析与排版在后台执行，UIKit 视图在主线程创建和更新。
+- 修详情页崩溃时，优先补覆盖 楼层复用、布局、富文本配置的测试。
 
 ## 5. 网络与解析
 

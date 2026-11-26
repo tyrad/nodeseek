@@ -205,17 +205,9 @@ extension PostDetailViewController {
         testPresentedPreviewUsesBottomSheet = true
         testPresentedPreviewShowsFullPostButton = wasOpenedFromInitialAnchor
         #endif
-        let renderedContent = Self.makeRenderedContent(
-            html: comment.contentHTML,
-            signatureHTML: comment.signatureHTML,
-            baseURL: baseURL,
-            maxImageWidth: availableCommentContentWidth,
-            showsSignature: PostSignatureDisplaySettings.shared.showsSignatures
-        )
-
         let previewController = LoadedCommentPreviewViewController(
             comment: comment,
-            renderedContent: renderedContent,
+            baseURL: baseURL,
             showsFullPostButton: wasOpenedFromInitialAnchor,
             onOpenFullPost: { [weak self] in
                 self?.openFullPostFromFloorPreview()
@@ -228,7 +220,6 @@ extension PostDetailViewController {
         )
         let preferredSize = LoadedCommentPreviewViewController.preferredSize(
             comment: comment,
-            renderedContent: renderedContent,
             containerSize: view.bounds.size
         )
         previewController.overrideUserInterfaceStyle = traitCollection.userInterfaceStyle
@@ -241,8 +232,8 @@ extension PostDetailViewController {
             let detentID = UISheetPresentationController.Detent.Identifier("floor-preview")
             if #available(iOS 16.0, *) {
                 sheet.detents = [
-                    .custom(identifier: detentID) { _ in
-                        preferredSize.height
+                    .custom(identifier: detentID) { [weak previewController] _ in
+                        previewController?.preferredContentSize.height ?? preferredSize.height
                     }
                 ]
                 sheet.selectedDetentIdentifier = detentID

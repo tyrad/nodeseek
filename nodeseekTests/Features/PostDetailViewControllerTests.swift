@@ -7,7 +7,6 @@
 
 import Foundation
 import AVFoundation
-import AsyncDisplayKit
 import DTCoreText
 import Testing
 import UIKit
@@ -32,31 +31,22 @@ struct InlineImageLayoutTimingReproductionTests {
                 return value
             }.first)
             var invalidationCount = 0
-            let node = DetailRichTextNode(
-                attributedText: text,
-                onImageTapped: { _, _ in },
-                onLayoutInvalidated: { invalidationCount += 1 }
-            )
-            let constraint = CGSize(width: 398, height: CGFloat.greatestFiniteMagnitude)
-            let initialSize = node.calculateSizeThatFits(constraint)
-            let view = try #require(node.view as? DetailRichTextView)
-            // 手动驱动尺寸回调，避免真实网络失败混入布局时序。
+            let view = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 398, height: 1))
             view.shouldLayoutCustomSubviews = false
+            view.configure(text, onImageTapped: nil, onLayoutInvalidated: { invalidationCount += 1 })
             let host = UIView(frame: CGRect(x: 0, y: 0, width: 398, height: 2000))
             host.addSubview(view)
-            view.frame = CGRect(origin: .zero, size: initialSize)
+            view.frame.size.height = view.intrinsicContentSize.height
             view.layoutIfNeeded()
             let initialHeight = try #require(view.layoutFrame).frame.height
             let loadedSize = CGSize(width: 800, height: imageHeight)
             if cacheFirst {
                 // 页面重建的节点复用已渲染正文，测量时读取已知图片尺寸。
-                let replacementNode = DetailRichTextNode(
-                    attributedText: text,
-                    imageSizeProvider: { _ in loadedSize },
-                    onImageTapped: { _, _ in },
-                    onLayoutInvalidated: {}
-                )
-                _ = replacementNode.calculateSizeThatFits(constraint)
+                let replacement = DetailRichTextView(frame: view.frame)
+                replacement.shouldLayoutCustomSubviews = false
+                replacement.configure(text, onImageTapped: nil, onLayoutInvalidated: nil)
+                replacement.debugHandleLoadedImage(url, imageSize: loadedSize)
+                _ = replacement.intrinsicContentSize
             }
             view.debugHandleLoadedImage(url, imageSize: loadedSize)
             try await Task.sleep(nanoseconds: 150_000_000)
@@ -251,49 +241,12 @@ struct PostDetailViewControllerTests {
     func authorStatusBadgesUseSemanticColorsInBothThemes(style: UIUserInterfaceStyle) {
         UITraitCollection(userInterfaceStyle: style).performAsCurrent {
             let texts = ["临时禁言", "永久禁言", "Dev", "新身份"]
-            let header = PostDetailHeaderContent(
-                postID: "956253", title: "标签测试", authorName: "Neutralize",
-                authorBadgeTexts: texts, avatarURL: nil, metadataText: "刚刚"
-            )
-            let post = PostBodyCellNode(content: header, renderedContent: [], onImageTapped: { _, _ in }, onTextLayoutInvalidated: {})
-            let comment = CommentCellNode(
-                comment: Comment(id: "3", authorName: "评论作者", avatarURL: nil, authorBadgeTexts: texts, floorText: "#3", createdAtText: "刚刚", contentHTML: "评论"),
-                renderedBody: [], onImageTapped: { _, _ in }, onTextLayoutInvalidated: {}
-            )
-            post.applyCurrentTheme()
-            comment.applyCurrentTheme()
-            #expect(post.debugAuthorBadgeTexts == texts)
-            #expect(comment.debugAuthorBadgeTexts == texts)
-            #expect(post.debugAuthorBadgeTitleColors == [.systemRed, .systemRed, .label, .label])
-            #expect(comment.debugAuthorBadgeTitleColors == post.debugAuthorBadgeTitleColors)
-            let badge = AuthorStatusBadgeNode(text: "临时禁言")
-            #expect(badge.borderColor == UIColor.systemRed.resolvedColor(with: .current).cgColor)
-        }
-    }
-
-    @Test func authorBadgesWrapWithoutOverflowingAtNarrowWidths() {
-        let texts = ["临时禁言", "Dev", "新身份", "另一个身份标签"]
-        let header = PostDetailHeaderContent(
-            postID: "956253", title: "标签测试", authorName: "Neutralize",
-            authorBadgeTexts: texts, avatarURL: nil, metadataText: "刚刚 · 交易"
-        )
-        let post = PostBodyCellNode(content: header, renderedContent: [], onImageTapped: { _, _ in }, onTextLayoutInvalidated: {})
-        let comment = CommentCellNode(
-            comment: Comment(id: "3", authorName: "很长的评论作者用户名", isPoster: true, avatarURL: nil, authorBadgeTexts: texts, floorText: "#326", createdAtText: "刚刚", contentHTML: "评论"),
-            renderedBody: [], onImageTapped: { _, _ in }, onTextLayoutInvalidated: {}
-        )
-        for node in [post as ASCellNode, comment as ASCellNode] {
-            let wide = node.layoutThatFits(ASSizeRange(min: .zero, max: CGSize(width: 600, height: CGFloat.greatestFiniteMagnitude)))
-            let narrow = node.layoutThatFits(ASSizeRange(min: .zero, max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)))
-            #expect(narrow.size.height > wide.size.height)
-            let elements = narrow.filteredNodeLayoutTree().sublayouts
-            let badges = elements.filter { $0.layoutElement is AuthorStatusBadgeNode }
-            #expect(badges.count == texts.count)
-            for layout in elements {
-                #expect(layout.position.x >= 0)
-                #expect(layout.position.x + layout.size.width <= 320.5)
+            for text in texts {
+                let label = AuthorBadgeLabel()
+                label.configure(text, font: .preferredFont(forTextStyle: .caption1))
+                let expected: UIColor = text.contains("禁言") ? .systemRed : .label
+                #expect(label.textColor == expected)
             }
-            #expect(Set(badges.map { $0.position.y }).count > 1)
         }
     }
 
@@ -313,11 +266,13 @@ struct PostDetailViewControllerTests {
     }
 
     @Test func authorRiskWarningWrapsAtNarrowWidthAndAddsHeightOnlyWhenVisible() {
-        let header = PostDetailHeaderContent(postID: "975028", title: "测试帖子", authorName: "楼主", avatarURL: nil, metadataText: "拼车", contentHTML: "正文")
-        let range = ASSizeRange(min: .zero, max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude))
-        let normal = PostBodyCellNode(content: header, renderedContent: [], onImageTapped: { _, _ in }, onTextLayoutInvalidated: {})
-        let warning = PostBodyCellNode(content: header, renderedContent: [], onImageTapped: { _, _ in }, showsAuthorRiskWarning: true, onTextLayoutInvalidated: {})
-        #expect(warning.layoutThatFits(range).size.height > normal.layoutThatFits(range).size.height + 60)
+        let cell = DetailFloorListCell(frame: CGRect(x: 0, y: 0, width: 320, height: 300))
+        func measure(_ visible: Bool) -> CGFloat {
+            cell.configureHeader(title: "测试帖子", requiredLevel: nil, name: "楼主", badges: [],
+                                 time: nil, floor: nil, showsRiskWarning: visible)
+            return cell.measuredHeight(width: 320)
+        }
+        #expect(measure(true) > measure(false) + 60)
     }
 
     @Test func startsWithSkeletonRowsEvenWhenInitialHeaderExists() async throws {
@@ -1252,73 +1207,6 @@ struct PostDetailViewControllerTests {
         )
     }
 
-    @Test func detailTextureCellsCanBeConstructedOffMainThread() async throws {
-        let header = PostDetailHeaderContent(
-            postID: "703863",
-            title: "标题",
-            authorName: "ipv4",
-            avatarURL: URL(string: "https://www.nodeseek.com/avatar/34378.png"),
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>"
-        )
-        let comment = Comment(
-            id: "1",
-            authorName: "a",
-            avatarURL: URL(string: "https://www.nodeseek.com/avatar/1.png"),
-            floorText: "#1",
-            createdAtText: "1min ago",
-            contentHTML: "<p>评论</p>"
-        )
-
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let attributedText = NSAttributedString(string: "正文")
-                let renderedContent: [RenderedContentBlock] = [.text(attributedText)]
-                _ = PostBodyCellNode(
-                    content: header,
-                    renderedContent: renderedContent,
-                    onImageTapped: { _, _ in },
-                    onTextLayoutInvalidated: {}
-                ).layoutThatFits(ASSizeRange(
-                    min: .zero,
-                    max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-                ))
-                _ = CommentCellNode(
-                    comment: comment,
-                    renderedBody: renderedContent,
-                    onImageTapped: { _, _ in },
-                    onTextLayoutInvalidated: {}
-                ).layoutThatFits(ASSizeRange(
-                    min: .zero,
-                    max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-                ))
-                continuation.resume()
-            }
-        }
-    }
-
-    @Test func postBodyCellRefreshAppearanceRebuildsHeaderTitleText() {
-        let header = PostDetailHeaderContent(
-            postID: "703863",
-            title: "主题切换标题",
-            authorName: "ipv4",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>"
-        )
-        let node = PostBodyCellNode(
-            content: header,
-            renderedContent: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        let didRefresh = node.refreshAppearanceForCurrentTraits()
-
-        #expect(didRefresh)
-        #expect(node.debugTitleAttributedText?.string == "主题切换标题")
-    }
-
     @Test func mergedRendererIncludesPostSignatureWithoutChangingSourceContent() throws {
         let bodyHTML = "<p>正文</p>"
         let signatureHTML = "<p>签名</p>"
@@ -1373,18 +1261,11 @@ struct PostDetailViewControllerTests {
             }
             return nil
         }.first)
-        let richTextNode = DetailRichTextNode(
-            attributedText: text,
-            onImageTapped: { _, _ in },
-            onLayoutInvalidated: {}
-        )
+        let rich = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 120, height: 1))
+        rich.configure(text, onImageTapped: nil, onLayoutInvalidated: nil)
+        let measuredHeight = rich.intrinsicContentSize.height
 
-        let layout = richTextNode.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 120, height: CGFloat.greatestFiniteMagnitude)
-        ))
-
-        #expect(layout.size.height > 60)
+        #expect(measuredHeight > 60)
     }
 
     @Test func mergedRendererKeepsSingleLineSignatureCompact() throws {
@@ -1400,19 +1281,12 @@ struct PostDetailViewControllerTests {
             }
             return nil
         }.first)
-        let richTextNode = DetailRichTextNode(
-            attributedText: attributedText,
-            onImageTapped: { _, _ in },
-            onLayoutInvalidated: {}
-        )
-
-        let layout = richTextNode.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        ))
+        let rich = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 320, height: 1))
+        rich.configure(attributedText, onImageTapped: nil, onLayoutInvalidated: nil)
+        let measuredHeight = rich.intrinsicContentSize.height
 
         #expect(attributedText.string.contains("哈\n\n人生") == false)
-        #expect(layout.size.height < 70)
+        #expect(measuredHeight < 70)
     }
 
     @Test func mergedRendererUsesMutedTextAndLinkColorsForSignatureOnly() throws {
@@ -1522,470 +1396,39 @@ struct PostDetailViewControllerTests {
             contentHTML: "<p>正文</p>",
             requiredReadingLevel: 1
         )
-        let node = PostBodyCellNode(
-            content: header,
-            renderedContent: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        let title = try #require(node.debugTitleAttributedText)
-
+        let cell = DetailFloorListCell(frame: .zero)
+        cell.configureHeader(title: header.title, requiredLevel: header.requiredReadingLevel, name: header.authorName,
+                             badges: [], time: header.metadataText, floor: nil)
+        let title = try #require(cell.heading.attributedText)
         #expect(title.string.contains("闲置顶级亚太线路 成本价拼车"))
         #expect(title.string.contains("🔒"))
         #expect(title.string.contains("1"))
         #expect(title.foregroundColor(for: "1") == .systemRed)
     }
 
-    @Test func postBodyCellShowsReactionAndFavoriteCountsWhenAvailable() {
-        let header = PostDetailHeaderContent(
-            postID: "710379",
-            title: "带操作区的主题",
-            authorName: "mist",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            likeCount: 0,
-            chickenLegCount: 1,
-            opposeCount: 0,
-            favoriteCount: 2,
-            isFavoriteCollected: true
-        )
-        var likeTapCount = 0
-        var chickenLegTapCount = 0
-        var opposeTapCount = 0
-        var favoriteTapCount = 0
-        var replyTapCount = 0
-        var commentTapCount = 0
-        let node = PostBodyCellNode(
-            content: header,
-            renderedContent: [],
-            onImageTapped: { _, _ in },
-            onLikeTapped: {
-                likeTapCount += 1
-            },
-            onChickenLegTapped: {
-                chickenLegTapCount += 1
-            },
-            onOpposeTapped: {
-                opposeTapCount += 1
-            },
-            onFavoriteTapped: {
-                favoriteTapCount += 1
-            },
-            onReplyTapped: {
-                replyTapCount += 1
-            },
-            onCommentTapped: {
-                commentTapCount += 1
-            },
-            onTextLayoutInvalidated: {}
-        )
-        _ = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 360, height: CGFloat.greatestFiniteMagnitude)
-        ))
-        node.debugTapLikeAction()
-        node.debugTapChickenLegAction()
-        node.debugTapOpposeAction()
-        node.debugTapFavoriteAction()
-        node.debugTapReplyAction()
-        node.debugTapCommentAction()
-
-        #expect(node.debugReactionActionTitles == [nil, "1", nil, "2"])
-        #expect(node.debugFooterActionAccessibilityLabels == ["点赞", "加鸡腿 1", "反对", "收藏 2", "回复楼主", "评论帖子"])
-        #expect(node.debugFavoriteActionColor == .systemYellow)
-        #expect(likeTapCount == 1)
-        #expect(chickenLegTapCount == 1)
-        #expect(opposeTapCount == 1)
-        #expect(favoriteTapCount == 1)
-        #expect(replyTapCount == 1)
-        #expect(commentTapCount == 1)
+    @Test func reactionCountsKeepAccessibleValuesAndHandlersOnReuse() throws {
+        let cell = DetailFloorListCell(frame: CGRect(x: 0, y: 0, width: 390, height: 300))
+        for compact in [true, false] {
+            cell.clear()
+            cell.compactCounts = compact
+            var taps: [String] = []
+            cell.addVotes(like: 12_345, chicken: 2, oppose: 1, liked: true, rewarded: true, opposed: true, isOwn: false,
+                          onLike: { taps.append("like") }, onChicken: { taps.append("chicken") }, onOppose: { taps.append("oppose") })
+            cell.addAction("favorite", symbol: "star", count: 10, selected: true) { taps.append("favorite") }
+            for (key, value) in [("like", "12345"), ("chicken", "2"), ("oppose", "1"), ("favorite", "10")] {
+                let button = try #require(cell.contentView.allSubviews(of: UIButton.self).first {
+                    $0.accessibilityLabel == DetailListStrings.text(key)
+                })
+                #expect(button.accessibilityValue == value)
+                #expect(button.image(for: .normal) != nil)
+                if key == "like" { #expect(button.title(for: .normal) == (compact ? " 1.2万" : " 12345")) }
+                button.sendActions(for: .touchUpInside)
+            }
+            #expect(taps == ["like", "chicken", "oppose", "favorite"])
+        }
     }
 
-    @Test func postBodyCellUpdatesLikeReactionInPlace() {
-        let header = PostDetailHeaderContent(
-            postID: "710379",
-            title: "带操作区的主题",
-            authorName: "mist",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            likeCount: 0
-        )
-        let node = PostBodyCellNode(
-            content: header,
-            renderedContent: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        node.updateLikeReaction(count: 1, isClicked: true)
-
-        #expect(node.debugReactionActionTitles.first == "1")
-        #expect(node.debugFooterActionAccessibilityLabels.first == "点赞 1")
-        #expect(node.debugLikeActionColor == .systemRed)
-    }
-
-    @Test func postBodyCellUpdatesChickenLegReactionInPlace() {
-        let header = PostDetailHeaderContent(
-            postID: "710379",
-            title: "带操作区的主题",
-            authorName: "mist",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            chickenLegCount: 1
-        )
-        let node = PostBodyCellNode(
-            content: header,
-            renderedContent: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        node.updateChickenLegReaction(count: 2, isClicked: true)
-
-        #expect(node.debugReactionActionTitles[1] == "2")
-        #expect(node.debugFooterActionAccessibilityLabels[1] == "加鸡腿 2")
-        #expect(node.debugChickenLegActionColor == .systemOrange)
-    }
-
-    @Test func postBodyCellUpdatesOpposeReactionInPlace() {
-        let header = PostDetailHeaderContent(
-            postID: "710379",
-            title: "带操作区的主题",
-            authorName: "mist",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            opposeCount: 0
-        )
-        let node = PostBodyCellNode(
-            content: header,
-            renderedContent: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        node.updateOpposeReaction(count: 1, isClicked: true)
-
-        #expect(node.debugReactionActionTitles[2] == "1")
-        #expect(node.debugFooterActionAccessibilityLabels[2] == "反对 1")
-        #expect(node.debugOpposeActionColor == .systemRed)
-    }
-
-    @Test func postBodyCellCompactsLargeReactionCounts() {
-        let header = PostDetailHeaderContent(
-            postID: "710379",
-            title: "带操作区的主题",
-            authorName: "mist",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            likeCount: 12_345,
-            chickenLegCount: 123_456,
-            opposeCount: 100_000_000,
-            favoriteCount: 2_000_000_000
-        )
-        let node = PostBodyCellNode(
-            content: header,
-            renderedContent: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        #expect(node.debugReactionActionTitles == ["1.2万", "12.3万", "1亿", "20亿"])
-        #expect(node.debugFooterActionAccessibilityLabels == ["点赞 12345", "加鸡腿 123456", "反对 100000000", "收藏 2000000000", "回复楼主", "评论帖子"])
-        #expect(node.debugReactionActionPreferredWidths.allSatisfy { $0 > PostDetailContentLayout.reactionActionMinWidth })
-    }
-
-    @Test func postBodyCellUsesDynamicWidthForTwoDigitFavoriteCount() {
-        let header = PostDetailHeaderContent(
-            postID: "710379",
-            title: "带操作区的主题",
-            authorName: "mist",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            favoriteCount: 10
-        )
-        let node = PostBodyCellNode(
-            content: header,
-            renderedContent: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        #expect(node.debugReactionActionTitles[3] == "10")
-        #expect(node.debugReactionActionPreferredWidths[3] > PostDetailContentLayout.reactionActionMinWidth)
-    }
-
-    @Test func postBodyCellKeepsFavoriteIconStyleWhileSubmitting() {
-        let header = PostDetailHeaderContent(
-            postID: "710379",
-            title: "带操作区的主题",
-            authorName: "mist",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            favoriteCount: 2,
-            isFavoriteCollected: true,
-            isFavoriteSubmitting: true
-        )
-        let node = PostBodyCellNode(
-            content: header,
-            renderedContent: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        #expect(node.debugFavoriteActionColor == .systemYellow)
-    }
-
-    @Test func commentCellRefreshAppearanceRebuildsAuthorNameText() {
-        let comment = Comment(
-            id: "1",
-            authorName: "ipv4",
-            avatarURL: nil,
-            floorText: "#1",
-            createdAtText: "刚刚",
-            contentHTML: "<p>评论</p>"
-        )
-        let node = CommentCellNode(
-            comment: comment,
-            renderedBody: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        let didRefresh = node.refreshAppearanceForCurrentTraits()
-
-        #expect(didRefresh)
-        #expect(node.debugAuthorAttributedTitle?.string == "ipv4")
-        #expect((node.debugAuthorAttributedTitle?.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.pointSize == AppTextSizeSettings.adjustedPointSize(basePointSize: 17))
-        #expect((node.debugAuthorAttributedTitle?.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)?.fontDescriptor.symbolicTraits.contains(.traitBold) == true)
-    }
-
-    @Test func commentCellShowsPosterBadgeBesideAuthorName() {
-        let comment = Comment(
-            id: "1",
-            authorName: "大油桃",
-            isPoster: true,
-            avatarURL: nil,
-            floorText: "#1",
-            createdAtText: "刚刚",
-            contentHTML: "<p>楼主回复</p>"
-        )
-        let node = CommentCellNode(
-            comment: comment,
-            renderedBody: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        #expect(node.debugPosterBadgeAttributedText?.string == "楼主")
-    }
-
-    @Test func commentCellShowsHotIconBeforeFloorNumber() {
-        let comment = Comment(
-            id: "326",
-            authorName: "hostlocmjj",
-            avatarURL: nil,
-            floorText: "#326",
-            createdAtText: "刚刚",
-            contentHTML: "<p>热门评论</p>",
-            isHot: true
-        )
-        let node = CommentCellNode(
-            comment: comment,
-            renderedBody: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        #expect(node.debugHotBadgeImage != nil)
-    }
-
-    @Test func commentCellDisplaysTimeOnSecondLineBelowCommentLabels() {
-        let comment = Comment(
-            id: "326",
-            authorName: "hostlocmjj",
-            isPoster: true,
-            avatarURL: nil,
-            authorBadgeTexts: ["已停用"],
-            floorText: "#326",
-            createdAtText: "34min ago",
-            contentHTML: "<p>评论</p>",
-            isHot: true
-        )
-        let node = CommentCellNode(
-            comment: comment,
-            renderedBody: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        _ = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 360, height: CGFloat.greatestFiniteMagnitude)
-        ))
-
-        #expect(node.debugHeaderTopLineText == "hostlocmjj 楼主 已停用 #326")
-        #expect(node.debugHeaderTimeLineText == "34min ago")
-        #expect(node.debugHeaderTimeIsOnSecondLine)
-    }
-
-    @Test func commentCellShowsDynamicAuthorBadgeText() {
-        let comment = Comment(
-            id: "326",
-            authorName: "hostlocmjj",
-            avatarURL: nil,
-            authorBadgeTexts: ["已停用"],
-            floorText: "#326",
-            createdAtText: "刚刚",
-            contentHTML: "<p>评论</p>"
-        )
-        let node = CommentCellNode(
-            comment: comment,
-            renderedBody: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        #expect(node.debugAuthorBadgeTexts == ["已停用"])
-        #expect(node.debugAuthorBadgeBorderWidths == [1])
-        #expect(node.debugAuthorBadgeTitleColors == [.label])
-    }
-
-    @Test func commentCellUsesIconOnlyFooterActions() {
-        let comment = Comment(
-            id: "1",
-            authorName: "ipv4",
-            avatarURL: nil,
-            floorText: "#1",
-            createdAtText: "刚刚",
-            contentHTML: "<p>评论</p>"
-        )
-        let node = CommentCellNode(
-            comment: comment,
-            renderedBody: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-        _ = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 360, height: CGFloat.greatestFiniteMagnitude)
-        ))
-
-        #expect(node.debugReplyActionTitle == nil)
-        #expect(node.debugQuoteActionTitle == nil)
-        #expect(node.debugReplyActionImage != nil)
-        #expect(node.debugQuoteActionImage != nil)
-        #expect(node.debugFooterActionAccessibilityLabels == ["点赞", "加鸡腿", "反对", "回复评论", "引用评论"])
-        #expect(node.debugActionsAreDisplayedBelowBody)
-    }
-
-    @Test func commentCellShowsReactionCountsWhenAvailable() {
-        let comment = Comment(
-            id: "1",
-            authorName: "ipv4",
-            avatarURL: nil,
-            floorText: "#1",
-            createdAtText: "刚刚",
-            contentHTML: "<p>评论</p>",
-            likeCount: 0,
-            chickenLegCount: 1,
-            opposeCount: 0
-        )
-        let node = CommentCellNode(
-            comment: comment,
-            renderedBody: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-        _ = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 360, height: CGFloat.greatestFiniteMagnitude)
-        ))
-
-        #expect(node.debugReactionActionTitles == [nil, "1", nil])
-        #expect(node.debugFooterActionAccessibilityLabels.prefix(3) == ["点赞", "加鸡腿 1", "反对"])
-    }
-
-    @Test func commentCellUpdatesLikeReactionInPlace() {
-        let comment = Comment(
-            id: "1",
-            authorName: "ipv4",
-            avatarURL: nil,
-            floorText: "#1",
-            createdAtText: "刚刚",
-            contentHTML: "<p>评论</p>",
-            likeCount: 0
-        )
-        let node = CommentCellNode(
-            comment: comment,
-            renderedBody: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        node.updateLikeReaction(count: 1, isClicked: true)
-
-        #expect(node.debugReactionActionTitles.first == "1")
-        #expect(node.debugFooterActionAccessibilityLabels.first == "点赞 1")
-        #expect(node.debugLikeActionColor == .systemRed)
-    }
-
-    @Test func commentCellUpdatesChickenLegReactionInPlace() {
-        let comment = Comment(
-            id: "1",
-            authorName: "ipv4",
-            avatarURL: nil,
-            floorText: "#1",
-            createdAtText: "刚刚",
-            contentHTML: "<p>评论</p>",
-            chickenLegCount: 1
-        )
-        let node = CommentCellNode(
-            comment: comment,
-            renderedBody: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        node.updateChickenLegReaction(count: 2, isClicked: true)
-
-        #expect(node.debugReactionActionTitles[1] == "2")
-        #expect(node.debugFooterActionAccessibilityLabels[1] == "加鸡腿 2")
-        #expect(node.debugChickenLegActionColor == .systemOrange)
-    }
-
-    @Test func commentCellUpdatesOpposeReactionInPlace() {
-        let comment = Comment(
-            id: "1",
-            authorName: "ipv4",
-            avatarURL: nil,
-            floorText: "#1",
-            createdAtText: "刚刚",
-            contentHTML: "<p>评论</p>",
-            opposeCount: 0
-        )
-        let node = CommentCellNode(
-            comment: comment,
-            renderedBody: [],
-            onImageTapped: { _, _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        node.updateOpposeReaction(count: 1, isClicked: true)
-
-        #expect(node.debugReactionActionTitles[2] == "1")
-        #expect(node.debugFooterActionAccessibilityLabels[2] == "反对 1")
-        #expect(node.debugOpposeActionColor == .systemRed)
-    }
-
-    @Test func tableNodeKeepsViewportWidthAndMeasuresContentHeight() {
+    @Test func tableViewKeepsViewportWidthAndMeasuresContentHeight() {
         let table = RenderedTableBlock(rows: [
             .init(cells: [
                 .init(text: "Plan", isHeader: true),
@@ -1996,14 +1439,9 @@ struct PostDetailViewControllerTests {
                 .init(text: "Enough content to require a real row height", isHeader: false)
             ], isHeader: false)
         ])
-        let node = DetailTableNode(table: table, onImageTapped: { _, _ in })
-        let layout = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        ))
-
-        #expect(layout.size.width == 320)
-        #expect(layout.size.height > 0)
+        let size = DetailTableLayout.measure(table: table, constrainedSize: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude))
+        #expect(size.width == 320)
+        #expect(size.height > 0)
     }
 
     @Test func tableLayoutExpandsNarrowColumnsToFillViewportWidth() {
@@ -2025,7 +1463,7 @@ struct PostDetailViewControllerTests {
         #expect(abs(expandedWidth - 360) < 0.5)
     }
 
-    @Test func tableNodeAllocatesStableHeightForImageCells() throws {
+    @Test func tableViewAllocatesStableHeightForImageCells() throws {
         let imageURL = try #require(URL(string: "https://github.com/xykt/NetQuality/raw/main/res/v4_cn.png"))
         let table = RenderedTableBlock(rows: [
             .init(cells: [
@@ -2044,7 +1482,7 @@ struct PostDetailViewControllerTests {
         #expect(layout.height >= DetailTableLayout.imageHeight + 42)
     }
 
-    @Test func tableNodeExpandsHeightForExplicitTextLines() {
+    @Test func tableViewExpandsHeightForExplicitTextLines() {
         let singleLineTable = RenderedTableBlock(rows: [
             .init(cells: [
                 .init(text: "第一行", isHeader: false)
@@ -2068,7 +1506,7 @@ struct PostDetailViewControllerTests {
         #expect(multiLineHeight > singleLineHeight)
     }
 
-    @Test func tableNodeWrapsLongChineseCellTextWithoutTailTruncation() {
+    @Test func tableViewWrapsLongChineseCellTextWithoutTailTruncation() {
         let table = RenderedTableBlock(rows: [
             .init(cells: [
                 .init(text: "核心功能", isHeader: true),
@@ -2082,16 +1520,12 @@ struct PostDetailViewControllerTests {
                 )
             ], isHeader: false)
         ])
-        let node = DetailTableNode(table: table, onImageTapped: { _, _ in })
-        _ = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        ))
-        node.view.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
-        node.view.setNeedsLayout()
-        node.view.layoutIfNeeded()
+        let view = DetailTableScrollView(table: table, onImageTapped: { _, _ in }, onLinkTapped: { _ in })
+        view.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
 
-        let cellLabels = node.view.allSubviews(of: UILabel.self)
+        let cellLabels = view.allSubviews(of: UILabel.self)
         let longTextLabel = cellLabels.first { $0.text?.contains("秒开秒验") == true }
 
         #expect(longTextLabel?.numberOfLines == 0)
@@ -2102,7 +1536,7 @@ struct PostDetailViewControllerTests {
         )[1] > 70)
     }
 
-    @Test func tableNodeRoutesCellLinkTap() throws {
+    @Test func tableViewRoutesCellLinkTap() throws {
         let linkURL = try #require(URL(string: "https://www.nodeseek.com/go/aff"))
         let table = RenderedTableBlock(rows: [
             .init(cells: [
@@ -2116,21 +1550,20 @@ struct PostDetailViewControllerTests {
             ], isHeader: false)
         ])
         var tappedURL: URL?
-        let node = DetailTableNode(
+        let view = DetailTableScrollView(
             table: table,
             onImageTapped: { _, _ in },
             onLinkTapped: { url in
                 tappedURL = url
             }
         )
-        _ = node.view
 
-        node.debugTapFirstLink()
+        view.debugTapFirstLink()
 
         #expect(tappedURL == linkURL)
     }
 
-    @Test func tableNodeUsesUnifiedLinkColor() throws {
+    @Test func tableViewUsesUnifiedLinkColor() throws {
         let linkURL = try #require(URL(string: "https://www.nodeseek.com/go/aff"))
         let table = RenderedTableBlock(rows: [
             .init(cells: [
@@ -2143,16 +1576,12 @@ struct PostDetailViewControllerTests {
                 )
             ], isHeader: false)
         ])
-        let node = DetailTableNode(table: table, onImageTapped: { _, _ in })
-        _ = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        ))
-        node.view.frame = CGRect(x: 0, y: 0, width: 320, height: 120)
-        node.view.setNeedsLayout()
-        node.view.layoutIfNeeded()
+        let view = DetailTableScrollView(table: table, onImageTapped: { _, _ in }, onLinkTapped: { _ in })
+        view.frame = CGRect(x: 0, y: 0, width: 320, height: 120)
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
 
-        let label = try #require(node.view.allSubviews(of: UILabel.self).first {
+        let label = try #require(view.allSubviews(of: UILabel.self).first {
             $0.attributedText?.string.contains("#AFF") == true
         })
         let color = try #require(label.attributedText?.foregroundColor(for: "#AFF"))
@@ -2164,7 +1593,7 @@ struct PostDetailViewControllerTests {
         #expect(text.attribute(.link, at: range.location, effectiveRange: nil) == nil)
     }
 
-    @Test func codeBlockNodeKeepsViewportWidthForLongLines() {
+    @Test func codeBlockKeepsViewportWidthForLongLines() {
         let codeBlock = RenderedCodeBlock(text: String(repeating: "A", count: 160))
         let layout = DetailCodeBlockLayout.measure(
             codeBlock: codeBlock,
@@ -2214,22 +1643,6 @@ struct PostDetailViewControllerTests {
         button.sendActions(for: .touchUpInside)
 
         #expect(copiedString == codeBlock.text)
-    }
-
-    @Test func richTextNodeMeasureUsesLargerHeightForAttachmentContent() {
-        let resolved = DetailRichTextNode.resolvedMeasuredHeight(
-            dtCoreTextHeight: 80,
-            boundingHeight: 82,
-            usesBoundingHeightFallback: true
-        )
-        #expect(resolved == 82)
-
-        let plainResolved = DetailRichTextNode.resolvedMeasuredHeight(
-            dtCoreTextHeight: 80,
-            boundingHeight: 82,
-            usesBoundingHeightFallback: false
-        )
-        #expect(plainResolved == 80)
     }
 
     @Test func resolvesNodeSeekPostLinksToNativeDetail() throws {
@@ -2416,11 +1829,16 @@ struct PostDetailViewControllerTests {
         previewController.loadViewIfNeeded()
 
         #expect(previewController.overrideUserInterfaceStyle == .dark)
-        #expect(previewController.view.backgroundColor == .systemBackground)
-        #expect(previewController.view.firstSubview(of: UITableView.self)?.backgroundColor == .systemBackground)
+        let darkBase = UITraitCollection(traitsFrom: [
+            UITraitCollection(userInterfaceStyle: .dark), UITraitCollection(userInterfaceLevel: .base)
+        ])
+        #expect(previewController.view.backgroundColor == UIColor.systemBackground.resolvedColor(with: darkBase))
+        let preview = try #require(previewController.view.firstSubview(of: DetailFloorPreviewScrollView.self))
+        #expect(preview.backgroundColor == .clear)
+        #expect(preview.floor.contentView.backgroundColor == .clear)
         #expect(previewController.view.allSubviews(of: UIView.self).contains { $0.backgroundColor == .separator })
         let revealButton = try #require(
-            previewController.view.allSubviews(of: UIButton.self).first { $0.configuration?.title == "查看原楼" }
+            previewController.view.allSubviews(of: UIButton.self).first { $0.configuration?.title == DetailListStrings.text("preview-show-floor") }
         )
         #expect(revealButton.configuration?.baseBackgroundColor == .secondarySystemBackground)
         #expect(revealButton.configuration?.baseForegroundColor == .label)
@@ -2968,119 +2386,21 @@ struct PostDetailViewControllerTests {
         await tearDownPostDetailViewController(viewController, window: window)
     }
 
-    @Test func richTextNodeUpdatesMeasuredHeightAfterNormalImageLoads() throws {
-        let imageURL = try #require(URL(string: "https://i.111666.best/image/network.webp"))
-        let blocks = DTCoreTextHTMLContentRenderer().render(
-            fragment: "<p>配图<img src=\"\(imageURL.absoluteString)\" alt=\"image\">正文</p>",
-            baseURL: URL(string: "https://www.nodeseek.com")!,
-            maxImageWidth: 320
-        )
-        let attributedText = try #require(blocks.compactMap { block -> NSAttributedString? in
-            guard case .text(let text) = block else { return nil }
-            return text
-        }.first)
-        let node = DetailRichTextNode(
-            attributedText: attributedText,
-            onImageTapped: { _, _ in },
-            onLayoutInvalidated: {}
-        )
-        let constrainedSize = ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        )
-
-        let initialHeight = node.layoutThatFits(constrainedSize).size.height
-        let displaySize = DetailImageLayout.presentation(
-            for: CGSize(width: 1200, height: 800),
-            maxWidth: 320,
-            kind: .normal
-        ).size
-        let didUpdate = node.updateAttachmentLayout(
-            matching: imageURL,
-            originalSize: CGSize(width: 1200, height: 800),
-            displaySize: displaySize
-        )
-        let updatedHeight = node.layoutThatFits(constrainedSize).size.height
-
-        #expect(didUpdate)
-        #expect(updatedHeight < initialHeight)
-    }
-
-    @Test func richTextNodeUsesCachedAttachmentSizeBeforeImageReloads() throws {
-        let imageURL = try #require(URL(string: "https://i.111666.best/image/network.webp"))
-        let blocks = DTCoreTextHTMLContentRenderer().render(
-            fragment: "<p>配图<img src=\"\(imageURL.absoluteString)\" alt=\"image\">正文</p>",
-            baseURL: URL(string: "https://www.nodeseek.com")!,
-            maxImageWidth: 320
-        )
-        let attributedText = try #require(blocks.compactMap { block -> NSAttributedString? in
-            guard case .text(let text) = block else { return nil }
-            return text
-        }.first)
-        let constrainedSize = ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        )
-        let uncachedNode = DetailRichTextNode(
-            attributedText: attributedText,
-            onImageTapped: { _, _ in },
-            onLayoutInvalidated: {}
-        )
-        let cachedNode = DetailRichTextNode(
-            attributedText: attributedText,
-            imageSizeProvider: { url in
-                url == imageURL ? CGSize(width: 1200, height: 800) : nil
-            },
-            onImageTapped: { _, _ in },
-            onLayoutInvalidated: {}
-        )
-
-        let uncachedHeight = uncachedNode.layoutThatFits(constrainedSize).size.height
-        let cachedHeight = cachedNode.layoutThatFits(constrainedSize).size.height
-
-        #expect(cachedHeight < uncachedHeight)
-    }
-
-    @Test func cellShrinksAfterInlineImageWithoutSizeLoads() throws {
-        // 回归：post-1022915 四楼「文字+无尺寸小图」加载后 cell 仍停在占位高度。
-        let imageURL = try #require(URL(string: "https://cdn.nodeimage.com/i/eB0aGOtTVdI0wVT4mNmW0daMuYYRrVZo.webp"))
-        let blocks = DTCoreTextHTMLContentRenderer().render(
-            fragment: "<p>万圣夜<img src=\"\(imageURL.absoluteString)\" alt=\"image\" class=\"\"></p>",
-            baseURL: URL(string: "https://www.nodeseek.com")!,
-            maxImageWidth: 343
-        )
-        let attributedText = try #require(blocks.compactMap { block -> NSAttributedString? in
-            guard case .text(let text) = block else { return nil }
-            return text
-        }.first)
-        let textNode = DetailRichTextNode(
-            attributedText: attributedText,
-            onImageTapped: { _, _ in },
-            onLayoutInvalidated: {}
-        )
-        let cell = ASCellNode()
-        cell.addSubnode(textNode)
-        cell.layoutSpecBlock = { _, _ in
-            ASInsetLayoutSpec(insets: UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16), child: textNode)
-        }
-        let constrainedSize = ASSizeRange(
-            min: CGSize(width: 375, height: 0),
-            max: CGSize(width: 375, height: CGFloat.greatestFiniteMagnitude)
-        )
-
-        let placeholderHeight = cell.layoutThatFits(constrainedSize).size.height
-        let imageSize = CGSize(width: 80, height: 80)
-        let displaySize = DetailImageLayout.presentation(for: imageSize, maxWidth: 343, kind: .normal).size
-        let didUpdate = textNode.updateAttachmentLayout(
-            matching: imageURL,
-            originalSize: imageSize,
-            displaySize: displaySize
-        )
-        let loadedHeight = cell.layoutThatFits(constrainedSize).size.height
-
-        #expect(didUpdate)
-        #expect(loadedHeight < placeholderHeight)
-        #expect(loadedHeight <= displaySize.height + 60)
+    @Test(arguments: [CGSize(width: 80, height: 80), CGSize(width: 1200, height: 180)])
+    func inlineImageShrinksAfterItsSizeArrives(size: CGSize) async throws {
+        let url = URL(string: "https://example.invalid/inline.webp")!
+        let blocks = DTCoreTextHTMLContentRenderer().renderTextBlocks(
+            fragment: "<p>配图<img src='\(url.absoluteString)'>正文</p>", baseURL: NodeSeekSite.baseURL, maxImageWidth: 343)
+        guard case .text(let text) = blocks.first else { Issue.record("缺少正文"); return }
+        let view = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 343, height: 1))
+        view.shouldLayoutCustomSubviews = false
+        view.configure(text, onImageTapped: nil, onLayoutInvalidated: nil)
+        let placeholderHeight = view.intrinsicContentSize.height
+        view.debugHandleLoadedImage(url, imageSize: size)
+        try await Task.sleep(nanoseconds: 150_000_000)
+        #expect(view.intrinsicContentSize.height < placeholderHeight)
+        let display = DetailImageLayout.presentation(for: size, maxWidth: 343, kind: .normal).size
+        #expect(view.intrinsicContentSize.height <= display.height + 60)
     }
 
     @Test func rendererSplitsWideBlockImageBeforeFollowingText() throws {
@@ -3117,7 +2437,7 @@ struct PostDetailViewControllerTests {
         #expect(combinedText.contains("protonmail"))
     }
 
-    @Test func richTextNodeMeasuresTextAfterImageAndLineBreak() throws {
+    @Test func richTextViewMeasuresTextAfterImageAndLineBreak() throws {
         let imageURL = try #require(URL(string: "https://cdn.nodeimage.com/i/E7rnyCXgl36hsqI97dJqQxtLPjZBruA1.webp"))
         let blocks = DTCoreTextHTMLContentRenderer().render(
             fragment: """
@@ -3138,15 +2458,9 @@ struct PostDetailViewControllerTests {
         #expect(attributedText.string.contains("上个月啥都没干"))
         #expect(imageBlock.url == imageURL)
 
-        let node = DetailRichTextNode(
-            attributedText: attributedText,
-            onImageTapped: { _, _ in },
-            onLayoutInvalidated: {}
-        )
-        let layout = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        ))
+        let rich = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 320, height: 1))
+        rich.configure(attributedText, onImageTapped: nil, onLayoutInvalidated: nil)
+        let measuredHeight = rich.intrinsicContentSize.height
         let layouter = try #require(DTCoreTextLayouter(attributedString: attributedText))
         let layoutFrame = try #require(layouter.layoutFrame(
             with: CGRect(x: 0, y: 0, width: 320, height: 16_777_215),
@@ -3154,10 +2468,10 @@ struct PostDetailViewControllerTests {
         ))
         let expectedHeight = ceil(layoutFrame.frame.maxY)
 
-        #expect(layout.size.height == expectedHeight)
+        #expect(measuredHeight == expectedHeight)
     }
 
-    @Test func richTextNodeMeasuresTrailingStickerLine() throws {
+    @Test func richTextViewMeasuresTrailingStickerLine() throws {
         let blocks = DTCoreTextHTMLContentRenderer().render(
             fragment: """
             <p>活动啥时候开始 <img class="sticker" src="/static/image/sticker/xhj/001.png" loading="lazy" alt="xhj001"></p>
@@ -3169,15 +2483,9 @@ struct PostDetailViewControllerTests {
             guard case .text(let text) = block else { return nil }
             return text
         }.first)
-        let node = DetailRichTextNode(
-            attributedText: attributedText,
-            onImageTapped: { _, _ in },
-            onLayoutInvalidated: {}
-        )
-        let layout = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        ))
+        let rich = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 320, height: 1))
+        rich.configure(attributedText, onImageTapped: nil, onLayoutInvalidated: nil)
+        let measuredHeight = rich.intrinsicContentSize.height
         let boundingHeight = ceil(attributedText.boundingRect(
             with: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
@@ -3191,7 +2499,7 @@ struct PostDetailViewControllerTests {
         let expectedHeight = ceil(layoutFrame.frame.maxY)
 
         #expect(boundingHeight > expectedHeight)
-        #expect(layout.size.height == expectedHeight)
+        #expect(measuredHeight == expectedHeight)
     }
 
     @Test func richTextViewRebuildsFixedQuoteLookupWhenReconfigured() throws {
@@ -3352,26 +2660,15 @@ struct PostDetailViewControllerTests {
     }
 
     @Test func quoteBlockNodeKeepsBorderVertical() throws {
-        let textNode = ASTextNode()
-        textNode.maximumNumberOfLines = 0
-        textNode.attributedText = NSAttributedString(
-            string: "引用内容\n第二行",
-            attributes: [
-                .font: UIFont.preferredFont(forTextStyle: .body),
-                .foregroundColor: UIColor.label
-            ]
-        )
-        let quoteNode = DetailQuoteBlockNode(children: [textNode])
-        let layout = quoteNode.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        ))
-        let borderLayout = try #require(layout.firstLayoutElement(identicalTo: quoteNode.debugBorderNode))
-
-        #expect(borderLayout.position.x == 0)
-        #expect(borderLayout.position.y == 0)
-        #expect(borderLayout.size.width == 3)
-        #expect(borderLayout.size.height > borderLayout.size.width)
+        let stack = DetailBlockStack()
+        stack.axis = .vertical
+        stack.frame = CGRect(x: 0, y: 0, width: 320, height: 120)
+        stack.appendLegacy([.quote(.init(children: [.text(NSAttributedString(string: "引用内容\n第二行"))]))], to: stack, width: 320)
+        stack.layoutIfNeeded()
+        let border = try #require(stack.allSubviews(of: UIView.self).first {
+            $0.bounds.width == DetailQuoteLayout.borderWidth && $0.bounds.height > $0.bounds.width
+        })
+        #expect(border.frame.minX == 0)
     }
 
     @Test func videoStickerViewKeepsPlayerLayerHiddenUntilTapped() throws {
@@ -3498,108 +2795,24 @@ struct PostDetailViewControllerTests {
         #expect(layout.height > 320)
     }
 
-    @Test func imageBlockNodeUsesCachedImageSizeForInitialMeasurement() throws {
-        let imageURL = try #require(URL(string: "https://i.111666.best/image/network.webp"))
-        let node = DetailImageBlockNode(
-            imageBlock: RenderedImageBlock(url: imageURL, altText: nil),
-            imageURLs: [imageURL],
-            imageIndex: 0,
-            initialImageSize: CGSize(width: 1200, height: 800),
-            onImageTapped: { _, _ in },
-            onLayoutInvalidated: {}
-        )
-
-        let layout = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        ))
-
-        #expect(layout.size.width == 320)
-        #expect(layout.size.height == 214)
-    }
-
-    @Test func imageBlockNodeRequestsRowReloadWhenLoadedImageIsShorterThanPlaceholder() throws {
-        let imageURL = try #require(URL(string: "https://i.111666.best/image/wide.webp"))
-        var didRequestRowReload = false
-        var didRequestGeneralRelayout = false
-        let node = DetailImageBlockNode(
-            imageBlock: RenderedImageBlock(url: imageURL, altText: nil),
-            imageURLs: [imageURL],
-            imageIndex: 0,
-            onImageTapped: { _, _ in },
-            onImageHeightReduced: {
-                didRequestRowReload = true
-            },
-            onLayoutInvalidated: {
-                didRequestGeneralRelayout = true
-            }
-        )
-
-        _ = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        ))
-        node.updateLoadedImageSize(CGSize(width: 1200, height: 180))
-
-        #expect(didRequestRowReload)
-        #expect(didRequestGeneralRelayout == false)
-    }
-
-    @Test func imageBlockNodeRequestsRelayoutWhenPortraitIsTallerThanPlaceholder() throws {
-        let imageURL = try #require(URL(string: "https://i.111666.best/image/portrait.webp"))
-        var didRequestRowReload = false
-        var didRequestGeneralRelayout = false
-        let node = DetailImageBlockNode(
-            imageBlock: RenderedImageBlock(url: imageURL, altText: nil),
-            imageURLs: [imageURL],
-            imageIndex: 0,
-            onImageTapped: { _, _ in },
-            onImageHeightReduced: {
-                didRequestRowReload = true
-            },
-            onLayoutInvalidated: {
-                didRequestGeneralRelayout = true
-            }
-        )
-
-        _ = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 360, height: CGFloat.greatestFiniteMagnitude)
-        ))
-        node.updateLoadedImageSize(CGSize(width: 1200, height: 1800))
-
-        #expect(didRequestRowReload == false)
-        #expect(didRequestGeneralRelayout)
-    }
-
-    @Test(arguments: [false, true])
-    func imageBlockGrowthInvalidatesCachedParentLayouts(isQuoted: Bool) throws {
-        let imageURL = try #require(URL(string: "https://example.com/portrait.webp"))
-        let image = DetailImageBlockNode(
-            imageBlock: RenderedImageBlock(url: imageURL, altText: nil),
-            imageURLs: [imageURL], imageIndex: 0,
-            onImageTapped: { _, _ in }, onLayoutInvalidated: {}
-        )
-        let content: ASDisplayNode
-        if isQuoted {
-            let quote = DetailQuoteBlockNode(children: [image])
-            quote.addSubnode(image)
-            content = quote
-        } else {
-            content = image
-        }
-        let cell = ASCellNode()
-        cell.addSubnode(content)
-        cell.layoutSpecBlock = { _, _ in ASWrapperLayoutSpec(layoutElement: content) }
-        let constraints = ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 360, height: CGFloat.greatestFiniteMagnitude)
-        )
-        let before = cell.layoutThatFits(constraints).size.height
-        image.updateLoadedImageSize(CGSize(width: 1200, height: 1800))
-        let after = cell.layoutThatFits(constraints).size.height
-
-        #expect(after > before + 50)
+    @Test(arguments: [false, true], [CGSize(width: 1200, height: 180), CGSize(width: 1200, height: 1800)])
+    func loadedImageChangesTheHeightOfItsParent(quoted: Bool, original: CGSize) throws {
+        let url = URL(string: "https://example.invalid/post.webp")!
+        let stack = DetailBlockStack()
+        stack.axis = .vertical
+        var invalidated = false
+        stack.onSizeChange = { invalidated = true }
+        stack.imageSize = { _ in CGSize(width: 1200, height: 800) }
+        let image = RenderedContentBlock.image(.init(url: url, altText: nil))
+        stack.appendLegacy(quoted ? [.quote(.init(children: [image]))] : [image], to: stack, width: 320)
+        let block = try #require(stack.firstSubview(of: DetailImageBlockView.self))
+        let height = try #require(block.constraints.first { $0.firstAttribute == .height })
+        let width = quoted ? DetailQuoteLayout.contentWidth(320) : 320
+        #expect(height.constant == ceil(DetailImageLayout.presentation(for: CGSize(width: 1200, height: 800), maxWidth: width, kind: .normal).size.height))
+        let thumbnail = UIGraphicsImageRenderer(size: CGSize(width: 24, height: 24)).image { _ in }
+        block.applyLoadedImage(.init(image: thumbnail, resolvedKind: nil, originalSize: original))
+        #expect(invalidated)
+        #expect(height.constant == DetailImageLayout.presentation(for: original, maxWidth: width, kind: .normal).size.height)
     }
 
     @Test func imageBlockWaitsForFinalRowHeightBeforeShowingPortrait() {
@@ -3625,74 +2838,18 @@ struct PostDetailViewControllerTests {
         #expect(wide != nil)
     }
 
-    @Test func imageBlockNodeCanSwitchToReportLayoutAfterSVGContentIsResolved() throws {
-        let imageURL = try #require(URL(string: "https://example.com/report.svg"))
-        var didRequestGeneralRelayout = false
-        let node = DetailImageBlockNode(
-            imageBlock: RenderedImageBlock(url: imageURL, altText: nil),
-            imageURLs: [imageURL],
-            imageIndex: 0,
-            onImageTapped: { _, _ in },
-            onLayoutInvalidated: {
-                didRequestGeneralRelayout = true
-            }
-        )
-
-        _ = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        ))
-        node.updateLoadedImageSize(CGSize(width: 300, height: 1000), resolvedKind: .report)
-
-        #expect(didRequestGeneralRelayout)
-    }
-
-    @Test func contentBlockFactoryPassesReducedImageHeightCallbackToImageNodes() throws {
-        let imageURL = try #require(URL(string: "https://i.111666.best/image/wide.webp"))
-        var didRequestRowReload = false
-        let nodes = DetailContentBlockNodeFactory.makeNodes(
-            from: [.image(RenderedImageBlock(url: imageURL, altText: nil))],
-            onImageTapped: { _, _ in },
-            onLinkTapped: { _ in },
-            onTextLayoutInvalidated: {},
-            onImageHeightReduced: {
-                didRequestRowReload = true
-            }
-        )
-        let imageNode = try #require(nodes.first as? DetailImageBlockNode)
-
-        _ = imageNode.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        ))
-        imageNode.updateLoadedImageSize(CGSize(width: 1200, height: 180))
-
-        #expect(didRequestRowReload)
-    }
-
-    @Test func contentBlockFactoryCreatesFullWidthIframeLinkNode() throws {
-        let openURL = try #require(URL(string: "https://player.bilibili.com/player.html?bvid=BV1GUdgBdESz"))
-        let nodes = DetailContentBlockNodeFactory.makeNodes(
-            from: [
-                .iframeLink(RenderedIFrameLinkBlock(
-                    source: "//player.bilibili.com/player.html?bvid=BV1GUdgBdESz",
-                    displayDomain: "player.bilibili.com",
-                    openURL: openURL
-                ))
-            ],
-            onImageTapped: { _, _ in },
-            onLinkTapped: { _ in },
-            onTextLayoutInvalidated: {}
-        )
-        let node = try #require(nodes.first)
-        #expect(String(describing: type(of: node)).contains("DetailIFrameLinkNode"))
-
-        let layout = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        ))
-        #expect(layout.size.width == 320)
-        #expect(layout.size.height > 0)
+    @Test func webpageBlocksBuildIframeCardAndUpdateReportHeight() throws {
+        let url = URL(string: "https://example.invalid/report.svg")!
+        let stack = DetailBlockStack()
+        stack.axis = .vertical
+        stack.appendLegacy([.image(.init(url: url, altText: nil)),
+                            .iframeLink(.init(source: url.absoluteString, displayDomain: "example.invalid", openURL: url))], to: stack, width: 320)
+        let block = try #require(stack.arrangedSubviews.first as? DetailImageBlockView)
+        let thumbnail = UIGraphicsImageRenderer(size: CGSize(width: 30, height: 100)).image { _ in }
+        block.applyLoadedImage(.init(image: thumbnail, resolvedKind: .report, originalSize: CGSize(width: 300, height: 1000)))
+        #expect(block.imageKind == .report)
+        let iframe = try #require(stack.arrangedSubviews.last as? DetailIFrameLinkView)
+        #expect(iframe.constraints.contains { $0.firstAttribute == .height && $0.constant > 0 })
     }
 
     @Test func iframeLinkTitleIncludesClickToViewHint() {
@@ -3715,7 +2872,7 @@ struct PostDetailViewControllerTests {
         #expect(imageFrame == CGRect(x: 0, y: 0, width: 320, height: 48))
     }
 
-    @Test func richTextNodeUsesDTCoreTextHeightForFixture() throws {
+    @Test func richTextViewUsesDTCoreTextHeightForFixture() throws {
         let baseURL = try #require(URL(string: "https://www.nodeseek.com"))
         let html = try FixtureLoader.html(named: "post-705039-1")
         let detail = try KannaNodeSeekParser(baseURL: baseURL).parsePostDetail(
@@ -3731,15 +2888,9 @@ struct PostDetailViewControllerTests {
             guard case .text(let text) = block else { return nil }
             return text
         }.first)
-        let node = DetailRichTextNode(
-            attributedText: attributed,
-            onImageTapped: { _, _ in },
-            onLayoutInvalidated: {}
-        )
-        let layout = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        ))
+        let rich = DetailRichTextView(frame: CGRect(x: 0, y: 0, width: 320, height: 1))
+        rich.configure(attributed, onImageTapped: nil, onLayoutInvalidated: nil)
+        let measuredHeight = rich.intrinsicContentSize.height
         let layouter = try #require(DTCoreTextLayouter(attributedString: attributed))
         let layoutFrame = try #require(layouter.layoutFrame(
             with: CGRect(x: 0, y: 0, width: 320, height: 16_777_215),
@@ -3747,24 +2898,10 @@ struct PostDetailViewControllerTests {
         ))
         let expectedHeight = ceil(layoutFrame.frame.maxY)
 
-        #expect(layout.size.height == expectedHeight)
+        #expect(measuredHeight == expectedHeight)
     }
 
-    @Test func richTextNodePrefersDTCoreTextHeightWhenBoundingHeightIsLarger() {
-        let height = DetailRichTextNode.resolvedMeasuredHeight(
-            dtCoreTextHeight: 120,
-            boundingHeight: 300,
-            usesBoundingHeightFallback: false
-        )
 
-        #expect(height == 120)
-    }
-
-    @Test func richTextNodeUsesDefaultWidthForUnboundedMeasurement() {
-        let width = DetailRichTextNode.resolvedMeasureWidth(.infinity)
-
-        #expect(width == 320)
-    }
 }
 
 @MainActor
@@ -5284,20 +4421,6 @@ private struct DelayedPostDetailAccountRefresher: CurrentAccountRefreshing {
             profileURL: nil,
             stats: []
         )
-    }
-}
-
-private extension ASLayout {
-    func firstLayoutElement(identicalTo target: ASLayoutElement) -> ASLayout? {
-        if (layoutElement as AnyObject) === (target as AnyObject) {
-            return self
-        }
-        for sublayout in sublayouts {
-            if let match = sublayout.firstLayoutElement(identicalTo: target) {
-                return match
-            }
-        }
-        return nil
     }
 }
 

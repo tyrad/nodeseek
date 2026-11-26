@@ -17,7 +17,7 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         descendants(root, UIButton.self).first { $0.accessibilityIdentifier == "detail-magic-tab-\(index)" }
     }
 
-    func testTabsKeepTextureStripHeightAndOldPageUntilNewIsReady() async throws {
+    func testTabsKeepStripHeightAndOldPageUntilNewIsReady() async throws {
         let long = String(repeating: "第二页很长。", count: 400)
         let markdown = ":::: tabs\n::: tab-item 一\n首页\n:::\n::: tab-item 二\n" + long + "\n:::\n::::"
         let page = DetailMarkdownPrototypeController(id: "strip", source: .init(html: "", visibleMarkdown: markdown))
@@ -25,7 +25,7 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         defer { window.isHidden = true }
         func visibleText() -> [String] { descendants(page.view, DetailSelectableTextView.self).map { $0.snapshot.string } }
         try await waitFor { visibleText() == ["首页"] }
-        // 与 Texture 一致：文字标签条，选中项加粗加下划线，不用系统分段控件。
+        // 文字标签条，选中项加粗加下划线，不用系统分段控件。
         XCTAssertTrue(descendants(page.view, UISegmentedControl.self).isEmpty)
         let first = try XCTUnwrap(tabButton(0, in: page.view))
         let second = try XCTUnwrap(tabButton(1, in: page.view))
@@ -176,7 +176,7 @@ final class DetailTextKitPrototypeTests: XCTestCase {
         XCTAssertEqual(tabButton(1, in: second)?.accessibilityTraits.contains(.selected), true)
     }
 
-    func testIFrameLinkUsesTextureCard() throws {
+    func testIFrameLinkUsesFullWidthCard() throws {
         let stack = DetailBlockStack(frame: CGRect(x: 0, y: 0, width: 360, height: 10))
         stack.axis = .vertical
         var opened: URL?

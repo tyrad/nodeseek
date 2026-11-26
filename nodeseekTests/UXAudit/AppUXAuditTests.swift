@@ -9,7 +9,6 @@
 import XCTest
 import UIKit
 import WebKit
-import AsyncDisplayKit
 @testable import nodeseek
 
 @MainActor
@@ -167,18 +166,21 @@ final class AppUXAuditTests: XCTestCase {
         controller.onSelectPost = { _, page, anchor in opened.append((page, anchor)) }
         controller.loadViewIfNeeded()
 
-        let probeTable = ASTableNode()
+        let probeTable = try XCTUnwrap(controller.view.subviews.compactMap { $0 as? UITableView }.first)
         let loaded = await uxWaitUntil(timeout: 3) {
-            controller.tableNode(probeTable, numberOfRowsInSection: 0) == 1
+            controller.tableView(probeTable, numberOfRowsInSection: 0) == 1
                 && (uxChild(of: controller, named: "groups") as [UserCommentGroup]?)?.count == 1
         }
         XCTAssertTrue(loaded, "前置条件：评论列表应加载出 1 组")
 
         // 点回复文字所在的整行（不是右侧气泡）
-        let cell = controller.tableNode(probeTable, nodeBlockForRowAt: IndexPath(row: 0, section: 0))()
-        let replies = try XCTUnwrap(uxChild(of: cell, named: "replies") as [ASControlNode]?)
-        XCTAssertEqual(replies.count, 1)
-        replies[0].sendActions(forControlEvents: .touchUpInside, with: nil)
+        let cell = controller.tableView(probeTable, cellForRowAt: IndexPath(row: 0, section: 0))
+        func buttons(in view: UIView) -> [UIButton] {
+            view.subviews.compactMap { $0 as? UIButton } + view.subviews.flatMap { buttons(in: $0) }
+        }
+        let replyLabel = String(format: UserContentL10n.text("打开评论 #%ld"), 15)
+        let reply = try XCTUnwrap(buttons(in: cell).first { $0.accessibilityLabel == replyLabel })
+        reply.sendActions(for: .touchUpInside)
 
         XCTAssertEqual(opened.count, 1)
         XCTAssertEqual(opened.first?.page, 2, "U23: 点评论行打开的是第 \(opened.first?.page ?? 0) 页，不是 #15 所在的第 2 页")

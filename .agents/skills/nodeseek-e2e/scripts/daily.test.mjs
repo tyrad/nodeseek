@@ -30,7 +30,7 @@ function daily(id, run, launchArgs = []) {
       async function start(post, page = 1, anchor = '') {
         const url = post ? 'https://www.nodeseek.com/post-' + post + '-' + page + anchor : '';
         execFileSync('xcrun', ['simctl', 'launch', '--terminate-running-process', device, bundle,
-          '-nodeSeekDebug.fileLoggingEnabled', 'YES', ...launchArgs], { env: { ...process.env, SIMCTL_CHILD_NODESEEK_E2E_DETAIL_URL: url } });
+          '-nodeSeekDebug.fileLoggingEnabled', 'YES', '-appNavigationLayout.layout', 'reading', ...launchArgs], { env: { ...process.env, SIMCTL_CHILD_NODESEEK_E2E_DETAIL_URL: url } });
         await ui.get(home);
       }
       async function sidebar() {

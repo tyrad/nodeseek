@@ -1,4 +1,3 @@
-import AsyncDisplayKit
 import CryptoKit
 import UIKit
 import WebKit
@@ -17,8 +16,9 @@ final class VoteIntegrationTests: XCTestCase {
             let blocks = DTCoreTextHTMLContentRenderer().render(fragment: html, baseURL: baseURL)
             XCTAssertEqual(blocks.count, 3)
             guard case .vote(3108) = blocks[1] else { return XCTFail("缺少投票内容块") }
-            let nodes = DetailContentBlockNodeFactory.makeNodes(from: blocks, onImageTapped: { _, _ in }, onLinkTapped: { _ in }, onTextLayoutInvalidated: {})
-            XCTAssertTrue(nodes[1] is DetailVoteNode)
+            let stack = DetailBlockStack()
+            stack.appendLegacy(blocks, to: stack, width: 320)
+            XCTAssertTrue(stack.arrangedSubviews[1] is DetailVoteView)
             XCTAssertEqual(CommentCopyTextFormatter.plainText(from: blocks).split(separator: "\n"), ["之前", "nsapp://vote?id=3108", "之后"])
         }
         let url = URL(string: "nsapp://vote?id=3108")!
@@ -176,30 +176,20 @@ final class VoteIntegrationTests: XCTestCase {
         try saveSnapshot(window, name: "vote-results-dark")
     }
 
-    func testInlineTextureNodeGrowsAndRefreshesAfterReturningFromWeb() async throws {
+    func testInlineVoteGrowsAndRefreshesAfterReturningFromWeb() async throws {
         let service = VoteTestService()
-        let root = ASDisplayNode()
-        root.automaticallyManagesSubnodes = true
-        root.backgroundColor = .systemBackground
-        let vote = DetailVoteNode(id: 3108, service: service, onLayoutInvalidated: { [weak root] in
-            root?.setNeedsLayout()
-        })
-        root.layoutSpecBlock = { _, _ in
-            let stack = ASStackLayoutSpec.vertical()
-            stack.children = [vote]
-            return ASInsetLayoutSpec(insets: UIEdgeInsets(top: 70, left: 16, bottom: 16, right: 16), child: stack)
-        }
-        let controller = ASDKViewController(node: root)
+        let controller = UIViewController()
+        let preview = DetailFloorPreviewScrollView()
+        preview.floor.body.voteService = service
+        preview.loadContent = { _, _, deliver in deliver([.vote(3108)]); return nil }
+        controller.view = preview
         let window = makeWindow(controller: controller)
         defer { window.isHidden = true }
-        let card = try XCTUnwrap(vote.view as? DetailVoteView)
-        await waitUntil { card.model.vote != nil }
-        root.setNeedsLayout()
-        root.layoutIfNeeded()
-        card.layoutIfNeeded()
-        root.layoutIfNeeded()
-        XCTAssertGreaterThan(vote.calculatedSize.height, 300)
-        XCTAssertLessThan(vote.calculatedSize.height, 600, "卡片不应拉伸填满剩余屏幕")
+        preview.layoutIfNeeded()
+        let card = try XCTUnwrap(preview.floor.body.arrangedSubviews.first as? DetailVoteView)
+        await waitUntil { card.model.vote != nil && card.bounds.height > 300 }
+        XCTAssertGreaterThan(card.bounds.height, 300)
+        XCTAssertLessThan(card.bounds.height, 600, "卡片不应拉伸填满剩余屏幕")
         try saveSnapshot(window, name: "vote-inline")
 
         // 网页中完成投票后，重新进入原生卡片必须重新读取状态。
@@ -209,8 +199,12 @@ final class VoteIntegrationTests: XCTestCase {
         window.rootViewController = nil
         window.rootViewController = controller
         window.makeKeyAndVisible()
-        await waitUntil { card.model.vote?.hasVoted == true }
-        XCTAssertFalse(card.model.canSubmit)
+        await waitUntil {
+            let visibleCard = preview.floor.body.arrangedSubviews.first as? DetailVoteView
+            return visibleCard?.model.vote?.hasVoted == true
+        }
+        let visibleCard = try XCTUnwrap(preview.floor.body.arrangedSubviews.first as? DetailVoteView)
+        XCTAssertFalse(visibleCard.model.canSubmit)
     }
 
     func testAccessibilityTextSizeIncreasesCardHeight() async throws {

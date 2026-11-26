@@ -1,16 +1,16 @@
 //
-//  PostTextureListHostPresenter.swift
+//  PostListHostPresenter.swift
 //  nodeseek
 //
 
 import Foundation
 
-final class PostTextureListHostPresenter: PostTextureListHostPresenterProtocol {
-    weak var delegate: PostTextureListHostPresenterDelegate?
+final class PostListHostPresenter: PostListHostPresenterProtocol {
+    weak var delegate: PostListHostPresenterDelegate?
 
-    private weak var view: PostTextureListHostViewProtocol?
+    private weak var view: PostListHostViewProtocol?
     private let category: PostListCategoryItem
-    private let interactor: PostTextureListHostInteractorInput
+    private let interactor: PostListHostInteractorInput
     private let visitedStore: VisitedPostStoreProtocol
     private let sortPreferenceStore: PostListSortPreferenceStoring
     private var requestGeneration = 0
@@ -28,7 +28,7 @@ final class PostTextureListHostPresenter: PostTextureListHostPresenterProtocol {
 
     init(
         category: PostListCategoryItem,
-        interactor: PostTextureListHostInteractorInput,
+        interactor: PostListHostInteractorInput,
         visitedStore: VisitedPostStoreProtocol,
         sortPreferenceStore: PostListSortPreferenceStoring = PostListSortPreferenceStore.shared
     ) {
@@ -40,7 +40,7 @@ final class PostTextureListHostPresenter: PostTextureListHostPresenterProtocol {
         self.interactor.presenter = self
     }
 
-    func setView(_ view: PostTextureListHostViewProtocol) {
+    func setView(_ view: PostListHostViewProtocol) {
         self.view = view
     }
 
@@ -66,7 +66,7 @@ final class PostTextureListHostPresenter: PostTextureListHostPresenterProtocol {
         sortMode = sortMode.toggled
         sortPreferenceStore.sortMode = sortMode
         resetAndLoadFirstPage()
-        delegate?.postTextureListHostDidChangeSortMode(sortMode, category: category)
+        delegate?.postListHostDidChangeSortMode(sortMode, category: category)
         return sortMode
     }
 
@@ -82,7 +82,7 @@ final class PostTextureListHostPresenter: PostTextureListHostPresenterProtocol {
             items[index] = PostListItem(post: item.post, isVisited: true)
             view?.updateVisitedState(at: index, isVisited: true)
         }
-        delegate?.postTextureListHostDidSelectPost(item.post, category: category)
+        delegate?.postListHostDidSelectPost(item.post, category: category)
     }
 
     func didRequestRefresh() {
@@ -111,7 +111,7 @@ final class PostTextureListHostPresenter: PostTextureListHostPresenterProtocol {
     }
 }
 
-extension PostTextureListHostPresenter: PostTextureListHostInteractorOutput {
+extension PostListHostPresenter: PostListHostInteractorOutput {
     func didLoadPosts(
         _ posts: [PostSummary],
         category: PostListCategoryItem,
@@ -135,7 +135,7 @@ extension PostTextureListHostPresenter: PostTextureListHostInteractorOutput {
         view?.hideRefreshing()
         view?.hideLoadingMore()
         finishTabReselectRefresh(failureMessage: nil)
-        delegate?.postTextureListHostDidLoadFirstPage(category: category)
+        delegate?.postListHostDidLoadFirstPage(category: category)
     }
 
     func didLoadMorePosts(
@@ -197,7 +197,7 @@ extension PostTextureListHostPresenter: PostTextureListHostInteractorOutput {
     }
 }
 
-private extension PostTextureListHostPresenter {
+private extension PostListHostPresenter {
     func finishTabReselectRefresh(failureMessage: String?) {
         guard isTabReselectRefreshing else { return }
         isTabReselectRefreshing = false

@@ -1,4 +1,3 @@
-import AsyncDisplayKit
 import UIKit
 import XCTest
 @testable import nodeseek
@@ -42,7 +41,9 @@ final class VoteLayoutRegressionTests: XCTestCase {
         if #available(iOS 17.0, *) {
             controller.traitOverrides.preferredContentSizeCategory = .accessibilityExtraLarge
             try await Task.sleep(nanoseconds: 500_000_000)
-            assertContentFits(card: card, controller: controller)
+            let resizedCard = try await waitForCard(in: controller)
+            await settle { resizedCard.model.vote != nil }
+            assertContentFits(card: resizedCard, controller: controller)
         }
     }
 
@@ -53,18 +54,14 @@ final class VoteLayoutRegressionTests: XCTestCase {
         }
         let lastControlBottom = card.convert(lastContent.bounds, from: lastContent).maxY
         XCTAssertGreaterThanOrEqual(card.bounds.height, lastControlBottom + 11, "投票背景必须包含全部选项和按钮", file: file, line: line)
-        guard let cell = controller.table.nodeForRow(at: IndexPath(row: 0, section: 0)),
-              let following = (cell.subnodes ?? []).compactMap({ $0 as? DetailRichTextNode }).first else {
-            return XCTFail("真实正文缺少投票后的文字", file: file, line: line)
-        }
-        let contentBottom = cell.view.convert(CGPoint(x: 0, y: lastControlBottom), from: card).y
-        XCTAssertGreaterThanOrEqual(following.frame.minY, contentBottom + 11, "投票后的正文不得与选项重叠", file: file, line: line)
-        let followingImage = (cell.subnodes ?? []).compactMap { $0 as? DetailImageBlockNode }.first
-        XCTAssertNotNil(followingImage, file: file, line: line)
-        XCTAssertGreaterThan(followingImage?.frame.minY ?? 0, contentBottom, "后续图片不得覆盖投票", file: file, line: line)
-        let nextRow = controller.table.view.rectForRow(at: IndexPath(row: 1, section: 0))
-        let contentBottomInTable = controller.table.view.convert(CGPoint(x: 0, y: lastControlBottom), from: card).y
-        XCTAssertGreaterThan(nextRow.minY, contentBottomInTable, "列表行高必须随投票内容增长", file: file, line: line)
+        let floor = controller.preview.floor
+        let following = try? XCTUnwrap(descendants(floor.body).compactMap { $0 as? DetailRichTextView }.first)
+        guard let following else { return XCTFail("投票后的文字缺失", file: file, line: line) }
+        let bottom = card.convert(CGPoint(x: 0, y: lastControlBottom), to: floor.body).y
+        XCTAssertGreaterThanOrEqual(following.frame.minY, bottom + 11, file: file, line: line)
+        let image = descendants(floor.body).compactMap { $0 as? DetailImageBlockView }.first
+        XCTAssertGreaterThan(image?.frame.minY ?? 0, bottom, file: file, line: line)
+        XCTAssertGreaterThan(controller.preview.contentSize.height, floor.body.convert(CGPoint(x: 0, y: bottom), to: floor).y, file: file, line: line)
     }
 
     private func waitForCard(in controller: VoteTableFixtureController) async throws -> DetailVoteView {
@@ -93,11 +90,10 @@ final class VoteLayoutRegressionTests: XCTestCase {
 }
 
 @MainActor
-private final class VoteTableFixtureController: UIViewController, ASTableDataSource, ASTableDelegate {
-    let table = ASTableNode(style: .plain)
+private final class VoteTableFixtureController: UIViewController {
+    let preview = DetailFloorPreviewScrollView()
     private let service: NodeSeekVoteServing
     private let imageURL: URL
-    private var refreshWork: DispatchWorkItem?
 
     init(service: NodeSeekVoteServing) throws {
         self.service = service
@@ -114,37 +110,18 @@ private final class VoteTableFixtureController: UIViewController, ASTableDataSou
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        table.dataSource = self
-        table.delegate = self
-        table.view.frame = view.bounds
-        table.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        view.addSubview(table.view)
-    }
-
-    func tableNode(_ tableNode: ASTableNode, numberOfRowsInSection section: Int) -> Int { 2 }
-
-    func tableNode(_ tableNode: ASTableNode, nodeBlockForRowAt indexPath: IndexPath) -> ASCellNodeBlock {
-        if indexPath.row == 1 {
-            return {
-                let cell = ASTextCellNode()
-                cell.text = "后面的回帖"
-                return cell
-            }
-        }
+        preview.frame = view.bounds
+        preview.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(preview)
+        preview.floor.body.voteService = service
         let html = #"<p><a href="javascript://void(0)" data-href="nsapp://vote?id=3108">nsapp://vote?id=3108</a></p><p>难不成真的歧视 Plus？</p><p>截至为止，我的两个 Plus 还没重置</p>"#
         var blocks = DTCoreTextHTMLContentRenderer().render(fragment: html, baseURL: NodeSeekSite.baseURL)
         blocks.append(.image(.init(url: imageURL, altText: "剩余用量截图")))
         let content = PostDetailHeaderContent(postID: "917518", title: "统计下，截至目前为止，Plus 用户重置的分布", authorName: "CIYYYT", avatarURL: nil, metadataText: "4min ago · 日常", contentHTML: html)
-        return { [weak self, service] in
-            PostBodyCellNode(content: content, renderedContent: blocks, voteService: service, onImageTapped: { _, _ in }, onTextLayoutInvalidated: {
-                self?.refreshWork?.cancel()
-                let work = DispatchWorkItem { [weak self] in
-                    self?.table.relayoutItems()
-                    self?.table.performBatch(animated: false, updates: {})
-                }
-                self?.refreshWork = work
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: work)
-            }, imageSizeProvider: { _ in CGSize(width: 320, height: 120) })
+        preview.configureHeader = { floor in
+            floor.configureHeader(title: content.title, requiredLevel: nil, name: content.authorName,
+                                  badges: [], time: content.metadataText, floor: nil)
         }
+        preview.loadContent = { _, _, deliver in deliver(blocks); return nil }
     }
 }

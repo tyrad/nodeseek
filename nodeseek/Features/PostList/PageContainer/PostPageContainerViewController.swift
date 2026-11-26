@@ -22,7 +22,7 @@ final class PostPageContainerViewController: UIPageViewController {
     var onListScroll: ((UIScrollView) -> Void)?
 
     var categories: [PostListCategoryItem] = []
-    var hostViewControllers: [PostListCategoryItem: PostTextureListHostViewController] = [:]
+    var hostViewControllers: [PostListCategoryItem: PostListHostViewController] = [:]
     private(set) var currentCategory: PostListCategoryItem?
     weak var pagingScrollView: UIScrollView?
     var maximumLeadingBoundaryPullDistance: CGFloat = 0
@@ -57,12 +57,12 @@ final class PostPageContainerViewController: UIPageViewController {
         guard self.categories != categories else { return }
         self.categories = categories
 
-        var newHosts: [PostListCategoryItem: PostTextureListHostViewController] = [:]
+        var newHosts: [PostListCategoryItem: PostListHostViewController] = [:]
         for category in categories {
             if let existing = hostViewControllers[category] {
                 newHosts[category] = existing
             } else {
-                let host = PostTextureListHostRouter.createModule(
+                let host = PostListHostRouter.createModule(
                     category: category,
                     visitedStore: visitedStore,
                     delegate: self
@@ -162,16 +162,16 @@ final class PostPageContainerViewController: UIPageViewController {
     }
 }
 
-extension PostPageContainerViewController: PostTextureListHostPresenterDelegate {
-    func postTextureListHostDidSelectPost(_ post: PostSummary, category: PostListCategoryItem) {
+extension PostPageContainerViewController: PostListHostPresenterDelegate {
+    func postListHostDidSelectPost(_ post: PostSummary, category: PostListCategoryItem) {
         eventDelegate?.postPageContainerViewController(self, didSelectPost: post, category: category)
     }
 
-    func postTextureListHostDidChangeSortMode(_ sortMode: PostListSortMode, category: PostListCategoryItem) {
+    func postListHostDidChangeSortMode(_ sortMode: PostListSortMode, category: PostListCategoryItem) {
         eventDelegate?.postPageContainerViewController(self, didChangeSortMode: sortMode, category: category)
     }
 
-    func postTextureListHostDidLoadFirstPage(category: PostListCategoryItem) {
+    func postListHostDidLoadFirstPage(category: PostListCategoryItem) {
         eventDelegate?.postPageContainerViewController(self, didLoadFirstPageFor: category)
     }
 }

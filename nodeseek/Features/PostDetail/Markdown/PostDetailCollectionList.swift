@@ -554,7 +554,7 @@ private extension PostDetailCollectionList {
         [header.likeCount, header.chickenLegCount, header.opposeCount, header.favoriteCount].contains { $0 != nil }
     }
 
-    func floorActions(page: PostDetailViewController, cell: DetailFloorListCell, comment: Comment?) -> [DetailFloorListCell.FloorAction] {
+    internal func floorActions(page: PostDetailViewController, cell: DetailFloorListCell, comment: Comment?) -> [DetailFloorListCell.FloorAction] {
         let binding = cell.request
         var actions: [DetailFloorListCell.FloorAction] = []
         func add(_ key: String, _ image: UIImage?, _ perform: @escaping (PostDetailViewController) -> Void) {

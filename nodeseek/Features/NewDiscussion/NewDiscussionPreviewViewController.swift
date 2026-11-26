@@ -3,7 +3,6 @@
 //  nodeseek
 //
 
-import AsyncDisplayKit
 import UIKit
 
 /// 发帖预览：正文转成 HTML 后走详情页同一套渲染，看到的就是发出去在 App 里的样子。
@@ -11,9 +10,8 @@ final class NewDiscussionPreviewViewController: UIViewController {
     private let draft: NewDiscussionDraft
     private let publishTitle: String
     private let onPublish: () -> Void
-    private let tableNode = ASTableNode(style: .plain)
+    private let preview = DetailFloorPreviewScrollView()
     private var headerContent: PostDetailHeaderContent
-    private var renderedContent: [RenderedContentBlock]?
 
     init(draft: NewDiscussionDraft, publishTitle: String = "发布", onPublish: @escaping () -> Void) {
         self.draft = draft
@@ -33,39 +31,34 @@ final class NewDiscussionPreviewViewController: UIViewController {
         view.backgroundColor = .systemBackground
         setupPublishButton()
 
-        tableNode.dataSource = self
-        tableNode.view.separatorStyle = .none
-        tableNode.view.backgroundColor = .systemBackground
-        tableNode.view.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(tableNode.view)
-        NSLayoutConstraint.activate([
-            tableNode.view.topAnchor.constraint(equalTo: view.topAnchor),
-            tableNode.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableNode.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableNode.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
-
-        loadAuthor()
-    }
-
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        // 富文本颜色在渲染时就固定了，要等进入窗口拿到真实的深浅模式再渲染。
-        if renderedContent == nil {
-            reloadRenderedContent()
+        preview.configureHeader = { [weak self] cell in
+            guard let content = self?.headerContent else { return }
+            cell.configureHeader(title: content.title, requiredLevel: content.requiredReadingLevel,
+                                 name: content.authorName, badges: [], time: content.metadataText, floor: nil)
+            cell.configureAuthor(name: content.authorName, avatarURL: content.avatarURL, profileURL: nil) { _ in }
         }
-    }
-
-    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-        super.traitCollectionDidChange(previousTraitCollection)
-        guard renderedContent != nil,
-              previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle else { return }
-        reloadRenderedContent()
-    }
-
-    private func reloadRenderedContent() {
-        traitCollection.performAsCurrent { renderContent() }
-        tableNode.reloadData(completion: nil)
+        let markdown = draft.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let stickers = Self.stickerURLs
+        let emptyColor = MarkdownEditorStyler.secondaryTextColor
+        preview.loadContent = DetailFloorPreviewScrollView.background { width in
+            guard !markdown.isEmpty else {
+                return [.text(NSAttributedString(string: "正文还是空的", attributes: [
+                    .font: AppTypography.commentBodyFont(), .foregroundColor: emptyColor
+                ]))]
+            }
+            let html = MarkdownPreviewHTMLRenderer.html(from: markdown) { stickers[$0] }
+            return PostDetailViewController.makeRenderedContent(html: html, baseURL: NodeSeekSite.baseURL,
+                                                               maxImageWidth: width, showsSignature: false)
+        }
+        preview.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(preview)
+        NSLayoutConstraint.activate([
+            preview.topAnchor.constraint(equalTo: view.topAnchor),
+            preview.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            preview.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            preview.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        loadAuthor()
     }
 
     private func setupPublishButton() {
@@ -84,32 +77,13 @@ final class NewDiscussionPreviewViewController: UIViewController {
         navigationItem.rightBarButtonItem = item
     }
 
-    private func renderContent() {
-        let markdown = draft.content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !markdown.isEmpty else {
-            renderedContent = [.text(NSAttributedString(
-                string: "正文还是空的",
-                attributes: [.font: UIFont.preferredFont(forTextStyle: .body), .foregroundColor: MarkdownEditorStyler.secondaryTextColor]
-            ))]
-            return
-        }
-        let html = MarkdownPreviewHTMLRenderer.html(from: markdown, stickerURL: Self.stickerURL)
-        let maxImageWidth = max(view.bounds.width - PostDetailContentLayout.horizontalInset * 2, 1)
-        renderedContent = PostDetailViewController.makeRenderedContent(
-            html: html,
-            baseURL: NodeSeekSite.baseURL,
-            maxImageWidth: maxImageWidth,
-            showsSignature: false
-        )
-    }
-
     /// 作者信息只用缓存账号，读不到时显示“我”，不为预览单独发请求。
     private func loadAuthor() {
         Task { [weak self] in
             let account = await CurrentAccountRefresher.shared.cachedAccount()
             guard let self, let account, account.isLoggedIn else { return }
             headerContent = Self.headerContent(for: draft, account: account)
-            tableNode.reloadData(completion: nil)
+            preview.refreshHeader()
         }
     }
 
@@ -141,32 +115,4 @@ final class NewDiscussionPreviewViewController: UIViewController {
         }
         return result
     }()
-
-    private static func stickerURL(_ token: String) -> URL? {
-        stickerURLs[token]
-    }
-}
-
-extension NewDiscussionPreviewViewController: ASTableDataSource {
-    func tableNode(_ tableNode: ASTableNode, numberOfRowsInSection section: Int) -> Int {
-        renderedContent == nil ? 0 : 1
-    }
-
-    func tableNode(_ tableNode: ASTableNode, nodeBlockForRowAt indexPath: IndexPath) -> ASCellNodeBlock {
-        let content = headerContent
-        let renderedContent = renderedContent
-        return { [weak self] in
-            let node = PostBodyCellNode(
-                content: content,
-                renderedContent: renderedContent,
-                onImageTapped: { _, _ in },
-                showsReplyActions: false,
-                onTextLayoutInvalidated: {
-                    self?.tableNode.relayoutItems()
-                }
-            )
-            node.selectionStyle = .none
-            return node
-        }
-    }
 }

@@ -28,7 +28,7 @@ struct DetailSignatureDocumentTests {
         #expect(blocks(#"<p><a href="https://example.com/shop"><img src="https://example.com/banner.png"></a></p>"#) == nil)
     }
 
-    @Test func leadingRulesAreDroppedLikeTexture() throws {
+    @Test func leadingRulesAreDropped() throws {
         // 取自 1075091 #3 的签名：旧版只画文字下方的分隔线，开头的 <hr> 不显示。
         let html = "<hr>\n<hr>\n<p>签名</p>\n<hr>\n"
         #expect(blocks(html) == [.paragraph([.text("签名", [], nil)]), .divider])

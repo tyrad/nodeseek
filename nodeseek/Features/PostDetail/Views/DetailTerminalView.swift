@@ -1,35 +1,4 @@
-import AsyncDisplayKit
 import UIKit
-
-final class DetailTerminalNode: ASDisplayNode {
-    private let lineCount: Int
-    private var loadedSize: CGSize = .zero
-    private let onLayoutInvalidated: () -> Void
-
-    init(terminal: RenderedTerminalBlock, onImageTapped: @escaping ([URL], Int) -> Void, onLayoutInvalidated: @escaping () -> Void) {
-        lineCount = terminal.ansi.components(separatedBy: "\n").count
-        self.onLayoutInvalidated = onLayoutInvalidated
-        super.init()
-        setViewBlock { [weak self] in
-            DetailTerminalView(terminal: terminal, onImageTapped: onImageTapped, onImageLoaded: { size in
-                guard let self, self.loadedSize != size else { return }
-                self.loadedSize = size
-                self.invalidateCalculatedLayout()
-                self.setNeedsLayout()
-                self.onLayoutInvalidated()
-            })
-        }
-        style.flexGrow = 1
-        style.flexShrink = 1
-    }
-
-    override func calculateSizeThatFits(_ constrainedSize: CGSize) -> CGSize {
-        let width = constrainedSize.width.isFinite && constrainedSize.width > 0 ? constrainedSize.width : 320
-        let size = loadedSize == .zero ? CGSize(width: 875, height: CGFloat(lineCount) * 21 + 32) : loadedSize
-        let imageSize = DetailImageBlockLayout.measure(originalSize: size, constrainedSize: CGSize(width: width, height: .greatestFiniteMagnitude), kind: .report)
-        return CGSize(width: width, height: imageSize.height)
-    }
-}
 
 final class DetailTerminalView: UIView {
     private let terminal: RenderedTerminalBlock

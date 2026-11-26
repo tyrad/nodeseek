@@ -1,5 +1,5 @@
 //
-//  PostTextureListViewTests.swift
+//  PostListViewTests.swift
 //  nodeseekTests
 //
 
@@ -8,9 +8,9 @@ import UIKit
 @testable import nodeseek
 
 @MainActor
-struct PostTextureListViewTests {
+struct PostListViewTests {
     @Test func footerHeightStaysFixedAfterHidingLoadingMore() throws {
-        let view = PostTextureListView()
+        let view = PostListView()
         view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         view.layoutIfNeeded()
 
@@ -23,7 +23,7 @@ struct PostTextureListViewTests {
     }
 
     @Test func canRefreshVisibleCellAppearanceWithoutReloadingItems() throws {
-        let view = PostTextureListView()
+        let view = PostListView()
         view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         view.setItems([
             PostListItem(post: PostSummary(
@@ -47,7 +47,7 @@ struct PostTextureListViewTests {
 
     /// 首页用的列表默认不带关键词；搜索页设置后可见行重新排版出高亮，清空后恢复。
     @Test func searchHighlightTermsRelayoutVisibleTitles() throws {
-        let view = PostTextureListView()
+        let view = PostListView()
         #expect(view.searchHighlightTerms.isEmpty)
         view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         view.setItems([
@@ -92,7 +92,7 @@ struct PostTextureListViewTests {
     }
 
     @Test func loadingSkeletonRowsFillVisibleListHeight() throws {
-        let view = PostTextureListView()
+        let view = PostListView()
         view.frame = CGRect(x: 0, y: 0, width: 390, height: 806)
 
         view.showLoadingSkeleton()
@@ -105,8 +105,8 @@ struct PostTextureListViewTests {
     }
 
     @Test func shortFirstPageRequestsNextPageOnlyOnce() async throws {
-        let view = PostTextureListView()
-        let delegate = SpyPostTextureListViewDelegate()
+        let view = PostListView()
+        let delegate = SpyPostListViewDelegate()
         view.delegate = delegate
         view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         view.setItems([
@@ -131,8 +131,8 @@ struct PostTextureListViewTests {
     }
 
     @Test func retryButtonNotifiesDelegateAfterFirstPageError() throws {
-        let view = PostTextureListView()
-        let delegate = SpyPostTextureListViewDelegate()
+        let view = PostListView()
+        let delegate = SpyPostListViewDelegate()
         view.delegate = delegate
 
         view.showFirstPageError(message: "网络超时")
@@ -144,19 +144,19 @@ struct PostTextureListViewTests {
     }
 }
 
-private final class SpyPostTextureListViewDelegate: PostTextureListViewDelegate {
+private final class SpyPostListViewDelegate: PostListViewDelegate {
     private(set) var retryRequestCount = 0
     private(set) var approachBottomCount = 0
 
-    func postTextureListView(_ textureListView: PostTextureListView, didSelectPostAt index: Int) {}
+    func postListView(_ listView: PostListView, didSelectPostAt index: Int) {}
 
-    func postTextureListViewDidRequestRefresh(_ textureListView: PostTextureListView) {}
+    func postListViewDidRequestRefresh(_ listView: PostListView) {}
 
-    func postTextureListViewDidRequestFirstPageRetry(_ textureListView: PostTextureListView) {
+    func postListViewDidRequestFirstPageRetry(_ listView: PostListView) {
         retryRequestCount += 1
     }
 
-    func postTextureListView(_ textureListView: PostTextureListView, didApproachBottomAt index: Int, totalCount: Int) {
+    func postListView(_ listView: PostListView, didApproachBottomAt index: Int, totalCount: Int) {
         approachBottomCount += 1
     }
 }

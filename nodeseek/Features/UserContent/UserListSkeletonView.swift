@@ -15,6 +15,7 @@ final class UserListSkeletonView: UIView {
         case member
         case stardust
         case credit
+        case collection
     }
 
     private static let pulseKey = "user_list_skeleton_pulse"
@@ -74,6 +75,10 @@ final class UserListSkeletonView: UIView {
         // 宽度轻微错落，看起来更像真实内容
         let wide: CGFloat = index.isMultiple(of: 2) ? 1 : 0.78
         switch style {
+        case .collection:
+            return vertical([block(width: 200, height: 18), horizontal([
+                block(width: 80, height: 13), block(width: 50, height: 13)
+            ], alignment: .center, spacing: 8)], spacing: 9)
         case .member:
             let info = vertical([block(width: 110 * wide, height: 16), block(width: 76, height: 12)], spacing: 8)
             let head = horizontal([block(width: 44, height: 44, radius: 10), info], alignment: .center, spacing: 12)

@@ -5,12 +5,11 @@
 //  Created by Codex on 2026/5/11.
 //
 
-import AsyncDisplayKit
 import UIKit
 
 @MainActor
 final class UserDiscussionsViewController: UIViewController {
-    private let tableNode = ASTableNode(style: .plain)
+    private let tableView = UITableView(frame: .zero, style: .plain)
     private let refreshControl = UIRefreshControl()
     private let footerView = UserContentFooterView()
     private let errorView = UserContentErrorView(accessibilityIdentifier: "user-discussions-error-view")
@@ -61,31 +60,34 @@ final class UserDiscussionsViewController: UIViewController {
 
     private func setupUI() {
         view.backgroundColor = UIColor.systemBackground
-        tableNode.dataSource = self
-        tableNode.delegate = self
-        tableNode.leadingScreensForBatching = 2
-        tableNode.view.separatorStyle = .singleLine
-        tableNode.view.tableFooterView = footerView
-        tableNode.view.backgroundColor = UIColor.systemBackground
+        tableView.dataSource = self
+        tableView.delegate = self
+        tableView.rowHeight = UITableView.automaticDimension
+        tableView.estimatedRowHeight = 72
+        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "content")
+        tableView.register(UserContentSkeletonCell.self, forCellReuseIdentifier: "skeleton")
+        tableView.separatorStyle = .singleLine
+        tableView.tableFooterView = footerView
+        tableView.backgroundColor = UIColor.systemBackground
         refreshControl.addTarget(self, action: #selector(refreshTriggered), for: .valueChanged)
-        tableNode.view.refreshControl = refreshControl
-        tableNode.view.translatesAutoresizingMaskIntoConstraints = false
+        tableView.refreshControl = refreshControl
+        tableView.translatesAutoresizingMaskIntoConstraints = false
         errorView.onRetry = { [weak self] in
             self?.loadFirstPage()
         }
 
-        view.addSubview(tableNode.view)
+        view.addSubview(tableView)
         view.addSubview(errorView)
         NSLayoutConstraint.activate([
-            tableNode.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableNode.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableNode.view.topAnchor.constraint(equalTo: view.topAnchor),
-            tableNode.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            tableView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            tableView.topAnchor.constraint(equalTo: view.topAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            errorView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            errorView.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
             errorView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            errorView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
-            errorView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32)
+            errorView.leadingAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 32),
+            errorView.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -32)
         ])
     }
 
@@ -132,6 +134,7 @@ final class UserDiscussionsViewController: UIViewController {
             } catch {
                 guard generation == requestGeneration else { return }
                 isLoadingMore = false
+                lastBatchFetchRequestedCount = nil
                 footerView.stopAnimating()
             }
         }
@@ -156,7 +159,7 @@ final class UserDiscussionsViewController: UIViewController {
         errorView.isHidden = true
         refreshControl.endRefreshing()
         footerView.stopAnimating()
-        tableNode.reloadData()
+        tableView.reloadData()
     }
 
     private func finishLoadMore(records loaded: [UserDiscussionRecord], page: Int) {
@@ -168,14 +171,21 @@ final class UserDiscussionsViewController: UIViewController {
         }
         nextPage = page + 1
         let oldCount = records.count
-        records.append(contentsOf: loaded.filter { item in
-            records.contains { $0.postID == item.postID } == false
-        })
+        var known = Set(records.map(\.postID))
+        records.append(contentsOf: loaded.filter { known.insert($0.postID).inserted })
         let newCount = records.count
-        guard newCount > oldCount else { return }
+        guard newCount > oldCount else {
+            lastBatchFetchRequestedCount = nil
+            return
+        }
+        // 离屏时 UITableView 可能尚未读取上一次 reload 的行数，直接同步当前数据。
+        guard tableView.window != nil else {
+            tableView.reloadData()
+            return
+        }
         let indexPaths = (oldCount..<newCount).map { IndexPath(row: $0, section: 0) }
-        tableNode.performBatch(animated: false) { [weak self] in
-            self?.tableNode.insertRows(at: indexPaths, with: .none)
+        tableView.performBatchUpdates {
+            tableView.insertRows(at: indexPaths, with: .none)
         }
     }
 
@@ -184,7 +194,7 @@ final class UserDiscussionsViewController: UIViewController {
         records = []
         errorView.isHidden = true
         footerView.stopAnimating()
-        tableNode.reloadData()
+        tableView.reloadData()
     }
 
     private func showFirstPageError(_ message: String) {
@@ -197,7 +207,7 @@ final class UserDiscussionsViewController: UIViewController {
         footerView.stopAnimating()
         errorView.messageLabel.text = message
         errorView.isHidden = false
-        tableNode.reloadData()
+        tableView.reloadData()
     }
 
     @objc private func refreshTriggered() {
@@ -216,7 +226,7 @@ final class UserDiscussionsViewController: UIViewController {
 
     @objc private func appTextSizeDidChange(_ notification: Notification) {
         guard displayMode == .content else { return }
-        tableNode.reloadData()
+        tableView.reloadData()
     }
 
     private func openRecord(_ record: UserDiscussionRecord) {
@@ -225,8 +235,8 @@ final class UserDiscussionsViewController: UIViewController {
     }
 }
 
-extension UserDiscussionsViewController: ASTableDataSource {
-    func tableNode(_ tableNode: ASTableNode, numberOfRowsInSection section: Int) -> Int {
+extension UserDiscussionsViewController: UITableViewDataSource {
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         switch displayMode {
         case .content:
             return records.count
@@ -237,48 +247,35 @@ extension UserDiscussionsViewController: ASTableDataSource {
         }
     }
 
-    func tableNode(_ tableNode: ASTableNode, nodeBlockForRowAt indexPath: IndexPath) -> ASCellNodeBlock {
-        switch displayMode {
-        case .content:
-            let record = records[indexPath.row]
-            return {
-                UserDiscussionCellNode(record: record)
-            }
-        case .skeleton:
-            return {
-                UserContentSkeletonCellNode()
-            }
-        case .firstPageError:
-            return {
-                ASCellNode()
-            }
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        guard displayMode == .content else {
+            return tableView.dequeueReusableCell(withIdentifier: "skeleton", for: indexPath)
         }
+        let cell = tableView.dequeueReusableCell(withIdentifier: "content", for: indexPath)
+        var content = cell.defaultContentConfiguration()
+        content.text = records[indexPath.row].title
+        content.textProperties.font = UIFontMetrics(forTextStyle: .body).scaledFont(for: PostListCellStyle.Typography.titleFont, compatibleWith: traitCollection)
+        content.textProperties.color = ReadingColors.text
+        content.textProperties.numberOfLines = 2
+        content.directionalLayoutMargins = .init(top: 13, leading: 18, bottom: 13, trailing: 18)
+        cell.contentConfiguration = content
+        return cell
     }
 }
 
-extension UserDiscussionsViewController: ASTableDelegate {
-    func tableNode(_ tableNode: ASTableNode, didSelectRowAt indexPath: IndexPath) {
+extension UserDiscussionsViewController: UITableViewDelegate {
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         guard displayMode == .content, records.indices.contains(indexPath.row) else { return }
-        tableNode.deselectRow(at: indexPath, animated: true)
+        tableView.deselectRow(at: indexPath, animated: true)
         openRecord(records[indexPath.row])
     }
 
-    func shouldBatchFetch(for tableNode: ASTableNode) -> Bool {
-        displayMode == .content
-            && !records.isEmpty
-            && lastBatchFetchRequestedCount != records.count
-    }
-
-    func tableNode(_ tableNode: ASTableNode, willBeginBatchFetchWith context: ASBatchContext) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else {
-                context.completeBatchFetching(true)
-                return
-            }
-            self.lastBatchFetchRequestedCount = self.records.count
-            self.loadMoreIfNeeded()
-            context.completeBatchFetching(true)
-        }
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        guard displayMode == .content, !isLoadingMore, !isLoadingFirstPage, hasMorePages,
+              scrollView.contentOffset.y + scrollView.bounds.height * 2 >= scrollView.contentSize.height,
+              lastBatchFetchRequestedCount != records.count else { return }
+        lastBatchFetchRequestedCount = records.count
+        loadMoreIfNeeded()
     }
 }
 

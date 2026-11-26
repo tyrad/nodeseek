@@ -1,4 +1,3 @@
-import AsyncDisplayKit
 import UIKit
 import Testing
 @testable import nodeseek
@@ -25,12 +24,18 @@ struct ListRequestIsolationTests {
                 try await until { IsolationURLProtocol.count == 1 }
                 try IsolationURLProtocol.reply(0, kind: kind, ids: [1])
                 try await until { self.value(controller, "isLoadingFirstPage", as: Bool.self) == false }
-                let table = ASTableNode()
+                let table = try #require(controller.view.subviews.compactMap { $0 as? UITableView }.first)
                 func paginate() {
-                    let context = ASBatchContext()
-                    if let c = controller as? UserCollectionsViewController { c.tableNode(table, willBeginBatchFetchWith: context) }
-                    if let c = controller as? UserDiscussionsViewController { c.tableNode(table, willBeginBatchFetchWith: context) }
-                    if let c = controller as? UserCommentsViewController { c.tableNode(table, willBeginBatchFetchWith: context) }
+                    if let c = controller as? UserCollectionsViewController {
+                        c.tableView(table, willDisplay: UITableViewCell(), forRowAt: IndexPath(row: 0, section: 0))
+                    }
+                    let viewport = UIScrollView(frame: CGRect(x: 0, y: 0, width: 390, height: 800))
+                    viewport.contentSize = CGSize(width: 390, height: 900)
+                    if let c = controller as? UserDiscussionsViewController { c.scrollViewDidScroll(viewport) }
+                    if let c = controller as? UserCommentsViewController {
+                        c.scrollViewWillBeginDragging(viewport)
+                        c.scrollViewDidScroll(viewport)
+                    }
                 }
                 paginate()
                 try await until { IsolationURLProtocol.count == 2 }
@@ -58,6 +63,47 @@ struct ListRequestIsolationTests {
         }
     }
 
+    @Test func collectionPaginationFailureRetriesTheSamePageFromFooter() async throws {
+        IsolationURLProtocol.reset()
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [IsolationURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let controller = UserCollectionsViewController(uid: 1, client: NodeSeekUserContentClient(session: session))
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        try await until { IsolationURLProtocol.count == 1 }
+        try IsolationURLProtocol.reply(0, kind: "collections", ids: Array(1...40))
+        let table = try #require(controller.view.subviews.compactMap { $0 as? UITableView }.first)
+        try await until { table.numberOfRows(inSection: 0) == 40 }
+        controller.tableView(table, willDisplay: UITableViewCell(), forRowAt: IndexPath(row: 39, section: 0))
+        try await until { IsolationURLProtocol.count == 2 }
+        try IsolationURLProtocol.reply(1, kind: "collections", ids: [], failure: true)
+        try await until { table.tableFooterView is UIButton }
+        let retry = try #require(table.tableFooterView as? UIButton)
+        #expect(retry.configuration?.title == UserContentL10n.text("重试"))
+        retry.sendActions(for: .touchUpInside)
+        try await until { IsolationURLProtocol.count == 3 }
+        try IsolationURLProtocol.reply(2, kind: "collections", ids: [40, 41, 41, 42])
+        try await until { table.numberOfRows(inSection: 0) == 42 }
+        #expect(IsolationURLProtocol.pages == [1, 2, 2])
+        #expect(table.tableFooterView !== retry)
+
+        controller.tableView(table, willDisplay: UITableViewCell(), forRowAt: IndexPath(row: 41, section: 0))
+        try await until { IsolationURLProtocol.count == 4 }
+        try IsolationURLProtocol.reply(3, kind: "collections", ids: [41, 42])
+        try await until { table.tableFooterView === retry }
+        #expect(retry.configuration?.title == UserContentL10n.text("加载更多"))
+        retry.sendActions(for: .touchUpInside)
+        try await until { IsolationURLProtocol.count == 5 }
+        try IsolationURLProtocol.reply(4, kind: "collections", ids: [43])
+        try await until { table.numberOfRows(inSection: 0) == 43 }
+        #expect(IsolationURLProtocol.pages == [1, 2, 2, 3, 4])
+    }
+
     @Test func testSearchRefreshBlocksPaginationAndRepeatedRefresh() async throws {
         let client = IsolationHTMLClient()
         let controller = SearchViewController(service: NodeSeekService(htmlClient: client, parser: IsolationParser()))
@@ -69,28 +115,28 @@ struct ListRequestIsolationTests {
         try await until { await client.count == 1 }
         await client.reply(0, html: "old-1,old-2")
         try await until { self.value(controller, "isLoadingFirstPage", as: Bool.self) == false }
-        let list = PostTextureListView()
-        controller.postTextureListViewDidRequestRefresh(list)
+        let list = PostListView()
+        controller.postListViewDidRequestRefresh(list)
         try await until { await client.count == 2 }
-        controller.postTextureListViewDidRequestRefresh(list)
-        controller.postTextureListView(list, didApproachBottomAt: 0, totalCount: 1)
+        controller.postListViewDidRequestRefresh(list)
+        controller.postListView(list, didApproachBottomAt: 0, totalCount: 1)
         try await Task.sleep(nanoseconds: 100_000_000)
         let count = await client.count
         #expect(count == 2)
         await client.reply(1, html: "new-1,new-2")
         try await until { self.value(controller, "isRefreshing", as: Bool.self) == false }
-        controller.postTextureListView(list, didApproachBottomAt: 0, totalCount: 1)
+        controller.postListView(list, didApproachBottomAt: 0, totalCount: 1)
         try await until { await client.count == 3 }
         await client.reply(2, html: "new-2,new-3,new-4")
         try await until { self.value(controller, "isLoadingMore", as: Bool.self) == false }
         let items = try #require(value(controller, "items", as: [PostListItem].self))
         #expect(items.map { $0.post.id } == ["new-1", "new-2", "new-3", "new-4"])
-        let results = try #require(value(controller, "listView", as: PostTextureListView.self))
+        let results = try #require(value(controller, "listView", as: PostListView.self))
         let table = try #require(views(results).compactMap { $0 as? UITableView }.first)
         table.layoutIfNeeded()
         #expect(table.numberOfRows(inSection: 0) == 4)
         #expect(value(controller, "nextPage", as: Int.self) == 3)
-        controller.postTextureListView(list, didApproachBottomAt: 3, totalCount: 4)
+        controller.postListView(list, didApproachBottomAt: 3, totalCount: 4)
         try await until { await client.count == 4 }
         await client.reply(3, html: "")
         try await until { self.value(controller, "isLoadingMore", as: Bool.self) == false }
@@ -116,7 +162,7 @@ struct ListRequestIsolationTests {
         #expect(value(controller, "isLoadingFirstPage", as: Bool.self) == true)
         await client.fail(1)
         try await until { self.value(controller, "isLoadingFirstPage", as: Bool.self) == false }
-        controller.postTextureListViewDidRequestFirstPageRetry(PostTextureListView())
+        controller.postListViewDidRequestFirstPageRetry(PostListView())
         try await until { await client.count == 3 }
         await client.reply(2)
         try await until { self.value(controller, "isLoadingFirstPage", as: Bool.self) == false }
@@ -175,4 +221,131 @@ private struct IsolationParser: NodeSeekParser {
     func parsePostDetail(html: String, url: URL) throws -> PostDetail { throw URLError(.badServerResponse) }
     func parseCheckInState(html: String, pageURL: URL) throws -> CheckInState { CheckInState(isCheckedIn: false, message: "", actionURL: nil, hiddenFields: [:]) }
     func parseAccount(html: String) throws -> AccountResponse { AccountResponse(displayName: "test", isLoggedIn: false) }
+}
+
+@MainActor
+private final class SuspendedCollectionSubmitter: PostCollectionSubmitting {
+    var pending: CheckedContinuation<PostCollectionResponse, Error>?
+    var ids: [String] = []
+    func addFavorite(postID: String, referer: URL) async throws -> PostCollectionResponse { throw URLError(.unsupportedURL) }
+    func removeFavorite(postID: String, referer: URL) async throws -> PostCollectionResponse {
+        ids.append(postID)
+        return try await withCheckedThrowingContinuation { pending = $0 }
+    }
+}
+
+extension ListRequestIsolationTests {
+    @Test(arguments: [true, false])
+    func collectionRefreshDuringRemoval(refreshFinishesFirst: Bool) async throws {
+        IsolationURLProtocol.reset()
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [IsolationURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let store = CurrentAccountStore(userDefaults: UserDefaults(suiteName: UUID().uuidString)!)
+        await store.save(AccountResponse(displayName: "Test", isLoggedIn: true, profileURL: URL(string: "https://www.nodeseek.com/space/1")))
+        let removal = SuspendedCollectionSubmitter()
+        let controller = UserCollectionsViewController(uid: 1, client: NodeSeekUserContentClient(session: session), currentAccountStore: store, collectionSubmitter: removal)
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        let nav = UINavigationController(rootViewController: controller)
+        window.rootViewController = nav
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        try await until { IsolationURLProtocol.count == 1 }
+        let ids = Array(1...40)
+        try IsolationURLProtocol.reply(0, kind: "collections", ids: ids)
+        let table = try #require(controller.view.subviews.compactMap { $0 as? UITableView }.first)
+        let path = IndexPath(row: 0, section: 0)
+        try await until { table.numberOfRows(inSection: 0) == 40 && table.cellForRow(at: path) != nil }
+        var sizes: [CGFloat] = []
+        for (style, category) in [(UIUserInterfaceStyle.light, UIContentSizeCategory.large), (.dark, .accessibilityExtraExtraExtraLarge)] {
+            controller.overrideUserInterfaceStyle = style
+            nav.setOverrideTraitCollection(UITraitCollection(preferredContentSizeCategory: category), forChild: controller)
+            window.layoutIfNeeded()
+            let cell = try #require(table.cellForRow(at: path))
+            let title = try #require(views(cell).compactMap { $0 as? UILabel }.first { $0.text == cell.accessibilityLabel })
+            #expect(cell.traitCollection.userInterfaceStyle == style)
+            #expect(table.frame.minX == controller.view.safeAreaLayoutGuide.layoutFrame.minX)
+            #expect(table.frame.maxX == controller.view.safeAreaLayoutGuide.layoutFrame.maxX)
+            #expect(title.frame.height >= title.font.lineHeight - 1)
+            sizes.append(title.font.pointSize)
+        }
+        #expect(sizes[1] > sizes[0])
+        var selected: String?
+        controller.onSelectPost = { post, page, anchor in
+            selected = post.id
+            #expect(page == 1 && anchor == nil)
+        }
+        controller.tableView(table, didSelectRowAt: path)
+        #expect(selected == "1")
+        let swipe = try #require(controller.tableView(table, trailingSwipeActionsConfigurationForRowAt: path))
+        #expect(!swipe.performsFirstActionWithFullSwipe)
+        let action = try #require(swipe.actions.first)
+        action.handler(action, table) { _ in }
+        try await until { removal.pending != nil }
+        table.refreshControl?.sendActions(for: .valueChanged)
+        try await until { IsolationURLProtocol.count == 2 }
+        if refreshFinishesFirst {
+            try IsolationURLProtocol.reply(1, kind: "collections", ids: ids)
+            try await until { table.numberOfRows(inSection: 0) == 40 }
+            removal.pending?.resume(returning: PostCollectionResponse(message: "ok"))
+        } else {
+            removal.pending?.resume(returning: PostCollectionResponse(message: "ok"))
+            try await until { self.value(controller, "removingPostIDs", as: Set<Int>.self)?.isEmpty == true }
+            try IsolationURLProtocol.reply(1, kind: "collections", ids: ids)
+        }
+        try await until { table.numberOfRows(inSection: 0) == 39 }
+        #expect(removal.ids == ["1"])
+        #expect(table.cellForRow(at: path)?.accessibilityIdentifier == "user-collection-post-2")
+    }
+
+    @Test func collectionFirstPageRetryDeduplicatesAndSwipeFailureKeepsRow() async throws {
+        IsolationURLProtocol.reset()
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [IsolationURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let store = CurrentAccountStore(userDefaults: UserDefaults(suiteName: UUID().uuidString)!)
+        await store.save(AccountResponse(displayName: "Test", isLoggedIn: true, profileURL: URL(string: "https://www.nodeseek.com/space/1")))
+        let removal = SuspendedCollectionSubmitter()
+        let controller = UserCollectionsViewController(uid: 1, client: NodeSeekUserContentClient(session: session), currentAccountStore: store, collectionSubmitter: removal)
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        try await until { IsolationURLProtocol.count == 1 }
+        try IsolationURLProtocol.reply(0, kind: "collections", ids: [], failure: true)
+        let errorView = try #require(views(controller.view).first { $0.accessibilityIdentifier == "user-collections-error-view" })
+        try await until { !errorView.isHidden }
+        let retry = try #require(views(errorView).compactMap { $0 as? UIButton }.first)
+        retry.sendActions(for: .touchUpInside)
+        try await until { IsolationURLProtocol.count == 2 }
+        let ids = Array(1...40)
+        try IsolationURLProtocol.reply(1, kind: "collections", ids: ids)
+        let table = try #require(controller.view.subviews.compactMap { $0 as? UITableView }.first)
+        let path = IndexPath(row: 0, section: 0)
+        try await until { table.numberOfRows(inSection: 0) == 40 }
+        func swipe() throws {
+            let action = try #require(controller.tableView(table, trailingSwipeActionsConfigurationForRowAt: path)?.actions.first)
+            action.handler(action, table) { _ in }
+        }
+        try swipe()
+        try await until { removal.pending != nil }
+        removal.pending?.resume(throwing: URLError(.timedOut))
+        removal.pending = nil
+        try await until { self.value(controller, "removingPostIDs", as: Set<Int>.self)?.isEmpty == true }
+        #expect(table.numberOfRows(inSection: 0) == 40)
+        try swipe()
+        try await until { removal.pending != nil }
+        removal.pending?.resume(returning: PostCollectionResponse(message: "ok"))
+        try await until { table.numberOfRows(inSection: 0) == 39 }
+        #expect(removal.ids == ["1", "1"])
+        table.refreshControl?.sendActions(for: .valueChanged)
+        try await until { IsolationURLProtocol.count == 3 }
+        try IsolationURLProtocol.reply(2, kind: "collections", ids: [1] + ids)
+        try await until { self.value(controller, "isLoadingFirstPage", as: Bool.self) == false }
+        #expect(table.numberOfRows(inSection: 0) == 40)
+    }
 }

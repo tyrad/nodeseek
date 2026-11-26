@@ -5,6 +5,7 @@
 "entry-opened-on-page" = "目前從第 %ld 頁進入";
 "entry-starts-at-page" = "目前從第 %ld 頁開始";
 "entry-open-full-post" = "查看完整貼文";
+"preview-show-floor" = "查看原樓";
 "entry-return-first" = "回到第 1 頁";
 "reply" = "回覆";
 "quote" = "引用";

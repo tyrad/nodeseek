@@ -6,7 +6,6 @@
 //  每个测试描述修复后应成立的行为，当前代码下应因断言失败。
 //
 
-import AsyncDisplayKit
 import JXPhotoBrowser
 import UIKit
 import XCTest
@@ -155,126 +154,20 @@ final class PostDetailUXAuditTests: XCTestCase {
     // MARK: - U19
 
     // 预期：自己的评论和自己的帖子不显示（或禁用）点赞 / 鸡腿 / 反对按钮，避免点了才报“不能给自己点赞”。
-    func test_U19_ownContentHidesSelfVoteButtons() {
-        let ownComment = Comment(
-            id: "1",
-            authorName: "mist",
-            avatarURL: nil,
-            floorText: "#2",
-            createdAtText: "刚刚",
-            contentHTML: "<p>我的评论</p>",
-            likeCount: 0,
-            chickenLegCount: 0,
-            opposeCount: 0,
-            isOwnComment: true
-        )
-        let commentNode = CommentCellNode(
-            comment: ownComment,
-            renderedBody: [],
-            onImageTapped: { _, _ in },
-            onEditTapped: { _ in },
-            onTextLayoutInvalidated: {}
-        )
-        let commentLayout = commentNode.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 390, height: CGFloat.greatestFiniteMagnitude)
-        ))
-        let usableCommentVotes: [String] = ["likeButtonNode", "chickenLegButtonNode", "opposeButtonNode"].filter { name in
-            isUsableButton(named: name, in: commentNode, layout: commentLayout)
+    func test_U19_ownContentHidesEmptyCountsAndDisablesExistingVotes() {
+        for count in [0, 3] {
+            let cell = DetailFloorListCell(frame: .zero)
+            cell.addVotes(like: count, chicken: 0, oppose: 0, liked: false, rewarded: false, opposed: false, isOwn: true,
+                          onLike: {}, onChicken: {}, onOppose: {})
+            let votes = cell.contentView.uxAuditAllSubviews().compactMap { $0 as? UIButton }.filter {
+                $0.accessibilityLabel == DetailListStrings.text("like") || $0.accessibilityLabel == DetailListStrings.text("chicken")
+            }
+            XCTAssertEqual(votes.count, count == 0 ? 0 : 1)
+            if count > 0 {
+                XCTAssertEqual(votes.first?.accessibilityValue, "3")
+                XCTAssertEqual(votes.first?.isEnabled, false)
+            }
         }
-
-        let ownHeader = PostDetailHeaderContent(
-            postID: "1017330",
-            title: "测试",
-            authorName: "mist",
-            avatarURL: nil,
-            metadataText: "刚刚",
-            contentHTML: "<p>正文</p>",
-            likeCount: 0,
-            chickenLegCount: 0,
-            opposeCount: 0,
-            favoriteCount: 0,
-            isOwnPost: true
-        )
-        let postNode = PostBodyCellNode(
-            content: ownHeader,
-            renderedContent: [],
-            onImageTapped: { _, _ in },
-            onEditTapped: {},
-            onTextLayoutInvalidated: {}
-        )
-        let postLayout = postNode.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 390, height: CGFloat.greatestFiniteMagnitude)
-        ))
-        let usablePostVotes: [String] = ["likeButtonNode", "chickenLegButtonNode", "opposeButtonNode"].filter { name in
-            isUsableButton(named: name, in: postNode, layout: postLayout)
-        }
-
-        XCTAssertEqual(usableCommentVotes, [], "自己的评论仍显示可点的投票按钮：\(usableCommentVotes)")
-        XCTAssertEqual(usablePostVotes, [], "自己的帖子仍显示可点的投票按钮：\(usablePostVotes)")
-    }
-
-    // 自己的评论已有别人点的赞时保留数字，但按钮不可点；计数为 0 的投票按钮不占位。
-    func test_U19_ownCommentKeepsExistingVoteCountsButNotTappable() throws {
-        let ownComment = Comment(
-            id: "1",
-            authorName: "mist",
-            avatarURL: nil,
-            floorText: "#2",
-            createdAtText: "刚刚",
-            contentHTML: "<p>我的评论</p>",
-            likeCount: 3,
-            chickenLegCount: 0,
-            opposeCount: 0,
-            isOwnComment: true
-        )
-        let node = CommentCellNode(
-            comment: ownComment,
-            renderedBody: [],
-            onImageTapped: { _, _ in },
-            onEditTapped: { _ in },
-            onTextLayoutInvalidated: {}
-        )
-        let layout = node.layoutThatFits(ASSizeRange(
-            min: .zero,
-            max: CGSize(width: 390, height: CGFloat.greatestFiniteMagnitude)
-        ))
-        let likeButton = try XCTUnwrap(uxAuditStoredNode(named: "likeButtonNode", in: node) as? ASButtonNode)
-        let chickenLegButton = try XCTUnwrap(uxAuditStoredNode(named: "chickenLegButtonNode", in: node) as? ASButtonNode)
-
-        XCTAssertNotNil(layout.uxAuditAbsoluteOrigin(of: likeButton), "已有点赞数应继续显示")
-        XCTAssertEqual(likeButton.attributedTitle(for: .normal)?.string, "3")
-        XCTAssertFalse(likeButton.isEnabled, "自己的评论点赞按钮不应可点")
-        XCTAssertNil(layout.uxAuditAbsoluteOrigin(of: chickenLegButton), "计数为 0 的鸡腿按钮不应占位")
-    }
-
-    // MARK: - U32
-
-    // 预期：自己评论的长按菜单不出现「投放鸡腿」。
-    func test_U32_ownCommentContextMenuHasNoChickenLeg() {
-        let comment = Comment(
-            id: "9835758",
-            authorName: "mist",
-            avatarURL: nil,
-            authorProfileURL: URL(string: "https://www.nodeseek.com/space/31037"),
-            floorText: "#2",
-            createdAtText: "刚刚",
-            contentHTML: "<p>我的评论</p>",
-            isOwnComment: true
-        )
-        let node = CommentCellNode(
-            comment: comment,
-            renderedBody: [],
-            onImageTapped: { _, _ in },
-            onEditTapped: { _ in },
-            onTextLayoutInvalidated: {}
-        )
-
-        XCTAssertFalse(
-            node.debugBodyContextMenuActionTitles.contains("投放鸡腿"),
-            "自己评论的长按菜单包含「投放鸡腿」：\(node.debugBodyContextMenuActionTitles)"
-        )
     }
 
     // MARK: - U40
@@ -316,12 +209,7 @@ final class PostDetailUXAuditTests: XCTestCase {
         return window
     }
 
-    /// 按钮在布局里、未隐藏、可交互，才算对用户“可用”。
-    private func isUsableButton(named name: String, in node: ASDisplayNode, layout: ASLayout) -> Bool {
-        guard let button = uxAuditStoredNode(named: name, in: node) as? ASControlNode else { return false }
-        guard layout.uxAuditAbsoluteOrigin(of: button) != nil else { return false }
-        return button.isHidden == false && button.alpha > 0.01 && button.isEnabled && button.isUserInteractionEnabled
-    }
+
 }
 
 // MARK: - Test doubles
@@ -378,36 +266,6 @@ private final class UXAuditSpyPostDetailView: PostDetailViewProtocol {
 }
 
 // MARK: - Reflection & hierarchy helpers
-
-/// 通过反射读取节点的私有子节点，避免为测试改动生产代码。
-private func uxAuditStoredNode(named name: String, in object: AnyObject) -> ASDisplayNode? {
-    var mirror: Mirror? = Mirror(reflecting: object)
-    while let current = mirror {
-        if let value = current.children.first(where: { $0.label == name })?.value as? ASDisplayNode {
-            return value
-        }
-        mirror = current.superclassMirror
-    }
-    return nil
-}
-
-private extension ASLayout {
-    /// 在布局树中查找元素，返回其相对根布局的位置。
-    func uxAuditAbsoluteOrigin(of target: ASLayoutElement, offset: CGPoint = .zero) -> CGPoint? {
-        // 根布局的 position 是 CGPointNull（NaN），按原点处理。
-        let ownPosition = position.x.isFinite && position.y.isFinite ? position : .zero
-        let origin = CGPoint(x: offset.x + ownPosition.x, y: offset.y + ownPosition.y)
-        if (layoutElement as AnyObject) === (target as AnyObject) {
-            return origin
-        }
-        for sublayout in sublayouts {
-            if let match = sublayout.uxAuditAbsoluteOrigin(of: target, offset: origin) {
-                return match
-            }
-        }
-        return nil
-    }
-}
 
 private extension UIView {
     func uxAuditAllSubviews() -> [UIView] {

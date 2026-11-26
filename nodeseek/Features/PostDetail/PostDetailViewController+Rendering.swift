@@ -9,7 +9,7 @@ import DTCoreText
 import UIKit
 
 extension PostDetailViewController {
-    static func makeRenderedContent(
+    nonisolated static func makeRenderedContent(
         html: String,
         signatureHTML: String? = nil,
         baseURL: URL,
@@ -34,7 +34,7 @@ extension PostDetailViewController {
         return mergedBlocks.isEmpty ? nil : mergedBlocks
     }
 
-    private static func renderSignatureBlocks(
+    private nonisolated static func renderSignatureBlocks(
         signatureHTML: String?,
         renderer: DTCoreTextHTMLContentRenderer,
         baseURL: URL,
@@ -54,11 +54,11 @@ extension PostDetailViewController {
         return styledSignatureBlocks(blocks)
     }
 
-    static func styledSignatureBlocks(_ blocks: [RenderedContentBlock]) -> [RenderedContentBlock] {
+    nonisolated static func styledSignatureBlocks(_ blocks: [RenderedContentBlock]) -> [RenderedContentBlock] {
         blocks.compactMap { styledSignatureBlock($0) }
     }
 
-    private static func styledSignatureBlock(_ block: RenderedContentBlock) -> RenderedContentBlock? {
+    private nonisolated static func styledSignatureBlock(_ block: RenderedContentBlock) -> RenderedContentBlock? {
         switch block {
         case .text(let attributedText):
             let styledText = styledSignatureAttributedText(attributedText)
@@ -73,14 +73,14 @@ extension PostDetailViewController {
         }
     }
 
-    private static func styledSignatureAttributedText(_ attributedText: NSAttributedString) -> NSAttributedString {
+    private nonisolated static func styledSignatureAttributedText(_ attributedText: NSAttributedString) -> NSAttributedString {
         let mutable = NSMutableAttributedString(attributedString: attributedText)
         guard mutable.length > 0 else { return mutable }
         applySignatureTextAttributes(to: mutable, range: NSRange(location: 0, length: mutable.length))
         return mutable
     }
 
-    private static func mergedBodyBlocks(
+    private nonisolated static func mergedBodyBlocks(
         _ bodyBlocks: [RenderedContentBlock],
         withSignatureBlocks signatureBlocks: [RenderedContentBlock]
     ) -> [RenderedContentBlock] {
@@ -101,7 +101,7 @@ extension PostDetailViewController {
         return merged
     }
 
-    private static func mergedTextBlock(_ body: NSAttributedString, signature: NSAttributedString) -> NSAttributedString {
+    private nonisolated static func mergedTextBlock(_ body: NSAttributedString, signature: NSAttributedString) -> NSAttributedString {
         let merged = NSMutableAttributedString(attributedString: body)
         let normalizedSignature = NSMutableAttributedString(attributedString: signature)
         trimTrailingWhitespaceAndNewlines(in: merged)
@@ -114,7 +114,7 @@ extension PostDetailViewController {
         return merged
     }
 
-    private static func trimLeadingWhitespaceAndNewlines(in attributed: NSMutableAttributedString) {
+    private nonisolated static func trimLeadingWhitespaceAndNewlines(in attributed: NSMutableAttributedString) {
         guard attributed.length > 0 else { return }
         let source = attributed.string as NSString
         var upperBound = 0
@@ -127,7 +127,7 @@ extension PostDetailViewController {
         attributed.deleteCharacters(in: NSRange(location: 0, length: upperBound))
     }
 
-    private static func trimTrailingWhitespaceAndNewlines(in attributed: NSMutableAttributedString) {
+    private nonisolated static func trimTrailingWhitespaceAndNewlines(in attributed: NSMutableAttributedString) {
         guard attributed.length > 0 else { return }
         let source = attributed.string as NSString
         var lowerBound = source.length
@@ -140,7 +140,7 @@ extension PostDetailViewController {
         attributed.deleteCharacters(in: NSRange(location: lowerBound, length: source.length - lowerBound))
     }
 
-    private static func applySignatureTextAttributes(
+    private nonisolated static func applySignatureTextAttributes(
         to mutable: NSMutableAttributedString,
         range: NSRange
     ) {
@@ -168,7 +168,7 @@ extension PostDetailViewController {
         }
     }
 
-    private static func applySignatureParagraphStyle(
+    private nonisolated static func applySignatureParagraphStyle(
         to mutable: NSMutableAttributedString,
         range: NSRange
     ) {
