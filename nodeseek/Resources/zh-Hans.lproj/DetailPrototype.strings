@@ -55,3 +55,6 @@
 "reply-bar-placeholder" = "写评论…";
 "reply-bar-accessibility" = "评论";
 "open-in-browser" = "在浏览器打开";
+
+"comments-end" = "已经到底了";
+"comments-refresh" = "刷新";

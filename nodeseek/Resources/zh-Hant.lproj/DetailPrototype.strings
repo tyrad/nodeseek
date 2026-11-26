@@ -55,3 +55,6 @@
 "reply-bar-placeholder" = "寫評論…";
 "reply-bar-accessibility" = "評論";
 "open-in-browser" = "在瀏覽器開啟";
+
+"comments-end" = "已經到底了";
+"comments-refresh" = "重新整理";

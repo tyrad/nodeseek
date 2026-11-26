@@ -318,10 +318,39 @@ class PostDetailViewController: UIViewController {
     let loadMoreCommentsRefreshButton: UIButton = {
         let button = UIButton(type: .system)
         var configuration = UIButton.Configuration.plain()
-        configuration.title = "点击加载新评论"
-        configuration.baseForegroundColor = .secondaryLabel
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 8, bottom: 12, trailing: 8)
         button.configuration = configuration
+        // 「已经到底了」是状态，用更浅的颜色；「刷新」才是操作，颜色和字重稍强。
+        button.configurationUpdateHandler = { button in
+            let font = UIFont.preferredFont(forTextStyle: .footnote)
+            let actionFont = UIFontMetrics(forTextStyle: .footnote)
+                .scaledFont(for: .systemFont(ofSize: 13, weight: .medium))
+            let title = NSMutableAttributedString(
+                string: DetailListStrings.text("comments-end") + " · ",
+                attributes: [.font: font, .foregroundColor: UIColor.tertiaryLabel]
+            )
+            let action: [NSAttributedString.Key: Any] = [.font: actionFont, .foregroundColor: UIColor.secondaryLabel]
+            if let icon = UIImage(
+                systemName: "arrow.clockwise",
+                withConfiguration: UIImage.SymbolConfiguration(font: actionFont, scale: .small)
+            ) {
+                let attachment = NSTextAttachment(image: icon)
+                title.append(NSAttributedString(attachment: attachment))
+                title.addAttributes(action, range: NSRange(location: title.length - 1, length: 1))
+                title.append(NSAttributedString(string: " ", attributes: action))
+            }
+            title.append(NSAttributedString(string: DetailListStrings.text("comments-refresh"), attributes: action))
+            var updated = button.configuration
+            updated?.attributedTitle = AttributedString(title)
+            updated?.titleLineBreakMode = .byTruncatingTail
+            button.configuration = updated
+        }
+        if #available(iOS 17.0, *) {
+            button.registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (button: UIButton, _) in
+                button.setNeedsUpdateConfiguration()
+            }
+        }
+        button.accessibilityLabel = DetailListStrings.text("comments-end") + ", " + DetailListStrings.text("comments-refresh")
         button.isHidden = true
         button.translatesAutoresizingMaskIntoConstraints = false
         button.accessibilityIdentifier = "post-detail-refresh-comments-at-end-button"
@@ -330,22 +359,15 @@ class PostDetailViewController: UIViewController {
 
     lazy var loadMoreCommentsContainer: UIView = {
         let container = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 56))
-        let separator = UIView()
-        separator.backgroundColor = .separator
-        separator.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(separator)
         container.addSubview(loadMoreCommentsIndicator)
         container.addSubview(loadMoreCommentsRefreshButton)
-        let separatorHeight = 1.0 / UIScreen.main.scale
+        let button = loadMoreCommentsRefreshButton
         NSLayoutConstraint.activate([
-            separator.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            separator.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            separator.topAnchor.constraint(equalTo: container.topAnchor),
-            separator.heightAnchor.constraint(equalToConstant: separatorHeight),
             loadMoreCommentsIndicator.centerXAnchor.constraint(equalTo: container.centerXAnchor),
             loadMoreCommentsIndicator.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            loadMoreCommentsRefreshButton.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-            loadMoreCommentsRefreshButton.centerYAnchor.constraint(equalTo: container.centerYAnchor)
+            button.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            button.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            button.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: 16)
         ])
         return container
     }()

@@ -56,3 +56,6 @@
 "reply-bar-placeholder" = "Add a comment…";
 "reply-bar-accessibility" = "Comment";
 "open-in-browser" = "Open in Browser";
+
+"comments-end" = "You're all caught up";
+"comments-refresh" = "Refresh";
