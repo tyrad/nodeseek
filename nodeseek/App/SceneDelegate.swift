@@ -10,38 +10,45 @@ import UIKit
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
+    private var launchTask: Task<Void, Never>?
     private let appRouter = AppRouter()
     private let deepLinkRouter = AppDeepLinkRouter()
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
+        let window = UIWindow(windowScene: windowScene)
+        self.window = window
         let appDelegate = UIApplication.shared.delegate as? AppDelegate
         if let preparation = appDelegate?.accountLaunchPreparation ?? appDelegate?.logoutCleanup {
-            Task { @MainActor [weak self] in
+            // 系统启动屏退场前先显示同款底色和标志。账号恢复完成后再创建业务页面。
+            let logo = UIImageView(image: UIImage(named: "SplashLogo"))
+            logo.backgroundColor = UIColor(named: "SplashBackground")
+            logo.contentMode = .center
+            let placeholder = UIViewController()
+            placeholder.view = logo
+            window.rootViewController = placeholder
+            launchTask = Task { @MainActor [weak self] in
                 await preparation.value
-                self?.connectWindow(to: windowScene, options: connectionOptions)
+                guard !Task.isCancelled else { return }
+                self?.showRoot(in: window, options: connectionOptions)
             }
         } else {
-            connectWindow(to: windowScene, options: connectionOptions)
+            showRoot(in: window, options: connectionOptions)
         }
+        window.makeKeyAndVisible()
     }
 
-    private func connectWindow(to windowScene: UIWindowScene, options connectionOptions: UIScene.ConnectionOptions) {
-        let window = UIWindow(windowScene: windowScene)
+    private func showRoot(in window: UIWindow, options connectionOptions: UIScene.ConnectionOptions) {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-DetailTextKitPrototype") {
             window.rootViewController = UINavigationController(rootViewController: DetailMarkdownPrototypeController.demo())
-            self.window = window
-            window.makeKeyAndVisible()
             return
         }
         #endif
         appRouter.window = window
         let launchedFromPush = connectionOptions.notificationResponse != nil || !connectionOptions.urlContexts.isEmpty
         window.rootViewController = appRouter.makeRootViewController()
-        window.makeKeyAndVisible()
-        self.window = window
 
         // 窗口显示后异步预热 WebView，供验证页回退使用；推送冷启动不弹引导，避免挡住跳转。
         DispatchQueue.main.async { [weak self, weak window] in
@@ -79,27 +86,21 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {
-        // Called as the scene is being released by the system.
-        // This occurs shortly after the scene enters the background, or when its session is discarded.
-        // Release any resources associated with this scene that can be re-created the next time the scene connects.
-        // The scene may re-connect later, as its session was not necessarily discarded (see `application:didDiscardSceneSessions` instead).
+        launchTask?.cancel()
+        launchTask = nil
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
         Task { @MainActor [weak self] in
             guard let self else { return }
-            await (UIApplication.shared.delegate as? AppDelegate)?.logoutCleanup?.value
+            await launchTask?.value
+            guard scene.activationState == .foregroundActive else { return }
             guard let presentationContext = self.autoCheckInPresentationContext() else { return }
             await AutoCheckInModule.runIfNeeded(
                 presentationContext: presentationContext,
                 trigger: .sceneBecomeActive
             )
         }
-    }
-
-    func sceneWillResignActive(_ scene: UIScene) {
-        // Called when the scene will move from an active state to an inactive state.
-        // This may occur due to temporary interruptions (ex. an incoming phone call).
     }
 
     func sceneWillEnterForeground(_ scene: UIScene) {
