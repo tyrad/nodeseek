@@ -403,7 +403,7 @@ platform :ios do
           metadata_path: metadata, skip_binary_upload: true, skip_screenshots: true,
           release_notes: { "zh-Hans" => ENV.fetch("NOTES_ZH_HANS"), "zh-Hant" => ENV.fetch("NOTES_ZH_HANT"),
                            "en-US" => english, "en-GB" => english },
-          force: true, automatic_release: true, submit_for_review: true, precheck_include_in_app_purchases: false
+          force: true, automatic_release: false, submit_for_review: true, precheck_include_in_app_purchases: false
         )
       end
     else
