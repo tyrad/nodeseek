@@ -118,6 +118,7 @@ class SettingsViewController: UITableViewController {
         case sortPreferences
         case textSize
         case signatureDisplay
+        case replyPagination
         case imageDimming
         // 仅在开启变暗后显示，必须保持在最后一行。
         case imageDimmingLevel
@@ -147,6 +148,7 @@ class SettingsViewController: UITableViewController {
     private let nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting
     private let textSizeSettings: AppTextSizeSettings
     private let signatureDisplaySettings: PostSignatureDisplaySettings
+    private let replyPaginationSettings: ReplyPaginationDisplaySettings
     private let imageDimmingSettings: DetailImageDimmingSettings
     private let searchEntrySettings: PostListSearchEntrySettings
     private let sortPreferenceStore: PostListSortPreferenceStoring
@@ -175,6 +177,7 @@ class SettingsViewController: UITableViewController {
         nodeImageAuthorizationPresenter: NodeImageAuthorizationPresenting? = nil,
         textSizeSettings: AppTextSizeSettings = .shared,
         signatureDisplaySettings: PostSignatureDisplaySettings = .shared,
+        replyPaginationSettings: ReplyPaginationDisplaySettings = .shared,
         imageDimmingSettings: DetailImageDimmingSettings = .shared,
         searchEntrySettings: PostListSearchEntrySettings = .shared,
         sortPreferenceStore: PostListSortPreferenceStoring = PostListSortPreferenceStore.shared,
@@ -201,6 +204,7 @@ class SettingsViewController: UITableViewController {
         self.nodeImageAuthorizationPresenter = nodeImageAuthorizationPresenter ?? DefaultNodeImageAuthorizationPresenter()
         self.textSizeSettings = textSizeSettings
         self.signatureDisplaySettings = signatureDisplaySettings
+        self.replyPaginationSettings = replyPaginationSettings
         self.imageDimmingSettings = imageDimmingSettings
         self.searchEntrySettings = searchEntrySettings
         self.sortPreferenceStore = sortPreferenceStore
@@ -406,6 +410,8 @@ class SettingsViewController: UITableViewController {
             return textSizeCell(for: indexPath)
         case .signatureDisplay:
             return signatureDisplayCell(for: indexPath)
+        case .replyPagination:
+            return replyPaginationCell()
         case .imageDimming:
             return imageDimmingCell()
         case .imageDimmingLevel:
@@ -468,6 +474,22 @@ class SettingsViewController: UITableViewController {
         cell.accessoryView = signatureSwitch
         cell.selectionStyle = .none
         cell.accessibilityIdentifier = "settings-post-signature-cell"
+
+        return cell
+    }
+
+    private func replyPaginationCell() -> UITableViewCell {
+        let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.textColor = ReadingColors.text
+        cell.textLabel?.text = "主帖下方显示回复页码"
+        cell.imageView?.image = UIImage(systemName: "list.number")
+        let paginationSwitch = UISwitch()
+        paginationSwitch.isOn = replyPaginationSettings.showsInlineBar
+        paginationSwitch.accessibilityIdentifier = "settings-reply-pagination-switch"
+        paginationSwitch.addTarget(self, action: #selector(replyPaginationSwitchChanged(_:)), for: .valueChanged)
+        cell.accessoryView = paginationSwitch
+        cell.selectionStyle = .none
+        cell.accessibilityIdentifier = "settings-reply-pagination-cell"
 
         return cell
     }
@@ -775,7 +797,7 @@ class SettingsViewController: UITableViewController {
             )
         case .textSize:
             showTextSizeSettings()
-        case .homeSearchEntry, .signatureDisplay, .imageDimming, .imageDimmingLevel, .none:
+        case .homeSearchEntry, .signatureDisplay, .replyPagination, .imageDimming, .imageDimmingLevel, .none:
             break
         }
     }
@@ -896,6 +918,10 @@ class SettingsViewController: UITableViewController {
 
     @objc private func signatureDisplaySwitchChanged(_ sender: UISwitch) {
         signatureDisplaySettings.setShowsSignatures(sender.isOn)
+    }
+
+    @objc private func replyPaginationSwitchChanged(_ sender: UISwitch) {
+        replyPaginationSettings.setShowsInlineBar(sender.isOn)
     }
 
     @objc private func homeSearchEntrySwitchChanged(_ sender: UISwitch) {

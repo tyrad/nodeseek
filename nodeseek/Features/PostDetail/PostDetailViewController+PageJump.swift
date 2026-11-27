@@ -49,7 +49,7 @@ extension PostDetailViewController {
 
     /// 总页数取分页条里最大的页码；站点分页条会省略中间页，但总会给出最后一页。
     var totalCommentPages: Int {
-        guard let pagination = visiblePagination else { return 1 }
+        guard let pagination else { return 1 }
         let maxItemPage = pagination.items.map(\.page).max() ?? 1
         return max(maxItemPage, pagination.nextPage ?? 1, currentPage)
     }
@@ -156,6 +156,7 @@ extension PostDetailViewController {
             reloadTableData()
         }
         pendingPageJumpScroll = true
+        showPageJumpToast(page: page)
         presenter.didSelectCommentPage(page)
     }
 }

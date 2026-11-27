@@ -62,6 +62,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         view.delegate = self
         view.register(DetailFloorListCell.self, forCellWithReuseIdentifier: "floor")
         view.register(UICollectionViewListCell.self, forCellWithReuseIdentifier: "notice")
+        view.register(DetailReplyPaginationCell.self, forCellWithReuseIdentifier: "reply-pages")
         view.register(DetailEntryHintCell.self, forCellWithReuseIdentifier: "entry")
         view.register(DetailAuthorFilterBannerCell.self, forCellWithReuseIdentifier: "filter")
         view.register(DetailSkeletonListCell.self, forCellWithReuseIdentifier: "skeleton")
@@ -126,6 +127,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
                 return replyKey(comment, page: number, occurrences: &occurrences)
             case .authorFilterBanner: return "filter"
             case .entryHint: return "entry"
+            case .replyPagination: return "reply-pages"
             case .postRepliesDivider: return "divider"
             case .skeletonComment(let index): return index < 0 ? "skeleton-header" : "skeleton-\(index)"
             }
@@ -141,6 +143,9 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
         snapshot.appendSections([0])
         snapshot.appendItems(keys)
+        if !refresh, keys.contains("reply-pages"), data.snapshot().indexOfItem("reply-pages") != nil {
+            snapshot.reconfigureItems(["reply-pages"])
+        }
         if refresh {
             let previous = Set(data.snapshot().itemIdentifiers)
             snapshot.reconfigureItems(keys.filter(previous.contains))
@@ -168,7 +173,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
     func appendComments(in range: Range<Int>, pageNumber: Int, bannerChanged: Bool) {
         guard let page else { return }
         if range.lowerBound == 0, !range.isEmpty, page.currentHeaderContent != nil, page.authorFilter == nil {
-            queuedRows.append((.postRepliesDivider, "divider"))
+            if !page.showsInlineReplyPagination { queuedRows.append((.postRepliesDivider, "divider")) }
         }
         var occurrences: [String: Int] = [:]
         for index in range {
@@ -191,6 +196,7 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         rows.append(contentsOf: queuedRows.map(\.row))
         keys.append(contentsOf: addedKeys)
         snapshot.appendItems(addedKeys, toSection: 0)
+        if snapshot.indexOfItem("reply-pages") != nil { snapshot.reconfigureItems(["reply-pages"]) }
         if refreshQueuedBanner, snapshot.indexOfItem("filter") != nil { snapshot.reconfigureItems(["filter"]) }
         queuedRows.removeAll()
         refreshQueuedBanner = false
@@ -234,6 +240,13 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             floor = value.floorText?.trimmingCharacters(in: .whitespacesAndNewlines)
             time = value.createdAtText
             signature = value.signatureHTML
+        case .replyPagination:
+            let cell = list.dequeueReusableCell(withReuseIdentifier: "reply-pages", for: path) as! DetailReplyPaginationCell
+            cell.configure(startPage: page.loadedCommentPageRanges.keys.min() ?? page.currentPage,
+                           totalPages: page.totalCommentPages,
+                           selectPage: { [weak page] in page?.jumpToCommentPage($0) },
+                           openPicker: { [weak page] in page?.presentPagePicker() })
+            return cell
         case .entryHint:
             let cell = list.dequeueReusableCell(withReuseIdentifier: "entry", for: path) as! DetailEntryHintCell
             cell.configure(page: page.entryHintPage, afterJump: page.hasJumpedCommentPage, traits: list.traitCollection)
@@ -448,6 +461,9 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             let width = max(1, collectionView.bounds.width)
             sizingEntryHint.configure(page: page.entryHintPage, afterJump: page.hasJumpedCommentPage, traits: collectionView.traitCollection)
             return CGSize(width: width, height: sizingEntryHint.height(for: width))
+        }
+        if key == "reply-pages" {
+            return CGSize(width: collectionView.bounds.width, height: DetailReplyPaginationCell.height(for: collectionView.traitCollection))
         }
         if key == "filter", let page {
             let width = max(1, collectionView.bounds.width)

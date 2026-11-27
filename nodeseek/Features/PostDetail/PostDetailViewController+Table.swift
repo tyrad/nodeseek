@@ -8,9 +8,9 @@
 import UIKit
 
 extension PostDetailViewController {
-    var visiblePagination: PostDetailPagination? {
-        guard let pagination, pagination.hasMultiplePages else { return nil }
-        return pagination
+    var showsInlineReplyPagination: Bool {
+        displayMode == .content && totalCommentPages > 1 && authorFilter == nil
+            && ReplyPaginationDisplaySettings.shared.showsInlineBar
     }
 
     var detailRows: [DetailRow] {
@@ -22,7 +22,9 @@ extension PostDetailViewController {
             }
             if authorFilter != nil, displayMode == .content {
                 rows.append(.authorFilterBanner)
-            } else if displayMode == .pageSkeleton || comments.isEmpty == false {
+            } else if showsInlineReplyPagination {
+                rows.append(.replyPagination)
+            } else if displayMode == .pageSkeleton || !comments.isEmpty {
                 rows.append(.postRepliesDivider)
             }
         }

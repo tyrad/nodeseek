@@ -291,6 +291,7 @@ class PostDetailViewController: UIViewController {
         return item
     }()
     var toastHideWorkItem: DispatchWorkItem?
+    var isPageJumpToastVisible = false
     lazy var toastIconWidthConstraint = toastIconView.widthAnchor.constraint(equalToConstant: 18)
     lazy var toastLabelLeadingConstraint = toastLabel.leadingAnchor.constraint(equalTo: toastIconView.trailingAnchor, constant: 8)
     let navigationAuthorTitleView = PostDetailNavigationAuthorTitleView()
@@ -299,6 +300,7 @@ class PostDetailViewController: UIViewController {
     enum DetailRow {
         case header
         case entryHint
+        case replyPagination
         case postRepliesDivider
         case authorFilterBanner
         case comment(Int)
@@ -908,6 +910,12 @@ class PostDetailViewController: UIViewController {
             name: PostSignatureDisplaySettings.didChangeNotification,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(replyPaginationDisplayDidChange(_:)),
+            name: ReplyPaginationDisplaySettings.didChangeNotification,
+            object: nil
+        )
 
         reloadTableData()
         updateReplyButtonVisibility()
@@ -927,6 +935,11 @@ class PostDetailViewController: UIViewController {
     @objc
     func postSignatureDisplayDidChange(_ notification: Notification) {
         invalidateRenderedContentAndReload()
+    }
+
+    @objc
+    func replyPaginationDisplayDidChange(_ notification: Notification) {
+        reloadTableData()
     }
 
     private func invalidateRenderedContentAndReload() {

@@ -34,7 +34,8 @@ extension PostDetailViewController: PostDetailViewProtocol {
         replyBarFadeView.isHidden = true
         hideLoadingMoreComments()
         if hasRenderedDetailContent {
-            loadingIndicator.startAnimating()
+            // 跳页已由底部提示告知进度，不再叠加居中转圈
+            if !pendingPageJumpScroll { loadingIndicator.startAnimating() }
         } else {
             loadingIndicator.stopAnimating()
             showLoadingSkeletonIfNeeded()
@@ -56,6 +57,7 @@ extension PostDetailViewController: PostDetailViewProtocol {
         // 跳页请求结束却没渲染（失败或取消）时清掉待跳标记，否则续页一直被拦住。
         pendingPageJumpScroll = false
         loadingIndicator.stopAnimating()
+        if isPageJumpToastVisible { dismissToast() }
         collectionList.scheduleBatchFetchCheck()
         updateReplyButtonVisibility()
     }
@@ -80,9 +82,17 @@ extension PostDetailViewController: PostDetailViewProtocol {
         presentToast(message: message, style: .failure)
     }
 
+    /// 跳页进行中的提示，加载结束（成功、失败或取消）时由 hideLoading 收起。
+    func showPageJumpToast(page: Int) {
+        let format = NSLocalizedString("reply-page-loading", tableName: "DetailPrototype", comment: "")
+        presentToast(message: String.localizedStringWithFormat(format, page), style: .progress, autoHides: false)
+        isPageJumpToastVisible = true
+    }
+
     /// 图标与全局 BottomToast 一致：成功绿勾、失败橙色感叹号、进行中不显示图标。
-    private func presentToast(message: String, style: BottomToast.Style) {
+    private func presentToast(message: String, style: BottomToast.Style, autoHides: Bool = true) {
         toastHideWorkItem?.cancel()
+        isPageJumpToastVisible = false
         toastLabel.text = message
         // 三种提示共用一个图标视图，每次都要重设图标和颜色
         let showsIcon = style != .progress
@@ -103,22 +113,31 @@ extension PostDetailViewController: PostDetailViewProtocol {
             self.toastContainerView.transform = .identity
         }
 
+        guard autoHides else { return }
         let workItem = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            UIView.animate(
-                withDuration: 0.2,
-                delay: 0,
-                options: [.curveEaseIn, .allowUserInteraction]
-            ) {
-                self.toastContainerView.alpha = 0
-                self.toastContainerView.transform = CGAffineTransform(translationX: 0, y: 8)
-            } completion: { _ in
-                self.toastContainerView.isHidden = true
-                self.toastContainerView.transform = .identity
-            }
+            self?.dismissToast()
         }
         toastHideWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: workItem)
+    }
+
+    func dismissToast() {
+        toastHideWorkItem?.cancel()
+        toastHideWorkItem = nil
+        isPageJumpToastVisible = false
+        UIView.animate(
+            withDuration: 0.2,
+            delay: 0,
+            options: [.curveEaseIn, .allowUserInteraction, .beginFromCurrentState]
+        ) {
+            self.toastContainerView.alpha = 0
+            self.toastContainerView.transform = CGAffineTransform(translationX: 0, y: 8)
+        } completion: { _ in
+            // 收起动画期间可能已弹出新提示，此时不能把它藏掉
+            guard self.toastContainerView.alpha == 0 else { return }
+            self.toastContainerView.isHidden = true
+            self.toastContainerView.transform = .identity
+        }
     }
 
     func setFavoriteSubmitting(_ isSubmitting: Bool) {
@@ -167,14 +186,19 @@ extension PostDetailViewController: PostDetailViewProtocol {
             refreshCurrentCommentPage(detail: detail)
             return
         }
+        let previouslyShowedPagination = showsInlineReplyPagination
         let oldCommentCount = comments.count
         let oldAuthorFilterBannerText = authorFilterBannerText
         currentPage = max(currentPage, detail.page)
         pagination = detail.pagination
         comments.append(contentsOf: detail.comments)
         loadedCommentPageRanges[detail.page] = oldCommentCount..<comments.count
-        collectionList.appendComments(in: oldCommentCount..<comments.count, pageNumber: detail.page,
-                                      bannerChanged: oldAuthorFilterBannerText != authorFilterBannerText)
+        if previouslyShowedPagination != showsInlineReplyPagination {
+            collectionList.reload(refresh: false)
+        } else {
+            collectionList.appendComments(in: oldCommentCount..<comments.count, pageNumber: detail.page,
+                                          bannerChanged: oldAuthorFilterBannerText != authorFilterBannerText)
+        }
         updateLoadMoreCommentsFooter()
         updateReplyButtonVisibility()
         if let authorFilter { scheduleAuthorFilterAutoLoadIfNeeded(newMatchCount: detail.comments.filter(authorFilter.matches).count) }

@@ -67,3 +67,9 @@
 "stardust-login" = "登录后查看收款记录";
 "stardust-payment" = "星辰付款";
 "stardust-card-unavailable" = "未找到对应的收款卡，请核对原帖。";
+"reply-page-previous" = "上一页";
+"reply-page-next" = "下一页";
+"reply-page-choose" = "选择页码";
+"reply-page-number" = "第 %ld 页";
+"reply-page-summary" = "回复 %1$@ / %2$@ 页";
+"reply-page-loading" = "正在加载第 %ld 页";

@@ -44,7 +44,7 @@ struct SettingsViewControllerTests {
             let tableView = try #require(viewController.tableView)
             #expect(viewController.title == "设置")
             #expect(tableView.numberOfSections == 7)
-            #expect(tableView.numberOfRows(inSection: 0) == 8)
+            #expect(tableView.numberOfRows(inSection: 0) == 9)
             #expect(tableView.numberOfRows(inSection: 1) == 3)
             #expect(tableView.numberOfRows(inSection: 2) == 1)
             #expect(tableView.numberOfRows(inSection: 3) == 1)
@@ -198,13 +198,13 @@ struct SettingsViewControllerTests {
         )
         controller.loadViewIfNeeded()
         let tableView = try #require(controller.tableView)
-        let cell = controller.tableView(tableView, cellForRowAt: IndexPath(row: 6, section: 0))
+        let cell = controller.tableView(tableView, cellForRowAt: IndexPath(row: 7, section: 0))
         let control = try #require(cell.accessoryView as? UISwitch)
         #expect(cell.textLabel?.text == "深色模式图片变暗")
         #expect(control.isOn)
-        #expect(tableView.numberOfRows(inSection: 0) == 8)
+        #expect(tableView.numberOfRows(inSection: 0) == 9)
 
-        let levelCell = controller.tableView(tableView, cellForRowAt: IndexPath(row: 7, section: 0))
+        let levelCell = controller.tableView(tableView, cellForRowAt: IndexPath(row: 8, section: 0))
         let levelControl = try #require(levelCell.accessoryView as? UISegmentedControl)
         #expect(levelCell.textLabel?.text == "变暗程度")
         #expect(levelControl.numberOfSegments == 3)
@@ -216,11 +216,11 @@ struct SettingsViewControllerTests {
         control.isOn = false
         control.sendActions(for: .valueChanged)
         #expect(!DetailImageDimmingSettings(userDefaults: defaults).isEnabled)
-        #expect(tableView.numberOfRows(inSection: 0) == 7)
+        #expect(tableView.numberOfRows(inSection: 0) == 8)
         control.isOn = true
         control.sendActions(for: .valueChanged)
         #expect(DetailImageDimmingSettings(userDefaults: defaults).isEnabled)
-        #expect(tableView.numberOfRows(inSection: 0) == 8)
+        #expect(tableView.numberOfRows(inSection: 0) == 9)
         #expect(DetailImageDimmingSettings(userDefaults: defaults).level == .strong)
     }
 
@@ -232,6 +232,30 @@ struct SettingsViewControllerTests {
 
         #expect(defaults.object(forKey: "show-signatures") == nil)
         #expect(signatureSettings.showsSignatures == true)
+    }
+
+    @Test func replyPaginationSwitchDefaultsOnAndPersists() throws {
+        let suiteName = "settings-reply-pagination-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = ReplyPaginationDisplaySettings(userDefaults: defaults, storageKey: "reply-pagination")
+        #expect(settings.showsInlineBar == true)
+        let controller = SettingsViewController(
+            cacheManager: FakeSettingsCacheManager(cacheByteSize: 0),
+            sessionManager: FakeSettingsSessionManager(),
+            nodeImageAPIKeyStore: FakeNodeImageAPIKeyStore(),
+            replyPaginationSettings: settings
+        )
+        controller.loadViewIfNeeded()
+        let tableView = try #require(controller.tableView)
+        let cell = controller.tableView(tableView, cellForRowAt: IndexPath(row: 6, section: 0))
+        let control = try #require(cell.accessoryView as? UISwitch)
+        #expect(cell.textLabel?.text == "主帖下方显示回复页码")
+        #expect(control.isOn)
+
+        control.isOn = false
+        control.sendActions(for: .valueChanged)
+        #expect(ReplyPaginationDisplaySettings(userDefaults: defaults, storageKey: "reply-pagination").showsInlineBar == false)
     }
 
     @Test func togglingSignatureDisplaySwitchPersistsPreference() throws {

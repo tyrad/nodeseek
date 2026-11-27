@@ -68,3 +68,9 @@
 "stardust-login" = "Sign in to view payments";
 "stardust-payment" = "Stardust payment";
 "stardust-card-unavailable" = "The payment card could not be opened. Check the original post.";
+"reply-page-previous" = "Previous page";
+"reply-page-next" = "Next page";
+"reply-page-choose" = "Choose a page";
+"reply-page-number" = "Page %ld";
+"reply-page-summary" = "Replies %1$@ / %2$@";
+"reply-page-loading" = "Loading page %ld";

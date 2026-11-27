@@ -1160,7 +1160,7 @@ struct PostDetailViewControllerTests {
         viewController.render(detail: makePageJumpDetail(page: 5))
         await waitForDetailContent(in: viewController)
 
-        #expect(viewController.testDetailRowKinds() == ["header", "entryHint", "postRepliesDivider", "comment"])
+        #expect(viewController.testDetailRowKinds() == ["header", "entryHint", "replyPagination", "comment"])
         #expect(viewController.entryHintPage == 5)
 
         // 跳页后的提示按钮原地回到第 1 页，不新开详情页。
