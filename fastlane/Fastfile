@@ -392,6 +392,7 @@ platform :ios do
         api_key: key, app_identifier: APP_IDENTIFIER, app_platform: "ios",
         app_version: version, build_number: build, distribute_only: true,
         distribute_external: true, groups: groups, submit_beta_review: true,
+        notify_external_testers: env_bool("TESTFLIGHT_NOTIFY_EXTERNAL_TESTERS"),
         changelog: ENV.fetch("NOTES_ZH_HANS")
       )
     when "appstore"

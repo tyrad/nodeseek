@@ -68,5 +68,6 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_KEY_CONTENT }}
+          TESTFLIGHT_NOTIFY_EXTERNAL_TESTERS: ${{ vars.TESTFLIGHT_NOTIFY_EXTERNAL_TESTERS || 'false' }}
           TESTFLIGHT_GROUPS: ${{ vars.TESTFLIGHT_GROUPS || 'Public Beta' }}
         run: bundle exec fastlane distribute_processed_build
