@@ -1,0 +1,72 @@
+name: Distribute processed iOS build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: App version already uploaded to App Store Connect
+        required: true
+        type: string
+      build_number:
+        description: Exact processed build number
+        required: true
+        type: string
+      destination:
+        description: Distribution channel
+        type: choice
+        options: [both, testflight, appstore]
+        default: both
+      notes_zh_hans:
+        description: Simplified Chinese release notes
+        required: true
+        type: string
+      notes_zh_hant:
+        description: Traditional Chinese release notes
+        required: true
+        type: string
+      notes_en:
+        description: English release notes
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: distribute-ios-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  distribute:
+    if: github.ref == 'refs/heads/main'
+    environment: app-store
+    runs-on: xcode-27
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [testflight, appstore]
+    steps:
+      - uses: actions/checkout@v5
+        if: inputs.destination == 'both' || inputs.destination == matrix.channel
+
+      - uses: ruby/setup-ruby@v1
+        if: inputs.destination == 'both' || inputs.destination == matrix.channel
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Submit processed build
+        if: inputs.destination == 'both' || inputs.destination == matrix.channel
+        env:
+          DISTRIBUTION_CHANNEL: ${{ matrix.channel }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_BUILD: ${{ inputs.build_number }}
+          NOTES_ZH_HANS: ${{ inputs.notes_zh_hans }}
+          NOTES_ZH_HANT: ${{ inputs.notes_zh_hant }}
+          NOTES_EN: ${{ inputs.notes_en }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_KEY_CONTENT }}
+          TESTFLIGHT_GROUPS: ${{ vars.TESTFLIGHT_GROUPS || 'Public Beta' }}
+        run: bundle exec fastlane distribute_processed_build

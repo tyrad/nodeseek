@@ -376,6 +376,41 @@ platform :ios do
     )
   end
 
+  desc "Submit an existing processed build to the selected distribution channel"
+  lane :distribute_processed_build do
+    version = ENV.fetch("RELEASE_VERSION")
+    build = ENV.fetch("RELEASE_BUILD")
+    UI.user_error!("Invalid version or build") unless version.match?(/\A\d+(?:\.\d+){1,2}\z/) && build.match?(/\A\d+\z/)
+    key = app_store_api_key_from_env
+    UI.user_error!("An App Store Connect API key is required") unless key
+
+    case ENV.fetch("DISTRIBUTION_CHANNEL")
+    when "testflight"
+      groups = testflight_groups
+      UI.user_error!("An external TestFlight group is required") if groups.empty?
+      upload_to_testflight(
+        api_key: key, app_identifier: APP_IDENTIFIER, app_platform: "ios",
+        app_version: version, build_number: build, distribute_only: true,
+        distribute_external: true, groups: groups, submit_beta_review: true,
+        changelog: ENV.fetch("NOTES_ZH_HANS")
+      )
+    when "appstore"
+      # 复用商店已有资料，只更新这一版的更新说明和构建。
+      Dir.mktmpdir do |metadata|
+        english = ENV.fetch("NOTES_EN")
+        deliver(
+          api_key: key, app_identifier: APP_IDENTIFIER, app_version: version, build_number: build,
+          metadata_path: metadata, skip_binary_upload: true, skip_screenshots: true,
+          release_notes: { "zh-Hans" => ENV.fetch("NOTES_ZH_HANS"), "zh-Hant" => ENV.fetch("NOTES_ZH_HANT"),
+                           "en-US" => english, "en-GB" => english },
+          force: true, automatic_release: true, submit_for_review: true, precheck_include_in_app_purchases: false
+        )
+      end
+    else
+      UI.user_error!("Unknown distribution channel")
+    end
+  end
+
   desc "Upload App Store basic metadata without uploading a binary or submitting for review"
   lane :app_store_metadata do
     deliver(
