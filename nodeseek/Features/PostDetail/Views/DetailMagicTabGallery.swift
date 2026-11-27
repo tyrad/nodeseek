@@ -62,7 +62,7 @@ enum DetailMagicTabGallery {
                           let url = ImageURLResolver.resolve(attachment.contentURL) else { return }
                     urls.append(url)
                 }
-            case .vote, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported: break
+            case .stardust, .vote, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported: break
             }
         }
         return urls

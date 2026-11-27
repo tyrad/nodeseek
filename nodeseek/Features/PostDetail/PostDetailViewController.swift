@@ -9,6 +9,7 @@ import UIKit
 
 enum PostDetailLinkDestination {
     case vote(Int)
+    case stardust(StardustReceipt)
     case currentPageAnchor(String)
     case nativePost(postID: String, page: Int, url: URL)
     case userProfile(URL)
@@ -100,6 +101,9 @@ enum PostDetailLinkResolver {
             return nil
         }
 
+        if resolvedURL.scheme?.lowercased() == "nsapp", resolvedURL.host?.lowercased() == "stardust-receive" {
+            return StardustReceipt(url: resolvedURL).map(PostDetailLinkDestination.stardust)
+        }
         if resolvedURL.scheme?.lowercased() == "nsapp", resolvedURL.host?.lowercased() == "vote" {
             return NodeSeekVoteParser.voteID(in: resolvedURL).map(PostDetailLinkDestination.vote)
         }

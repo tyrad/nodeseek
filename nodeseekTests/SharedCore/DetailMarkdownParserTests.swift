@@ -67,7 +67,7 @@ struct DetailMarkdownParserTests {
                 case .tabs(let tabs): for tab in tabs { paragraphs.append(tab.title); read(tab.blocks) }
                 case .code(_, let text), .terminal(let text): paragraphs.append(text)
                 case .image(_, let url): images.append(url)
-                case .vote, .divider, .brokenImage: break
+                case .stardust, .vote, .divider, .brokenImage: break
                 }
             }
         }
@@ -127,6 +127,34 @@ struct DetailMarkdownParserTests {
                     #expect(reports.count == 2)
                     for text in reports { #expect(item.markdown.contains(text)); #expect(text.contains("\u{1B}[")) }
                 }
+            }
+        }
+    }
+
+    @Test func post1074312RendersStardustAndPreservesRemainingBlocks() throws {
+        let captured = try JSONDecoder().decode(Page.self, from: data("post-1074312"))
+        let main = try #require(captured.items.first)
+        #expect(main.main)
+        #expect(captured.items.count == 11)
+        let config = ["postData": ["comments": [["commentId": 1, "blocked": false, "markdown": main.markdown]]]]
+        let payload = try JSONSerialization.data(withJSONObject: config)
+        let detail = try page(payload: String(decoding: payload, as: UTF8.self), main: main.html, reply: "")
+        let source = DetailFloorSource(post: detail)
+        #expect(source.visibleMarkdown == main.markdown)
+        guard case .native(let document) = parser.render(source),
+              case .stardust(let receipt) = document.blocks.first else {
+            Issue.record("主楼首块应为星辰收款卡")
+            return
+        }
+        #expect(receipt.memberID == 32297 && receipt.referenceID == 48395171)
+        #expect(receipt.amount == 100 && receipt.note == "Pay with Stardust" && receipt.oneTime)
+        let remaining = try #require(main.markdown.split(separator: "\n", maxSplits: 1).last)
+        #expect(parser.render(.init(html: main.html, visibleMarkdown: String(remaining))) ==
+                .native(.init(blocks: Array(document.blocks.dropFirst()))))
+        for reply in captured.items where !reply.main {
+            guard case .native = parser.render(.init(html: reply.html, visibleMarkdown: reply.markdown)) else {
+                Issue.record("回复意外回退：\(reply.id)")
+                continue
             }
         }
     }

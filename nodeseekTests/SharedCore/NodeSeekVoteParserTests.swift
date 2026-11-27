@@ -68,7 +68,7 @@ final class NodeSeekVoteParserTests: XCTestCase {
     private func ids(_ parts: [NodeSeekVoteParser.Part]) -> [Int] {
         parts.flatMap { part -> [Int] in
             switch part {
-            case .html: return []
+            case .stardust, .html: return []
             case .vote(let id): return [id]
             case .quote(let children): return ids(children)
             }
@@ -79,7 +79,7 @@ final class NodeSeekVoteParserTests: XCTestCase {
         parts.map { part in
             switch part {
             case .html(let html): return html
-            case .vote: return ""
+            case .stardust, .vote: return ""
             case .quote(let children): return text(children)
             }
         }.joined()

@@ -59,3 +59,11 @@
 
 "comments-end" = "已经到底了";
 "comments-refresh" = "刷新";
+"stardust-loading" = "读取收款记录…";
+"stardust-retry" = "读取失败，点按重试";
+"stardust-paid" = "你已付款，";
+"stardust-unpaid" = "你未付款，";
+"stardust-summary" = "共计 %@ 用户付款，共收到 %ld 🌌";
+"stardust-login" = "登录后查看收款记录";
+"stardust-payment" = "星辰付款";
+"stardust-card-unavailable" = "未找到对应的收款卡，请核对原帖。";

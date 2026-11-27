@@ -5,6 +5,7 @@ nonisolated enum NodeSeekVoteParser {
     indirect enum Part {
         case html(String)
         case vote(Int)
+        case stardust(StardustReceipt)
         case quote([Part])
     }
 
@@ -18,9 +19,9 @@ nonisolated enum NodeSeekVoteParser {
     }
 
     static func parts(in html: String) -> [Part]? {
-        guard html.localizedCaseInsensitiveContains("nsapp://vote") || html.contains("vote-panel"),
+        guard html.localizedCaseInsensitiveContains("nsapp://") || html.contains("vote-panel"),
               let doc = try? HTML(html: "<div id=\"__vote_root__\">\(html)</div>", encoding: .utf8),
-              let root = doc.at_css("#__vote_root__"), containsVote(root) else { return nil }
+              let root = doc.at_css("#__vote_root__"), containsWidget(root) else { return nil }
         return split(root)
     }
 
@@ -34,28 +35,30 @@ nonisolated enum NodeSeekVoteParser {
         ["pre", "code", "script", "style", "textarea"].contains(node.tagName?.lowercased() ?? "")
     }
 
-    private static func reference(_ node: Kanna.XMLElement) -> Int? {
+    private static func reference(_ node: Kanna.XMLElement) -> Part? {
         if node.tagName?.lowercased() == "a" {
             for value in [node["data-href"], node["href"]].compactMap({ $0 }) {
-                if let url = URL(string: value), let id = voteID(in: url) { return id }
+                guard let url = URL(string: value) else { continue }
+                if let receipt = StardustReceipt(url: url) { return .stardust(receipt) }
+                if let id = voteID(in: url) { return .vote(id) }
             }
         }
         guard (node["class"] ?? "").split(whereSeparator: \.isWhitespace).contains("vote-panel") else { return nil }
         // 官网挂载后原链接被替换，编号仍保留在组件说明或选项 ID 中。
         let text = node.text ?? ""
         if let range = text.range(of: #"nsapp://vote\?id=[0-9]+(?![0-9])"#, options: .regularExpression),
-           let url = URL(string: String(text[range])), let id = voteID(in: url) { return id }
+           let url = URL(string: String(text[range])), let id = voteID(in: url) { return .vote(id) }
         for input in node.css("input[id]") {
             let parts = (input["id"] ?? "").split(separator: "-")
             if parts.count == 4, parts[0] == "vote", parts[1] == "item",
-               let id = positiveID(String(parts[2])), positiveID(String(parts[3])) != nil { return id }
+               let id = positiveID(String(parts[2])), positiveID(String(parts[3])) != nil { return .vote(id) }
         }
         return nil
     }
 
-    private static func containsVote(_ node: Kanna.XMLElement) -> Bool {
+    private static func containsWidget(_ node: Kanna.XMLElement) -> Bool {
         if isExcluded(node) { return false }
-        return reference(node) != nil || node.children.contains(where: containsVote)
+        return reference(node) != nil || node.children.contains(where: containsWidget)
     }
 
     private static func split(_ node: Kanna.XMLElement) -> [Part] {
@@ -65,9 +68,9 @@ nonisolated enum NodeSeekVoteParser {
             if !pending.isEmpty { parts.append(.html(pending)); pending = "" }
         }
         for child in node.xpath("node()") {
-            guard containsVote(child) else { pending += child.toHTML ?? ""; continue }
+            guard containsWidget(child) else { pending += child.toHTML ?? ""; continue }
             flush()
-            if let id = reference(child) { parts.append(.vote(id)) }
+            if let widget = reference(child) { parts.append(widget) }
             else if child.tagName?.lowercased() == "blockquote" { parts.append(.quote(split(child))) }
             else { parts += split(child) }
         }

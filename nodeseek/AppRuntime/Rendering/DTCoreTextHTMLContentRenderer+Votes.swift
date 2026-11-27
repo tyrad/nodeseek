@@ -6,6 +6,7 @@ nonisolated extension DTCoreTextHTMLContentRenderer {
             switch part {
             case .html(let html):
                 return renderContentBlocks(fragment: html, baseURL: baseURL, maxImageWidth: maxImageWidth)
+            case .stardust(let receipt): return [.stardust(receipt)]
             case .vote(let id):
                 return [.vote(id)]
             case .quote(let children):

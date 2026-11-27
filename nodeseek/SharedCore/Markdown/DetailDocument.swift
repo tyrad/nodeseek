@@ -36,6 +36,7 @@ nonisolated struct DetailDocument: Equatable, Sendable {
         /// 地址无效的图片，按加载失败占位显示。
         case brokenImage(alt: String)
         case vote(Int)
+        case stardust(StardustReceipt)
         case tabs([Tab])
         case divider
     }

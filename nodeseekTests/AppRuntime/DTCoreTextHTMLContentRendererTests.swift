@@ -1415,7 +1415,7 @@ struct DTCoreTextHTMLContentRendererTests {
                 if let font = font(in: quoteBlock.children, matching: text) {
                     return font
                 }
-            case .vote, .terminal, .tabs, .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
+            case .stardust, .vote, .terminal, .tabs, .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
                 continue
             }
         }
@@ -1431,7 +1431,7 @@ struct DTCoreTextHTMLContentRendererTests {
                 if let attributed = attributedText(in: quoteBlock.children, matching: text) {
                     return attributed
                 }
-            case .vote, .terminal, .tabs, .text, .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
+            case .stardust, .vote, .terminal, .tabs, .text, .table, .codeBlock, .image, .iframeLink, .imagePlaceholder, .unsupported:
                 continue
             }
         }
@@ -1464,7 +1464,7 @@ struct DTCoreTextHTMLContentRendererTests {
                 return [codeBlock]
             case .quote(let quoteBlock):
                 return codeBlocks(in: quoteBlock.children)
-            case .vote, .terminal, .tabs, .text, .table, .image, .iframeLink, .imagePlaceholder, .unsupported:
+            case .stardust, .vote, .terminal, .tabs, .text, .table, .image, .iframeLink, .imagePlaceholder, .unsupported:
                 return []
             }
         }
@@ -1490,7 +1490,7 @@ struct DTCoreTextHTMLContentRendererTests {
                 return imageBlocks(in: quoteBlock.children)
             case .tabs(let tabs):
                 return tabs.sections.flatMap { imageBlocks(in: $0.blocks) }
-            case .vote, .terminal, .text, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
+            case .stardust, .vote, .terminal, .text, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
                 return []
             }
         }
@@ -1517,7 +1517,7 @@ struct DTCoreTextHTMLContentRendererTests {
                 }
             case .tabs(let tabs):
                 urls.append(contentsOf: tabs.sections.flatMap { imageURLs(in: $0.blocks) })
-            case .vote, .terminal, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
+            case .stardust, .vote, .terminal, .table, .codeBlock, .iframeLink, .imagePlaceholder, .unsupported:
                 continue
             }
         }

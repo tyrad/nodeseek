@@ -60,3 +60,11 @@
 
 "comments-end" = "You're all caught up";
 "comments-refresh" = "Refresh";
+"stardust-loading" = "Loading payments…";
+"stardust-retry" = "Couldn’t load payments. Tap to retry.";
+"stardust-paid" = "You paid · ";
+"stardust-unpaid" = "Unpaid · ";
+"stardust-summary" = "%@ paid · %ld 🌌 received";
+"stardust-login" = "Sign in to view payments";
+"stardust-payment" = "Stardust payment";
+"stardust-card-unavailable" = "The payment card could not be opened. Check the original post.";

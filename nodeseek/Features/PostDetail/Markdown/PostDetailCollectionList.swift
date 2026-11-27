@@ -278,7 +278,8 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         }
         cell.configureHeader(title: title, requiredLevel: requiredLevel, name: author, isPoster: isPoster, badges: badges, time: time,
                              floor: floor, isHot: isHot, showsRiskWarning: showsRiskWarning)
-        cell.body.onLink = { [weak page] in page?.handleContentLinkTap($0) }
+        let sourceFloor = comment.flatMap(CommentReplyRelationParser.floorNumber(for:)) ?? 0
+        cell.body.onLink = { [weak page] in page?.handleContentLinkTap($0, floor: sourceFloor) }
         cell.body.onSignatureLinks = { [weak page] in page?.handleSignatureLinkCandidatesTap($0) }
         cell.body.onPhotos = { [weak page] in page?.presentPhotoBrowser(imageURLs: $0, initialIndex: $1) }
         cell.body.imageSize = { [weak page] in page?.cachedDetailImageSize(for: $0) }

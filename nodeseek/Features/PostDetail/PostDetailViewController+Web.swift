@@ -52,7 +52,7 @@ extension PostDetailViewController {
         showToast(message: "已复制链接")
     }
 
-    func handleContentLinkTap(_ url: URL) {
+    func handleContentLinkTap(_ url: URL, floor: Int? = nil) {
         if handleLoadedCommentAnchorIfNeeded(for: url) {
             return
         }
@@ -65,6 +65,11 @@ extension PostDetailViewController {
         ) else { return }
 
         switch destination {
+        case .stardust(let receipt):
+            guard let postID = currentHeaderContent?.postID else { return }
+            let page = floor.map(CommentComposerContentBuilder.commentPage(forFloor:)) ?? currentPage
+            let postURL = NodeSeekSite.postURL(id: postID, page: page)
+            showDetailDestination(StardustPaymentViewController(postURL: postURL, receipt: receipt))
         case .vote(let id):
             showDetailDestination(VoteViewController(voteID: id))
         case .currentPageAnchor(let anchorID):

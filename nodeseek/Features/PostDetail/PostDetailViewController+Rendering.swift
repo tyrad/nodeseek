@@ -68,7 +68,7 @@ extension PostDetailViewController {
                 styledSignatureBlock(child)
             }
             return children.isEmpty ? nil : .quote(RenderedQuoteBlock(children: children))
-        case .vote, .table, .codeBlock, .terminal, .tabs, .image, .iframeLink, .imagePlaceholder, .unsupported:
+        case .stardust, .vote, .table, .codeBlock, .terminal, .tabs, .image, .iframeLink, .imagePlaceholder, .unsupported:
             return block
         }
     }

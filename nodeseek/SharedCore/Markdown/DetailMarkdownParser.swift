@@ -254,8 +254,8 @@ nonisolated struct DetailMarkdownParser: Sendable {
             guard let url = destination(image.source) else { return [.block(.brokenImage(alt: image.plainText))] }
             return [.block(.image(alt: image.plainText, url: mediaURLs[url] ?? url))]
         case let anchor as Markdown.Link:
-            if let raw = anchor.destination, let url = URL(string: raw), let id = NodeSeekVoteParser.voteID(in: url) {
-                return [.block(.vote(id))]
+            if let raw = anchor.destination, let block = Self.siteWidget(raw) {
+                return [.block(block)]
             }
             guard let url = destination(anchor.destination) else { throw ParseError.unsupported }
             link = url
@@ -309,6 +309,12 @@ nonisolated struct DetailMarkdownParser: Sendable {
         return end
     }
 
+    private static func siteWidget(_ raw: String) -> Block? {
+        guard let url = URL(string: raw) else { return nil }
+        if let receipt = StardustReceipt(url: url) { return .stardust(receipt) }
+        return NodeSeekVoteParser.voteID(in: url).map(Block.vote)
+    }
+
     private func tokenize(_ text: String, style: Style, link: URL?) throws -> [Piece] {
         guard link == nil else { return [.inline(.text(text, style, link))] }
         let string = text as NSString
@@ -323,8 +329,8 @@ nonisolated struct DetailMarkdownParser: Sendable {
             if string.substring(with: range).hasPrefix("http") { range.length = Self.linkifiedLength(string.substring(with: range)) }
             let token = string.substring(with: range)
             if token.hasPrefix("nsapp://") {
-                guard let url = URL(string: token), let id = NodeSeekVoteParser.voteID(in: url) else { throw ParseError.unsupported }
-                result.append(.block(.vote(id)))
+                guard let block = Self.siteWidget(token) else { throw ParseError.unsupported }
+                result.append(.block(block))
             } else if token.first == ":", let url = NodeSeekStickerLibrary.urlsByToken[String(token.dropFirst().dropLast())] {
                 result.append(.inline(.sticker(token: token, url: mediaURLs[url] ?? url)))
             } else if token.first == "@" {

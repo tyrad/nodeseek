@@ -31,6 +31,7 @@ enum CommentCopyTextFormatter {
 
     private static func text(from block: RenderedContentBlock, includingStickerCodes: Bool) -> String? {
         switch block {
+        case .stardust(let receipt): return receipt.sourceURL.absoluteString
         case .vote(let id):
             return "nsapp://vote?id=\(id)"
         case .text(let attributedText):

@@ -108,7 +108,7 @@ final class UserProfileReadmeView: UIView, UITextViewDelegate {
                 .map { $0.cells.map(\.text).joined(separator: "  ") }
                 .joined(separator: "\n")
             return makeCodeView(text)
-        case .vote, .terminal, .tabs, .iframeLink, .imagePlaceholder, .unsupported:
+        case .stardust, .vote, .terminal, .tabs, .iframeLink, .imagePlaceholder, .unsupported:
             return nil
         }
     }

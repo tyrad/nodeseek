@@ -80,6 +80,7 @@ struct HTMLContainerShell: Equatable {
 
 enum RenderedContentBlock {
     case vote(Int)
+    case stardust(StardustReceipt)
     case text(NSAttributedString)
     case table(RenderedTableBlock)
     case codeBlock(RenderedCodeBlock)

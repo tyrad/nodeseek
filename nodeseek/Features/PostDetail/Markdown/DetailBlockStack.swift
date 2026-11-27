@@ -70,6 +70,7 @@ final class DetailBlockStack: UIStackView {
             case .widget(let block):
                 switch block {
                 case let .image(alt, url): appendLegacy([.image(.init(url: url, altText: alt))], to: stack, width: width)
+                case .stardust(let receipt): appendLegacy([.stardust(receipt)], to: stack, width: width)
                 case .vote(let id): appendLegacy([.vote(id)], to: stack, width: width)
                 case .terminal(let ansi): appendLegacy([.terminal(.init(ansi: ansi))], to: stack, width: width)
                 case .code(_, let text): appendLegacy([.codeBlock(.init(text: text))], to: stack, width: width)
@@ -362,7 +363,7 @@ final class DetailBlockStack: UIStackView {
             case .list(_, let items): return items.flatMap(galleryBlocks)
             case .table(let rows): return [.table(table(rows))]
             case .tabs(let tabs): return [.tabs(.init(id: "", sections: tabs.map { .init(title: $0.title, blocks: galleryBlocks($0.blocks)) }))]
-            case .paragraph, .heading, .code, .vote, .divider, .brokenImage: return []
+            case .paragraph, .heading, .code, .stardust, .vote, .divider, .brokenImage: return []
             }
         }
     }
@@ -423,6 +424,8 @@ final class DetailBlockStack: UIStackView {
                        height: DetailTableLayout.measure(table: table, constrainedSize: size).height)
             case .codeBlock(let code):
                 attach(DetailCodeBlockView(codeBlock: code), to: stack, height: DetailCodeBlockLayout.measure(codeBlock: code, constrainedSize: size).height)
+            case .stardust(let receipt):
+                stack.addArrangedSubview(DetailStardustView(receipt: receipt, open: open))
             case .vote(let id):
                 weak var height: NSLayoutConstraint?
                 let view = DetailVoteView(id: id, service: voteService) { [weak self] value in height?.constant = value; self?.onSizeChange?() }
