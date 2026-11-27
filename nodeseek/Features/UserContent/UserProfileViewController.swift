@@ -34,6 +34,13 @@ final class UserProfileViewController: UIViewController {
 
     private var profile: UserProfileRecord?
     private var isSelf = false
+    private var accountID: Int?
+    private var blocked: Bool?
+    private weak var blockLoadingToast: UIView?
+    private var blockLoadTask: Task<Void, Never>?
+    private lazy var blockButton = makeSecondaryButton(title: AccountsL10n.text("拉黑"), symbol: "nosign") { [weak self] in
+        self?.blockTapped()
+    }
     private let followButton = UIButton(configuration: .plain())
     private weak var fansStatView: UserProfileStatView?
     private var isUpdatingFollow = false
@@ -58,13 +65,21 @@ final class UserProfileViewController: UIViewController {
 
     deinit {
         loadTask?.cancel()
+        blockLoadTask?.cancel()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        if profile != nil { refreshBlockButton() }
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
         setupMoreMenu()
+        avatarControl.addInteraction(UIContextMenuInteraction(delegate: self))
         setupFollowButton()
+        NotificationCenter.default.addObserver(self, selector: #selector(blockListChanged(_:)), name: .nodeSeekBlockListChanged, object: nil)
         loadProfile(showsIndicator: true)
     }
 
@@ -101,8 +116,8 @@ final class UserProfileViewController: UIViewController {
         view.addSubview(errorView)
 
         NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
@@ -112,14 +127,14 @@ final class UserProfileViewController: UIViewController {
             contentStack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -32),
             contentStack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
 
-            skeletonView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            skeletonView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            skeletonView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            skeletonView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
             skeletonView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
 
-            errorView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            errorView.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
             errorView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            errorView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
-            errorView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32)
+            errorView.leadingAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 32),
+            errorView.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -32)
         ])
     }
 
@@ -136,6 +151,15 @@ final class UserProfileViewController: UIViewController {
         )
         item.accessibilityLabel = "个人页更多操作"
         navigationItem.rightBarButtonItem = item
+    }
+
+    private func avatarMenuElements() -> [UIMenuElement] {
+        guard let profile, profile.uid == uid, !isSelf else { return [] }
+        let follow = UserAvatarMenu.followAction(followed: profile.followed, busy: isUpdatingFollow) { [weak self] in
+            self?.followTapped()
+        }
+        return [UserAvatarMenu.element(for: BlockedMember(id: uid, name: profile.name), presenter: self,
+                                       client: client, accountStore: currentAccountStore, followAction: follow)]
     }
 
     private var profileURL: URL {
@@ -157,10 +181,11 @@ final class UserProfileViewController: UIViewController {
         loadTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let currentUID = await currentAccountStore.snapshot()?.account.nodeSeekUID
+                let account = await currentAccountStore.snapshot()?.account
                 let profile = try await client.loadProfile(uid: uid)
                 guard !Task.isCancelled else { return }
-                self.isSelf = currentUID == uid
+                self.accountID = account?.isLoggedIn == true ? account?.nodeSeekUID : nil
+                self.isSelf = accountID == uid
                 show(profile)
                 if isSelf {
                     loadTodayProgress()
@@ -190,6 +215,7 @@ final class UserProfileViewController: UIViewController {
 
     private func show(_ profile: UserProfileRecord) {
         self.profile = profile
+        refreshBlockButton()
         navigationItem.backButtonTitle = profile.name
         skeletonView.isHidden = true
         refreshControl.endRefreshing()
@@ -296,15 +322,21 @@ final class UserProfileViewController: UIViewController {
         header.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20)
         guard !isSelf else { return header }
 
-        // 关注、私信单独成行，不再和名字、徽章抢宽度
         followButton.applyFollowStyle(followed: profile.followed, busy: isUpdatingFollow)
-        let actionRow = UIStackView(arrangedSubviews: [followButton, makeMessageButton()])
+        let messageButton = makeSecondaryButton(title: UserContentL10n.text("私信"), symbol: "bubble.left") { [weak self] in
+            self?.openMessage()
+        }
+        let actionRow = UIStackView(arrangedSubviews: [followButton, messageButton])
+        if accountID != nil {
+            blockButton.accessibilityIdentifier = "user-profile-block-button"
+            actionRow.addArrangedSubview(blockButton)
+        }
         actionRow.axis = .horizontal
         actionRow.distribution = .fillEqually
         actionRow.spacing = 10
         actionRow.isLayoutMarginsRelativeArrangement = true
         actionRow.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20)
-        actionRow.heightAnchor.constraint(greaterThanOrEqualToConstant: 36).isActive = true
+        actionRow.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
 
         let container = UIStackView(arrangedSubviews: [header, actionRow])
         container.axis = .vertical
@@ -324,8 +356,6 @@ final class UserProfileViewController: UIViewController {
 
     private func setupFollowButton() {
         followButton.accessibilityIdentifier = "user-profile-follow-button"
-        followButton.setContentHuggingPriority(.required, for: .horizontal)
-        followButton.setContentCompressionResistancePriority(.required, for: .horizontal)
         followButton.addAction(UIAction { [weak self] _ in
             self?.followTapped()
         }, for: .touchUpInside)
@@ -337,15 +367,9 @@ final class UserProfileViewController: UIViewController {
             updateFollow(true)
             return
         }
-        // 取消关注需要确认，和关注列表一致
-        let sheet = UIAlertController(title: "不再关注「\(profile.name)」？", message: nil, preferredStyle: .actionSheet)
-        sheet.addAction(UIAlertAction(title: "取消关注", style: .destructive) { [weak self] _ in
+        UserAvatarMenu.confirmUnfollow(profile.name, from: self, source: followButton) { [weak self] in
             self?.updateFollow(false)
-        })
-        sheet.addAction(UIAlertAction(title: "取消", style: .cancel))
-        sheet.popoverPresentationController?.sourceView = followButton
-        sheet.popoverPresentationController?.sourceRect = followButton.bounds
-        present(sheet, animated: true)
+        }
     }
 
     private func updateFollow(_ follow: Bool) {
@@ -373,14 +397,67 @@ final class UserProfileViewController: UIViewController {
         }
     }
 
-    private func makeMessageButton() -> UIButton {
+    @objc private func blockListChanged(_ notification: Notification) {
+        guard let owner = notification.object as? Int, owner == accountID else { return }
+        refreshBlockButton()
+    }
+
+    private func refreshBlockButton() {
+        blockLoadTask?.cancel()
+        guard let accountID, !isSelf else { return }
+        if let blockLoadingToast { BottomToast.dismiss(blockLoadingToast) }
+        if let cached = client.cachedBlockStatus(uid, for: accountID) {
+            showBlockStatus(cached)
+            return
+        }
+        blockButton.isEnabled = false
+        let progress = BottomToast.show(AccountsL10n.text("正在加载黑名单…"), style: .progress, in: view, duration: 60)
+        blockLoadingToast = progress
+        blockLoadTask = Task { [weak self, client, uid] in
+            defer { BottomToast.dismiss(progress) }
+            do {
+                let blocked = try await client.isBlocked(uid, for: accountID)
+                guard !Task.isCancelled else { return }
+                self?.showBlockStatus(blocked)
+            } catch {
+                guard let self, !Task.isCancelled else { return }
+                self.blocked = nil
+                blockButton.configuration?.title = AccountsL10n.text("重试")
+                blockButton.accessibilityHint = error.localizedDescription
+                blockButton.isEnabled = true
+                if view.window != nil { BottomToast.show(error.localizedDescription, style: .failure, in: view) }
+            }
+        }
+    }
+
+    private func showBlockStatus(_ blocked: Bool) {
+        self.blocked = blocked
+        blockButton.configuration?.title = AccountsL10n.text(blocked ? "已拉黑" : "拉黑")
+        blockButton.accessibilityHint = blocked ? AccountsL10n.text("解除拉黑") : nil
+        blockButton.isEnabled = true
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        blockLoadTask?.cancel()
+        if let blockLoadingToast { BottomToast.dismiss(blockLoadingToast) }
+    }
+
+    private func blockTapped() {
+        guard let profile, let accountID else { return }
+        guard let blocked else { return refreshBlockButton() }
+        UserAvatarMenu.confirm(!blocked, member: BlockedMember(id: uid, name: profile.name),
+                              accountID: accountID, client: client, presenter: self)
+    }
+
+    private func makeSecondaryButton(title: String, symbol: String, action: @escaping () -> Void) -> UIButton {
         var configuration = UIButton.Configuration.plain()
         configuration.image = UIImage(
-            systemName: "bubble.left",
+            systemName: symbol,
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
         )
         configuration.imagePadding = 4
-        configuration.title = "私信"
+        configuration.title = title
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
             var attributes = attributes
             attributes.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .systemFont(ofSize: 13.5, weight: .semibold))
@@ -391,11 +468,7 @@ final class UserProfileViewController: UIViewController {
         configuration.cornerStyle = .capsule
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
         let button = UIButton(configuration: configuration)
-        button.setContentHuggingPriority(.required, for: .horizontal)
-        button.setContentCompressionResistancePriority(.required, for: .horizontal)
-        button.addAction(UIAction { [weak self] _ in
-            self?.openMessage()
-        }, for: .touchUpInside)
+        button.addAction(UIAction { _ in action() }, for: .touchUpInside)
         return button
     }
 
@@ -528,8 +601,7 @@ final class UserProfileViewController: UIViewController {
     }
 
     private func openMessage() {
-        let url = NodeSeekNotificationURLBuilder.webURL(fragment: "/message?mode=talk&to=\(uid)")
-        navigationController?.pushViewController(NodeSeekWebViewController(url: url), animated: true)
+        UserAvatarMenu.openMessage(to: uid, from: self)
     }
 
     private func openWeb(path: String, query: [URLQueryItem]) {
@@ -608,6 +680,15 @@ final class UserProfileViewController: UIViewController {
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.dateFormat = "M 月 d 日"
         return formatter.string(from: Date())
+    }
+}
+
+extension UserProfileViewController: UIContextMenuInteractionDelegate {
+    func contextMenuInteraction(_ interaction: UIContextMenuInteraction,
+                                configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
+        let elements = avatarMenuElements()
+        guard !elements.isEmpty else { return nil }
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in UIMenu(children: elements) }
     }
 }
 

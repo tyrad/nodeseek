@@ -3,6 +3,7 @@ import UIKit
 @MainActor
 final class UserConnectionCell: UITableViewCell {
     private let avatar = UIImageView()
+    private var member: UserConnectionRecord?
     private let nameLabel = UILabel()
     private let bioLabel = UILabel()
     private let statsLabel = UILabel()
@@ -13,6 +14,8 @@ final class UserConnectionCell: UITableViewCell {
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         backgroundColor = .secondarySystemGroupedBackground
+        avatar.isUserInteractionEnabled = true
+        avatar.addInteraction(UIContextMenuInteraction(delegate: self))
         avatar.contentMode = .scaleAspectFill
         avatar.layer.cornerRadius = 10
         avatar.layer.cornerCurve = .continuous
@@ -61,10 +64,12 @@ final class UserConnectionCell: UITableViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         AvatarImageLoader.shared.cancel(on: avatar)
+        member = nil
         onToggleFollow = nil
     }
 
     func configure(_ record: UserConnectionRecord, isUpdatingFollow: Bool = false, showsFollowButton: Bool = true) {
+        member = record
         followButton.isHidden = !showsFollowButton
         configureFollowButton(followed: record.followed ?? false, busy: isUpdatingFollow)
         AvatarImageLoader.shared.cancel(on: avatar)
@@ -78,6 +83,18 @@ final class UserConnectionCell: UITableViewCell {
 
     private func configureFollowButton(followed: Bool, busy: Bool) {
         followButton.applyFollowStyle(followed: followed, busy: busy)
+    }
+}
+
+extension UserConnectionCell: UIContextMenuInteractionDelegate {
+    func contextMenuInteraction(_ interaction: UIContextMenuInteraction,
+                                configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
+        guard let member else { return nil }
+        let follow = onToggleFollow.map { toggle in
+            UserAvatarMenu.followAction(followed: member.followed == true, busy: !followButton.isUserInteractionEnabled, perform: toggle)
+        }
+        return UserAvatarMenu.avatarConfiguration(url: NodeSeekNotificationURLBuilder.profileURL(memberID: member.uid),
+                                                 name: member.name, source: self, followAction: follow)
     }
 }
 

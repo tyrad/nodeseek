@@ -28,7 +28,7 @@ nonisolated enum XPathRules {
     static let viewCount = ".//*[contains(@class, 'info-views')]//span"
     static let replyCount = ".//*[contains(@class, 'reply-count')] | .//*[contains(@class, 'info-comments-count')]//span[last()]"
     static let lastActive = ".//*[contains(@class, 'last-active')] | .//*[contains(@class, 'info-last-comment-time')]//time"
-    static let fallbackPostLinks = "//a[contains(@href, '/post-') or contains(@href, '/post/')]"
+    static let fallbackPostLinks = "//a[contains(@href, '/post-') or contains(@href, '/post/')][not(ancestor-or-self::*[contains(concat(' ', normalize-space(@class), ' '), ' blocked-post ')])]"
     static let fallbackPostContainer = "./ancestor::*[self::article or self::li or self::tr or self::div][1]"
     static let fallbackAvatar = ".//img[contains(@src, '/avatar/')]"
     static let fallbackAuthor = ".//a[contains(@href, '/space/') or contains(@href, '/user/')]"

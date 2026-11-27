@@ -242,14 +242,9 @@ final class UserConnectionsViewController: UIViewController, UITableViewDataSour
         }
         // 取消关注需要确认，避免列表滚动时误触
         let name = record.name.isEmpty ? "UID \(record.uid)" : record.name
-        let sheet = UIAlertController(title: "不再关注「\(name)」？", message: nil, preferredStyle: .actionSheet)
-        sheet.addAction(UIAlertAction(title: "取消关注", style: .destructive) { [weak self] _ in
+        UserAvatarMenu.confirmUnfollow(name, from: self, source: sourceView) { [weak self] in
             self?.toggleFollow(uid: record.uid, follow: false)
-        })
-        sheet.addAction(UIAlertAction(title: "取消", style: .cancel))
-        sheet.popoverPresentationController?.sourceView = sourceView
-        sheet.popoverPresentationController?.sourceRect = sourceView.bounds
-        present(sheet, animated: true)
+        }
     }
 
     private func toggleFollow(uid: Int, follow: Bool) {

@@ -353,6 +353,9 @@ final class SearchViewController: UIViewController {
         keyboardDismissCoordinator = KeyboardDismissCoordinator(rootView: view, backgrounds: [view] + listView.keyboardDismissBackgrounds + userResultsView.keyboardDismissBackgrounds)
         setupUI()
         NotificationCenter.default.addObserver(self, selector: #selector(refreshTextSize), name: AppTextSizeSettings.didChangeNotification, object: nil)
+        listView.onOpenAuthorPreview = { [weak self] profile in
+            self?.navigationController?.pushViewController(profile, animated: true)
+        }
         let rememberedCategory = searchPreferenceStore.category()
         applySelectedCategory(categories.contains(rememberedCategory) ? rememberedCategory : .all)
         applyScope(.post)

@@ -153,10 +153,8 @@ extension PostSummaryCell: UIContextMenuInteractionDelegate {
         _ interaction: UIContextMenuInteraction,
         configurationForMenuAtLocation location: CGPoint
     ) -> UIContextMenuConfiguration? {
-        guard let url = item?.post.authorProfileURL, onOpenAuthorPreview != nil else { return nil }
-        return UIContextMenuConfiguration(identifier: nil, previewProvider: {
-            UserProfileRouter.makeViewController(profileURL: url)
-        })
+        guard let post = item?.post, let url = post.authorProfileURL, onOpenAuthorPreview != nil else { return nil }
+        return UserAvatarMenu.avatarConfiguration(url: url, name: post.authorName, source: self)
     }
 
     func contextMenuInteraction(

@@ -29,6 +29,24 @@ enum FixtureLoader {
 }
 
 struct KannaNodeSeekParserTests {
+    @Test func hidesWebsiteBlockedRowsAndKeepsDirectLinksAndFloorNumbers() throws {
+        let parser = KannaNodeSeekParser(baseURL: NodeSeekSite.baseURL)
+        let hidden = "<li class='blocked-post post-list-item'><a class='post-title' href='/post-7-1'>隐藏</a></li>"
+        let visible = "<li class='post-list-item'><a class='post-title' href='/post-8-1'>可见</a></li>"
+        #expect(try parser.parsePostList(html: hidden + visible).map(\.id) == ["8"])
+        #expect(try parser.parsePostList(html: hidden + "<aside><a href='/post-9-1'>侧栏</a></aside>").isEmpty)
+        let detail = try parser.parsePostDetail(html: """
+        <div class="nsk-post"><div class="post-title"><h1>主题</h1></div>
+        <div class="content-item"><article class="post-content">直接访问的正文</article></div>
+        <ul class="comments">
+          <li class="content-item blocked-comment" id="1"><a class="author-name">隐藏作者</a><article class="post-content">隐藏的回复</article></li>
+          <li class="content-item" id="2"><a class="author-name">可见作者</a><a class="floor-link">#2</a><article class="post-content">可见回复</article></li>
+        </ul></div>
+        """, url: NodeSeekSite.postURL(id: "7", page: 1))
+        #expect(detail.contentHTML.contains("直接访问的正文"))
+        #expect(detail.comments.map(\.floorText) == ["#2"])
+    }
+
     @Test func laterPageReadsOwnerFromPostConfigAndKeepsFirstReplySeparate() throws {
         let html = """
         <script id="nodeseek-captured-config" type="application/json">

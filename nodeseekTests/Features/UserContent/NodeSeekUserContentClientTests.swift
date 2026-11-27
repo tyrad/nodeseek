@@ -21,6 +21,40 @@ struct NodeSeekUserContentClientTests {
         #expect(account.nodeSeekUID == 31037)
     }
 
+    @Test func blockListUsesTheWebsiteContractAndRereadsAfterChanges() async throws {
+        let suite = UUID().uuidString
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let client = makeClient(responseBody: #"{"success":true,"data":[]}"#, blockCacheDefaults: defaults)
+        let target = BlockedMember(id: 42, name: "Test Member")
+        #expect(try await client.loadBlockedMembers(for: 123).isEmpty)
+        #expect(MockURLProtocol.lastRequest?.url?.path == "/api/block-list/list")
+        #expect(MockURLProtocol.lastRequest?.cachePolicy == .reloadIgnoringLocalCacheData)
+        try await client.setBlocked(true, member: target, for: 123)
+        #expect(MockURLProtocol.lastRequest?.url?.path == "/api/block-list/add")
+        #expect(MockURLProtocol.lastRequest?.httpMethod == "POST")
+        #expect(try JSONDecoder().decode([String: String].self, from: #require(MockURLProtocol.lastBody)) == ["block_member_name": target.name])
+        let reopened = makeClient(responseBody: #"{"success":true,"data":[]}"#, blockCacheDefaults: defaults)
+        #expect(try await reopened.isBlocked(target.id, for: 123))
+        #expect(MockURLProtocol.lastRequest == nil)
+        #expect(try await !reopened.isBlocked(target.id, for: 456))
+        MockURLProtocol.responseData = Data(#"{"success":true,"data":[{"block_member_id":42,"block_member_name":"Test Member"}]}"#.utf8)
+        #expect(try await client.loadBlockedMembers(for: 123) == [target])
+        try await client.setBlocked(false, member: target, for: 123)
+        #expect(MockURLProtocol.lastRequest?.url?.path == "/api/block-list/del")
+        #expect(try JSONDecoder().decode([String: Int].self, from: #require(MockURLProtocol.lastBody)) == ["block_member_id": target.id])
+        MockURLProtocol.responseData = Data(#"{"success":true,"data":[]}"#.utf8)
+        #expect(try await client.loadBlockedMembers(for: 123).isEmpty)
+        MockURLProtocol.responseData = Data(#"{"success":false,"message":"invalid username"}"#.utf8)
+        do {
+            try await client.setBlocked(true, member: target, for: 123)
+            Issue.record("Expected server rejection")
+        } catch {
+            #expect(error.localizedDescription == "invalid username")
+            #expect(try await !reopened.isBlocked(target.id, for: 123))
+        }
+    }
+
     @Test func loadsCollectionsFromJSONAPI() async throws {
         let client = makeClient(
             responseBody: """
@@ -391,13 +425,13 @@ private func makeProfile(rank: Int, coin: Int, createdAt: Date?) -> UserProfileR
     )
 }
 
-private func makeClient(responseBody: String) -> NodeSeekUserContentClient {
+private func makeClient(responseBody: String, blockCacheDefaults: UserDefaults = .standard) -> NodeSeekUserContentClient {
     MockURLProtocol.responseData = Data(responseBody.utf8)
     MockURLProtocol.lastRequest = nil
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [MockURLProtocol.self]
     let session = URLSession(configuration: configuration)
-    return NodeSeekUserContentClient(session: session)
+    return NodeSeekUserContentClient(session: session, blockCacheDefaults: blockCacheDefaults)
 }
 
 private final class MockURLProtocol: URLProtocol, @unchecked Sendable {
@@ -405,6 +439,7 @@ private final class MockURLProtocol: URLProtocol, @unchecked Sendable {
     /// 一次调用多个接口时按路径返回；为空时统一用 responseData
     static var responsesByPath: [String: String] = [:]
     static var lastRequest: URLRequest?
+    static var lastBody: Data?
 
     override class func canInit(with request: URLRequest) -> Bool {
         true
@@ -416,6 +451,7 @@ private final class MockURLProtocol: URLProtocol, @unchecked Sendable {
 
     override func startLoading() {
         Self.lastRequest = request
+        Self.lastBody = request.httpBody ?? request.httpBodyStream.map(Self.read)
         let response = HTTPURLResponse(
             url: request.url!,
             statusCode: 200,
@@ -426,6 +462,19 @@ private final class MockURLProtocol: URLProtocol, @unchecked Sendable {
         let body = request.url.flatMap { Self.responsesByPath[$0.path] }.map { Data($0.utf8) } ?? Self.responseData
         client?.urlProtocol(self, didLoad: body)
         client?.urlProtocolDidFinishLoading(self)
+    }
+
+    private static func read(_ stream: InputStream) -> Data {
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        while stream.hasBytesAvailable {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            guard count > 0 else { break }
+            data.append(buffer, count: count)
+        }
+        return data
     }
 
     override func stopLoading() {}

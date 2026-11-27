@@ -141,8 +141,14 @@ final class UserProfileViewControllerTests: XCTestCase {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockProfileURLProtocol.self]
         let submitter = ProfileFollowSubmitterStub()
-        let client = NodeSeekUserContentClient(session: URLSession(configuration: configuration), followSubmitter: submitter)
-        let controller = UserProfileViewController(uid: 9, client: client)
+        let suite = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = CurrentAccountStore(userDefaults: defaults)
+        await store.save(AccountResponse(displayName: "测试", isLoggedIn: true, profileURL: URL(string: "https://www.nodeseek.com/space/31")))
+        let client = NodeSeekUserContentClient(session: URLSession(configuration: configuration),
+                                               followSubmitter: submitter, blockCacheDefaults: defaults)
+        let controller = UserProfileViewController(uid: 9, client: client, currentAccountStore: store)
         let navigation = UINavigationController(rootViewController: controller)
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let previous = scene.windows.first(where: \.isKeyWindow)
@@ -167,6 +173,20 @@ final class UserProfileViewControllerTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(name.bounds.width, name.intrinsicContentSize.width - 0.5)
         XCTAssertGreaterThan(follow.convert(follow.bounds, to: nil).minY, name.convert(name.bounds, to: nil).maxY)
         XCTAssertGreaterThanOrEqual(follow.bounds.height, 36)
+        let row = try XCTUnwrap(follow.superview as? UIStackView)
+        let buttons = row.arrangedSubviews.compactMap { $0 as? UIButton }
+        let block = try XCTUnwrap(buttons.last)
+        for _ in 0..<50 where block.configuration?.title != AccountsL10n.text("已拉黑") {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertEqual(buttons.map { $0.configuration?.title }, ["关注", "私信", AccountsL10n.text("已拉黑")])
+        XCTAssertEqual(row.axis, .horizontal)
+        for button in buttons {
+            XCTAssertEqual(button.frame.midY, follow.frame.midY, accuracy: 0.5)
+            XCTAssertGreaterThanOrEqual(button.bounds.height, 44)
+            XCTAssertGreaterThanOrEqual(button.bounds.width, 44)
+        }
+
 
         follow.sendActions(for: .touchUpInside)
         try await Task.sleep(nanoseconds: 100_000_000)
@@ -240,7 +260,10 @@ private final class MockProfileURLProtocol: URLProtocol, @unchecked Sendable {
             headerFields: ["Content-Type": "application/json"]
         )!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Self.responseData)
+        let data = request.url?.path == "/api/block-list/list"
+            ? Data(#"{"success":true,"data":[{"block_member_id":9,"block_member_name":"酒神"}]}"#.utf8)
+            : Self.responseData
+        client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)
     }
 

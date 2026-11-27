@@ -217,7 +217,12 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
         var seenIDs = Set<String>()
         var posts: [PostSummary] = []
 
+        var hasBlockedPosts = false
         for item in document.xpath(XPathRules.postListItems) {
+            if item["class"]?.split(whereSeparator: \.isWhitespace).contains("blocked-post") == true {
+                hasBlockedPosts = true
+                continue
+            }
             guard let post = parsePostListItem(item) else {
                 continue
             }
@@ -226,7 +231,7 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
         }
 
         // 标准列表已命中时不再扫全页 /post- 链接，避免页脚「商业推广」等入口混进列表。
-        guard posts.isEmpty else {
+        guard posts.isEmpty, !hasBlockedPosts else {
             return posts
         }
 
@@ -729,7 +734,8 @@ nonisolated struct KannaNodeSeekParser: NodeSeekParser {
         commentSources: [String: CommentSource] = [:],
         restrictedNotice: String? = nil
     ) -> Comment? {
-        guard let authorName = firstText(in: item, xpaths: [XPathRules.contentAuthor]) else {
+        guard item["class"]?.split(whereSeparator: \.isWhitespace).contains("blocked-comment") != true,
+              let authorName = firstText(in: item, xpaths: [XPathRules.contentAuthor]) else {
             return nil
         }
 

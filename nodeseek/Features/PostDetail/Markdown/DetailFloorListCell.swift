@@ -41,6 +41,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
     private var topInset: NSLayoutConstraint!
     private var headerHeight: NSLayoutConstraint!
     private var bottomInset: CGFloat = 0
+    private var authorName = ""
     private var authorURL: URL?
     private var openAuthor: ((URL) -> Void)?
     private var openThread: (() -> Void)?
@@ -292,6 +293,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         avatar.isHidden = !AuthorDisplayPolicy.isDisplayable(name)
         avatar.isUserInteractionEnabled = profileURL != nil
         metadata.isUserInteractionEnabled = profileURL != nil
+        authorName = name
         authorURL = profileURL
         openAuthor = open
         // 名字可点开主页，读屏说明用途。
@@ -462,7 +464,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
             }
         }
         guard interaction.view === avatar || interaction.view === metadata, let authorURL else { return nil }
-        return UIContextMenuConfiguration(identifier: nil, previewProvider: { UserProfileRouter.makeViewController(profileURL: authorURL) })
+        return UserAvatarMenu.avatarConfiguration(url: authorURL, name: authorName, source: self)
     }
 
     private func floorPreview(_ interaction: UIContextMenuInteraction, _ configuration: UIContextMenuConfiguration) -> UITargetedPreview? {
@@ -578,6 +580,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         AvatarImageLoader.shared.cancel(on: avatar)
         avatar.image = nil
         authorURL = nil
+        authorName = ""
         openAuthor = nil
         openThread = nil
         threadButton.isHidden = true

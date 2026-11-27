@@ -9,3 +9,9 @@
 "加载更多" = "Load more";
 "加载失败" = "Failed to load";
 "打开评论 #%ld" = "Open reply #%ld";
+"关注" = "Follow";
+"已关注" = "Following";
+"取消关注" = "Unfollow";
+"已取消关注" = "Unfollowed";
+"私信" = "Message";
+"不再关注「%@」？" = "Unfollow %@?";

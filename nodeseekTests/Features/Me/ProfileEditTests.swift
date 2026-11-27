@@ -331,6 +331,35 @@ struct HiddenWebViewAutomationPageMatchTests {
 
 @MainActor
 struct ProfileEditPageTests {
+    @Test func blacklistTabBelongsToProfileAndRestoresEditor() throws {
+        let page = ProfileEditViewController(
+            uid: 1,
+            account: AccountResponse(displayName: "测试", isLoggedIn: true),
+            client: ProfileEditClientStub()
+        )
+        let views = Self.descendants(of: page.view)
+        let tabs = try #require(page.navigationItem.titleView as? UIStackView)
+        let edit = try #require(tabs.arrangedSubviews.first as? UIButton)
+        let blacklist = try #require(tabs.arrangedSubviews.last as? UIButton)
+        let table = try #require(views.compactMap { $0 as? UITableView }.first)
+        let logout = try #require(views.first { $0.accessibilityIdentifier == "profile-edit-logout" })
+        #expect(page.title == "测试")
+        #expect(tabs.arrangedSubviews.count == 2)
+        #expect(edit.accessibilityTraits.contains(.selected))
+        #expect(page.children.isEmpty)
+
+        blacklist.sendActions(for: .touchUpInside)
+        #expect(blacklist.accessibilityTraits.contains(.selected))
+        #expect(page.children.first is BlockedMembersViewController)
+        #expect(table.isHidden && logout.isHidden)
+        #expect(page.navigationItem.rightBarButtonItem == nil)
+
+        edit.sendActions(for: .touchUpInside)
+        #expect(page.children.isEmpty)
+        #expect(!table.isHidden && !logout.isHidden)
+        #expect(page.navigationItem.rightBarButtonItem != nil)
+    }
+
     @Test func logoutFitsBelowListAndRequiresConfirmation() throws {
         let page = ProfileEditViewController(
             uid: 1,

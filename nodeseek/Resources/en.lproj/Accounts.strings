@@ -46,3 +46,20 @@
 "已完成 %d 个账号的今日签到" = "Completed check-in for %d accounts";
 "已完成 %d 个账号签到（%@）" = "Checked in %d accounts (%@)";
 "将以 %@ 身份发布" = "Posting as %@";
+
+"黑名单" = "Blocked users";
+"拉黑用户" = "Block user";
+"解除拉黑" = "Unblock";
+"拉黑 %@ 后，帖子列表会隐藏对方的主题，评论区会隐藏对方的回复。仍可通过链接打开主题。" = "Blocking %@ hides their topics in post lists and their replies in discussions. Topics can still be opened by link.";
+"将 %@ 从当前账号的屏蔽名单中移除。" = "Remove %@ from this account’s blocked users.";
+"已拉黑" = "Blocked";
+"黑名单为空" = "No blocked users";
+"%@，点按重试" = "%@. Tap to retry.";
+"黑名单加载失败" = "Couldn’t load blocked users";
+"拉黑" = "Block";
+"重试" = "Retry";
+"正在加载黑名单…" = "Loading blocked users…";
+"正在拉黑…" = "Blocking…";
+"正在解除拉黑…" = "Unblocking…";
+"拉黑成功（%@），手动刷新帖子后生效。" = "Blocked %@. Refresh posts to see the change.";
+"解除拉黑成功（%@），手动刷新帖子后生效。" = "Unblocked %@. Refresh posts to see the change.";

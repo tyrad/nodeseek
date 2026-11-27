@@ -24,6 +24,9 @@ final class ProfileEditViewController: UIViewController {
     private let account: AccountResponse
     private let client: ProfileEditClienting
     private let avatarUploader: ProfileAvatarUploading
+    private let editTab = CategoryTabButton()
+    private let blacklistTab = CategoryTabButton()
+    private var blockedMembersPage: BlockedMembersViewController?
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private let logoutButton = UIButton(type: .system)
     private let onLogout: () -> Void
@@ -48,7 +51,7 @@ final class ProfileEditViewController: UIViewController {
         self.client = client ?? NodeSeekProfileEditClient()
         self.avatarUploader = avatarUploader ?? NodeSeekProfileAvatarUploader()
         super.init(nibName: nil, bundle: nil)
-        title = Self.text("编辑资料")
+        title = account.displayName
     }
 
     required init?(coder: NSCoder) {
@@ -63,6 +66,7 @@ final class ProfileEditViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = .systemGroupedBackground
         view.accessibilityIdentifier = "profile-edit-page"
+        setupTabs()
         setupNavigationItem()
         setupLogoutButton()
         setupTableView()
@@ -98,6 +102,57 @@ final class ProfileEditViewController: UIViewController {
     }
 
     // MARK: - 布局
+
+    private func setupTabs() {
+        let tabs = UIStackView(arrangedSubviews: [editTab, blacklistTab])
+        tabs.spacing = 22
+        tabs.accessibilityIdentifier = "profile-edit-tabs"
+        tabs.translatesAutoresizingMaskIntoConstraints = false
+        tabs.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        editTab.setTitle(Self.text("编辑资料"), for: .normal)
+        blacklistTab.setTitle(Self.text("黑名单管理"), for: .normal)
+        for button in [editTab, blacklistTab] {
+            button.addTarget(self, action: #selector(selectTab(_:)), for: .touchUpInside)
+        }
+        editTab.applySelectedStyle(isSelected: true)
+        editTab.accessibilityTraits.insert(.selected)
+        navigationItem.largeTitleDisplayMode = .never
+        navigationItem.titleView = tabs
+    }
+
+    @objc private func selectTab(_ sender: CategoryTabButton) {
+        let showsBlockedMembers = sender === blacklistTab
+        guard showsBlockedMembers != (blockedMembersPage != nil) else { return }
+        for tab in [editTab, blacklistTab] {
+            tab.applySelectedStyle(isSelected: tab === sender)
+            tab.accessibilityTraits = tab === sender ? [.button, .selected] : .button
+        }
+        tableView.isHidden = showsBlockedMembers
+        logoutButton.isHidden = showsBlockedMembers
+        if showsBlockedMembers {
+            statusView.isHidden = true
+            navigationItem.rightBarButtonItem = nil
+            let page = BlockedMembersViewController(accountID: uid)
+            blockedMembersPage = page
+            addChild(page)
+            page.view.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(page.view)
+            NSLayoutConstraint.activate([
+                page.view.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+                page.view.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+                page.view.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+                page.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            ])
+            page.didMove(toParent: self)
+        } else {
+            blockedMembersPage?.willMove(toParent: nil)
+            blockedMembersPage?.view.removeFromSuperview()
+            blockedMembersPage?.removeFromParent()
+            blockedMembersPage = nil
+            setupNavigationItem()
+            render()
+        }
+    }
 
     private func setupNavigationItem() {
         let webAction = UIAction(
@@ -165,9 +220,9 @@ final class ProfileEditViewController: UIViewController {
         tableView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(tableView)
         NSLayoutConstraint.activate([
-            tableView.topAnchor.constraint(equalTo: view.topAnchor),
-            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            tableView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: logoutButton.topAnchor, constant: -8)
         ])
         headerView.configure(account: account)
@@ -216,6 +271,7 @@ final class ProfileEditViewController: UIViewController {
     }
 
     private func render() {
+        guard blockedMembersPage == nil else { return }
         switch loadState {
         case .loading:
             statusView.showLoading()

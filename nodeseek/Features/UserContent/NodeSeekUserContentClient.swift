@@ -10,14 +10,17 @@ import Foundation
 final class NodeSeekUserContentClient {
     private let session: URLSession
     private let baseURL: URL
+    private let blockCacheDefaults: UserDefaults
     private let decoder = JSONDecoder()
     private let followSubmitter: UserFollowSubmitting
 
     init(
         session: URLSession = .shared,
         baseURL: URL = NodeSeekSite.baseURL,
-        followSubmitter: UserFollowSubmitting? = nil
+        followSubmitter: UserFollowSubmitting? = nil,
+        blockCacheDefaults: UserDefaults = .standard
     ) {
+        self.blockCacheDefaults = blockCacheDefaults
         self.session = session
         self.baseURL = baseURL
         self.followSubmitter = followSubmitter ?? WebViewUserFollowSubmitter()
@@ -74,6 +77,63 @@ final class NodeSeekUserContentClient {
         return response.discussions.map {
             UserDiscussionRecord(rank: $0.rank, title: $0.title, postID: $0.postID)
         }
+    }
+
+    private func blockedMembersKey(for accountID: Int) -> String {
+        "com.nodeseek.blocked-member-ids.\(accountID)"
+    }
+
+    private func cachedBlockedIDs(for accountID: Int) -> [Int]? {
+        blockCacheDefaults.array(forKey: blockedMembersKey(for: accountID)) as? [Int]
+    }
+
+    func cachedBlockStatus(_ memberID: Int, for accountID: Int) -> Bool? {
+        cachedBlockedIDs(for: accountID)?.contains(memberID)
+    }
+
+    func isBlocked(_ memberID: Int, for accountID: Int) async throws -> Bool {
+        if let blocked = cachedBlockStatus(memberID, for: accountID) { return blocked }
+        _ = try await loadBlockedMembers(for: accountID)
+        return cachedBlockStatus(memberID, for: accountID) == true
+    }
+
+    func loadBlockedMembers(for accountID: Int) async throws -> [BlockedMember] {
+        let previous = cachedBlockedIDs(for: accountID)
+        let response = try await blockListRequest(action: "list")
+        try Task.checkCancellation()
+        guard let members = response.data else { throw UserContentClientError.unsuccessfulResponse }
+        // 在途的读取不能覆盖刚完成的拉黑或解除操作。
+        if cachedBlockedIDs(for: accountID) == previous {
+            blockCacheDefaults.set(members.map(\.id), forKey: blockedMembersKey(for: accountID))
+        }
+        return members
+    }
+
+    func setBlocked(_ blocked: Bool, member: BlockedMember, for accountID: Int) async throws {
+        let body = blocked
+            ? try JSONEncoder().encode(["block_member_name": member.name])
+            : try JSONEncoder().encode(["block_member_id": member.id])
+        _ = try await blockListRequest(action: blocked ? "add" : "del", body: body)
+        var ids = Set(cachedBlockedIDs(for: accountID) ?? [])
+        if blocked { ids.insert(member.id) } else { ids.remove(member.id) }
+        blockCacheDefaults.set(ids.sorted(), forKey: blockedMembersKey(for: accountID))
+        NotificationCenter.default.post(name: .nodeSeekBlockListChanged, object: accountID)
+    }
+
+    private func blockListRequest(action: String, body: Data? = nil) async throws -> BlockListResponse {
+        let url = baseURL.appendingPathComponent("api/block-list/\(action)")
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
+        WebRequestFingerprint.applyJSONHeaders(to: &request, referer: baseURL.appendingPathComponent("setting"))
+        if let body {
+            request.httpMethod = "POST"
+            request.httpBody = body
+            request.setValue(baseURL.absoluteString, forHTTPHeaderField: "Origin")
+        }
+        let response = try await decode(BlockListResponse.self, from: request)
+        guard response.success else {
+            throw response.message.map(UserContentClientError.rejected) ?? UserContentClientError.unsuccessfulResponse
+        }
+        return response
     }
 
     /// 关注与被关注均只返回当前登录账号的完整名单。
@@ -247,6 +307,26 @@ enum UserContentClientError: LocalizedError {
             return message
         }
     }
+}
+
+struct BlockedMember: Decodable, Equatable {
+    let id: Int
+    let name: String
+
+    enum CodingKeys: String, CodingKey {
+        case id = "block_member_id"
+        case name = "block_member_name"
+    }
+}
+
+private struct BlockListResponse: Decodable {
+    let success: Bool
+    let data: [BlockedMember]?
+    let message: String?
+}
+
+extension Notification.Name {
+    static let nodeSeekBlockListChanged = Notification.Name("nodeSeekBlockListChanged")
 }
 
 private struct CollectionResponse: Decodable {
