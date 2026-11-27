@@ -15,7 +15,7 @@ final class DetailPreviewMigrationTests: XCTestCase {
         let editor = NewDiscussionPreviewViewController(draft: draft) { published += 1 }
         let comment = Comment(id: "7", authorName: "作者", avatarURL: nil, floorText: "#7",
                               createdAtText: nil, contentHTML: "<p>可见的回复</p>", signatureHTML: "<p>签名</p>",
-                              likeCount: 12, chickenLegCount: 2, opposeCount: 1)
+                              isLikeClicked: true, chickenLegCount: 2, opposeCount: 1)
         let reply = LoadedCommentPreviewViewController(comment: comment, baseURL: NodeSeekSite.baseURL,
                                                       showsFullPostButton: true, onOpenFullPost: { opened += 1 },
                                                       onReveal: { revealed += 1 })
@@ -47,7 +47,10 @@ final class DetailPreviewMigrationTests: XCTestCase {
                 if controller === reply {
                     let buttons = try XCTUnwrap(preview.floor.stack.arrangedSubviews.compactMap { $0 as? UIScrollView }.last?
                         .subviews.compactMap { $0 as? UIStackView }.first?.arrangedSubviews.compactMap { $0 as? UIButton })
-                    XCTAssertEqual(buttons.map(\.accessibilityValue), ["12", "2", "1"])
+                    XCTAssertEqual(buttons.map(\.accessibilityValue), [nil, "2", "1"])
+                    let like = try XCTUnwrap(buttons.first)
+                    XCTAssertNil(like.title(for: .normal))
+                    XCTAssertTrue(like.accessibilityTraits.contains(.selected))
                     XCTAssertTrue(buttons.allSatisfy { !$0.isUserInteractionEnabled && $0.accessibilityTraits.contains(.staticText) && $0.bounds.height > 0 })
                     let footer = try XCTUnwrap(controller.view.subviews.compactMap { $0 as? UIStackView }.first)
                     XCTAssertEqual(footer.axis, category.isAccessibilityCategory ? .vertical : .horizontal)

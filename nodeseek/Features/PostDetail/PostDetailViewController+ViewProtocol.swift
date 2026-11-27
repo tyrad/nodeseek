@@ -210,35 +210,35 @@ extension PostDetailViewController: PostDetailViewProtocol {
         collectionList.refreshHeader()
     }
 
-    func updatePostBody(detail: PostDetail) {
-        guard hasRenderedDetailContent else {
+    func updatePostReactions(detail: PostDetail) {
+        guard hasRenderedDetailContent, var header = currentHeaderContent, header.postID == detail.id else {
             render(detail: detail)
             return
         }
-        collectionList.headerSource = .init(post: detail)
-        configureHeader(PostDetailHeaderContent(detail: detail))
-        collectionList.refreshHeader()
+        header.updateReactions(from: detail)
+        currentHeaderContent = header
+        collectionList.refreshReactions()
     }
 
     func updateCommentLike(commentID: String, count: Int?, isClicked: Bool) {
         for index in comments.indices where comments[index].id == commentID {
             comments[index] = comments[index].updatingLikeReaction(count: count, isClicked: isClicked)
         }
-        collectionList.refresh(commentID: commentID)
+        collectionList.refreshReactions(commentID: commentID)
     }
 
     func updateCommentChickenLeg(commentID: String, count: Int?, isClicked: Bool) {
         for index in comments.indices where comments[index].id == commentID {
             comments[index] = comments[index].updatingChickenLegReaction(count: count, isClicked: isClicked)
         }
-        collectionList.refresh(commentID: commentID)
+        collectionList.refreshReactions(commentID: commentID)
     }
 
     func updateCommentOppose(commentID: String, count: Int?, isClicked: Bool) {
         for index in comments.indices where comments[index].id == commentID {
             comments[index] = comments[index].updatingOpposeReaction(count: count, isClicked: isClicked)
         }
-        collectionList.refresh(commentID: commentID)
+        collectionList.refreshReactions(commentID: commentID)
     }
 
     func setReplySubmitting(_ isSubmitting: Bool) {

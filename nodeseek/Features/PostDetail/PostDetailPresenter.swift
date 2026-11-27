@@ -524,7 +524,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
 
         guard nextDetail != currentDetail else { return }
         self.currentDetail = nextDetail
-        view?.updatePostBody(detail: nextDetail)
+        view?.updatePostReactions(detail: nextDetail)
     }
 
     private func applyOptimisticFavoriteState(isCollected: Bool) {
@@ -538,7 +538,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         )
         guard nextDetail != currentDetail else { return }
         self.currentDetail = nextDetail
-        view?.updatePostBody(detail: nextDetail)
+        view?.updatePostReactions(detail: nextDetail)
     }
 
     private func restoreFavoriteStateFromRollback() {
@@ -548,7 +548,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
         guard let rollback = favoriteRollbackDetail else { return }
         guard currentDetail != rollback else { return }
         currentDetail = rollback
-        view?.updatePostBody(detail: rollback)
+        view?.updatePostReactions(detail: rollback)
     }
 
     private func normalizedReactionToast(message: String?, kind: ReactionKind) -> String {
@@ -588,7 +588,7 @@ class PostDetailPresenter: PostDetailPresenterProtocol {
                 )
             }
             self.currentDetail = nextDetail
-            view?.updatePostBody(detail: nextDetail)
+            view?.updatePostReactions(detail: nextDetail)
         }
         view?.showToast(message: normalizedReactionToast(message: response.message, kind: kind))
     }

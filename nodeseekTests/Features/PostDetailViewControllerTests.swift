@@ -687,7 +687,7 @@ struct PostDetailViewControllerTests {
         viewController.render(detail: detail)
         await waitForDetailContent(in: viewController, expectedRowCount: 1)
 
-        viewController.updatePostBody(detail: PostDetail(
+        viewController.updatePostReactions(detail: PostDetail(
             id: "703863",
             title: "详情标题",
             authorName: "ipv4",
@@ -1408,20 +1408,27 @@ struct PostDetailViewControllerTests {
 
     @Test func reactionCountsKeepAccessibleValuesAndHandlersOnReuse() throws {
         let cell = DetailFloorListCell(frame: CGRect(x: 0, y: 0, width: 390, height: 300))
-        for compact in [true, false] {
+        for (liked, collected) in [(false, false), (true, false), (true, true), (true, false)] {
             cell.clear()
-            cell.compactCounts = compact
+            cell.compactCounts = true
             var taps: [String] = []
-            cell.addVotes(like: 12_345, chicken: 2, oppose: 1, liked: true, rewarded: true, opposed: true, isOwn: false,
+            cell.addVotes(like: liked ? 1 : 50, chicken: 2, oppose: 1, liked: liked, rewarded: true, opposed: true, isOwn: false,
                           onLike: { taps.append("like") }, onChicken: { taps.append("chicken") }, onOppose: { taps.append("oppose") })
-            cell.addAction("favorite", symbol: "star", count: 10, selected: true) { taps.append("favorite") }
-            for (key, value) in [("like", "12345"), ("chicken", "2"), ("oppose", "1"), ("favorite", "10")] {
+            cell.addAction("favorite", symbol: collected ? "star.fill" : "star", count: collected ? 1 : 50, selected: collected) {
+                taps.append("favorite")
+            }
+            let expected: [(String, String?, Bool)] = [
+                ("like", liked ? nil : "50", liked), ("chicken", "2", true),
+                ("oppose", "1", true), ("favorite", collected ? nil : "50", collected)
+            ]
+            for (key, value, selected) in expected {
                 let button = try #require(cell.contentView.allSubviews(of: UIButton.self).first {
                     $0.accessibilityLabel == DetailListStrings.text(key)
                 })
                 #expect(button.accessibilityValue == value)
+                #expect(button.accessibilityTraits.contains(.selected) == selected)
+                #expect(button.title(for: .normal) == value.map { " " + $0 })
                 #expect(button.image(for: .normal) != nil)
-                if key == "like" { #expect(button.title(for: .normal) == (compact ? " 1.2万" : " 12345")) }
                 button.sendActions(for: .touchUpInside)
             }
             #expect(taps == ["like", "chicken", "oppose", "favorite"])

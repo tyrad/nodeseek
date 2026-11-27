@@ -299,24 +299,8 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             self.cache.removeObject(forKey: key as NSString)
             self.refresh(key)
         }
-        cell.compactCounts = comment == nil
         if let comment {
             cell.configureAuthor(name: comment.authorName, avatarURL: comment.avatarURL, profileURL: comment.authorProfileURL) { [weak page] in page?.openUserInfo(profileURL: $0) }
-            cell.addVotes(like: comment.likeCount, chicken: comment.chickenLegCount, oppose: comment.opposeCount,
-                          liked: comment.isLikeClicked, rewarded: comment.isChickenLegClicked, opposed: comment.isOpposeClicked,
-                          isOwn: comment.isOwnComment,
-                          onLike: { [weak page] in page?.handleCommentLikeTap(comment) },
-                          onChicken: { [weak page] in page?.handleCommentChickenLegTap(comment) },
-                          onOppose: { [weak page] in page?.handleCommentOpposeTap(comment) })
-            // 回复、引用常驻底栏，本人楼层另有编辑。
-            let floor = comment.anchorID
-            cell.addAction("reply", symbol: "arrowshape.turn.up.left", label: "reply-comment") { [weak page] in page?.handleReply(to: comment) }
-            cell.addAction("quote", symbol: "quote.bubble", label: "quote-comment",
-                           identifier: floor.map { "post-detail-quote-comment-\($0)-\(comment.id)" }) { [weak page] in page?.handleQuote(comment) }
-            if comment.isOwnComment {
-                cell.addAction("edit", symbol: "square.and.pencil", label: "edit-comment",
-                               identifier: floor.map { "post-detail-edit-comment-\($0)-\(comment.id)" }) { [weak page] in page?.presenter.didTapEditComment(comment) }
-            }
         } else if let header = page.currentHeaderContent {
             cell.configureAuthor(name: header.authorName, avatarURL: header.avatarURL, profileURL: header.authorProfileURL) { [weak page] in page?.openUserInfo(profileURL: $0) }
             if page.entryHintPage > 1, source.html.isEmpty, source.visibleMarkdown == nil, signature == nil {
@@ -324,25 +308,8 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
                 cell.installPageSummary(request, hasAvatar: header.avatarURL != nil)
                 return cell
             }
-            if headerHasReactions(header) {
-                cell.addVotes(like: header.likeCount, chicken: header.chickenLegCount, oppose: header.opposeCount,
-                              liked: header.isLikeClicked, rewarded: header.isChickenLegClicked, opposed: header.isOpposeClicked,
-                              isOwn: header.isOwnPost,
-                              onLike: { [weak page] in page?.handlePostLikeTap(header) },
-                              onChicken: { [weak page] in page?.handlePostChickenLegTap(header) },
-                              onOppose: { [weak page] in page?.handlePostOpposeTap(header) })
-                cell.addAction("favorite", symbol: header.isFavoriteCollected ? "star.fill" : "star", count: header.favoriteCount,
-                               selected: header.isFavoriteCollected, enabled: !header.isFavoriteSubmitting) { [weak page] in page?.handleFavoriteTap() }
-            }
-            if page.showsReplyEntry {
-                cell.addAction("reply", symbol: "arrowshape.turn.up.left", label: "reply-post") { [weak page] in page?.handleReply(toPostHeader: header) }
-                cell.addAction("comment", symbol: "text.bubble") { [weak page] in page?.presentCommentEditor() }
-            }
-            if header.isOwnPost {
-                cell.addAction("edit", symbol: "square.and.pencil", label: "edit-post") { [weak page] in page?.presenter.didTapEditPost() }
-            }
         }
-        cell.floorActions = floorActions(page: page, cell: cell, comment: comment)
+        configureFloorActions(page: page, cell: cell, comment: comment)
         if let cached = cache.object(forKey: key as NSString), cached.source == source, cached.appearance == request.appearance {
             cell.receiver.install(request, .native(cached.blocks))
         } else {
@@ -356,6 +323,49 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
             cell.loadSignature(signature, pointSize: font.pointSize, for: request)
         }
         return cell
+    }
+
+    private func configureFloorActions(page: PostDetailViewController, cell: DetailFloorListCell, comment: Comment?) {
+        cell.floorActions = floorActions(page: page, cell: cell, comment: comment)
+        guard !cell.body.isHidden else { return } // 从后续页进入时，主楼摘要只有菜单。
+        cell.compactCounts = comment == nil
+        cell.replaceActions {
+            if let comment {
+                cell.addVotes(like: comment.likeCount, chicken: comment.chickenLegCount, oppose: comment.opposeCount,
+                              liked: comment.isLikeClicked, rewarded: comment.isChickenLegClicked, opposed: comment.isOpposeClicked,
+                              isOwn: comment.isOwnComment,
+                              onLike: { [weak page] in page?.handleCommentLikeTap(comment) },
+                              onChicken: { [weak page] in page?.handleCommentChickenLegTap(comment) },
+                              onOppose: { [weak page] in page?.handleCommentOpposeTap(comment) })
+                // 回复、引用常驻底栏，本人楼层另有编辑。
+                let floor = comment.anchorID
+                cell.addAction("reply", symbol: "arrowshape.turn.up.left", label: "reply-comment") { [weak page] in page?.handleReply(to: comment) }
+                cell.addAction("quote", symbol: "quote.bubble", label: "quote-comment",
+                               identifier: floor.map { "post-detail-quote-comment-\($0)-\(comment.id)" }) { [weak page] in page?.handleQuote(comment) }
+                if comment.isOwnComment {
+                    cell.addAction("edit", symbol: "square.and.pencil", label: "edit-comment",
+                                   identifier: floor.map { "post-detail-edit-comment-\($0)-\(comment.id)" }) { [weak page] in page?.presenter.didTapEditComment(comment) }
+                }
+            } else if let header = page.currentHeaderContent {
+                if headerHasReactions(header) {
+                    cell.addVotes(like: header.likeCount, chicken: header.chickenLegCount, oppose: header.opposeCount,
+                                  liked: header.isLikeClicked, rewarded: header.isChickenLegClicked, opposed: header.isOpposeClicked,
+                                  isOwn: header.isOwnPost,
+                                  onLike: { [weak page] in page?.handlePostLikeTap(header) },
+                                  onChicken: { [weak page] in page?.handlePostChickenLegTap(header) },
+                                  onOppose: { [weak page] in page?.handlePostOpposeTap(header) })
+                    cell.addAction("favorite", symbol: header.isFavoriteCollected ? "star.fill" : "star", count: header.favoriteCount,
+                                   selected: header.isFavoriteCollected, enabled: !header.isFavoriteSubmitting) { [weak page] in page?.handleFavoriteTap() }
+                }
+                if page.showsReplyEntry {
+                    cell.addAction("reply", symbol: "arrowshape.turn.up.left", label: "reply-post") { [weak page] in page?.handleReply(toPostHeader: header) }
+                    cell.addAction("comment", symbol: "text.bubble") { [weak page] in page?.presentCommentEditor() }
+                }
+                if header.isOwnPost {
+                    cell.addAction("edit", symbol: "square.and.pencil", label: "edit-post") { [weak page] in page?.presenter.didTapEditPost() }
+                }
+            }
+        }
     }
 
     private static func bitmapCost(_ blocks: [DetailLayoutBlock]) -> Int {
@@ -380,7 +390,22 @@ final class PostDetailCollectionList: NSObject, UICollectionViewDelegateFlowLayo
         data.apply(snapshot, animatingDifferences: false)
     }
 
-    /// 只重配主楼：点赞、收藏、风险提示只改主楼，整页重配会让回复的签名和网页回退正文清空后再回填。
+    func refreshReactions(commentID: String? = nil) {
+        guard let page else { return }
+        for (row, key) in zip(rows, keys) {
+            let comment: Comment?
+            switch row {
+            case .header where commentID == nil: comment = nil
+            case .comment(let index) where page.comments[index].id == commentID: comment = page.comments[index]
+            default: continue
+            }
+            // 离屏楼层下次绑定时从模型读最新状态，已绑定的楼层只更新底栏和菜单。
+            guard let path = data.indexPath(for: key), let cell = view.cellForItem(at: path) as? DetailFloorListCell,
+                  cell.request?.id == key else { continue }
+            configureFloorActions(page: page, cell: cell, comment: comment)
+        }
+    }
+
     func refreshHeader() {
         guard let key = keys.first(where: { $0.hasPrefix("post-") }) else { return }
         refresh(key)
@@ -551,7 +576,8 @@ extension PostDetailCollectionList {
 
 private extension PostDetailCollectionList {
     func headerHasReactions(_ header: PostDetailHeaderContent) -> Bool {
-        [header.likeCount, header.chickenLegCount, header.opposeCount, header.favoriteCount].contains { $0 != nil }
+        header.isLikeClicked || header.isFavoriteCollected ||
+            [header.likeCount, header.chickenLegCount, header.opposeCount, header.favoriteCount].contains { $0 != nil }
     }
 
     internal func floorActions(page: PostDetailViewController, cell: DetailFloorListCell, comment: Comment?) -> [DetailFloorListCell.FloorAction] {

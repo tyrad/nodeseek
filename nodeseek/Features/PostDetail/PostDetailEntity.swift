@@ -130,6 +130,17 @@ struct PostDetailHeaderContent: Equatable {
         )
     }
 
+    mutating func updateReactions(from detail: PostDetail) {
+        likeCount = detail.likeCount
+        isLikeClicked = detail.isLikeClicked
+        chickenLegCount = detail.chickenLegCount
+        isChickenLegClicked = detail.isChickenLegClicked
+        opposeCount = detail.opposeCount
+        isOpposeClicked = detail.isOpposeClicked
+        favoriteCount = detail.favoriteCount
+        isFavoriteCollected = detail.isFavoriteCollected
+    }
+
     func updatingFavoriteSubmitting(_ isSubmitting: Bool) -> PostDetailHeaderContent {
         var updated = self
         updated.isFavoriteSubmitting = isSubmitting

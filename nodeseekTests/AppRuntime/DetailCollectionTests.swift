@@ -870,27 +870,60 @@ final class DetailCollectionTests: XCTestCase {
         XCTAssertEqual(spy.didApproachCommentEndCount, 2, "失败后用户再拖动，应能重新请求下一页")
     }
 
-    func testMainPostReactionOnlyRefreshesTheMainPost() async throws {
+    func testReactionsUpdateButtonsWithoutRebindingVisibleFloors() async throws {
         let page = PostDetailViewController(presenter: SpyPostDetailPresenter())
         let window = try pagingWindow(for: page)
         defer { window.isHidden = true; window.rootViewController = nil }
         let detail = makePagedDetail(1...5, pageNumber: 1, next: nil)
+            .updatingPostLikeState(count: 50, isClicked: false)
+            .updatingFavoriteState(count: 10, isCollected: false)
         page.render(detail: detail)
-        let list = try XCTUnwrap(page.collectionList.view)
+        let list = page.collectionList.view
         window.layoutIfNeeded()
-        try await Task.sleep(nanoseconds: 300_000_000)
-        func versions() -> [String: Int] {
-            Dictionary(uniqueKeysWithValues: list.visibleCells.compactMap { ($0 as? DetailFloorListCell)?.request }.map { ($0.id, $0.version) })
+        let header = try await waitForCell(list, at: try XCTUnwrap(page.indexPathForCurrentPageAnchor("0")))
+        let reply = try await waitForCell(list, at: try XCTUnwrap(page.indexPathForCurrentPageAnchor("1")))
+        window.layoutIfNeeded()
+        let headerBody = header.body, replyBody = reply.body
+        let headerBinding = try XCTUnwrap(header.request), replyBinding = try XCTUnwrap(reply.request)
+        let offset = list.contentOffset
+        func button(_ key: String, in cell: DetailFloorListCell) throws -> UIButton {
+            try XCTUnwrap(allButtons(cell.contentView).first { !$0.isHidden && $0.accessibilityLabel == DetailListStrings.text(key) })
         }
-        let before = versions()
-        XCTAssertGreaterThan(before.count, 1)
-        // 主楼点赞、鸡腿、收藏和作者风险提示只改主楼，回复楼层不应清空重装（签名和网页回退正文会闪）。
-        page.updatePostBody(detail: detail)
+        func assertStableFloors() {
+            window.layoutIfNeeded()
+            XCTAssertTrue(header.body === headerBody)
+            XCTAssertTrue(reply.body === replyBody)
+            XCTAssertEqual(header.request, headerBinding)
+            XCTAssertEqual(reply.request, replyBinding)
+            XCTAssertEqual(list.contentOffset, offset)
+        }
+        let like = try button("like", in: header), favorite = try button("favorite", in: header)
+        let liked = detail.updatingPostLikeState(count: 1, isClicked: true)
+        page.updatePostReactions(detail: liked)
+        XCTAssertTrue(like.accessibilityTraits.contains(.selected))
+        XCTAssertNil(like.title(for: .normal))
+        XCTAssertEqual(favorite.accessibilityValue, "10")
+        assertStableFloors()
+
+        page.updatePostReactions(detail: liked.updatingFavoriteState(count: 11, isCollected: true))
+        XCTAssertTrue(favorite.accessibilityTraits.contains(.selected))
+        XCTAssertNil(favorite.title(for: .normal))
+        assertStableFloors()
+        page.updatePostReactions(detail: liked)
+        XCTAssertFalse(favorite.accessibilityTraits.contains(.selected))
+        XCTAssertEqual(favorite.accessibilityValue, "10")
+        assertStableFloors()
+
+        let replyLike = try button("like", in: reply)
+        page.updateCommentLike(commentID: "1", count: 1, isClicked: true)
+        XCTAssertTrue(replyLike.accessibilityTraits.contains(.selected))
+        XCTAssertNil(replyLike.title(for: .normal))
+        assertStableFloors()
+
         page.updateAuthorRiskWarning(postID: detail.id, isVisible: true)
         window.layoutIfNeeded()
-        let after = versions()
-        XCTAssertEqual(after.filter { !$0.key.hasPrefix("post-") }, before.filter { !$0.key.hasPrefix("post-") })
-        XCTAssertNotEqual(after.first { $0.key.hasPrefix("post-") }?.value, before.first { $0.key.hasPrefix("post-") }?.value)
+        XCTAssertNotEqual(header.request, headerBinding)
+        XCTAssertEqual(reply.request, replyBinding)
     }
 
     func testDuplicateHotAndPagedReplyKeepSeparateSourcesAndTargetThePagedRow() async throws {

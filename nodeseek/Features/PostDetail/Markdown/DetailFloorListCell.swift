@@ -499,9 +499,20 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         animator.addCompletion { [weak self] in self?.showAuthor() }
     }
 
+    func replaceActions(_ configure: () -> Void) {
+        usedButtonCount = 0
+        configure()
+        for button in actionButtons.dropFirst(usedButtonCount) {
+            button.perform = nil
+            button.minimumWidth.constant = 0
+            button.isHidden = true
+        }
+        footer.isHidden = usedButtonCount == 0
+    }
+
     func addVotes(like: Int?, chicken: Int?, oppose: Int?, liked: Bool, rewarded: Bool, opposed: Bool, isOwn: Bool,
                   onLike: (() -> Void)? = nil, onChicken: (() -> Void)? = nil, onOppose: (() -> Void)? = nil) {
-        if (!isOwn && onLike != nil) || (like ?? 0) > 0 {
+        if liked || (!isOwn && onLike != nil) || (like ?? 0) > 0 {
             addAction("like", symbol: liked ? "hand.thumbsup.fill" : "hand.thumbsup", count: like, selected: liked, enabled: !isOwn && onLike != nil, perform: onLike)
         }
         if (!isOwn && onChicken != nil) || (chicken ?? 0) > 0 {
@@ -534,13 +545,15 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         button.isEnabled = enabled || perform == nil
         button.isUserInteractionEnabled = perform != nil
         button.accessibilityTraits = perform == nil ? .staticText : .button
+        if selected { button.accessibilityTraits.insert(.selected) }
+        let displayedCount = selected && (key == "like" || key == "favorite") ? nil : count
         footer.isHidden = false
-        button.setTitle(count.flatMap { $0 > 0 ? " " + (compactCounts ? PostDetailContentLayout.reactionCountText($0) : String($0)) : nil }, for: .normal)
+        button.setTitle(displayedCount.flatMap { $0 > 0 ? " " + (compactCounts ? PostDetailContentLayout.reactionCountText($0) : String($0)) : nil }, for: .normal)
         button.titleLabel?.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(for: AppTypography.commentActionFont(), compatibleWith: traitCollection)
-        button.minimumWidth.constant = (count ?? 0) > 0 ? PostDetailContentLayout.reactionActionMinWidth : PostDetailContentLayout.reactionIconOnlyWidth
+        button.minimumWidth.constant = (displayedCount ?? 0) > 0 ? PostDetailContentLayout.reactionActionMinWidth : PostDetailContentLayout.reactionIconOnlyWidth
         button.accessibilityLabel = DetailListStrings.text(label ?? key)
         button.accessibilityIdentifier = identifier
-        button.accessibilityValue = count.map { String($0) }
+        button.accessibilityValue = displayedCount.map { String($0) }
         button.tintColor = selected ? (key == "chicken" || key == "favorite" ? .systemOrange : .systemRed) : UIColor.secondaryLabel.withAlphaComponent(PostDetailContentLayout.inactiveReactionAlpha)
     }
 
@@ -569,13 +582,7 @@ final class DetailFloorListCell: UICollectionViewCell, UIContextMenuInteractionD
         openThread = nil
         threadButton.isHidden = true
         threadButton.accessibilityIdentifier = nil
-        for button in actionButtons.prefix(usedButtonCount) {
-            button.perform = nil
-            button.minimumWidth.constant = 0
-            button.isHidden = true
-        }
-        usedButtonCount = 0
-        footer.isHidden = true
+        replaceActions {}
         footer.contentOffset = .zero
         contentInstalled = false
         request = nil

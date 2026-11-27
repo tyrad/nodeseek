@@ -257,7 +257,7 @@ private final class UXAuditSpyPostDetailView: PostDetailViewProtocol {
     func render(detail: PostDetail) {}
     func refreshCurrentCommentPage(detail: PostDetail) {}
     func appendCommentPage(detail: PostDetail) {}
-    func updatePostBody(detail: PostDetail) {}
+    func updatePostReactions(detail: PostDetail) {}
     func updateAuthorRiskWarning(postID: String, isVisible: Bool) {}
     func updateCommentLike(commentID: String, count: Int?, isClicked: Bool) {}
     func updateCommentChickenLeg(commentID: String, count: Int?, isClicked: Bool) {}

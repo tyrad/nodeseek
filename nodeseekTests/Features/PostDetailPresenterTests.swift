@@ -1588,7 +1588,7 @@ private final class SpyPostDetailView: PostDetailViewProtocol {
     func refreshCurrentCommentPage(detail: PostDetail) { refreshedCommentPageDetails.append(detail) }
     func appendCommentPage(detail: PostDetail) { appendedCommentPageDetails.append(detail) }
     func updateAuthorRiskWarning(postID: String, isVisible: Bool) {}
-    func updatePostBody(detail: PostDetail) { updatedPostBodyDetails.append(detail) }
+    func updatePostReactions(detail: PostDetail) { updatedPostBodyDetails.append(detail) }
     func updateCommentLike(commentID: String, count: Int?, isClicked: Bool) {
         updatedCommentLikeEvents.append((commentID: commentID, count: count, isClicked: isClicked))
     }
